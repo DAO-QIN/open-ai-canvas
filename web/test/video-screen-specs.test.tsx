@@ -6,7 +6,10 @@ import type { ModelProtocolWorkflow } from "../src/lib/model-protocols";
 import { resolveWorkflowVideoScreenSpec, updateWorkflowVideoScreenSpec } from "../src/lib/video-screen-specs";
 
 const workflow: ModelProtocolWorkflow = {
-    id: "minimax_h3_zm_u24", label: "H3 ZM U24", providerId: "autodl-comfyui", capability: "video",
+    id: "minimax_h3_zm_u24",
+    label: "H3 ZM U24",
+    providerId: "autodl-comfyui",
+    capability: "video",
     parameters: [{ name: "resolution", mapping: "resolution", type: "string", values: ["480p竖", "768p竖", "480p横", "768p横", "480p(1:1)", "768p(1:1)"] }],
     defaults: { resolution: "768p竖" },
 };

@@ -3,12 +3,14 @@ import type { ModelProtocolWorkflow } from "./model-protocols";
 
 export function cleanVideoScreenSpecValues(values: readonly string[]) {
     const seen = new Set<string>();
-    return values.map((value) => value.trim()).filter((value) => {
-        const key = value.toLowerCase();
-        if (!value || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-    });
+    return values
+        .map((value) => value.trim())
+        .filter((value) => {
+            const key = value.toLowerCase();
+            if (!value || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
 }
 
 export function workflowVideoScreenSpec(workflow: ModelProtocolWorkflow): VideoScreenSpecConfig {
@@ -49,8 +51,11 @@ export function resolveWorkflowVideoScreenSpec(profile: VideoCapabilityConfig, w
 export function updateWorkflowVideoScreenSpec(profile: VideoCapabilityConfig, workflow: ModelProtocolWorkflow | undefined, patch: Partial<VideoScreenSpecConfig>): VideoCapabilityConfig {
     const resolved = resolveWorkflowVideoScreenSpec(profile, workflow);
     if (!resolved.fixedScreenSpec) return profile;
-    return resolveWorkflowVideoScreenSpec({
-        ...resolved,
-        ...patch,
-    }, workflow);
+    return resolveWorkflowVideoScreenSpec(
+        {
+            ...resolved,
+            ...patch,
+        },
+        workflow,
+    );
 }
