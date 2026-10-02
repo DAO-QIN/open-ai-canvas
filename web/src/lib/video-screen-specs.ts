@@ -24,31 +24,33 @@ export function workflowVideoScreenSpec(workflow: ModelProtocolWorkflow): VideoS
 export function resolveWorkflowVideoScreenSpec(profile: VideoCapabilityConfig, workflow?: ModelProtocolWorkflow): VideoCapabilityConfig {
     const fixed = workflow ? workflowVideoScreenSpec(workflow) : profile.fixedScreenSpec;
     if (!fixed) return profile;
-    const source = profile.customScreenSpec || (profile.customSizeEnabled ? profile : fixed);
-    const resolutions = cleanVideoScreenSpecValues(source.resolutions);
+    const previous = profile.fixedScreenSpec;
+    const workflowChanged = workflow && previous && (previous.defaultResolution !== fixed.defaultResolution || previous.resolutions.length !== fixed.resolutions.length || previous.resolutions.some((value, index) => value !== fixed.resolutions[index]));
+    const initializing = workflow && !profile.fixedScreenSpec;
+    const available = new Map(fixed.resolutions.map((value) => [value.toLowerCase(), value]));
+    const configured = cleanVideoScreenSpecValues(profile.resolutions).map((value) => available.get(value.toLowerCase()) || value);
+    const initialValues = configured.filter((value) => available.has(value.toLowerCase()));
+    const source = workflowChanged || (initializing && !initialValues.length) ? fixed : profile;
+    const resolutions = source === fixed ? fixed.resolutions : initializing ? initialValues : configured;
     const defaultResolution = source.defaultResolution.trim();
-    const custom: VideoScreenSpecConfig = {
+    const selected: VideoScreenSpecConfig = {
         ratios: [],
         defaultRatio: "",
         resolutions,
-        defaultResolution: resolutions.find((value) => value.toLowerCase() === defaultResolution.toLowerCase()) || defaultResolution,
+        defaultResolution: resolutions.find((value) => value.toLowerCase() === defaultResolution.toLowerCase()) || (initializing ? resolutions[0] || "" : defaultResolution),
     };
     return {
         ...profile,
-        ...(profile.customSizeEnabled ? custom : fixed),
-        customSizeEnabled: profile.customSizeEnabled === true,
-        customScreenSpec: custom,
+        ...selected,
         fixedScreenSpec: fixed,
     };
 }
 
-export function updateWorkflowVideoScreenSpec(profile: VideoCapabilityConfig, workflow: ModelProtocolWorkflow | undefined, patch: Partial<VideoScreenSpecConfig> & { customSizeEnabled?: boolean }): VideoCapabilityConfig {
+export function updateWorkflowVideoScreenSpec(profile: VideoCapabilityConfig, workflow: ModelProtocolWorkflow | undefined, patch: Partial<VideoScreenSpecConfig>): VideoCapabilityConfig {
     const resolved = resolveWorkflowVideoScreenSpec(profile, workflow);
     if (!resolved.fixedScreenSpec) return profile;
-    const { customSizeEnabled = resolved.customSizeEnabled, ...values } = patch;
     return resolveWorkflowVideoScreenSpec({
         ...resolved,
-        customSizeEnabled,
-        customScreenSpec: { ...resolved.customScreenSpec!, ...values },
+        ...patch,
     }, workflow);
 }

@@ -5,17 +5,22 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"infinite-canvas/backend/internal/model"
 	"infinite-canvas/backend/internal/protocol"
 )
 
-func autoDLProfile(t *testing.T, custom bool) *ModelCapabilityConfig {
+func autoDLProfile(t *testing.T, subset bool) *ModelCapabilityConfig {
 	t.Helper()
 	profile := DefaultModelCapabilityConfigForModel("autodl-comfyui", "minimax_h3_zm_u24")
-	profile.Video.CustomSizeEnabled = custom
-	profile.Video.CustomScreenSpec = &VideoScreenSpecConfig{Resolutions: []string{"480p横", "768p(1:1)"}, DefaultResolution: "768p(1:1)"}
+	profile.Video.Resolutions = []string{"480p竖", "768p竖", "480p横", "768p横", "480p(1:1)", "768p(1:1)"}
+	profile.Video.DefaultResolution = "768p竖"
+	if subset {
+		profile.Video.Resolutions = []string{"480p横", "768p(1:1)"}
+		profile.Video.DefaultResolution = "768p(1:1)"
+	}
 	return profile
 }
 
@@ -28,53 +33,64 @@ func normalizeAutoDLProfile(t *testing.T, profile *ModelCapabilityConfig, name s
 	return result
 }
 
-func TestAutoDLScreenSpecFixedIgnoresCustomAndKeepsOtherParameters(t *testing.T) {
-	profile := autoDLProfile(t, false)
-	profile.Video.CustomScreenSpec.DefaultResolution = "invalid"
-	profile.Video.FixedScreenSpec = &VideoScreenSpecConfig{Resolutions: []string{"forged"}, DefaultResolution: "forged"}
-	result := normalizeAutoDLProfile(t, profile, "minimax_h3_zm_u24")
-	if result.Video.DefaultResolution != "768p竖" || len(result.Video.Resolutions) != 6 || len(result.Video.Ratios) != 0 || result.Video.DefaultRatio != "" {
-		t.Fatalf("fixed spec = %#v", result.Video)
-	}
-	if !reflect.DeepEqual(result.Video.References, profile.Video.References) || !reflect.DeepEqual(result.Video.Duration, profile.Video.Duration) || !reflect.DeepEqual(result.Video.Operations, profile.Video.Operations) {
-		t.Fatal("screen-spec switch changed unrelated parameters")
-	}
-	if profile.Video.DefaultResolution != "720p" {
-		t.Fatal("normalization mutated the original profile")
+func TestAutoDLScreenSpecIgnoresRemovedSwitchAndDraft(t *testing.T) {
+	for _, oldEnabled := range []bool{false, true} {
+		data, _ := json.Marshal(autoDLProfile(t, false))
+		var raw map[string]any
+		if err := json.Unmarshal(data, &raw); err != nil {
+			t.Fatal(err)
+		}
+		video := raw["video"].(map[string]any)
+		video["customSizeEnabled"] = oldEnabled
+		video["customScreenSpec"] = map[string]any{"resolutions": []string{"invalid"}, "defaultResolution": "invalid"}
+		video["fixedScreenSpec"] = map[string]any{"resolutions": []string{"forged"}, "defaultResolution": "forged"}
+		data, _ = json.Marshal(raw)
+		profile, err := DecodeModelCapabilityConfig(string(data))
+		if err != nil {
+			t.Fatal(err)
+		}
+		result := normalizeAutoDLProfile(t, profile, "minimax_h3_zm_u24")
+		if result.Video.DefaultResolution != "768p竖" || len(result.Video.Resolutions) != 6 || len(result.Video.Ratios) != 0 || result.Video.DefaultRatio != "" || len(result.Video.FixedScreenSpec.Resolutions) != 6 {
+			t.Fatalf("selected spec = %#v", result.Video)
+		}
+		if !reflect.DeepEqual(result.Video.References, profile.Video.References) || !reflect.DeepEqual(result.Video.Duration, profile.Video.Duration) || !reflect.DeepEqual(result.Video.Operations, profile.Video.Operations) {
+			t.Fatal("screen-spec normalization changed unrelated parameters")
+		}
+		data, _ = json.Marshal(result)
+		if strings.Contains(string(data), "customSizeEnabled") || strings.Contains(string(data), "customScreenSpec") {
+			t.Fatalf("removed fields remain in saved JSON: %s", data)
+		}
+		if profile.Video.DefaultRatio != "16:9" || profile.Video.FixedScreenSpec.DefaultResolution != "forged" {
+			t.Fatal("normalization mutated the original profile")
+		}
 	}
 }
 
-func TestAutoDLScreenSpecCustomSurvivesDisableAndJSONReload(t *testing.T) {
+func TestAutoDLScreenSpecSelectedValuesSurviveJSONReload(t *testing.T) {
 	profile := autoDLProfile(t, true)
-	profile.Video.CustomScreenSpec.Resolutions = []string{" 480p横 ", "768p(1:1)", "480P横", ""}
-	profile.Video.CustomScreenSpec.DefaultResolution = " 768P(1:1) "
-	enabled := normalizeAutoDLProfile(t, profile, "minimax_h3_zm_u24")
-	if !reflect.DeepEqual(enabled.Video.Resolutions, []string{"480p横", "768p(1:1)"}) || enabled.Video.DefaultResolution != "768p(1:1)" {
-		t.Fatalf("custom spec = %#v", enabled.Video)
-	}
-	enabled.Video.CustomSizeEnabled = false
-	fixed := normalizeAutoDLProfile(t, enabled, "minimax_h3_zm_u24")
-	loaded, err := DecodeModelCapabilityConfig(mustEncodeModelCapabilityConfig(t, fixed))
+	profile.Video.Resolutions = []string{" 480p横 ", "768p(1:1)", "480P横", ""}
+	profile.Video.DefaultResolution = " 768P(1:1) "
+	selected := normalizeAutoDLProfile(t, profile, "minimax_h3_zm_u24")
+	loaded, err := DecodeModelCapabilityConfig(mustEncodeModelCapabilityConfig(t, selected))
 	if err != nil {
 		t.Fatal(err)
 	}
-	loaded.Video.CustomSizeEnabled = true
 	restored := normalizeAutoDLProfile(t, loaded, "minimax_h3_zm_u24")
-	if !reflect.DeepEqual(restored.Video.CustomScreenSpec, enabled.Video.CustomScreenSpec) || restored.Video.DefaultResolution != "768p(1:1)" {
-		t.Fatalf("restored spec = %#v", restored.Video)
+	if !reflect.DeepEqual(restored.Video.Resolutions, []string{"480p横", "768p(1:1)"}) || restored.Video.DefaultResolution != "768p(1:1)" {
+		t.Fatalf("restored selected spec = %#v", restored.Video)
 	}
 }
 
-func TestAutoDLScreenSpecRejectsInvalidEnabledDraftAndUnknownWorkflow(t *testing.T) {
-	for _, values := range [][]string{nil, {"480p横"}} {
+func TestAutoDLScreenSpecRejectsInvalidSelectionsAndUnknownWorkflow(t *testing.T) {
+	for _, values := range [][]string{nil, {"480p横"}, {"480p横", "768p(1:1)", "1080p横"}} {
 		profile := autoDLProfile(t, true)
-		profile.Video.CustomScreenSpec.Resolutions = values
+		profile.Video.Resolutions = values
 		if _, err := NormalizeModelCapabilityConfigForModel("video", "autodl-comfyui", "minimax_h3_zm_u24", profile); err == nil {
-			t.Fatal("invalid custom default was accepted")
+			t.Fatal("invalid selection or default was accepted")
 		}
 	}
 	if _, err := NormalizeModelCapabilityConfigForModel("video", "autodl-comfyui", "unknown", autoDLProfile(t, false)); err == nil {
-		t.Fatal("unknown workflow invented fixed values")
+		t.Fatal("unknown workflow invented preset values")
 	}
 }
 
@@ -89,9 +105,12 @@ func TestAutoDLScreenSpecUsesEachPackagedWorkflowExactly(t *testing.T) {
 	}
 	for _, workflow := range pkg.info.Manifest.Contributes.Workflows {
 		t.Run(workflow.ID, func(t *testing.T) {
-			profile := normalizeAutoDLProfile(t, autoDLProfile(t, false), workflow.ID)
 			for _, parameter := range workflow.Parameters {
 				if parameter.Name == "resolution" {
+					input := autoDLProfile(t, false)
+					input.Video.Resolutions = parameter.Values
+					input.Video.DefaultResolution = workflow.Defaults[parameter.Name].(string)
+					profile := normalizeAutoDLProfile(t, input, workflow.ID)
 					if !reflect.DeepEqual(profile.Video.Resolutions, parameter.Values) || profile.Video.DefaultResolution != workflow.Defaults[parameter.Name] {
 						t.Fatalf("workflow contract mismatch: %#v", profile.Video)
 					}
@@ -106,12 +125,9 @@ func TestAutoDLScreenSpecSubmissionUsesSameValueAsValidation(t *testing.T) {
 	if !ok {
 		t.Fatal("AutoDL adapter missing")
 	}
-	for _, custom := range []bool{false, true} {
-		profile := normalizeAutoDLProfile(t, autoDLProfile(t, custom), "minimax_h3_zm_u24")
-		input := canvasGenerationInput{Mode: "video", Prompt: "test", VideoCapability: profile.Video, Config: providerConfig{InterfaceType: "autodl-comfyui", Model: "minimax_h3_zm_u24", Size: "16:9", VQuality: "720p", VideoSeconds: "6"}}
-		if custom {
-			input.Config.VQuality = "768p(1:1)"
-		}
+	for _, subset := range []bool{false, true} {
+		profile := normalizeAutoDLProfile(t, autoDLProfile(t, subset), "minimax_h3_zm_u24")
+		input := canvasGenerationInput{Mode: "video", Prompt: "test", VideoCapability: profile.Video, Config: providerConfig{InterfaceType: "autodl-comfyui", Model: "minimax_h3_zm_u24", Size: "16:9", VQuality: "auto", VideoSeconds: "6"}}
 		applyAutoDLVideoScreenSpec(&input, profile.Video)
 		if err := validateVideoTask(profile.Video, input); err != nil {
 			t.Fatal(err)
@@ -122,7 +138,7 @@ func TestAutoDLScreenSpecSubmissionUsesSameValueAsValidation(t *testing.T) {
 			t.Fatal(err)
 		}
 		body := spec.Body.(map[string]any)
-		if body["resolution"] != input.Config.VQuality || request.AspectRatio != "" || body["duration"] != 6 {
+		if body["resolution"] != profile.Video.DefaultResolution || body["resolution"] != input.Config.VQuality || request.AspectRatio != "" || body["duration"] != 6 {
 			t.Fatalf("validated input and actual request differ: %#v, %#v", input.Config, body)
 		}
 		if _, exists := body["aspect_ratio"]; exists {
@@ -130,8 +146,8 @@ func TestAutoDLScreenSpecSubmissionUsesSameValueAsValidation(t *testing.T) {
 		}
 		input.Config.VQuality = "unsupported"
 		applyAutoDLVideoScreenSpec(&input, profile.Video)
-		if custom && validateVideoTask(profile.Video, input) == nil {
-			t.Fatal("enabled custom profile accepted an undeclared request value")
+		if validateVideoTask(profile.Video, input) == nil {
+			t.Fatal("accepted an undeclared explicit request value")
 		}
 	}
 }
@@ -145,15 +161,15 @@ func TestAutoDLScreenSpecSystemSaveCatalogAndExecutionIgnoreClientOverride(t *te
 	}
 	enabled := true
 	priceTiers := make([]ChannelModelPriceTierRequest, 0, 6)
-	for _, resolution := range []string{"480p竖", "768p竖", "480p横", "768p横", "480p(1:1)", "768p(1:1)"} {
+	for _, resolution := range autoDLProfile(t, false).Video.Resolutions {
 		sale, cost := int64(6), int64(3)
 		if resolution[:4] == "768p" {
 			sale, cost = 8, 4
 		}
 		priceTiers = append(priceTiers, ChannelModelPriceTierRequest{Resolution: resolution, BillingMode: "per_second", UnitPriceMicrocredits: sale * CreditScale, CostPricing: model.CreditCostPricing{Configured: true, UnitPriceMicrocredits: cost * CreditScale}, PriceConfigured: true, Enabled: &enabled})
 	}
-	for _, custom := range []bool{true, false} {
-		profile := autoDLProfile(t, custom)
+	for _, subset := range []bool{true, false} {
+		profile := autoDLProfile(t, subset)
 		id := ""
 		if item, err := svc.repo.ChannelModelByKey(channel.ID, "minimax_h3_zm_u24"); err == nil {
 			id = item.ID
@@ -176,15 +192,11 @@ func TestAutoDLScreenSpecSystemSaveCatalogAndExecutionIgnoreClientOverride(t *te
 		if _, exists := catalogSpec.Options["size"]; exists {
 			t.Fatal("catalog exposes an unsupported independent ratio")
 		}
-		wantChoices := 6
-		if custom {
-			wantChoices = 2
-		}
-		if len(catalogSpec.Options["vquality"].Values) != wantChoices {
-			t.Fatalf("catalog choices ignored the switch: %#v", catalogSpec)
+		if len(catalogSpec.Options["vquality"].Values) != len(profile.Video.Resolutions) {
+			t.Fatalf("catalog choices ignored the selected list: %#v", catalogSpec)
 		}
 		for _, tier := range saved.PriceTiers {
-			if custom && tier.Resolution != "480p横" && tier.Resolution != "768p(1:1)" {
+			if !containsCapabilityString(profile.Video.Resolutions, tier.Resolution) {
 				continue
 			}
 			priceInput := map[string]any{"mode": "video", "prompt": "test", "config": map[string]any{"channelId": channel.ID, "channelModelKey": saved.ModelKey, "model": saved.ModelKey, "vquality": tier.Resolution, "videoSeconds": "6"}}
@@ -199,14 +211,10 @@ func TestAutoDLScreenSpecSystemSaveCatalogAndExecutionIgnoreClientOverride(t *te
 		}
 		data, _ := json.Marshal(public.CapabilityConfig)
 		catalog, err := DecodeModelCapabilityConfig(string(data))
-		if err != nil || catalog.Video.CustomSizeEnabled != custom {
+		if err != nil || catalog.Video.DefaultResolution != profile.Video.DefaultResolution {
 			t.Fatalf("catalog = %s, err = %v", data, err)
 		}
-		resolution := "768p(1:1)"
-		if !custom {
-			resolution = "720p"
-		}
-		input := map[string]any{"mode": "video", "prompt": "test", "config": map[string]any{"channelId": channel.ID, "channelModelKey": saved.ModelKey, "model": saved.ModelKey, "interfaceType": "autodl-comfyui", "vquality": resolution, "size": "16:9", "videoSeconds": "6", "capabilityConfig": autoDLProfile(t, true)}}
+		input := map[string]any{"mode": "video", "prompt": "test", "config": map[string]any{"channelId": channel.ID, "channelModelKey": saved.ModelKey, "model": saved.ModelKey, "interfaceType": "autodl-comfyui", "vquality": "auto", "size": "16:9", "videoSeconds": "6", "capabilityConfig": autoDLProfile(t, !subset)}}
 		resolved, err := svc.resolveSystemChannelModelSelection(input, "canvas_video", "text_to_video")
 		if err != nil {
 			t.Fatal(err)
@@ -222,8 +230,15 @@ func TestAutoDLScreenSpecSystemSaveCatalogAndExecutionIgnoreClientOverride(t *te
 		if err := svc.validateResolvedVideoCapability(&execution); err != nil {
 			t.Fatal(err)
 		}
-		if execution.Config.VQuality != catalog.Video.DefaultResolution || execution.Config.Size != "" || execution.VideoCapability.CustomSizeEnabled != custom {
+		if execution.Config.VQuality != catalog.Video.DefaultResolution || execution.Config.Size != "" || !reflect.DeepEqual(execution.VideoCapability.Resolutions, catalog.Video.Resolutions) {
 			t.Fatalf("catalog and execution mismatch: %#v, %#v", catalog.Video, execution.Config)
+		}
+		if subset {
+			rejected := map[string]any{"mode": "video", "prompt": "test", "config": map[string]any{"channelId": channel.ID, "model": saved.ModelKey, "vquality": "768p竖", "videoSeconds": "6"}}
+			resolved, err = svc.resolveSystemChannelModelSelection(rejected, "canvas_video", "text_to_video")
+			if err == nil && svc.ValidateTaskCapability(resolved) == nil {
+				t.Fatal("unselected preset bypassed saved capability restrictions")
+			}
 		}
 	}
 }

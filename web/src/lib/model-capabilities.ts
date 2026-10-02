@@ -92,8 +92,6 @@ export type VideoCapabilityConfig = {
     defaultRatio: string;
     resolutions: string[];
     defaultResolution: string;
-    customSizeEnabled?: boolean;
-    customScreenSpec?: VideoScreenSpecConfig;
     fixedScreenSpec?: VideoScreenSpecConfig;
     generateAudio: { supported: boolean; default: boolean };
     watermark: { supported: boolean; default: boolean };

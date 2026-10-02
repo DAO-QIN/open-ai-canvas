@@ -41,7 +41,6 @@ export function PriceTierFields({
     const resolutionOptions = Array.from(new Set([
         ...(video?.resolutions || []),
         ...(protocol === "autodl-comfyui" ? video?.fixedScreenSpec?.resolutions || [] : []),
-        ...(protocol === "autodl-comfyui" ? video?.customScreenSpec?.resolutions || [] : []),
     ]));
     const tokenEnabled = modelProtocolSupportsTokenBilling(capability, protocol);
     const isVideo = capability === "video";

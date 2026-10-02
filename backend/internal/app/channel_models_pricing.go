@@ -22,14 +22,10 @@ func validateChannelModelTierCapabilities(tiers []model.ChannelModelPriceTier, r
 	for _, resolution := range config.Video.Resolutions {
 		resolutionSupported[normalizeChannelModelTierResolution(resolution)] = true
 	}
-	// Retain prices for both switch states; task validation still uses only the active list.
+	// Keep preset prices when narrowing the selected list; tasks use only selected values.
 	if config.Video.FixedScreenSpec != nil {
-		for _, spec := range []*VideoScreenSpecConfig{config.Video.FixedScreenSpec, config.Video.CustomScreenSpec} {
-			if spec != nil {
-				for _, resolution := range spec.Resolutions {
-					resolutionSupported[normalizeChannelModelTierResolution(resolution)] = true
-				}
-			}
+		for _, resolution := range config.Video.FixedScreenSpec.Resolutions {
+			resolutionSupported[normalizeChannelModelTierResolution(resolution)] = true
 		}
 	}
 	durationSupported := make(map[int]bool, len(config.Video.Duration.Values))

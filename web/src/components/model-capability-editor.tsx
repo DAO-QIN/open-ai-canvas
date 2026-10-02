@@ -55,12 +55,6 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
     const updateDuration = (patch: Partial<VideoCapabilityConfig["duration"]>) => update({ duration: { ...profile.duration, ...patch } });
     const durationValues = (profile.duration.values || []).join(",");
     const resolutionOptions = Array.from(new Set([...VIDEO_RESOLUTION_CAPABILITY_OPTIONS, ...profile.resolutions]));
-    const specSwitch = autoDL ? (
-        <label className="ml-auto flex flex-wrap items-center justify-end gap-2 text-[var(--fs-tiny)] text-foreground/70">
-            自定义比例分辨率
-            <Switch aria-label="自定义比例分辨率" checked={profile.customSizeEnabled === true} disabled={disabled || !profile.fixedScreenSpec?.resolutions.length} onChange={(customSizeEnabled) => onChange?.({ version: 1, video: updateWorkflowVideoScreenSpec(profile, workflow, { customSizeEnabled }) })} />
-        </label>
-    ) : undefined;
     const autoDLSpecFields = <AutoDLScreenSpecFields profile={profile} workflow={workflow} disabled={disabled} onChange={(video) => onChange?.({ version: 1, video })} />;
 
     if (section === "references") {
@@ -161,7 +155,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                             </div>
                         )}
                     </ProtocolParameterCard>
-                    <ProtocolParameterCard step="03" title="画面规格" description="控制比例、分辨率及默认输出" action={specSwitch}>
+                    <ProtocolParameterCard step="03" title="画面规格" description="控制比例、分辨率及默认输出">
                         {autoDL ? autoDLSpecFields : <div className="admin-capability-spec-grid">
                             <Field label="支持比例">
                                 <Select
@@ -274,7 +268,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                     )}
                 </CapabilityBlock>
                 <CapabilityBlock title="画面规格">
-                    {autoDL ? <div className="space-y-3">{specSwitch}{autoDLSpecFields}</div> : <div className="grid gap-3 sm:grid-cols-2">
+                    {autoDL ? autoDLSpecFields : <div className="grid gap-3 sm:grid-cols-2">
                         <Field label="画面比例">
                             <Select
                                 mode="multiple"
@@ -658,7 +652,7 @@ function ReferenceCard({ title, description, children }: { title: string; descri
     );
 }
 
-function ProtocolParameterCard({ step, title, description, children, action, className = "" }: { step: string; title: string; description: string; children: ReactNode; action?: ReactNode; className?: string }) {
+function ProtocolParameterCard({ step, title, description, children, className = "" }: { step: string; title: string; description: string; children: ReactNode; className?: string }) {
     return (
         <section className={`admin-capability-protocol-card ${className}`}>
             <header className="admin-capability-protocol-card-heading">
@@ -667,7 +661,6 @@ function ProtocolParameterCard({ step, title, description, children, action, cla
                     <h3>{title}</h3>
                     <p>{description}</p>
                 </div>
-                {action}
             </header>
             <div className="admin-capability-protocol-fields">{children}</div>
         </section>
@@ -678,20 +671,18 @@ function AutoDLScreenSpecFields({ profile, workflow, disabled, onChange }: { pro
     if (!profile.fixedScreenSpec?.resolutions.length) {
         return <p className="text-[var(--fs-label)] text-foreground/60">当前插件未声明此工作流的画面规格，请核对上游模型 ID。</p>;
     }
-    const readOnly = disabled || !profile.customSizeEnabled;
-    const options = cleanVideoScreenSpecValues([...profile.fixedScreenSpec.resolutions, ...profile.resolutions]);
+    const options = profile.fixedScreenSpec.resolutions;
     return (
         <div className="admin-capability-spec-grid">
-            <p className="text-[var(--fs-label)] leading-relaxed text-foreground/60">画幅由完整分辨率标签中的横、竖或 1:1 控制。{profile.customSizeEnabled ? "填写工作流实际支持的完整值，可添加多个标签。" : "使用当前工作流的插件预设列表与默认值。"}</p>
             <Field label="输出分辨率">
-                <Select ariaLabel="输出分辨率" mode="tags" className="admin-capability-tags w-full" disabled={readOnly} value={profile.resolutions} tokenSeparators={[",", "，"]} placeholder="例如：768p竖、768p横" options={options.map((item) => ({ label: item, value: item }))} onChange={(values: string[]) => {
+                <Select ariaLabel="输出分辨率" mode="multiple" className="admin-capability-tags w-full" disabled={disabled} value={profile.resolutions} placeholder="选择分辨率" options={options.map((item) => ({ label: item, value: item }))} onChange={(values: string[]) => {
                     const resolutions = cleanVideoScreenSpecValues(values);
                     const defaultResolution = resolutions.includes(profile.defaultResolution) ? profile.defaultResolution : resolutions[0] || "";
                     onChange(updateWorkflowVideoScreenSpec(profile, workflow, { resolutions, defaultResolution }));
                 }} />
             </Field>
             <Field label="默认分辨率">
-                <Select ariaLabel="默认分辨率" className="w-full" disabled={readOnly} value={profile.defaultResolution || undefined} options={profile.resolutions.map((item) => ({ label: item, value: item }))} onChange={(defaultResolution: string) => onChange(updateWorkflowVideoScreenSpec(profile, workflow, { defaultResolution }))} />
+                <Select ariaLabel="默认分辨率" className="w-full" disabled={disabled} value={profile.defaultResolution || undefined} options={profile.resolutions.map((item) => ({ label: item, value: item }))} onChange={(defaultResolution: string) => onChange(updateWorkflowVideoScreenSpec(profile, workflow, { defaultResolution }))} />
             </Field>
         </div>
     );

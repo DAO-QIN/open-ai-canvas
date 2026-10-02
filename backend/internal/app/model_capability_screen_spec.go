@@ -38,34 +38,30 @@ func normalizeAutoDLVideoScreenSpec(profile *VideoCapabilityConfig, modelName st
 		return nil, BadAuthRequest("当前 AutoDL 工作流未声明有效的分辨率列表和默认值")
 	}
 	value := *profile
-	custom := fixed
-	if profile.CustomScreenSpec != nil {
-		custom = *profile.CustomScreenSpec
-	} else if profile.CustomSizeEnabled {
-		custom.Resolutions = profile.Resolutions
-		custom.DefaultResolution = profile.DefaultResolution
-	}
 	// No AutoDL v2.3 workflow declares an independent aspect-ratio parameter.
-	custom.Ratios, custom.DefaultRatio = []string{}, ""
-	custom.Resolutions = cleanVideoScreenSpecValues(custom.Resolutions)
-	custom.DefaultResolution = strings.TrimSpace(custom.DefaultResolution)
-	for _, resolution := range custom.Resolutions {
-		if strings.EqualFold(resolution, custom.DefaultResolution) {
-			custom.DefaultResolution = resolution
-			break
+	value.Ratios, value.DefaultRatio = []string{}, ""
+	value.Resolutions = cleanVideoScreenSpecValues(profile.Resolutions)
+	value.DefaultResolution = strings.TrimSpace(profile.DefaultResolution)
+	for i, resolution := range value.Resolutions {
+		matched := false
+		for _, preset := range fixed.Resolutions {
+			if strings.EqualFold(resolution, preset) {
+				value.Resolutions[i] = preset
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return nil, BadAuthRequest("分辨率不在当前 AutoDL 工作流的插件预设中：" + resolution)
+		}
+		if strings.EqualFold(value.Resolutions[i], value.DefaultResolution) {
+			value.DefaultResolution = value.Resolutions[i]
 		}
 	}
-	active := fixed
-	if value.CustomSizeEnabled {
-		if len(custom.Resolutions) == 0 || !containsCapabilityString(custom.Resolutions, custom.DefaultResolution) {
-			return nil, BadAuthRequest("请至少配置一个完整分辨率标签，并从支持值中选择默认值")
-		}
-		active = custom
+	if len(value.Resolutions) == 0 || !containsCapabilityString(value.Resolutions, value.DefaultResolution) {
+		return nil, BadAuthRequest("请至少选择一个完整分辨率，并从所选值中设置默认值")
 	}
 	value.FixedScreenSpec = &fixed
-	value.CustomScreenSpec = &custom
-	value.Ratios, value.DefaultRatio = active.Ratios, active.DefaultRatio
-	value.Resolutions, value.DefaultResolution = active.Resolutions, active.DefaultResolution
 	return &value, nil
 }
 
@@ -91,7 +87,7 @@ func applyAutoDLVideoScreenSpec(input *canvasGenerationInput, profile *VideoCapa
 	resolution := videoResolutionNameRequest(profile, input.Config.VQuality)
 	if resolution != "" {
 		input.Config.VQuality = resolution
-	} else if !profile.CustomSizeEnabled || isAutomaticVideoResolution(input.Config.VQuality) {
+	} else if isAutomaticVideoResolution(input.Config.VQuality) {
 		input.Config.VQuality = profile.DefaultResolution
 	}
 }

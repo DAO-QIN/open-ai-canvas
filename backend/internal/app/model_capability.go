@@ -88,8 +88,6 @@ type VideoCapabilityConfig struct {
 	DefaultRatio      string                 `json:"defaultRatio"`
 	Resolutions       []string               `json:"resolutions"`
 	DefaultResolution string                 `json:"defaultResolution"`
-	CustomSizeEnabled bool                   `json:"customSizeEnabled,omitempty"`
-	CustomScreenSpec  *VideoScreenSpecConfig `json:"customScreenSpec,omitempty"`
 	FixedScreenSpec   *VideoScreenSpecConfig `json:"fixedScreenSpec,omitempty"`
 	GenerateAudio     VideoBooleanConfig     `json:"generateAudio"`
 	Watermark         VideoBooleanConfig     `json:"watermark"`

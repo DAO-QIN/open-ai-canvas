@@ -304,7 +304,6 @@ func TestNormalizeVideoCapabilityAllowsOmittedRatio(t *testing.T) {
 	profile.DefaultRatio = ""
 	profile.Resolutions = []string{"480p竖", "480p横"}
 	profile.DefaultResolution = "480p竖"
-	profile.CustomSizeEnabled = true
 
 	result, err := NormalizeModelCapabilityConfigForModel("video", "autodl-comfyui", "minimax_h3_lightx2v_no_pic", &ModelCapabilityConfig{Version: 1, Video: profile})
 	if err != nil {
