@@ -1,6 +1,7 @@
 import type { ModelProtocol, ModelProtocolWorkflow } from "@/lib/model-protocols";
 import type { ImageResolutionOption, ImageResolutionTier } from "@/lib/image-resolution-tiers";
 import { type WorkflowVideoFieldLike, workflowImageCapabilityConfig, workflowVideoCapabilityConfig } from "./model-capabilities-workflow";
+import { resolveWorkflowVideoScreenSpec } from "./video-screen-specs";
 
 export { workflowFieldChoiceValues, workflowFieldConfigurationError, workflowFieldCurrentValue, workflowFieldHasStoredValue, workflowFieldKey, workflowFieldNumberBounds, workflowFieldPresetOptions, workflowFieldRandomKey, workflowFieldRole, workflowFieldSafeToOverride, workflowFieldSource, workflowFieldSubmissionValue, workflowFieldValueError, workflowImageCapabilityConfig, workflowOutputSizeValue, workflowParameterFields, workflowVideoCapabilityConfig, workflowVideoDefaultSize, workflowVideoFieldsFromJson, type WorkflowFieldNumberBounds, type WorkflowVideoFieldLike } from "./model-capabilities-workflow";
 
@@ -91,11 +92,16 @@ export type VideoCapabilityConfig = {
     defaultRatio: string;
     resolutions: string[];
     defaultResolution: string;
+    customSizeEnabled?: boolean;
+    customScreenSpec?: VideoScreenSpecConfig;
+    fixedScreenSpec?: VideoScreenSpecConfig;
     generateAudio: { supported: boolean; default: boolean };
     watermark: { supported: boolean; default: boolean };
     operations: string[];
     defaultOperation: string;
 };
+
+export type VideoScreenSpecConfig = Pick<VideoCapabilityConfig, "ratios" | "defaultRatio" | "resolutions" | "defaultResolution">;
 
 // 旧版本的“允许自定义”可能只保存了 `*`，前台需要用这组标准值恢复可选项。
 export const STANDARD_IMAGE_SIZE_VALUES = [
@@ -148,7 +154,7 @@ export function normalizeModelCapabilityConfig(config: ModelCapabilityConfig): M
               }
             : undefined,
         video: config.video
-            ? {
+            ? resolveWorkflowVideoScreenSpec({
                   ...config.video,
                   ratios: normalizeCapabilityStrings(config.video.ratios),
                   defaultRatio: normalizeCapabilityString(config.video.defaultRatio),
@@ -156,7 +162,7 @@ export function normalizeModelCapabilityConfig(config: ModelCapabilityConfig): M
                   defaultResolution: normalizeCapabilityString(config.video.defaultResolution),
                   operations: normalizeCapabilityStrings(config.video.operations),
                   defaultOperation: normalizeCapabilityString(config.video.defaultOperation),
-              }
+              })
             : undefined,
     };
 }

@@ -333,6 +333,7 @@ export function ChannelModelEditor({
                                                     model={providerModelKey || modelKey}
                                                     protocol={form.getFieldValue("protocol")}
                                                     section="references"
+                                                    workflows={protocols.find((item) => item.value === modelProtocol)?.workflows}
                                                     value={capabilityConfig}
                                                     onChange={(next) => {
                                                         dirtyRef.current = true;
@@ -351,6 +352,7 @@ export function ChannelModelEditor({
                                                     model={providerModelKey || modelKey}
                                                     protocol={form.getFieldValue("protocol")}
                                                     section="protocol"
+                                                    workflows={protocols.find((item) => item.value === modelProtocol)?.workflows}
                                                     value={capabilityConfig}
                                                     onChange={(next) => {
                                                         dirtyRef.current = true;

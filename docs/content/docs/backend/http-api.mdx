@@ -5,6 +5,12 @@ description: 信封、错误码与 OpenAPI
 
 # HTTP API 合同
 
+## AutoDL 视频画面规格配置
+
+渠道模型的 `capabilityConfig.video` 增加 `customSizeEnabled` 和 `customScreenSpec`，后者包含 `ratios`、`defaultRatio`、`resolutions`、`defaultResolution` 四项。AutoDL v2.3.0 未声明独立比例参数，因此比例数组为空，横竖与方形由完整 `resolutions` 标签表达。
+
+服务端返回 `fixedScreenSpec` 供前端展示；写入时重新读取官方插件的当前工作流规格，不信任客户端传入的固定值。开启时要求自定义列表非空且默认值属于列表；关闭时忽略自定义值并保留草稿。顶层四项始终返回实际生效值。任务创建在价格选择前清空无效的 `size`、归一化 `vquality`；关闭时过期选择回退到工作流默认值，开启时不支持的显式选择被拒绝。数据库继续使用现有能力 JSON 字段，无新增表或迁移。
+
 路径前缀是 `/api`。前后端一起发布，不按 `/api/v1`、`/api/v2` 做路径版本。不兼容变更随版本一起改接口和调用方。
 
 机器可读规范：运行中的 `GET /api/openapi.yaml`，源文件 `backend/internal/handler/openapi.yaml`。前端 TypeScript 仍走 `web/src/services/api` 的 `http`，不从 OpenAPI 生成客户端。
