@@ -226,7 +226,7 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
         const ratios = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "5:4", "16:9", "9:16", "21:9", ...(extendedRatios ? ["9:21"] : [])];
         // 卡藏未声明分辨率档。1K 预设只用于宿主比例选择，插件不发送 resolution。
         image.references = { ...image.references, maxImages: stable ? 5 : 1, maskSupported: false };
-        image.size = { parameter: "aspect_ratio", values: [...(extendedRatios ? ["auto"] : []), ...ratios], default: stable ? "9:16" : "16:9", allowCustom: false, presets: ratios.map((ratio) => imagePresetForRatio("1k", ratio)) };
+        image.size = { parameter: "aspect_ratio", values: [...(extendedRatios ? ["auto"] : []), ...ratios], default: stable ? "9:16" : "16:9", allowCustom: false, presets: ratios.map((ratio) => ({ ...imagePresetForRatio("1k", ratio), ratio })) };
         // 稳定版的数值 quality 通过插件命名空间设置，避免与宿主分辨率档混用。
         image.quality = { supported: false, values: [], default: "auto" };
         image.transparentBackground = { supported: false, default: false };

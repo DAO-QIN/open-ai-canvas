@@ -81,6 +81,8 @@ test("Kacang protocol selection uses the supplier ratio and reference contracts"
         assert.equal(image.size.default, ratio);
         assert.equal(image.size.values.includes("auto"), auto);
         assert.equal(image.size.presets!.length, presets);
+        for (const preset of image.size.presets!) assert.ok(image.size.values.includes(preset.ratio), `${protocol}: preset ${preset.ratio} must be an upstream-supported value`);
+        if (auto) assert.ok(image.size.presets!.some((preset) => preset.ratio === "9:21"));
         assert.equal(image.maxOutputs, 1);
         assert.equal(image.size.allowCustom, false);
         assert.equal(image.quality.supported, false);
