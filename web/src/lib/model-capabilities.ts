@@ -1,5 +1,6 @@
 import type { ModelProtocol, ModelProtocolWorkflow } from "@/lib/model-protocols";
 import type { ImageResolutionOption, ImageResolutionTier } from "@/lib/image-resolution-tiers";
+import { imagePresetForRatio } from "./image-size-presets";
 import { type WorkflowVideoFieldLike, workflowImageCapabilityConfig, workflowVideoCapabilityConfig } from "./model-capabilities-workflow";
 import { resolveWorkflowVideoScreenSpec } from "./video-screen-specs";
 
@@ -219,6 +220,22 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
         outputFormat: { supported: true },
         maxOutputs: 15,
     };
+    if (protocol === "cangyuan-midjourney-v7" || protocol === "cangyuan-midjourney-v82") {
+        const v7 = protocol === "cangyuan-midjourney-v7";
+        const tier = !v7 && model.trim().toLowerCase().replace(/^models\//, "") === "midjourney-2k" ? "2k" : "1k";
+        const ratios = v7
+            ? ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "5:4", "16:9", "9:16", "21:9"]
+            : ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "5:4", "16:9", "9:16", "1:2", "6:11", "5:6", "2:1", "11:6", "6:5"];
+        image.references = { ...image.references, promptMaxChars: v7 ? 4000 : 32000, maxImages: v7 ? 5 : 1, maskSupported: !v7 };
+        image.size = { parameter: "aspect_ratio", values: ["auto", ...ratios], default: "auto", allowCustom: false, presets: ratios.map((ratio) => imagePresetForRatio(tier, ratio)) };
+        image.quality = { supported: false, values: [], default: "auto" };
+        image.transparentBackground = { supported: false, default: false };
+        image.responseFormat = { supported: false };
+        image.outputFormat = { supported: false };
+        // n=1 是一次提交；供应商返回的四张图片仍全部消费。
+        image.maxOutputs = 1;
+        return image;
+    }
     if (protocol === "grok-image") {
         image.references.maxImages = 1;
         image.references.maskSupported = false;
