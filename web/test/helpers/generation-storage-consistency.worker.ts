@@ -469,7 +469,18 @@ async function runCanvasBatchCommitRace(multiOutput = false) {
                     nodeId: `node-${index}`,
                     nodesRef: ref,
                     setNodes,
-                    task: { id: `task-${index}`, projectId, type: "canvas_image", status: "succeeded", prompt: "test", attempts: 1, createdAt: "2026-09-21T00:00:00Z", updatedAt: "2026-09-21T00:00:01Z", resultJson: multiOutput ? JSON.stringify({ images: [0, 1, 2, 3].map((i) => ({ dataUrl: "/image.png", storageKey: `resource:image-${i}` })) }) : "{}", ...(multiOutput ? { outputs: [0, 1, 2, 3].map((i) => ({ outputIndex: i, mediaType: "image" as const, materializedAssetId: `asset-${i}` })) } : {}) },
+                    task: {
+                        id: `task-${index}`,
+                        projectId,
+                        type: "canvas_image",
+                        status: "succeeded",
+                        prompt: "test",
+                        attempts: 1,
+                        createdAt: "2026-09-21T00:00:00Z",
+                        updatedAt: "2026-09-21T00:00:01Z",
+                        resultJson: multiOutput ? JSON.stringify({ images: [0, 1, 2, 3].map((i) => ({ dataUrl: "/image.png", storageKey: `resource:image-${i}` })) }) : "{}",
+                        ...(multiOutput ? { outputs: [0, 1, 2, 3].map((i) => ({ outputIndex: i, mediaType: "image" as const, materializedAssetId: `asset-${i}` })) } : {}),
+                    },
                     output: { outputIndex: 0, mediaType: "image", materializedAssetId: `asset-${index}` },
                     effectKey: `attach:task-${index}:0`,
                 }),
@@ -482,7 +493,25 @@ async function runCanvasBatchCommitRace(multiOutput = false) {
         const live = ref.current;
         if (multiOutput) {
             setNodes(restored!);
-            await applyCanvasGenerationTaskNodeEffect({ projectId, nodeId: "node-0", nodesRef: ref, setNodes, task: { id: "task-0", projectId, type: "canvas_image", status: "succeeded", prompt: "test", attempts: 1, createdAt: "", updatedAt: "", resultJson: JSON.stringify({ images: [0, 1, 2, 3].map((i) => ({ dataUrl: "/image.png", storageKey: `resource:image-${i}` })) }) }, output: { outputIndex: 0, mediaType: "image", materializedAssetId: "asset-0" }, effectKey: "attach:task-0:0" });
+            await applyCanvasGenerationTaskNodeEffect({
+                projectId,
+                nodeId: "node-0",
+                nodesRef: ref,
+                setNodes,
+                task: {
+                    id: "task-0",
+                    projectId,
+                    type: "canvas_image",
+                    status: "succeeded",
+                    prompt: "test",
+                    attempts: 1,
+                    createdAt: "",
+                    updatedAt: "",
+                    resultJson: JSON.stringify({ images: [0, 1, 2, 3].map((i) => ({ dataUrl: "/image.png", storageKey: `resource:image-${i}` })) }),
+                },
+                output: { outputIndex: 0, mediaType: "image", materializedAssetId: "asset-0" },
+                effectKey: "attach:task-0:0",
+            });
         }
         return { edited, live, restored, replayed: ref.current };
     } finally {
@@ -504,9 +533,9 @@ self.onmessage = async (event: MessageEvent<Scenario>) => {
                     ? await runScopeCleanupAfterLateCanvasReference()
                     : event.data === "canvas-multi-output"
                       ? await runCanvasBatchCommitRace(true)
-                    : event.data === "canvas-batch-commit-race"
-                      ? await runCanvasBatchCommitRace()
-                      : await runMediaCommitRace(event.data === "audio-commit-race" ? "audio" : "video");
+                      : event.data === "canvas-batch-commit-race"
+                        ? await runCanvasBatchCommitRace()
+                        : await runMediaCommitRace(event.data === "audio-commit-race" ? "audio" : "video");
         self.postMessage({ ok: true, result });
     } catch (error) {
         self.postMessage({ ok: false, error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) });
