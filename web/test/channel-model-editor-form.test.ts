@@ -49,6 +49,18 @@ describe("channel model editor drafts", () => {
         expect(next.capabilityConfig?.image).toMatchObject({ references: { promptMaxChars: 4000, maxImages: 5, maskSupported: false }, maxOutputs: 1 });
         expect(next.priceTiers[0].unitPrice).toBe(0);
     });
+    test("Kacang image protocol selection fills capabilities without changing prices", () => {
+        for (const protocol of ["kacang-midjourney-special", "kacang-midjourney-v7", "kacang-midjourney"]) {
+            const draft = initialChannelModelValues(null, protocols);
+            draft.priceTiers[0].unitPrice = 12;
+            const next = changeChannelModelCapability({ ...draft, capability: "image", protocol }, [definition(protocol, "image")]);
+            expect(next.protocol).toBe(protocol);
+            expect(next.capabilityConfig?.image?.maxOutputs).toBe(1);
+            expect(next.capabilityConfig?.image?.references.maxImages).toBe(protocol === "kacang-midjourney" ? 5 : 1);
+            expect(next.priceTiers[0].unitPrice).toBe(12);
+            expect(updateChannelModelUpstreamCapabilities(next)).toBe(next);
+        }
+    });
     test("V8.2 upstream changes only retier presets and preserve administrator settings", () => {
         const draft = initialChannelModelValues(null, protocols);
         const capabilityConfig = defaultModelCapabilityConfig("cangyuan-midjourney-v82", "midjourney-1k");

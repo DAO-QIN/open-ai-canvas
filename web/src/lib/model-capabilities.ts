@@ -220,6 +220,21 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
         outputFormat: { supported: true },
         maxOutputs: 15,
     };
+    if (protocol === "kacang-midjourney-special" || protocol === "kacang-midjourney-v7" || protocol === "kacang-midjourney") {
+        const stable = protocol === "kacang-midjourney";
+        const extendedRatios = stable || protocol === "kacang-midjourney-v7";
+        const ratios = ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "5:4", "16:9", "9:16", "21:9", ...(extendedRatios ? ["9:21"] : [])];
+        // 卡藏未声明分辨率档。1K 预设只用于宿主比例选择，插件不发送 resolution。
+        image.references = { ...image.references, maxImages: stable ? 5 : 1, maskSupported: false };
+        image.size = { parameter: "aspect_ratio", values: [...(extendedRatios ? ["auto"] : []), ...ratios], default: stable ? "9:16" : "16:9", allowCustom: false, presets: ratios.map((ratio) => imagePresetForRatio("1k", ratio)) };
+        // 稳定版的数值 quality 通过插件命名空间设置，避免与宿主分辨率档混用。
+        image.quality = { supported: false, values: [], default: "auto" };
+        image.transparentBackground = { supported: false, default: false };
+        image.responseFormat = { supported: false };
+        image.outputFormat = { supported: false };
+        image.maxOutputs = 1;
+        return image;
+    }
     if (protocol === "cangyuan-midjourney-v7" || protocol === "cangyuan-midjourney-v82") {
         const v7 = protocol === "cangyuan-midjourney-v7";
         const tier = !v7 && model.trim().toLowerCase().replace(/^models\//, "") === "midjourney-2k" ? "2k" : "1k";

@@ -68,3 +68,28 @@ test("Midjourney protocol defaults expose only supported controls and one submis
         assert.deepEqual(normalizeImageValue(image, { size: "16:9", quality: "high", transparentBackground: "true", count: "4" }), { size: "16:9", quality: tier, transparentBackground: "false", count: "1" });
     }
 });
+
+test("Kacang protocol selection uses the supplier ratio and reference contracts", () => {
+    for (const [protocol, ratio, maxImages, presets, auto] of [
+        ["kacang-midjourney-special", "16:9", 1, 10, false],
+        ["kacang-midjourney-v7", "16:9", 1, 11, true],
+        ["kacang-midjourney", "9:16", 5, 11, true],
+    ] as const) {
+        const image = defaultModelCapabilityConfig(protocol).image!;
+        assert.equal(image.references.maxImages, maxImages);
+        assert.equal(image.references.maskSupported, false);
+        assert.equal(image.size.default, ratio);
+        assert.equal(image.size.values.includes("auto"), auto);
+        assert.equal(image.size.presets!.length, presets);
+        assert.equal(image.maxOutputs, 1);
+        assert.equal(image.size.allowCustom, false);
+        assert.equal(image.quality.supported, false);
+        assert.equal(image.responseFormat.supported, false);
+        assert.equal(image.transparentBackground.supported, false);
+        assert.equal(image.outputFormat.supported, false);
+        assert.equal(imageTierAvailable(image, "1k"), true);
+        assert.equal(imageTierAvailable(image, "2k"), false);
+        assert.equal(imageTierAvailable(image, "4k"), false);
+        assert.deepEqual(normalizeImageValue(image, { size: "bad", quality: "high", transparentBackground: "true", count: "4" }), { size: ratio, quality: "1k", transparentBackground: "false", count: "1" });
+    }
+});
