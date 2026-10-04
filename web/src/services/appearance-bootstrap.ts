@@ -1,8 +1,9 @@
 import { getPublicAppearance, type PublicAppearance } from "@/services/api/appearance";
-import { commitPublicAppearance, DEFAULT_PUBLIC_APPEARANCE, useAppearanceStore } from "@/stores/use-appearance-store";
+import { commitPublicAppearance, useAppearanceStore } from "@/stores/use-appearance-store";
 
 const APPEARANCE_BOOTSTRAP_TIMEOUT_MS = 4_000;
 let refreshing: Promise<PublicAppearance | undefined> | undefined;
+let bootstrapping: Promise<PublicAppearance> | undefined;
 
 // A failed refresh must keep the last saved identity rather than restore defaults.
 export function refreshPublicAppearance(fetchAppearance: (signal: AbortSignal) => Promise<PublicAppearance> = getPublicAppearance) {
@@ -31,13 +32,29 @@ export async function resolvePublicAppearance(fetchAppearance: (signal: AbortSig
     const timer = setTimeout(() => controller.abort(), APPEARANCE_BOOTSTRAP_TIMEOUT_MS);
     try {
         return await fetchAppearance(controller.signal);
-    } catch {
-        return DEFAULT_PUBLIC_APPEARANCE;
     } finally {
         clearTimeout(timer);
     }
 }
 
-export async function bootstrapAppearance(fetchAppearance?: (signal: AbortSignal) => Promise<PublicAppearance>) {
-    return commitPublicAppearance(await resolvePublicAppearance(fetchAppearance));
+export function bootstrapAppearance(fetchAppearance?: (signal: AbortSignal) => Promise<PublicAppearance>) {
+    if (bootstrapping) return bootstrapping;
+    const previous = useAppearanceStore.getState().appearance;
+    useAppearanceStore.setState({ loadFailed: false });
+    bootstrapping = resolvePublicAppearance(fetchAppearance)
+        .then((appearance) => {
+            const current = useAppearanceStore.getState();
+            if (current.appearance !== previous && current.resolved) return current.appearance;
+            return commitPublicAppearance(appearance);
+        })
+        .catch((error: unknown) => {
+            const current = useAppearanceStore.getState();
+            if (current.resolved) return current.appearance;
+            useAppearanceStore.setState({ loadFailed: true });
+            throw error;
+        })
+        .finally(() => {
+            bootstrapping = undefined;
+        });
+    return bootstrapping;
 }

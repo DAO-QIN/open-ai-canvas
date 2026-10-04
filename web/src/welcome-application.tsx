@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { getWelcomeAvailability } from "@/services/api/welcome";
 import WelcomePage from "@/pages/welcome";
+import { bootstrapAppearance } from "@/services/appearance-bootstrap";
 
 async function renderWelcome() {
     try {
@@ -10,7 +11,12 @@ async function renderWelcome() {
             window.location.replace("/");
             return;
         }
-        createRoot(document.getElementById("root")!).render(<StrictMode><WelcomePage /></StrictMode>);
+        await bootstrapAppearance();
+        createRoot(document.getElementById("root")!).render(
+            <StrictMode>
+                <WelcomePage />
+            </StrictMode>,
+        );
     } catch (error) {
         console.error("Welcome page initialization failed", error);
         createRoot(document.getElementById("root")!).render(

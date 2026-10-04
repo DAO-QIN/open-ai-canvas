@@ -14,9 +14,11 @@ type BrandLogoProps = {
 
 export function BrandLogo({ className, fallback, alt = "", theme = "auto" }: BrandLogoProps) {
     const appearance = useAppearanceStore((state) => state.appearance);
+    const resolved = useAppearanceStore((state) => state.resolved);
     const currentTheme = useActiveTheme();
     const source = appearanceLogoURL(appearance, theme === "auto" ? currentTheme : theme);
     const [failedSource, setFailedSource] = useState<string | null>(null);
+    if (!resolved) return <span className={cn("block", className)} aria-hidden="true" />;
     if (!appearance.logoConfigured) return <>{fallback}</>;
     // A configured custom logo must never fall through to the built-in brand
     // when its file becomes unavailable. Keep its footprint neutral instead.

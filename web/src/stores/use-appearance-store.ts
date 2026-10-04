@@ -38,13 +38,15 @@ export const DEFAULT_PUBLIC_APPEARANCE: PublicAppearance = {
 type AppearanceStore = {
     appearance: PublicAppearance;
     resolved: boolean;
+    loadFailed: boolean;
     setAppearance: (appearance: PublicAppearance) => void;
 };
 
 export const useAppearanceStore = create<AppearanceStore>((set) => ({
     appearance: DEFAULT_PUBLIC_APPEARANCE,
     resolved: false,
-    setAppearance: (appearance) => set({ appearance, resolved: true }),
+    loadFailed: false,
+    setAppearance: (appearance) => set({ appearance, resolved: true, loadFailed: false }),
 }));
 
 export function normalizePublicAppearance(value?: Partial<PublicAppearance> | null): PublicAppearance {

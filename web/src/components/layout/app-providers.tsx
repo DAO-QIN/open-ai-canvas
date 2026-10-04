@@ -5,6 +5,7 @@ import { App, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 
 import { AuthSessionHydrator } from "@/components/auth/auth-session-hydrator";
+import { AppearanceBootstrapBoundary } from "@/components/brand/appearance-bootstrap-boundary";
 import { FullScreenLoader } from "@/components/ui/aceternity/full-screen-loader";
 import { getAntThemeConfig } from "@/lib/app-theme";
 import { applySkinTheme } from "@/lib/skin-themes";
@@ -31,13 +32,15 @@ export function AppProviders({ children }: { children: ReactNode }) {
     const theme = useActiveTheme();
     const dark = theme === "dark";
     const appearance = useAppearanceStore((state) => state.appearance);
+    const appearanceResolved = useAppearanceStore((state) => state.resolved);
 
     useLayoutEffect(() => {
         document.documentElement.classList.toggle("dark", dark);
         document.documentElement.style.colorScheme = theme;
+        if (!appearanceResolved) return;
         applySkinTheme(appearance.activeSkin, theme);
         applyAppearanceMetadata(appearance);
-    }, [appearance, dark, theme]);
+    }, [appearance, appearanceResolved, dark, theme]);
 
     // DEV 复现台必须是同源本地确定性场景：AuthSessionHydrator 会打 /api/auth/session，
     // ClientRootInit 会打 /api/model-catalog，没有后端时产生真实 502，与导演台无关却会污染判据。
@@ -64,9 +67,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
                     {isolateDevRepro ? (
                         children
                     ) : (
-                        <AuthSessionHydrator>
-                            <ClientRootBoundary>{children}</ClientRootBoundary>
-                        </AuthSessionHydrator>
+                        <AppearanceBootstrapBoundary>
+                            <AuthSessionHydrator>
+                                <ClientRootBoundary>{children}</ClientRootBoundary>
+                            </AuthSessionHydrator>
+                        </AppearanceBootstrapBoundary>
                     )}
                 </QueryClientProvider>
             </App>
