@@ -13,6 +13,7 @@ import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { cinematicStoryboardColumns, storyboardRowsFromTask } from "@/lib/canvas/canvas-project-domain";
 import { generationTaskMetadata } from "@/lib/canvas/canvas-project-generation";
+import { nodeGenerationPrompt } from "@/lib/canvas/generation-contract";
 import { generationFailureMetadata } from "@/lib/generation-error";
 import { runGenerationConsumer } from "@/services/generation-consumer-lifecycle";
 import { attachNodeEffectKey } from "@/services/generation-task-materializer";
@@ -173,7 +174,7 @@ export async function recoverCanvasGenerationTaskNode(input: {
     } catch (error) {
         if (!isCurrentProject() || (error instanceof Error && error.name === "AbortError")) return;
         if (isCanvasGenerationDurableAckError(error)) return;
-        const failure = generationFailureMetadata(error, input.node.metadata?.composerContent || input.node.metadata?.prompt || "");
+        const failure = generationFailureMetadata(error, nodeGenerationPrompt(input.node));
         input.setNodes((current) =>
             current.map((item) =>
                 item.id === input.node.id
@@ -234,7 +235,7 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
                 status: (node.metadata?.taskStatus as GenerationTask["status"]) || "running",
                 stage: node.metadata?.taskStage,
                 progress: node.metadata?.taskProgress,
-                prompt: node.metadata?.prompt || "",
+                prompt: nodeGenerationPrompt(node),
                 attempts: 1,
                 createdAt: node.metadata?.taskCreatedAt || new Date().toISOString(),
                 updatedAt: node.metadata?.taskUpdatedAt || new Date().toISOString(),
@@ -259,7 +260,7 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
                     if (node.id !== targetNodeId) return node;
                     const failed = task.status === "failed" || task.status === "cancelled";
                     const hasCompletedContent = task.status === "succeeded" && Boolean(node.metadata?.content || node.metadata?.storageKey);
-                    const failure = failed ? generationFailureMetadata(task.error || (task.status === "cancelled" ? "任务已取消" : "任务失败"), node.metadata?.composerContent || node.metadata?.prompt || task.prompt || "") : undefined;
+                    const failure = failed ? generationFailureMetadata(task.error || (task.status === "cancelled" ? "任务已取消" : "任务失败"), nodeGenerationPrompt(node) || task.prompt || "") : undefined;
                     return {
                         ...node,
                         metadata: {
@@ -433,7 +434,7 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
                         });
                     } catch (error) {
                         if (!isCurrentProject() || (error instanceof Error && error.name === "AbortError")) return;
-                        const failure = generationFailureMetadata(error, node.metadata?.composerContent || node.metadata?.prompt || "");
+                        const failure = generationFailureMetadata(error, nodeGenerationPrompt(node));
                         setNodes((current) =>
                             isCurrentProject()
                                 ? current.map((item) =>

@@ -91,7 +91,7 @@ CANVAS_BACKEND_DATA_DIR=/明确的数据目录 ./migrate-schema repair-canvas-re
 
 外观设置新增 `updates: { enabled, currentVersion, releases }`，由管理员通过 `PATCH /admin/settings/appearance` 保存；关闭开关保留草稿，但 `GET /public/appearance` 返回关闭状态与空公告列表，前端恢复内置更新日志。开启时公开版本与内容块，当前版本须对应公告版本。媒体上传、管理员预览、公开引用读取及限制详见 [自定义更新公告](/docs/backend/update-announcements)。JSON 请求上限为 512KB；无数据表迁移。
 
-`GET /public/appearance` 和管理员 `GET /admin/settings/appearance` 返回 `canvas`；管理员通过 `PATCH /admin/settings/appearance` 随外观配置统一保存。字段为 `agentName`（1–24 字）、`launcherLabel`（0–24 字）、`panelTitle`（1–40 字）、`welcomeTitle`（1–100 字）、`welcomeDescription`（0–200 字）、`inputPlaceholder`（1–160 字）、`avatarType`（`orb|live2d`）、`avatarHeight`（120–360 整数）、`live2dResourceId`、`live2dEntry`。入口由服务端核验覆盖；Live2D 无有效资源时拒绝启用。配置不修改 Agent 系统提示词。
+`GET /public/appearance` 和管理员 `GET /admin/settings/appearance` 返回 `canvas`；管理员通过 `PATCH /admin/settings/appearance` 随外观配置统一保存。字段为 `agentName`（1–24 字）、`launcherLabel`（0–24 字）、`panelTitle`（1–40 字）、`welcomeTitle`（1–100 字）、`welcomeDescription`（0–200 字）、`inputPlaceholder`（1–160 字）、`avatarType`（`orb|live2d`）、`avatarHeight`（120–360 整数）、`live2dResourceId`、`live2dEntry`。入口由服务端核验覆盖；Live2D 无有效资源时拒绝启用。名称以数据形式投影到每轮 Agent 执行上下文，不提供自由系统提示词配置，也不改变工具权限。
 
 - `POST /admin/settings/appearance/live2d`：管理员 multipart `file` 上传，受上传频率和配额限制。成功信封的 `data.model` 为 `{ resourceId, entry }`，上传不会发布。ZIP 限 128 MiB、256 条目、解压合计 384 MiB、单文件 128 MiB；只接收 model3/MOC3/PNG/JSON，拒绝路径穿越、脚本和外部资源。
 - `GET /admin/settings/appearance/live2d/:id/*file`：管理员预览，校验资源归属；其他管理员仅能查看当前外观已引用模型。
