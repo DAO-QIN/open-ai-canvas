@@ -4,8 +4,7 @@ import type { ImageCapabilityConfig } from "./model-capabilities";
 export const IMAGE_RESOLUTIONS: ImageResolutionTier[] = ["1k", "2k", "4k"];
 // 1.5K 只在模型明确配置此档位时出现，既有模型的档位保持原有顺序。
 export function imageResolutionTiers(profile: ImageCapabilityConfig): ImageResolutionTier[] {
-    return profile.size.presets?.some((preset) => preset.tier === "1.5k") || profile.quality.values.includes("1.5k")
-        ? ["1k", "1.5k", "2k", "4k"] : IMAGE_RESOLUTIONS;
+    return profile.size.presets?.some((preset) => preset.tier === "1.5k") || profile.quality.values.includes("1.5k") ? ["1k", "1.5k", "2k", "4k"] : IMAGE_RESOLUTIONS;
 }
 export const IMAGE_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "4:5", "5:4", "21:9"];
 const standardSizes: Record<string, string[]> = {

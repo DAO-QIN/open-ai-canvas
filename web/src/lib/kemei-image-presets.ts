@@ -8,8 +8,10 @@ export function kemeiSeedreamPresets(): ImageResolutionOption[] {
         ["1.5k", ["1536x1536", "1792x1344", "1344x1792", "2048x1152", "1152x2048", "1872x1248", "1248x1872", "2352x1008"]],
         ["2k", ["2048x2048", "2368x1776", "1776x2368", "2816x1584", "1584x2816", "2496x1664", "1664x2496", "3136x1344"]],
     ];
-    return tiers.flatMap(([tier, sizes]) => sizes.map((size, index) => {
-        const [width, height] = size.split("x").map(Number);
-        return { tier, ratio: ratios[index], width, height, size };
-    }));
+    return tiers.flatMap(([tier, sizes]) =>
+        sizes.map((size, index) => {
+            const [width, height] = size.split("x").map(Number);
+            return { tier, ratio: ratios[index], width, height, size };
+        }),
+    );
 }
