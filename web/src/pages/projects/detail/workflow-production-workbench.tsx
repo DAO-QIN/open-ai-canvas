@@ -14,7 +14,7 @@ import { CanvasResourceMentionTextarea } from "@/components/canvas/canvas-resour
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ModelPicker } from "@/components/model-picker";
 import { CreditSymbol, requestCreditCost } from "@/constant/credits";
-import { modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, videoDurationOptions } from "@/lib/model-capabilities";
+import { modelCapabilityConfigFor, normalizeImageValue, normalizeVideoValue, videoCapabilityForResolution, videoDurationOptions } from "@/lib/model-capabilities";
 import { modelQuoteDescription, modelQuoteRequest } from "@/lib/model-pricing";
 import { customShotTitle, formatShotOrdinal, normalizeDefaultShotTitle } from "@/lib/shot-label";
 import { modelCompatibilityError, resolveCompatibleModel, resolveModelVideoBooleanOptions, type ModelRequirements } from "@/lib/model-selection";
@@ -152,7 +152,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
     }), [aspectRatio, generationCapability, generationReferenceAudios.length, generationSeconds, imageQuality, resolution, shotAssetReferenceContext.referenceImages.length, videoEditOperation]);
     const routedModel = resolveCompatibleModel(effectiveConfig, selectedModel, modelRequirements) || selectedModel;
     const activeProfile = useMemo(() => modelCapabilityConfigFor(effectiveConfig, routedModel), [effectiveConfig, routedModel]);
-    const videoProfile = generationCapability === "video" ? activeProfile.video : undefined;
+    const videoProfile = generationCapability === "video" && activeProfile.video ? videoCapabilityForResolution(activeProfile.video, resolution) : undefined;
     const imageProfile = generationCapability === "image" ? activeProfile.image : undefined;
     const videoBooleanOptions = useMemo(() => generationCapability === "video"
         ? resolveModelVideoBooleanOptions(effectiveConfig, routedModel, {}, {
@@ -514,7 +514,7 @@ export default function WorkflowProductionWorkbench(props: Props) {
                                         </Form.Item>
                                         {generationCapability === "video" ? <Form.Item label="画幅"><Select value={aspectRatio} onChange={setAspectRatio} options={(videoProfile?.ratios || []).map((value) => ({value, label:value}))} /></Form.Item> : null}
                                         {generationCapability === "video" ? (
-                                            <Form.Item label="分辨率"><Select value={resolution} onChange={setResolution} options={(videoProfile?.resolutions || []).map((value) => ({ value, label: formatVideoResolutionLabel(value) }))} /></Form.Item>
+                                            <Form.Item label="分辨率"><Select value={resolution} onChange={(value) => { setResolution(value); if (activeProfile?.video) form.setFieldValue("durationSeconds", Number(normalizeVideoValue(activeProfile.video, { resolution: value, seconds: String(form.getFieldValue("durationSeconds")) }).seconds)); }} options={(videoProfile?.resolutions || []).map((value) => ({ value, label: formatVideoResolutionLabel(value) }))} /></Form.Item>
                                         ) : imageProfile?.quality.supported && !imageResolutionUsesQuality(imageProfile) ? (
                                             <Form.Item label="生成画质"><Select value={imageQuality} onChange={setImageQuality} options={imageProfile.quality.values.map((value) => ({ value, label: value.toUpperCase() }))} /></Form.Item>
                                         ) : <div />}

@@ -154,6 +154,14 @@ func validateVideoCapabilityConfig(value *VideoCapabilityConfig) error {
 	} else if strings.TrimSpace(value.DefaultResolution) == "" || !containsCapabilityString(value.Resolutions, value.DefaultResolution) {
 		return BadAuthRequest("默认输出分辨率必须属于支持值")
 	}
+	for resolution, maximum := range value.Duration.MaxByResolution {
+		if value.Duration.Selection != "range" || !containsCapabilityString(value.Resolutions, resolution) || maximum < value.Duration.Min || maximum > value.Duration.Max {
+			return BadAuthRequest("分辨率对应的视频时长上限无效")
+		}
+	}
+	if !videoDurationAllowed(videoDurationForResolution(value, value.DefaultResolution), value.Duration.Default) {
+		return BadAuthRequest("默认视频时长超出默认分辨率限制")
+	}
 	if len(value.Operations) == 0 || strings.TrimSpace(value.DefaultOperation) == "" || !containsCapabilityString(value.Operations, value.DefaultOperation) {
 		return BadAuthRequest("请至少配置一个生成模式，并选择默认模式")
 	}
@@ -321,7 +329,7 @@ func validateVideoTask(profile *VideoCapabilityConfig, input canvasGenerationInp
 		}
 	}
 	seconds, err := strconv.Atoi(strings.TrimSpace(input.Config.VideoSeconds))
-	if err != nil || !videoDurationAllowed(profile.Duration, seconds) {
+	if err != nil || !videoDurationAllowed(videoDurationForResolution(profile, input.Config.VQuality), seconds) {
 		return BadAuthRequest("视频时长不在当前模型支持范围内")
 	}
 	if input.Config.Size != "" && !videoRatioAllowed(profile.Ratios, input.Config.Size) {

@@ -1,6 +1,6 @@
 import type { CanvasOperation, CanvasSnapshot } from "@/lib/canvas/canvas-operation-contract";
 import { buildCanvasWorkflowOps } from "@/lib/canvas/canvas-workflow-builder";
-import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
+import { modelCapabilityConfigFor, videoDurationAllowed } from "@/lib/model-capabilities";
 import { selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
 import { resourceFileUrl, resourceIdFromStorageKey } from "@/services/api/resources";
 import type { ResponseInputMessage } from "@/services/api/image";
@@ -123,8 +123,7 @@ export function assertCreativeMediaCapability(item: CreativeGenerationItem, conf
         const video = capability.video;
         if (!video) throw new Error("当前视频模型缺少可验证的能力配置");
         const seconds = Number(item.seconds);
-        const duration = video.duration;
-        const allowed = duration.selection === "enum" ? duration.values?.includes(seconds) : seconds >= (duration.min ?? 0) && seconds <= (duration.max ?? 0) && (seconds - (duration.min ?? 0)) % (duration.step || 1) === 0;
+        const allowed = videoDurationAllowed(video, seconds, item.quality);
         if (!Number.isFinite(seconds) || !allowed) throw new Error(`当前视频模型不支持 ${item.seconds ?? "未指定"} 秒，请调整方案或模型`);
         if (!item.size || !video.ratios.includes(item.size)) throw new Error(`当前视频模型不支持 ${item.size || "未指定"} 比例`);
         if (referenceCount < video.references.minImages || referenceCount > video.references.maxImages) throw new Error(`当前视频模型要求 ${video.references.minImages} 至 ${video.references.maxImages} 张参考图，本方案为 ${referenceCount} 张`);

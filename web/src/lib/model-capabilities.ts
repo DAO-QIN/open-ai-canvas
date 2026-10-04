@@ -88,6 +88,7 @@ export type VideoCapabilityConfig = {
         step?: number;
         values?: number[];
         default: number;
+        maxByResolution?: Record<string, number>;
     };
     durationSupported?: boolean;
     ratios: string[];
@@ -436,6 +437,15 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.defaultResolution = "720P";
         video.operations.push("reference_to_video", "audio_to_video");
     }
+    if (["api968-sd20", "api968-sdc2", "api968-sd25", "api968-sd25-15", "api968-sdmini"].includes(protocol || "")) {
+        const fixed = protocol === "api968-sd25";
+        const mini = protocol === "api968-sdmini";
+        video.references = { ...video.references, maxImages: fixed ? 14 : 9, maxImageBytes: 0, maxVideos: 0, maxAudios: protocol === "api968-sd25-15" ? 0 : fixed ? 10 : 3, maxAudioBytes: 0, maxAudioDurationSeconds: 0 };
+        video.duration = fixed ? { selection: "enum", values: [30], default: 30 } : { selection: "range", min: 5, max: 15, step: 1, default: mini ? 8 : 15, ...(mini ? { maxByResolution: { "480p": 15, "720p": 12 } } : {}) };
+        video.ratios = ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"];
+        video.resolutions = mini ? ["480p", "720p"] : ["720p"];
+        video.operations.push("reference_to_video");
+    }
     return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video };
 }
 
@@ -536,7 +546,8 @@ export function imageSizeRequest(profile: ImageCapabilityConfig, value?: string)
 }
 
 export function normalizeVideoValue(profile: VideoCapabilityConfig, value: { seconds?: string; ratio?: string; resolution?: string }) {
-    const duration = profile.duration.selection === "enum" ? ((profile.duration.values || []).includes(Number(value.seconds)) ? Number(value.seconds) : profile.duration.default) : normalizeRangeDuration(profile, Number(value.seconds));
+    const durationProfile = videoCapabilityForResolution(profile, value.resolution);
+    const duration = durationProfile.duration.selection === "enum" ? ((durationProfile.duration.values || []).includes(Number(value.seconds)) ? Number(value.seconds) : durationProfile.duration.default) : normalizeRangeDuration(durationProfile, Number(value.seconds));
     const ratio = resolveVideoRatioValue(profile, value.ratio);
     // 前端状态历史上保存过 `720`，而能力配置和供应商通常使用 `720p`；统一按能力中的原始值返回，避免被误判为不支持。
     const resolution = resolveVideoResolutionValue(profile, value.resolution);
@@ -581,7 +592,14 @@ function normalizeRangeDuration(profile: VideoCapabilityConfig, value: number) {
     return min + Math.min(maxStep, Math.max(0, Math.round((clamped - min) / step))) * step;
 }
 
-export function videoDurationOptions(profile: VideoCapabilityConfig) {
+export function videoCapabilityForResolution(profile: VideoCapabilityConfig, resolution?: string): VideoCapabilityConfig {
+    const key = resolveVideoResolutionValue(profile, resolution);
+    const max = profile.duration.maxByResolution?.[key];
+    return max === undefined ? profile : { ...profile, duration: { ...profile.duration, max, maxByResolution: undefined } };
+}
+
+export function videoDurationOptions(profile: VideoCapabilityConfig, resolution?: string) {
+    profile = videoCapabilityForResolution(profile, resolution);
     if (profile.duration.selection === "enum") return profile.duration.values || [];
     const min = profile.duration.min || 1;
     const max = profile.duration.max || min;
@@ -589,7 +607,8 @@ export function videoDurationOptions(profile: VideoCapabilityConfig) {
     return Array.from({ length: Math.floor((max - min) / step) + 1 }, (_, index) => min + index * step);
 }
 
-export function videoDurationAllowed(profile: VideoCapabilityConfig, value: number) {
+export function videoDurationAllowed(profile: VideoCapabilityConfig, value: number, resolution?: string) {
+    profile = videoCapabilityForResolution(profile, resolution);
     if (profile.duration.selection === "enum") return (profile.duration.values || []).includes(value);
     const min = profile.duration.min || 1;
     const max = profile.duration.max || min;

@@ -52,7 +52,11 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
     const profile = autoDL ? resolveWorkflowVideoScreenSpec(storedProfile, workflow) : storedProfile;
     const update = (patch: Partial<VideoCapabilityConfig>) => onChange?.({ version: 1, video: { ...profile, ...patch } });
     const updateReferences = (patch: Partial<VideoCapabilityConfig["references"]>) => update({ references: { ...profile.references, ...patch } });
-    const updateDuration = (patch: Partial<VideoCapabilityConfig["duration"]>) => update({ duration: { ...profile.duration, ...patch } });
+    const updateDuration = (patch: Partial<VideoCapabilityConfig["duration"]>) => update({ duration: { ...profile.duration, ...patch, ...(patch.selection === "enum" ? { maxByResolution: undefined } : {}) } });
+    const updateResolutions = (resolutions: string[]) => update({ resolutions, defaultResolution: resolutions.includes(profile.defaultResolution) ? profile.defaultResolution : resolutions[0] || "", duration: { ...profile.duration, ...(profile.duration.maxByResolution ? { maxByResolution: Object.fromEntries(Object.entries(profile.duration.maxByResolution).filter(([key]) => resolutions.includes(key))) } : {}) } });
+    const resolutionDurationFields = profile.duration.selection === "range" && profile.duration.maxByResolution ? <div className="grid gap-3 sm:grid-cols-2">
+        {profile.resolutions.map((resolution) => <NumberField key={resolution} label={`${resolution} 最长（秒）`} value={profile.duration.maxByResolution?.[resolution]} min={profile.duration.min || 1} max={profile.duration.max} disabled={disabled} onChange={(value) => updateDuration({ maxByResolution: { ...profile.duration.maxByResolution, [resolution]: value || profile.duration.max || 1 } })} />)}
+    </div> : null;
     const durationValues = (profile.duration.values || []).join(",");
     const resolutionOptions = Array.from(new Set([...VIDEO_RESOLUTION_CAPABILITY_OPTIONS, ...profile.resolutions]));
     const autoDLSpecFields = <AutoDLScreenSpecFields profile={profile} workflow={workflow} disabled={disabled} onChange={(video) => onChange?.({ version: 1, video })} />;
@@ -154,6 +158,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                                 <NumberField label="默认" value={profile.duration.default} min={1} disabled={disabled} onChange={(value) => updateDuration({ default: value || 1 })} />
                             </div>
                         )}
+                        {resolutionDurationFields}
                     </ProtocolParameterCard>
                     <ProtocolParameterCard step="03" title="画面规格" description="控制比例、分辨率及默认输出">
                         {autoDL ? autoDLSpecFields : <div className="admin-capability-spec-grid">
@@ -179,7 +184,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                                     tokenSeparators={[","]}
                                     placeholder="选择或输入模型档位"
                                     options={resolutionOptions.map((item) => ({ label: item.toUpperCase(), value: item }))}
-                                    onChange={(resolutions) => update({ resolutions, defaultResolution: resolutions.includes(profile.defaultResolution) ? profile.defaultResolution : resolutions[0] || "" })}
+                                    onChange={updateResolutions}
                                 />
                             </Field>
                             <Field label="默认分辨率">
@@ -266,6 +271,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                             <NumberField label="默认" value={profile.duration.default} min={1} disabled={disabled} onChange={(value) => updateDuration({ default: value || 1 })} />
                         </div>
                     )}
+                    {resolutionDurationFields}
                 </CapabilityBlock>
                 <CapabilityBlock title="画面规格">
                     {autoDL ? autoDLSpecFields : <div className="grid gap-3 sm:grid-cols-2">
@@ -291,7 +297,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                                 tokenSeparators={[","]}
                                 placeholder="选择标准档位或输入 768p 等模型专属值"
                                 options={resolutionOptions.map((item) => ({ label: item.toUpperCase(), value: item }))}
-                                onChange={(resolutions) => update({ resolutions, defaultResolution: resolutions.includes(profile.defaultResolution) ? profile.defaultResolution : resolutions[0] || "" })}
+                                onChange={updateResolutions}
                             />
                         </Field>
                         <Field label="默认分辨率">

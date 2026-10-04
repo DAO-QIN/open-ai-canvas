@@ -5,6 +5,12 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+## 968API SD 视频
+
+- 插件合同：`plugin-packages/api968-sd-video/manifest.json`、`README.md`、`docs/interface.md` 与同名 `.yingce-plugin` 包；五个 Provider 各自校验模型 ID 与上游参数。
+- 选择协议的默认能力：`backend/internal/app/model_capability_api968.go` 与 `web/src/lib/model-capabilities.ts`；按分辨率的时长限制由前端生成入口和 `model_capability_validate.go` 校验。
+- “能力与参数”编辑：`web/src/components/model-capability-editor.tsx`；创建、查询和成片保存复用声明式协议宿主。协议及能力回归测试分别为 `api968_sd_video_test.go`、`model_capability_api968_test.go`、`web/test/api968-video.test.ts`。
+
 ## 自定义更新公告
 
 - 后台编辑：`web/src/pages/admin/settings/components/update-announcement-editor.tsx`；版本、排序与草稿校验：`web/src/lib/update-announcement.ts`。

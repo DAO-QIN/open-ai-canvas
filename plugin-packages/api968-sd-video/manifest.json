@@ -1,0 +1,2563 @@
+{
+  "apiVersion": "yingce.plugin/v2",
+  "id": "api968-sd-video",
+  "name": "968API SD 视频",
+  "version": "1.0.0",
+  "author": "968API / 影策",
+  "description": "968API SD 2.0 / C2 / 2.5 / 2.5-15 / Mini 声明式视频协议。",
+  "permissions": [
+    "generation.run",
+    "media.read"
+  ],
+  "configuration": {
+    "fields": [
+      {
+        "name": "apiKey",
+        "type": "secret",
+        "label": "API Key",
+        "required": true
+      }
+    ]
+  },
+  "contributes": {
+    "providers": [
+      {
+        "id": "api968-sd20",
+        "label": "968API SD 2.0",
+        "description": "sd-2.0 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://ap.968968968.xyz/v1",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model",
+            "description": "上游模型 ID：sd-2.0"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt",
+            "description": "视频提示词。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "required": false,
+            "mapping": "duration",
+            "description": "时长秒数，默认 15 秒。"
+          },
+          {
+            "name": "aspectRatio",
+            "type": "string",
+            "required": false,
+            "mapping": "aspect_ratio/size",
+            "description": "画面比例，默认 16:9；size 按官方画布的比例映射。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "required": false,
+            "mapping": "resolution",
+            "description": "默认 720p。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "required": false,
+            "mapping": "image.url/images[].url",
+            "description": "一张图使用 image，多张图使用 images，按引用顺序发送。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "required": false,
+            "mapping": "audio_refs[]",
+            "description": "参考音频 URL 数组。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.model"
+                },
+                "sd-2.0"
+              ]
+            },
+            "message": "当前 968 协议只适用于 sd-2.0"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 15
+                      }
+                    },
+                    5
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 15
+                      }
+                    },
+                    15
+                  ]
+                }
+              ]
+            },
+            "message": "968 sd-2.0 视频时长不在当前分辨率支持范围内"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$lower": {
+                    "$coalesce": [
+                      {
+                        "$ref": "request.resolution"
+                      },
+                      "720p"
+                    ]
+                  }
+                },
+                [
+                  "720p"
+                ]
+              ]
+            },
+            "message": "968 sd-2.0 不支持当前分辨率"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.aspectRatio"
+                    },
+                    "16:9"
+                  ]
+                },
+                [
+                  "21:9",
+                  "16:9",
+                  "4:3",
+                  "1:1",
+                  "3:4",
+                  "9:16"
+                ]
+              ]
+            },
+            "message": "968 SD 不支持当前画面比例"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                9
+              ]
+            },
+            "message": "968 sd-2.0 参考图片超出上限"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
+                  }
+                },
+                0
+              ]
+            },
+            "message": "968 SD 模型未开放参考视频"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                3
+              ]
+            },
+            "message": "968 sd-2.0 参考音频超出上限"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v1/videos/generations",
+          "contentType": "application/json",
+          "headers": {
+            "User-Agent": "Mozilla/5.0",
+            "X-Request-Id": {
+              "$ref": "request.extra.idempotencyKey"
+            }
+          },
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "prompt": {
+              "$ref": "request.prompt"
+            },
+            "resolution": {
+              "$lower": {
+                "$coalesce": [
+                  {
+                    "$ref": "request.resolution"
+                  },
+                  "720p"
+                ]
+              }
+            },
+            "duration": {
+              "$if": {
+                "condition": {
+                  "$gt": [
+                    {
+                      "$ref": "request.duration"
+                    },
+                    0
+                  ]
+                },
+                "then": {
+                  "$ref": "request.duration"
+                },
+                "else": 15
+              }
+            },
+            "aspect_ratio": {
+              "$coalesce": [
+                {
+                  "$ref": "request.aspectRatio"
+                },
+                "16:9"
+              ]
+            },
+            "size": {
+              "$switch": {
+                "cases": [
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "21:9"
+                      ]
+                    },
+                    "then": "1680x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "16:9"
+                      ]
+                    },
+                    "then": "1280x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "4:3"
+                      ]
+                    },
+                    "then": "960x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "1:1"
+                      ]
+                    },
+                    "then": "720x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "3:4"
+                      ]
+                    },
+                    "then": "720x960"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "9:16"
+                      ]
+                    },
+                    "then": "720x1280"
+                  }
+                ],
+                "default": "1280x720"
+              }
+            },
+            "face_split": false,
+            "videoGenerateAudio": true,
+            "video_refs": [],
+            "image": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$eq": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$first": {
+                      "$map": {
+                        "from": {
+                          "$sortByOrder": {
+                            "$ref": "request.images"
+                          }
+                        },
+                        "as": "media",
+                        "in": {
+                          "url": {
+                            "$ref": "media.value"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "images": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$gt": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$map": {
+                      "from": {
+                        "$sortByOrder": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      "as": "media",
+                      "in": {
+                        "url": {
+                          "$ref": "media.value"
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "audio_refs": {
+              "$map": {
+                "from": {
+                  "$sortByOrder": {
+                    "$ref": "request.audios"
+                  }
+                },
+                "as": "media",
+                "in": {
+                  "$ref": "media.value"
+                }
+              }
+            }
+          }
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/v1/videos/generations/{{taskId}}",
+          "headers": {
+            "User-Agent": "Mozilla/5.0"
+          }
+        },
+        "response": {
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.request_id"
+              },
+              {
+                "$ref": "response.data.request_id"
+              },
+              {
+                "$ref": "response.video.request_id"
+              },
+              {
+                "$ref": "response.id"
+              },
+              {
+                "$ref": "response.data.id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          },
+          "status": {
+            "$coalesce": [
+              {
+                "$ref": "response.status"
+              },
+              "pending"
+            ]
+          },
+          "message": {
+            "$ref": "response.error.message"
+          },
+          "videos": {
+            "$ref": "response.video.url"
+          },
+          "errorPaths": [
+            "error.code"
+          ],
+          "resultEphemeral": true
+        }
+      },
+      {
+        "id": "api968-sdc2",
+        "label": "968API SD C2",
+        "description": "sd-c2 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://ap.968968968.xyz/v1",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model",
+            "description": "上游模型 ID：sd-c2"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt",
+            "description": "视频提示词。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "required": false,
+            "mapping": "duration",
+            "description": "时长秒数，默认 15 秒。"
+          },
+          {
+            "name": "aspectRatio",
+            "type": "string",
+            "required": false,
+            "mapping": "aspect_ratio/size",
+            "description": "画面比例，默认 16:9；size 按官方画布的比例映射。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "required": false,
+            "mapping": "resolution",
+            "description": "默认 720p。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "required": false,
+            "mapping": "image.url/images[].url",
+            "description": "一张图使用 image，多张图使用 images，按引用顺序发送。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "required": false,
+            "mapping": "audio_refs[]",
+            "description": "参考音频 URL 数组。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.model"
+                },
+                "sd-c2"
+              ]
+            },
+            "message": "当前 968 协议只适用于 sd-c2"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 15
+                      }
+                    },
+                    5
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 15
+                      }
+                    },
+                    15
+                  ]
+                }
+              ]
+            },
+            "message": "968 sd-c2 视频时长不在当前分辨率支持范围内"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$lower": {
+                    "$coalesce": [
+                      {
+                        "$ref": "request.resolution"
+                      },
+                      "720p"
+                    ]
+                  }
+                },
+                [
+                  "720p"
+                ]
+              ]
+            },
+            "message": "968 sd-c2 不支持当前分辨率"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.aspectRatio"
+                    },
+                    "16:9"
+                  ]
+                },
+                [
+                  "21:9",
+                  "16:9",
+                  "4:3",
+                  "1:1",
+                  "3:4",
+                  "9:16"
+                ]
+              ]
+            },
+            "message": "968 SD 不支持当前画面比例"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                9
+              ]
+            },
+            "message": "968 sd-c2 参考图片超出上限"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
+                  }
+                },
+                0
+              ]
+            },
+            "message": "968 SD 模型未开放参考视频"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                3
+              ]
+            },
+            "message": "968 sd-c2 参考音频超出上限"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v1/videos/generations",
+          "contentType": "application/json",
+          "headers": {
+            "User-Agent": "Mozilla/5.0",
+            "X-Request-Id": {
+              "$ref": "request.extra.idempotencyKey"
+            }
+          },
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "prompt": {
+              "$ref": "request.prompt"
+            },
+            "resolution": {
+              "$lower": {
+                "$coalesce": [
+                  {
+                    "$ref": "request.resolution"
+                  },
+                  "720p"
+                ]
+              }
+            },
+            "duration": {
+              "$if": {
+                "condition": {
+                  "$gt": [
+                    {
+                      "$ref": "request.duration"
+                    },
+                    0
+                  ]
+                },
+                "then": {
+                  "$ref": "request.duration"
+                },
+                "else": 15
+              }
+            },
+            "aspect_ratio": {
+              "$coalesce": [
+                {
+                  "$ref": "request.aspectRatio"
+                },
+                "16:9"
+              ]
+            },
+            "size": {
+              "$switch": {
+                "cases": [
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "21:9"
+                      ]
+                    },
+                    "then": "1680x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "16:9"
+                      ]
+                    },
+                    "then": "1280x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "4:3"
+                      ]
+                    },
+                    "then": "960x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "1:1"
+                      ]
+                    },
+                    "then": "720x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "3:4"
+                      ]
+                    },
+                    "then": "720x960"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "9:16"
+                      ]
+                    },
+                    "then": "720x1280"
+                  }
+                ],
+                "default": "1280x720"
+              }
+            },
+            "face_split": false,
+            "videoGenerateAudio": true,
+            "video_refs": [],
+            "image": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$eq": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$first": {
+                      "$map": {
+                        "from": {
+                          "$sortByOrder": {
+                            "$ref": "request.images"
+                          }
+                        },
+                        "as": "media",
+                        "in": {
+                          "url": {
+                            "$ref": "media.value"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "images": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$gt": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$map": {
+                      "from": {
+                        "$sortByOrder": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      "as": "media",
+                      "in": {
+                        "url": {
+                          "$ref": "media.value"
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "audio_refs": {
+              "$map": {
+                "from": {
+                  "$sortByOrder": {
+                    "$ref": "request.audios"
+                  }
+                },
+                "as": "media",
+                "in": {
+                  "$ref": "media.value"
+                }
+              }
+            }
+          }
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/v1/videos/generations/{{taskId}}",
+          "headers": {
+            "User-Agent": "Mozilla/5.0"
+          }
+        },
+        "response": {
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.request_id"
+              },
+              {
+                "$ref": "response.data.request_id"
+              },
+              {
+                "$ref": "response.video.request_id"
+              },
+              {
+                "$ref": "response.id"
+              },
+              {
+                "$ref": "response.data.id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          },
+          "status": {
+            "$coalesce": [
+              {
+                "$ref": "response.status"
+              },
+              "pending"
+            ]
+          },
+          "message": {
+            "$ref": "response.error.message"
+          },
+          "videos": {
+            "$ref": "response.video.url"
+          },
+          "errorPaths": [
+            "error.code"
+          ],
+          "resultEphemeral": true
+        }
+      },
+      {
+        "id": "api968-sd25",
+        "label": "968API SD 2.5（30秒）",
+        "description": "sd2.5 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://ap.968968968.xyz/v1",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model",
+            "description": "上游模型 ID：sd2.5"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt",
+            "description": "视频提示词。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "required": false,
+            "mapping": "duration",
+            "description": "时长秒数，默认 30 秒。"
+          },
+          {
+            "name": "aspectRatio",
+            "type": "string",
+            "required": false,
+            "mapping": "aspect_ratio/size",
+            "description": "画面比例，默认 16:9；size 按官方画布的比例映射。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "required": false,
+            "mapping": "resolution",
+            "description": "默认 720p。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "required": false,
+            "mapping": "image.url/images[].url",
+            "description": "一张图使用 image，多张图使用 images，按引用顺序发送。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "required": false,
+            "mapping": "audio_refs[]",
+            "description": "参考音频 URL 数组。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.model"
+                },
+                "sd2.5"
+              ]
+            },
+            "message": "当前 968 协议只适用于 sd2.5"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 30
+                      }
+                    },
+                    30
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 30
+                      }
+                    },
+                    30
+                  ]
+                }
+              ]
+            },
+            "message": "968 sd2.5 视频时长不在当前分辨率支持范围内"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$lower": {
+                    "$coalesce": [
+                      {
+                        "$ref": "request.resolution"
+                      },
+                      "720p"
+                    ]
+                  }
+                },
+                [
+                  "720p"
+                ]
+              ]
+            },
+            "message": "968 sd2.5 不支持当前分辨率"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.aspectRatio"
+                    },
+                    "16:9"
+                  ]
+                },
+                [
+                  "21:9",
+                  "16:9",
+                  "4:3",
+                  "1:1",
+                  "3:4",
+                  "9:16"
+                ]
+              ]
+            },
+            "message": "968 SD 不支持当前画面比例"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                14
+              ]
+            },
+            "message": "968 sd2.5 参考图片超出上限"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
+                  }
+                },
+                0
+              ]
+            },
+            "message": "968 SD 模型未开放参考视频"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                10
+              ]
+            },
+            "message": "968 sd2.5 参考音频超出上限"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v1/videos/generations",
+          "contentType": "application/json",
+          "headers": {
+            "User-Agent": "Mozilla/5.0",
+            "X-Request-Id": {
+              "$ref": "request.extra.idempotencyKey"
+            }
+          },
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "prompt": {
+              "$ref": "request.prompt"
+            },
+            "resolution": {
+              "$lower": {
+                "$coalesce": [
+                  {
+                    "$ref": "request.resolution"
+                  },
+                  "720p"
+                ]
+              }
+            },
+            "duration": {
+              "$if": {
+                "condition": {
+                  "$gt": [
+                    {
+                      "$ref": "request.duration"
+                    },
+                    0
+                  ]
+                },
+                "then": {
+                  "$ref": "request.duration"
+                },
+                "else": 30
+              }
+            },
+            "aspect_ratio": {
+              "$coalesce": [
+                {
+                  "$ref": "request.aspectRatio"
+                },
+                "16:9"
+              ]
+            },
+            "size": {
+              "$switch": {
+                "cases": [
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "21:9"
+                      ]
+                    },
+                    "then": "1680x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "16:9"
+                      ]
+                    },
+                    "then": "1280x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "4:3"
+                      ]
+                    },
+                    "then": "960x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "1:1"
+                      ]
+                    },
+                    "then": "720x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "3:4"
+                      ]
+                    },
+                    "then": "720x960"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "9:16"
+                      ]
+                    },
+                    "then": "720x1280"
+                  }
+                ],
+                "default": "1280x720"
+              }
+            },
+            "face_split": false,
+            "videoGenerateAudio": true,
+            "video_refs": [],
+            "image": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$eq": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$first": {
+                      "$map": {
+                        "from": {
+                          "$sortByOrder": {
+                            "$ref": "request.images"
+                          }
+                        },
+                        "as": "media",
+                        "in": {
+                          "url": {
+                            "$ref": "media.value"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "images": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$gt": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$map": {
+                      "from": {
+                        "$sortByOrder": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      "as": "media",
+                      "in": {
+                        "url": {
+                          "$ref": "media.value"
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "audio_refs": {
+              "$map": {
+                "from": {
+                  "$sortByOrder": {
+                    "$ref": "request.audios"
+                  }
+                },
+                "as": "media",
+                "in": {
+                  "$ref": "media.value"
+                }
+              }
+            }
+          }
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/v1/videos/generations/{{taskId}}",
+          "headers": {
+            "User-Agent": "Mozilla/5.0"
+          }
+        },
+        "response": {
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.request_id"
+              },
+              {
+                "$ref": "response.data.request_id"
+              },
+              {
+                "$ref": "response.video.request_id"
+              },
+              {
+                "$ref": "response.id"
+              },
+              {
+                "$ref": "response.data.id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          },
+          "status": {
+            "$coalesce": [
+              {
+                "$ref": "response.status"
+              },
+              "pending"
+            ]
+          },
+          "message": {
+            "$ref": "response.error.message"
+          },
+          "videos": {
+            "$ref": "response.video.url"
+          },
+          "errorPaths": [
+            "error.code"
+          ],
+          "resultEphemeral": true
+        }
+      },
+      {
+        "id": "api968-sd25-15",
+        "label": "968API SD 2.5（5–15秒）",
+        "description": "sd2.5-15 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://ap.968968968.xyz/v1",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model",
+            "description": "上游模型 ID：sd2.5-15"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt",
+            "description": "视频提示词。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "required": false,
+            "mapping": "duration",
+            "description": "时长秒数，默认 15 秒。"
+          },
+          {
+            "name": "aspectRatio",
+            "type": "string",
+            "required": false,
+            "mapping": "aspect_ratio/size",
+            "description": "画面比例，默认 16:9；size 按官方画布的比例映射。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "required": false,
+            "mapping": "resolution",
+            "description": "默认 720p。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "required": false,
+            "mapping": "image.url/images[].url",
+            "description": "一张图使用 image，多张图使用 images，按引用顺序发送。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "required": false,
+            "mapping": "audio_refs[]",
+            "description": "参考音频 URL 数组。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.model"
+                },
+                "sd2.5-15"
+              ]
+            },
+            "message": "当前 968 协议只适用于 sd2.5-15"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 15
+                      }
+                    },
+                    5
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 15
+                      }
+                    },
+                    15
+                  ]
+                }
+              ]
+            },
+            "message": "968 sd2.5-15 视频时长不在当前分辨率支持范围内"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$lower": {
+                    "$coalesce": [
+                      {
+                        "$ref": "request.resolution"
+                      },
+                      "720p"
+                    ]
+                  }
+                },
+                [
+                  "720p"
+                ]
+              ]
+            },
+            "message": "968 sd2.5-15 不支持当前分辨率"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.aspectRatio"
+                    },
+                    "16:9"
+                  ]
+                },
+                [
+                  "21:9",
+                  "16:9",
+                  "4:3",
+                  "1:1",
+                  "3:4",
+                  "9:16"
+                ]
+              ]
+            },
+            "message": "968 SD 不支持当前画面比例"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                9
+              ]
+            },
+            "message": "968 sd2.5-15 参考图片超出上限"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
+                  }
+                },
+                0
+              ]
+            },
+            "message": "968 SD 模型未开放参考视频"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                0
+              ]
+            },
+            "message": "968 sd2.5-15 参考音频超出上限"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v1/videos/generations",
+          "contentType": "application/json",
+          "headers": {
+            "User-Agent": "Mozilla/5.0",
+            "X-Request-Id": {
+              "$ref": "request.extra.idempotencyKey"
+            }
+          },
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "prompt": {
+              "$ref": "request.prompt"
+            },
+            "resolution": {
+              "$lower": {
+                "$coalesce": [
+                  {
+                    "$ref": "request.resolution"
+                  },
+                  "720p"
+                ]
+              }
+            },
+            "duration": {
+              "$if": {
+                "condition": {
+                  "$gt": [
+                    {
+                      "$ref": "request.duration"
+                    },
+                    0
+                  ]
+                },
+                "then": {
+                  "$ref": "request.duration"
+                },
+                "else": 15
+              }
+            },
+            "aspect_ratio": {
+              "$coalesce": [
+                {
+                  "$ref": "request.aspectRatio"
+                },
+                "16:9"
+              ]
+            },
+            "size": {
+              "$switch": {
+                "cases": [
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "21:9"
+                      ]
+                    },
+                    "then": "1680x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "16:9"
+                      ]
+                    },
+                    "then": "1280x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "4:3"
+                      ]
+                    },
+                    "then": "960x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "1:1"
+                      ]
+                    },
+                    "then": "720x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "3:4"
+                      ]
+                    },
+                    "then": "720x960"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "9:16"
+                      ]
+                    },
+                    "then": "720x1280"
+                  }
+                ],
+                "default": "1280x720"
+              }
+            },
+            "face_split": false,
+            "videoGenerateAudio": true,
+            "video_refs": [],
+            "image": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$eq": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$first": {
+                      "$map": {
+                        "from": {
+                          "$sortByOrder": {
+                            "$ref": "request.images"
+                          }
+                        },
+                        "as": "media",
+                        "in": {
+                          "url": {
+                            "$ref": "media.value"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "images": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$gt": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$map": {
+                      "from": {
+                        "$sortByOrder": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      "as": "media",
+                      "in": {
+                        "url": {
+                          "$ref": "media.value"
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "audio_refs": {
+              "$map": {
+                "from": {
+                  "$sortByOrder": {
+                    "$ref": "request.audios"
+                  }
+                },
+                "as": "media",
+                "in": {
+                  "$ref": "media.value"
+                }
+              }
+            }
+          }
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/v1/videos/generations/{{taskId}}",
+          "headers": {
+            "User-Agent": "Mozilla/5.0"
+          }
+        },
+        "response": {
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.request_id"
+              },
+              {
+                "$ref": "response.data.request_id"
+              },
+              {
+                "$ref": "response.video.request_id"
+              },
+              {
+                "$ref": "response.id"
+              },
+              {
+                "$ref": "response.data.id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          },
+          "status": {
+            "$coalesce": [
+              {
+                "$ref": "response.status"
+              },
+              "pending"
+            ]
+          },
+          "message": {
+            "$ref": "response.error.message"
+          },
+          "videos": {
+            "$ref": "response.video.url"
+          },
+          "errorPaths": [
+            "error.code"
+          ],
+          "resultEphemeral": true
+        }
+      },
+      {
+        "id": "api968-sdmini",
+        "label": "968API SD Mini",
+        "description": "sdmini 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://ap.968968968.xyz/v1",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model",
+            "description": "上游模型 ID：sdmini"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt",
+            "description": "视频提示词。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "required": false,
+            "mapping": "duration",
+            "description": "时长秒数，默认 8 秒。"
+          },
+          {
+            "name": "aspectRatio",
+            "type": "string",
+            "required": false,
+            "mapping": "aspect_ratio/size",
+            "description": "画面比例，默认 16:9；size 按官方画布的比例映射。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "required": false,
+            "mapping": "resolution",
+            "description": "默认 720p。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "required": false,
+            "mapping": "image.url/images[].url",
+            "description": "一张图使用 image，多张图使用 images，按引用顺序发送。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "required": false,
+            "mapping": "audio_refs[]",
+            "description": "参考音频 URL 数组。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.model"
+                },
+                "sdmini"
+              ]
+            },
+            "message": "当前 968 协议只适用于 sdmini"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 8
+                      }
+                    },
+                    5
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 8
+                      }
+                    },
+                    {
+                      "$if": {
+                        "condition": {
+                          "$eq": [
+                            {
+                              "$lower": {
+                                "$coalesce": [
+                                  {
+                                    "$ref": "request.resolution"
+                                  },
+                                  "720p"
+                                ]
+                              }
+                            },
+                            "720p"
+                          ]
+                        },
+                        "then": 12,
+                        "else": 15
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "message": "968 sdmini 视频时长不在当前分辨率支持范围内"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$lower": {
+                    "$coalesce": [
+                      {
+                        "$ref": "request.resolution"
+                      },
+                      "720p"
+                    ]
+                  }
+                },
+                [
+                  "480p",
+                  "720p"
+                ]
+              ]
+            },
+            "message": "968 sdmini 不支持当前分辨率"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.aspectRatio"
+                    },
+                    "16:9"
+                  ]
+                },
+                [
+                  "21:9",
+                  "16:9",
+                  "4:3",
+                  "1:1",
+                  "3:4",
+                  "9:16"
+                ]
+              ]
+            },
+            "message": "968 SD 不支持当前画面比例"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                9
+              ]
+            },
+            "message": "968 sdmini 参考图片超出上限"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
+                  }
+                },
+                0
+              ]
+            },
+            "message": "968 SD 模型未开放参考视频"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                3
+              ]
+            },
+            "message": "968 sdmini 参考音频超出上限"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v1/videos/generations",
+          "contentType": "application/json",
+          "headers": {
+            "User-Agent": "Mozilla/5.0",
+            "X-Request-Id": {
+              "$ref": "request.extra.idempotencyKey"
+            }
+          },
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "prompt": {
+              "$ref": "request.prompt"
+            },
+            "resolution": {
+              "$lower": {
+                "$coalesce": [
+                  {
+                    "$ref": "request.resolution"
+                  },
+                  "720p"
+                ]
+              }
+            },
+            "duration": {
+              "$if": {
+                "condition": {
+                  "$gt": [
+                    {
+                      "$ref": "request.duration"
+                    },
+                    0
+                  ]
+                },
+                "then": {
+                  "$ref": "request.duration"
+                },
+                "else": 8
+              }
+            },
+            "aspect_ratio": {
+              "$coalesce": [
+                {
+                  "$ref": "request.aspectRatio"
+                },
+                "16:9"
+              ]
+            },
+            "size": {
+              "$switch": {
+                "cases": [
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "21:9"
+                      ]
+                    },
+                    "then": "1680x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "16:9"
+                      ]
+                    },
+                    "then": "1280x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "4:3"
+                      ]
+                    },
+                    "then": "960x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "1:1"
+                      ]
+                    },
+                    "then": "720x720"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "3:4"
+                      ]
+                    },
+                    "then": "720x960"
+                  },
+                  {
+                    "when": {
+                      "$eq": [
+                        {
+                          "$coalesce": [
+                            {
+                              "$ref": "request.aspectRatio"
+                            },
+                            "16:9"
+                          ]
+                        },
+                        "9:16"
+                      ]
+                    },
+                    "then": "720x1280"
+                  }
+                ],
+                "default": "1280x720"
+              }
+            },
+            "face_split": false,
+            "videoGenerateAudio": true,
+            "video_refs": [],
+            "image": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$eq": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$first": {
+                      "$map": {
+                        "from": {
+                          "$sortByOrder": {
+                            "$ref": "request.images"
+                          }
+                        },
+                        "as": "media",
+                        "in": {
+                          "url": {
+                            "$ref": "media.value"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "images": {
+              "$omitEmpty": {
+                "$if": {
+                  "condition": {
+                    "$gt": [
+                      {
+                        "$len": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      1
+                    ]
+                  },
+                  "then": {
+                    "$map": {
+                      "from": {
+                        "$sortByOrder": {
+                          "$ref": "request.images"
+                        }
+                      },
+                      "as": "media",
+                      "in": {
+                        "url": {
+                          "$ref": "media.value"
+                        }
+                      }
+                    }
+                  },
+                  "else": null
+                }
+              }
+            },
+            "audio_refs": {
+              "$map": {
+                "from": {
+                  "$sortByOrder": {
+                    "$ref": "request.audios"
+                  }
+                },
+                "as": "media",
+                "in": {
+                  "$ref": "media.value"
+                }
+              }
+            }
+          }
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/v1/videos/generations/{{taskId}}",
+          "headers": {
+            "User-Agent": "Mozilla/5.0"
+          }
+        },
+        "response": {
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.request_id"
+              },
+              {
+                "$ref": "response.data.request_id"
+              },
+              {
+                "$ref": "response.video.request_id"
+              },
+              {
+                "$ref": "response.id"
+              },
+              {
+                "$ref": "response.data.id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          },
+          "status": {
+            "$coalesce": [
+              {
+                "$ref": "response.status"
+              },
+              "pending"
+            ]
+          },
+          "message": {
+            "$ref": "response.error.message"
+          },
+          "videos": {
+            "$ref": "response.video.url"
+          },
+          "errorPaths": [
+            "error.code"
+          ],
+          "resultEphemeral": true
+        }
+      }
+    ]
+  },
+  "documentation": "# 968API SD 视频\n\n通过五个专属协议接入 `sd-2.0`、`sd-c2`、`sd2.5`、`sd2.5-15`、`sdmini`。选择与上游模型一致的协议后，管理端自动填入对应能力和参数。\n\nBase URL 为 `https://ap.968968968.xyz/v1`，使用该站的视频分组 API Key。创建、查询和临时结果转存由宿主执行，密钥不进入插件文件。\n\n接口及参数依据：[968API 模型定价与参数](https://ap.968968968.xyz/videos#prices)、[968 官方画布](https://mf.968968968.xyz/)。官方画布视频请求代码是请求字段的一手依据，界面中的通用图片路径占位提示不适用于视频。\n\n详细合同见 [docs/interface.md](docs/interface.md)。\n\n---\n\n# 968API SD 视频接口\n\n## 请求与查询\n\n- API：`POST /v1/videos/generations`、`GET /v1/videos/generations/{request_id}`。\n- Bearer 鉴权，创建与查询使用同一视频分组 Key。\n- 创建响应 ID 依次读取 `request_id`、`data.request_id`、`video.request_id`、`id`、`data.id`。\n- 查询 `status=done` 表示完成，成片来自 `video.url`；`failed/expired` 表示失败，错误来自 `error.message`。\n- 配置 `User-Agent: Mozilla/5.0`；该站边缘网关会拒绝默认 Python User-Agent。`X-Request-Id` 来自宿主提交标识，避免泄漏宿主元数据到 JSON；供应商是否保证幂等不作承诺。\n\n## 模型默认能力\n\n| 协议 | 模型 | 分辨率 | 时长范围 / 默认 | 参考图 | 参考音频 |\n| --- | --- | --- | --- | --- | --- |\n| api968-sd20 | sd-2.0 | 720p | 5–15 / 15秒 | 9 | 3 |\n| api968-sdc2 | sd-c2 | 720p | 5–15 / 15秒 | 9 | 3 |\n| api968-sd25 | sd2.5 | 720p | 固定30秒 | 14 | 10 |\n| api968-sd25-15 | sd2.5-15 | 720p | 5–15 / 15秒 | 9 | 0 |\n| api968-sdmini | sdmini | 480p、720p（默认） | 480p:5–15，720p:5–12 / 8秒 | 9 | 3 |\n\n所有模型支持 `21:9,16:9,4:3,1:1,3:4,9:16`，平台默认 `16:9`；均未开放参考视频。Mini 的分辨率时长上限保存在 `video.duration.maxByResolution`，前端选择和后端任务校验均应用该限制。提示词的 8000 字符是影策既有默认限制；供应商页面没有公布素材字节或音频时长上限，默认值 0 表示不增加供应商限制，上传仍执行宿主限制。\n\n## 字段映射\n\n`model/prompt/duration/resolution` 直接发送。`aspectRatio` 发送为 `aspect_ratio`，同时按官方画布映射为 `size`：21:9→1680x720，16:9→1280x720，4:3→960x720，1:1→720x720，3:4→720x960，9:16→720x1280。这些是官方请求值，不作为成片精确像素保证。\n\n参考图按宿主顺序排序，一张发送 `image:{url}`，多张发送 `images:[{url}]`；二者互斥，无图时均不发送。图片 role 不作为上游字段，全部作为按顺序排列的参考图。参考音频发送 `audio_refs:[url]`，`video_refs:[]`。供应商官方画布固定发送 `face_split:false` 和 `videoGenerateAudio:true`，插件保持这些值，不提供未经文档确认的音频关闭、人脸拆分、水印或任意 JSON 覆盖开关。\n\n结果为临时 URL，视频记录页面说明视频约保留两天。宿主完成下载并转存后才返回成功；轮询、恢复任务、下载和 SSRF 检查沿用现有宿主流程。没有已公布的取消接口，不声明取消或猜测下载路径。\n\n校验覆盖模型与协议匹配、时长、分辨率、比例和参考数量，在提交前拒绝不支持的输入。协议测试不代表所有参考素材组合已经经过真实上游验收。\n\n<!-- YINGCE_MANIFEST_CONTRACT_START -->\n## Manifest 完整接口定义\n\n以下 JSON 与插件包内实际 `manifest.json` 逐字段一致，覆盖插件身份、权限、配置、鉴权、参数、校验、创建、Agent、查询、取消、结果下载、响应和 Agent 响应映射。`documentation` 字段的值就是当前完整文档；为避免文档在自身内部无限递归，JSON 中仅用等义占位文本表示正文。\n\n```json\n{\n  \"apiVersion\": \"yingce.plugin/v2\",\n  \"id\": \"api968-sd-video\",\n  \"name\": \"968API SD 视频\",\n  \"version\": \"1.0.0\",\n  \"author\": \"968API / 影策\",\n  \"description\": \"968API SD 2.0 / C2 / 2.5 / 2.5-15 / Mini 声明式视频协议。\",\n  \"permissions\": [\n    \"generation.run\",\n    \"media.read\"\n  ],\n  \"configuration\": {\n    \"fields\": [\n      {\n        \"name\": \"apiKey\",\n        \"type\": \"secret\",\n        \"label\": \"API Key\",\n        \"required\": true\n      }\n    ]\n  },\n  \"contributes\": {\n    \"providers\": [\n      {\n        \"id\": \"api968-sd20\",\n        \"label\": \"968API SD 2.0\",\n        \"description\": \"sd-2.0 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。\",\n        \"capabilities\": [\n          \"video\"\n        ],\n        \"scopes\": [\n          \"admin.system-channel\",\n          \"user.custom-channel\",\n          \"canvas\",\n          \"creation\",\n          \"agent\"\n        ],\n        \"baseUrl\": \"https://ap.968968968.xyz/v1\",\n        \"requiresPublicMediaUrls\": true,\n        \"auth\": {\n          \"type\": \"bearer\",\n          \"field\": \"apiKey\"\n        },\n        \"parameters\": [\n          {\n            \"name\": \"model\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"model\",\n            \"description\": \"上游模型 ID：sd-2.0\"\n          },\n          {\n            \"name\": \"prompt\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"prompt\",\n            \"description\": \"视频提示词。\"\n          },\n          {\n            \"name\": \"duration\",\n            \"type\": \"integer\",\n            \"required\": false,\n            \"mapping\": \"duration\",\n            \"description\": \"时长秒数，默认 15 秒。\"\n          },\n          {\n            \"name\": \"aspectRatio\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"aspect_ratio/size\",\n            \"description\": \"画面比例，默认 16:9；size 按官方画布的比例映射。\"\n          },\n          {\n            \"name\": \"resolution\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"resolution\",\n            \"description\": \"默认 720p。\"\n          },\n          {\n            \"name\": \"images\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"image.url/images[].url\",\n            \"description\": \"一张图使用 image，多张图使用 images，按引用顺序发送。\"\n          },\n          {\n            \"name\": \"audios\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"audio_refs[]\",\n            \"description\": \"参考音频 URL 数组。\"\n          }\n        ],\n        \"validations\": [\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.model\"\n                },\n                \"sd-2.0\"\n              ]\n            },\n            \"message\": \"当前 968 协议只适用于 sd-2.0\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 15\n                      }\n                    },\n                    5\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 15\n                      }\n                    },\n                    15\n                  ]\n                }\n              ]\n            },\n            \"message\": \"968 sd-2.0 视频时长不在当前分辨率支持范围内\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$lower\": {\n                    \"$coalesce\": [\n                      {\n                        \"$ref\": \"request.resolution\"\n                      },\n                      \"720p\"\n                    ]\n                  }\n                },\n                [\n                  \"720p\"\n                ]\n              ]\n            },\n            \"message\": \"968 sd-2.0 不支持当前分辨率\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$coalesce\": [\n                    {\n                      \"$ref\": \"request.aspectRatio\"\n                    },\n                    \"16:9\"\n                  ]\n                },\n                [\n                  \"21:9\",\n                  \"16:9\",\n                  \"4:3\",\n                  \"1:1\",\n                  \"3:4\",\n                  \"9:16\"\n                ]\n              ]\n            },\n            \"message\": \"968 SD 不支持当前画面比例\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.images\"\n                  }\n                },\n                9\n              ]\n            },\n            \"message\": \"968 sd-2.0 参考图片超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.videos\"\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"968 SD 模型未开放参考视频\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                3\n              ]\n            },\n            \"message\": \"968 sd-2.0 参考音频超出上限\"\n          }\n        ],\n        \"create\": {\n          \"method\": \"POST\",\n          \"path\": \"/v1/videos/generations\",\n          \"contentType\": \"application/json\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\",\n            \"X-Request-Id\": {\n              \"$ref\": \"request.extra.idempotencyKey\"\n            }\n          },\n          \"body\": {\n            \"model\": {\n              \"$ref\": \"request.model\"\n            },\n            \"prompt\": {\n              \"$ref\": \"request.prompt\"\n            },\n            \"resolution\": {\n              \"$lower\": {\n                \"$coalesce\": [\n                  {\n                    \"$ref\": \"request.resolution\"\n                  },\n                  \"720p\"\n                ]\n              }\n            },\n            \"duration\": {\n              \"$if\": {\n                \"condition\": {\n                  \"$gt\": [\n                    {\n                      \"$ref\": \"request.duration\"\n                    },\n                    0\n                  ]\n                },\n                \"then\": {\n                  \"$ref\": \"request.duration\"\n                },\n                \"else\": 15\n              }\n            },\n            \"aspect_ratio\": {\n              \"$coalesce\": [\n                {\n                  \"$ref\": \"request.aspectRatio\"\n                },\n                \"16:9\"\n              ]\n            },\n            \"size\": {\n              \"$switch\": {\n                \"cases\": [\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"21:9\"\n                      ]\n                    },\n                    \"then\": \"1680x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"16:9\"\n                      ]\n                    },\n                    \"then\": \"1280x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"4:3\"\n                      ]\n                    },\n                    \"then\": \"960x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"1:1\"\n                      ]\n                    },\n                    \"then\": \"720x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"3:4\"\n                      ]\n                    },\n                    \"then\": \"720x960\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"9:16\"\n                      ]\n                    },\n                    \"then\": \"720x1280\"\n                  }\n                ],\n                \"default\": \"1280x720\"\n              }\n            },\n            \"face_split\": false,\n            \"videoGenerateAudio\": true,\n            \"video_refs\": [],\n            \"image\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$eq\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$first\": {\n                      \"$map\": {\n                        \"from\": {\n                          \"$sortByOrder\": {\n                            \"$ref\": \"request.images\"\n                          }\n                        },\n                        \"as\": \"media\",\n                        \"in\": {\n                          \"url\": {\n                            \"$ref\": \"media.value\"\n                          }\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"images\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$gt\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$map\": {\n                      \"from\": {\n                        \"$sortByOrder\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      \"as\": \"media\",\n                      \"in\": {\n                        \"url\": {\n                          \"$ref\": \"media.value\"\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"audio_refs\": {\n              \"$map\": {\n                \"from\": {\n                  \"$sortByOrder\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                \"as\": \"media\",\n                \"in\": {\n                  \"$ref\": \"media.value\"\n                }\n              }\n            }\n          }\n        },\n        \"poll\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/generations/{{taskId}}\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\"\n          }\n        },\n        \"response\": {\n          \"taskId\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.request_id\"\n              },\n              {\n                \"$ref\": \"response.data.request_id\"\n              },\n              {\n                \"$ref\": \"response.video.request_id\"\n              },\n              {\n                \"$ref\": \"response.id\"\n              },\n              {\n                \"$ref\": \"response.data.id\"\n              },\n              {\n                \"$ref\": \"taskId\"\n              }\n            ]\n          },\n          \"status\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.status\"\n              },\n              \"pending\"\n            ]\n          },\n          \"message\": {\n            \"$ref\": \"response.error.message\"\n          },\n          \"videos\": {\n            \"$ref\": \"response.video.url\"\n          },\n          \"errorPaths\": [\n            \"error.code\"\n          ],\n          \"resultEphemeral\": true\n        }\n      },\n      {\n        \"id\": \"api968-sdc2\",\n        \"label\": \"968API SD C2\",\n        \"description\": \"sd-c2 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。\",\n        \"capabilities\": [\n          \"video\"\n        ],\n        \"scopes\": [\n          \"admin.system-channel\",\n          \"user.custom-channel\",\n          \"canvas\",\n          \"creation\",\n          \"agent\"\n        ],\n        \"baseUrl\": \"https://ap.968968968.xyz/v1\",\n        \"requiresPublicMediaUrls\": true,\n        \"auth\": {\n          \"type\": \"bearer\",\n          \"field\": \"apiKey\"\n        },\n        \"parameters\": [\n          {\n            \"name\": \"model\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"model\",\n            \"description\": \"上游模型 ID：sd-c2\"\n          },\n          {\n            \"name\": \"prompt\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"prompt\",\n            \"description\": \"视频提示词。\"\n          },\n          {\n            \"name\": \"duration\",\n            \"type\": \"integer\",\n            \"required\": false,\n            \"mapping\": \"duration\",\n            \"description\": \"时长秒数，默认 15 秒。\"\n          },\n          {\n            \"name\": \"aspectRatio\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"aspect_ratio/size\",\n            \"description\": \"画面比例，默认 16:9；size 按官方画布的比例映射。\"\n          },\n          {\n            \"name\": \"resolution\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"resolution\",\n            \"description\": \"默认 720p。\"\n          },\n          {\n            \"name\": \"images\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"image.url/images[].url\",\n            \"description\": \"一张图使用 image，多张图使用 images，按引用顺序发送。\"\n          },\n          {\n            \"name\": \"audios\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"audio_refs[]\",\n            \"description\": \"参考音频 URL 数组。\"\n          }\n        ],\n        \"validations\": [\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.model\"\n                },\n                \"sd-c2\"\n              ]\n            },\n            \"message\": \"当前 968 协议只适用于 sd-c2\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 15\n                      }\n                    },\n                    5\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 15\n                      }\n                    },\n                    15\n                  ]\n                }\n              ]\n            },\n            \"message\": \"968 sd-c2 视频时长不在当前分辨率支持范围内\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$lower\": {\n                    \"$coalesce\": [\n                      {\n                        \"$ref\": \"request.resolution\"\n                      },\n                      \"720p\"\n                    ]\n                  }\n                },\n                [\n                  \"720p\"\n                ]\n              ]\n            },\n            \"message\": \"968 sd-c2 不支持当前分辨率\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$coalesce\": [\n                    {\n                      \"$ref\": \"request.aspectRatio\"\n                    },\n                    \"16:9\"\n                  ]\n                },\n                [\n                  \"21:9\",\n                  \"16:9\",\n                  \"4:3\",\n                  \"1:1\",\n                  \"3:4\",\n                  \"9:16\"\n                ]\n              ]\n            },\n            \"message\": \"968 SD 不支持当前画面比例\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.images\"\n                  }\n                },\n                9\n              ]\n            },\n            \"message\": \"968 sd-c2 参考图片超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.videos\"\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"968 SD 模型未开放参考视频\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                3\n              ]\n            },\n            \"message\": \"968 sd-c2 参考音频超出上限\"\n          }\n        ],\n        \"create\": {\n          \"method\": \"POST\",\n          \"path\": \"/v1/videos/generations\",\n          \"contentType\": \"application/json\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\",\n            \"X-Request-Id\": {\n              \"$ref\": \"request.extra.idempotencyKey\"\n            }\n          },\n          \"body\": {\n            \"model\": {\n              \"$ref\": \"request.model\"\n            },\n            \"prompt\": {\n              \"$ref\": \"request.prompt\"\n            },\n            \"resolution\": {\n              \"$lower\": {\n                \"$coalesce\": [\n                  {\n                    \"$ref\": \"request.resolution\"\n                  },\n                  \"720p\"\n                ]\n              }\n            },\n            \"duration\": {\n              \"$if\": {\n                \"condition\": {\n                  \"$gt\": [\n                    {\n                      \"$ref\": \"request.duration\"\n                    },\n                    0\n                  ]\n                },\n                \"then\": {\n                  \"$ref\": \"request.duration\"\n                },\n                \"else\": 15\n              }\n            },\n            \"aspect_ratio\": {\n              \"$coalesce\": [\n                {\n                  \"$ref\": \"request.aspectRatio\"\n                },\n                \"16:9\"\n              ]\n            },\n            \"size\": {\n              \"$switch\": {\n                \"cases\": [\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"21:9\"\n                      ]\n                    },\n                    \"then\": \"1680x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"16:9\"\n                      ]\n                    },\n                    \"then\": \"1280x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"4:3\"\n                      ]\n                    },\n                    \"then\": \"960x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"1:1\"\n                      ]\n                    },\n                    \"then\": \"720x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"3:4\"\n                      ]\n                    },\n                    \"then\": \"720x960\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"9:16\"\n                      ]\n                    },\n                    \"then\": \"720x1280\"\n                  }\n                ],\n                \"default\": \"1280x720\"\n              }\n            },\n            \"face_split\": false,\n            \"videoGenerateAudio\": true,\n            \"video_refs\": [],\n            \"image\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$eq\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$first\": {\n                      \"$map\": {\n                        \"from\": {\n                          \"$sortByOrder\": {\n                            \"$ref\": \"request.images\"\n                          }\n                        },\n                        \"as\": \"media\",\n                        \"in\": {\n                          \"url\": {\n                            \"$ref\": \"media.value\"\n                          }\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"images\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$gt\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$map\": {\n                      \"from\": {\n                        \"$sortByOrder\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      \"as\": \"media\",\n                      \"in\": {\n                        \"url\": {\n                          \"$ref\": \"media.value\"\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"audio_refs\": {\n              \"$map\": {\n                \"from\": {\n                  \"$sortByOrder\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                \"as\": \"media\",\n                \"in\": {\n                  \"$ref\": \"media.value\"\n                }\n              }\n            }\n          }\n        },\n        \"poll\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/generations/{{taskId}}\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\"\n          }\n        },\n        \"response\": {\n          \"taskId\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.request_id\"\n              },\n              {\n                \"$ref\": \"response.data.request_id\"\n              },\n              {\n                \"$ref\": \"response.video.request_id\"\n              },\n              {\n                \"$ref\": \"response.id\"\n              },\n              {\n                \"$ref\": \"response.data.id\"\n              },\n              {\n                \"$ref\": \"taskId\"\n              }\n            ]\n          },\n          \"status\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.status\"\n              },\n              \"pending\"\n            ]\n          },\n          \"message\": {\n            \"$ref\": \"response.error.message\"\n          },\n          \"videos\": {\n            \"$ref\": \"response.video.url\"\n          },\n          \"errorPaths\": [\n            \"error.code\"\n          ],\n          \"resultEphemeral\": true\n        }\n      },\n      {\n        \"id\": \"api968-sd25\",\n        \"label\": \"968API SD 2.5（30秒）\",\n        \"description\": \"sd2.5 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。\",\n        \"capabilities\": [\n          \"video\"\n        ],\n        \"scopes\": [\n          \"admin.system-channel\",\n          \"user.custom-channel\",\n          \"canvas\",\n          \"creation\",\n          \"agent\"\n        ],\n        \"baseUrl\": \"https://ap.968968968.xyz/v1\",\n        \"requiresPublicMediaUrls\": true,\n        \"auth\": {\n          \"type\": \"bearer\",\n          \"field\": \"apiKey\"\n        },\n        \"parameters\": [\n          {\n            \"name\": \"model\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"model\",\n            \"description\": \"上游模型 ID：sd2.5\"\n          },\n          {\n            \"name\": \"prompt\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"prompt\",\n            \"description\": \"视频提示词。\"\n          },\n          {\n            \"name\": \"duration\",\n            \"type\": \"integer\",\n            \"required\": false,\n            \"mapping\": \"duration\",\n            \"description\": \"时长秒数，默认 30 秒。\"\n          },\n          {\n            \"name\": \"aspectRatio\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"aspect_ratio/size\",\n            \"description\": \"画面比例，默认 16:9；size 按官方画布的比例映射。\"\n          },\n          {\n            \"name\": \"resolution\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"resolution\",\n            \"description\": \"默认 720p。\"\n          },\n          {\n            \"name\": \"images\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"image.url/images[].url\",\n            \"description\": \"一张图使用 image，多张图使用 images，按引用顺序发送。\"\n          },\n          {\n            \"name\": \"audios\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"audio_refs[]\",\n            \"description\": \"参考音频 URL 数组。\"\n          }\n        ],\n        \"validations\": [\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.model\"\n                },\n                \"sd2.5\"\n              ]\n            },\n            \"message\": \"当前 968 协议只适用于 sd2.5\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 30\n                      }\n                    },\n                    30\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 30\n                      }\n                    },\n                    30\n                  ]\n                }\n              ]\n            },\n            \"message\": \"968 sd2.5 视频时长不在当前分辨率支持范围内\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$lower\": {\n                    \"$coalesce\": [\n                      {\n                        \"$ref\": \"request.resolution\"\n                      },\n                      \"720p\"\n                    ]\n                  }\n                },\n                [\n                  \"720p\"\n                ]\n              ]\n            },\n            \"message\": \"968 sd2.5 不支持当前分辨率\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$coalesce\": [\n                    {\n                      \"$ref\": \"request.aspectRatio\"\n                    },\n                    \"16:9\"\n                  ]\n                },\n                [\n                  \"21:9\",\n                  \"16:9\",\n                  \"4:3\",\n                  \"1:1\",\n                  \"3:4\",\n                  \"9:16\"\n                ]\n              ]\n            },\n            \"message\": \"968 SD 不支持当前画面比例\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.images\"\n                  }\n                },\n                14\n              ]\n            },\n            \"message\": \"968 sd2.5 参考图片超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.videos\"\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"968 SD 模型未开放参考视频\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                10\n              ]\n            },\n            \"message\": \"968 sd2.5 参考音频超出上限\"\n          }\n        ],\n        \"create\": {\n          \"method\": \"POST\",\n          \"path\": \"/v1/videos/generations\",\n          \"contentType\": \"application/json\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\",\n            \"X-Request-Id\": {\n              \"$ref\": \"request.extra.idempotencyKey\"\n            }\n          },\n          \"body\": {\n            \"model\": {\n              \"$ref\": \"request.model\"\n            },\n            \"prompt\": {\n              \"$ref\": \"request.prompt\"\n            },\n            \"resolution\": {\n              \"$lower\": {\n                \"$coalesce\": [\n                  {\n                    \"$ref\": \"request.resolution\"\n                  },\n                  \"720p\"\n                ]\n              }\n            },\n            \"duration\": {\n              \"$if\": {\n                \"condition\": {\n                  \"$gt\": [\n                    {\n                      \"$ref\": \"request.duration\"\n                    },\n                    0\n                  ]\n                },\n                \"then\": {\n                  \"$ref\": \"request.duration\"\n                },\n                \"else\": 30\n              }\n            },\n            \"aspect_ratio\": {\n              \"$coalesce\": [\n                {\n                  \"$ref\": \"request.aspectRatio\"\n                },\n                \"16:9\"\n              ]\n            },\n            \"size\": {\n              \"$switch\": {\n                \"cases\": [\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"21:9\"\n                      ]\n                    },\n                    \"then\": \"1680x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"16:9\"\n                      ]\n                    },\n                    \"then\": \"1280x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"4:3\"\n                      ]\n                    },\n                    \"then\": \"960x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"1:1\"\n                      ]\n                    },\n                    \"then\": \"720x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"3:4\"\n                      ]\n                    },\n                    \"then\": \"720x960\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"9:16\"\n                      ]\n                    },\n                    \"then\": \"720x1280\"\n                  }\n                ],\n                \"default\": \"1280x720\"\n              }\n            },\n            \"face_split\": false,\n            \"videoGenerateAudio\": true,\n            \"video_refs\": [],\n            \"image\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$eq\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$first\": {\n                      \"$map\": {\n                        \"from\": {\n                          \"$sortByOrder\": {\n                            \"$ref\": \"request.images\"\n                          }\n                        },\n                        \"as\": \"media\",\n                        \"in\": {\n                          \"url\": {\n                            \"$ref\": \"media.value\"\n                          }\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"images\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$gt\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$map\": {\n                      \"from\": {\n                        \"$sortByOrder\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      \"as\": \"media\",\n                      \"in\": {\n                        \"url\": {\n                          \"$ref\": \"media.value\"\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"audio_refs\": {\n              \"$map\": {\n                \"from\": {\n                  \"$sortByOrder\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                \"as\": \"media\",\n                \"in\": {\n                  \"$ref\": \"media.value\"\n                }\n              }\n            }\n          }\n        },\n        \"poll\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/generations/{{taskId}}\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\"\n          }\n        },\n        \"response\": {\n          \"taskId\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.request_id\"\n              },\n              {\n                \"$ref\": \"response.data.request_id\"\n              },\n              {\n                \"$ref\": \"response.video.request_id\"\n              },\n              {\n                \"$ref\": \"response.id\"\n              },\n              {\n                \"$ref\": \"response.data.id\"\n              },\n              {\n                \"$ref\": \"taskId\"\n              }\n            ]\n          },\n          \"status\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.status\"\n              },\n              \"pending\"\n            ]\n          },\n          \"message\": {\n            \"$ref\": \"response.error.message\"\n          },\n          \"videos\": {\n            \"$ref\": \"response.video.url\"\n          },\n          \"errorPaths\": [\n            \"error.code\"\n          ],\n          \"resultEphemeral\": true\n        }\n      },\n      {\n        \"id\": \"api968-sd25-15\",\n        \"label\": \"968API SD 2.5（5–15秒）\",\n        \"description\": \"sd2.5-15 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。\",\n        \"capabilities\": [\n          \"video\"\n        ],\n        \"scopes\": [\n          \"admin.system-channel\",\n          \"user.custom-channel\",\n          \"canvas\",\n          \"creation\",\n          \"agent\"\n        ],\n        \"baseUrl\": \"https://ap.968968968.xyz/v1\",\n        \"requiresPublicMediaUrls\": true,\n        \"auth\": {\n          \"type\": \"bearer\",\n          \"field\": \"apiKey\"\n        },\n        \"parameters\": [\n          {\n            \"name\": \"model\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"model\",\n            \"description\": \"上游模型 ID：sd2.5-15\"\n          },\n          {\n            \"name\": \"prompt\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"prompt\",\n            \"description\": \"视频提示词。\"\n          },\n          {\n            \"name\": \"duration\",\n            \"type\": \"integer\",\n            \"required\": false,\n            \"mapping\": \"duration\",\n            \"description\": \"时长秒数，默认 15 秒。\"\n          },\n          {\n            \"name\": \"aspectRatio\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"aspect_ratio/size\",\n            \"description\": \"画面比例，默认 16:9；size 按官方画布的比例映射。\"\n          },\n          {\n            \"name\": \"resolution\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"resolution\",\n            \"description\": \"默认 720p。\"\n          },\n          {\n            \"name\": \"images\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"image.url/images[].url\",\n            \"description\": \"一张图使用 image，多张图使用 images，按引用顺序发送。\"\n          },\n          {\n            \"name\": \"audios\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"audio_refs[]\",\n            \"description\": \"参考音频 URL 数组。\"\n          }\n        ],\n        \"validations\": [\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.model\"\n                },\n                \"sd2.5-15\"\n              ]\n            },\n            \"message\": \"当前 968 协议只适用于 sd2.5-15\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 15\n                      }\n                    },\n                    5\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 15\n                      }\n                    },\n                    15\n                  ]\n                }\n              ]\n            },\n            \"message\": \"968 sd2.5-15 视频时长不在当前分辨率支持范围内\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$lower\": {\n                    \"$coalesce\": [\n                      {\n                        \"$ref\": \"request.resolution\"\n                      },\n                      \"720p\"\n                    ]\n                  }\n                },\n                [\n                  \"720p\"\n                ]\n              ]\n            },\n            \"message\": \"968 sd2.5-15 不支持当前分辨率\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$coalesce\": [\n                    {\n                      \"$ref\": \"request.aspectRatio\"\n                    },\n                    \"16:9\"\n                  ]\n                },\n                [\n                  \"21:9\",\n                  \"16:9\",\n                  \"4:3\",\n                  \"1:1\",\n                  \"3:4\",\n                  \"9:16\"\n                ]\n              ]\n            },\n            \"message\": \"968 SD 不支持当前画面比例\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.images\"\n                  }\n                },\n                9\n              ]\n            },\n            \"message\": \"968 sd2.5-15 参考图片超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.videos\"\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"968 SD 模型未开放参考视频\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"968 sd2.5-15 参考音频超出上限\"\n          }\n        ],\n        \"create\": {\n          \"method\": \"POST\",\n          \"path\": \"/v1/videos/generations\",\n          \"contentType\": \"application/json\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\",\n            \"X-Request-Id\": {\n              \"$ref\": \"request.extra.idempotencyKey\"\n            }\n          },\n          \"body\": {\n            \"model\": {\n              \"$ref\": \"request.model\"\n            },\n            \"prompt\": {\n              \"$ref\": \"request.prompt\"\n            },\n            \"resolution\": {\n              \"$lower\": {\n                \"$coalesce\": [\n                  {\n                    \"$ref\": \"request.resolution\"\n                  },\n                  \"720p\"\n                ]\n              }\n            },\n            \"duration\": {\n              \"$if\": {\n                \"condition\": {\n                  \"$gt\": [\n                    {\n                      \"$ref\": \"request.duration\"\n                    },\n                    0\n                  ]\n                },\n                \"then\": {\n                  \"$ref\": \"request.duration\"\n                },\n                \"else\": 15\n              }\n            },\n            \"aspect_ratio\": {\n              \"$coalesce\": [\n                {\n                  \"$ref\": \"request.aspectRatio\"\n                },\n                \"16:9\"\n              ]\n            },\n            \"size\": {\n              \"$switch\": {\n                \"cases\": [\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"21:9\"\n                      ]\n                    },\n                    \"then\": \"1680x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"16:9\"\n                      ]\n                    },\n                    \"then\": \"1280x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"4:3\"\n                      ]\n                    },\n                    \"then\": \"960x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"1:1\"\n                      ]\n                    },\n                    \"then\": \"720x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"3:4\"\n                      ]\n                    },\n                    \"then\": \"720x960\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"9:16\"\n                      ]\n                    },\n                    \"then\": \"720x1280\"\n                  }\n                ],\n                \"default\": \"1280x720\"\n              }\n            },\n            \"face_split\": false,\n            \"videoGenerateAudio\": true,\n            \"video_refs\": [],\n            \"image\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$eq\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$first\": {\n                      \"$map\": {\n                        \"from\": {\n                          \"$sortByOrder\": {\n                            \"$ref\": \"request.images\"\n                          }\n                        },\n                        \"as\": \"media\",\n                        \"in\": {\n                          \"url\": {\n                            \"$ref\": \"media.value\"\n                          }\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"images\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$gt\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$map\": {\n                      \"from\": {\n                        \"$sortByOrder\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      \"as\": \"media\",\n                      \"in\": {\n                        \"url\": {\n                          \"$ref\": \"media.value\"\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"audio_refs\": {\n              \"$map\": {\n                \"from\": {\n                  \"$sortByOrder\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                \"as\": \"media\",\n                \"in\": {\n                  \"$ref\": \"media.value\"\n                }\n              }\n            }\n          }\n        },\n        \"poll\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/generations/{{taskId}}\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\"\n          }\n        },\n        \"response\": {\n          \"taskId\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.request_id\"\n              },\n              {\n                \"$ref\": \"response.data.request_id\"\n              },\n              {\n                \"$ref\": \"response.video.request_id\"\n              },\n              {\n                \"$ref\": \"response.id\"\n              },\n              {\n                \"$ref\": \"response.data.id\"\n              },\n              {\n                \"$ref\": \"taskId\"\n              }\n            ]\n          },\n          \"status\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.status\"\n              },\n              \"pending\"\n            ]\n          },\n          \"message\": {\n            \"$ref\": \"response.error.message\"\n          },\n          \"videos\": {\n            \"$ref\": \"response.video.url\"\n          },\n          \"errorPaths\": [\n            \"error.code\"\n          ],\n          \"resultEphemeral\": true\n        }\n      },\n      {\n        \"id\": \"api968-sdmini\",\n        \"label\": \"968API SD Mini\",\n        \"description\": \"sdmini 专属参数；POST /v1/videos/generations，GET /v1/videos/generations/{request_id}。\",\n        \"capabilities\": [\n          \"video\"\n        ],\n        \"scopes\": [\n          \"admin.system-channel\",\n          \"user.custom-channel\",\n          \"canvas\",\n          \"creation\",\n          \"agent\"\n        ],\n        \"baseUrl\": \"https://ap.968968968.xyz/v1\",\n        \"requiresPublicMediaUrls\": true,\n        \"auth\": {\n          \"type\": \"bearer\",\n          \"field\": \"apiKey\"\n        },\n        \"parameters\": [\n          {\n            \"name\": \"model\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"model\",\n            \"description\": \"上游模型 ID：sdmini\"\n          },\n          {\n            \"name\": \"prompt\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"prompt\",\n            \"description\": \"视频提示词。\"\n          },\n          {\n            \"name\": \"duration\",\n            \"type\": \"integer\",\n            \"required\": false,\n            \"mapping\": \"duration\",\n            \"description\": \"时长秒数，默认 8 秒。\"\n          },\n          {\n            \"name\": \"aspectRatio\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"aspect_ratio/size\",\n            \"description\": \"画面比例，默认 16:9；size 按官方画布的比例映射。\"\n          },\n          {\n            \"name\": \"resolution\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"resolution\",\n            \"description\": \"默认 720p。\"\n          },\n          {\n            \"name\": \"images\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"image.url/images[].url\",\n            \"description\": \"一张图使用 image，多张图使用 images，按引用顺序发送。\"\n          },\n          {\n            \"name\": \"audios\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"audio_refs[]\",\n            \"description\": \"参考音频 URL 数组。\"\n          }\n        ],\n        \"validations\": [\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.model\"\n                },\n                \"sdmini\"\n              ]\n            },\n            \"message\": \"当前 968 协议只适用于 sdmini\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 8\n                      }\n                    },\n                    5\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 8\n                      }\n                    },\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$eq\": [\n                            {\n                              \"$lower\": {\n                                \"$coalesce\": [\n                                  {\n                                    \"$ref\": \"request.resolution\"\n                                  },\n                                  \"720p\"\n                                ]\n                              }\n                            },\n                            \"720p\"\n                          ]\n                        },\n                        \"then\": 12,\n                        \"else\": 15\n                      }\n                    }\n                  ]\n                }\n              ]\n            },\n            \"message\": \"968 sdmini 视频时长不在当前分辨率支持范围内\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$lower\": {\n                    \"$coalesce\": [\n                      {\n                        \"$ref\": \"request.resolution\"\n                      },\n                      \"720p\"\n                    ]\n                  }\n                },\n                [\n                  \"480p\",\n                  \"720p\"\n                ]\n              ]\n            },\n            \"message\": \"968 sdmini 不支持当前分辨率\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$coalesce\": [\n                    {\n                      \"$ref\": \"request.aspectRatio\"\n                    },\n                    \"16:9\"\n                  ]\n                },\n                [\n                  \"21:9\",\n                  \"16:9\",\n                  \"4:3\",\n                  \"1:1\",\n                  \"3:4\",\n                  \"9:16\"\n                ]\n              ]\n            },\n            \"message\": \"968 SD 不支持当前画面比例\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.images\"\n                  }\n                },\n                9\n              ]\n            },\n            \"message\": \"968 sdmini 参考图片超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.videos\"\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"968 SD 模型未开放参考视频\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                3\n              ]\n            },\n            \"message\": \"968 sdmini 参考音频超出上限\"\n          }\n        ],\n        \"create\": {\n          \"method\": \"POST\",\n          \"path\": \"/v1/videos/generations\",\n          \"contentType\": \"application/json\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\",\n            \"X-Request-Id\": {\n              \"$ref\": \"request.extra.idempotencyKey\"\n            }\n          },\n          \"body\": {\n            \"model\": {\n              \"$ref\": \"request.model\"\n            },\n            \"prompt\": {\n              \"$ref\": \"request.prompt\"\n            },\n            \"resolution\": {\n              \"$lower\": {\n                \"$coalesce\": [\n                  {\n                    \"$ref\": \"request.resolution\"\n                  },\n                  \"720p\"\n                ]\n              }\n            },\n            \"duration\": {\n              \"$if\": {\n                \"condition\": {\n                  \"$gt\": [\n                    {\n                      \"$ref\": \"request.duration\"\n                    },\n                    0\n                  ]\n                },\n                \"then\": {\n                  \"$ref\": \"request.duration\"\n                },\n                \"else\": 8\n              }\n            },\n            \"aspect_ratio\": {\n              \"$coalesce\": [\n                {\n                  \"$ref\": \"request.aspectRatio\"\n                },\n                \"16:9\"\n              ]\n            },\n            \"size\": {\n              \"$switch\": {\n                \"cases\": [\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"21:9\"\n                      ]\n                    },\n                    \"then\": \"1680x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"16:9\"\n                      ]\n                    },\n                    \"then\": \"1280x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"4:3\"\n                      ]\n                    },\n                    \"then\": \"960x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"1:1\"\n                      ]\n                    },\n                    \"then\": \"720x720\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"3:4\"\n                      ]\n                    },\n                    \"then\": \"720x960\"\n                  },\n                  {\n                    \"when\": {\n                      \"$eq\": [\n                        {\n                          \"$coalesce\": [\n                            {\n                              \"$ref\": \"request.aspectRatio\"\n                            },\n                            \"16:9\"\n                          ]\n                        },\n                        \"9:16\"\n                      ]\n                    },\n                    \"then\": \"720x1280\"\n                  }\n                ],\n                \"default\": \"1280x720\"\n              }\n            },\n            \"face_split\": false,\n            \"videoGenerateAudio\": true,\n            \"video_refs\": [],\n            \"image\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$eq\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$first\": {\n                      \"$map\": {\n                        \"from\": {\n                          \"$sortByOrder\": {\n                            \"$ref\": \"request.images\"\n                          }\n                        },\n                        \"as\": \"media\",\n                        \"in\": {\n                          \"url\": {\n                            \"$ref\": \"media.value\"\n                          }\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"images\": {\n              \"$omitEmpty\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$gt\": [\n                      {\n                        \"$len\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      1\n                    ]\n                  },\n                  \"then\": {\n                    \"$map\": {\n                      \"from\": {\n                        \"$sortByOrder\": {\n                          \"$ref\": \"request.images\"\n                        }\n                      },\n                      \"as\": \"media\",\n                      \"in\": {\n                        \"url\": {\n                          \"$ref\": \"media.value\"\n                        }\n                      }\n                    }\n                  },\n                  \"else\": null\n                }\n              }\n            },\n            \"audio_refs\": {\n              \"$map\": {\n                \"from\": {\n                  \"$sortByOrder\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                \"as\": \"media\",\n                \"in\": {\n                  \"$ref\": \"media.value\"\n                }\n              }\n            }\n          }\n        },\n        \"poll\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/generations/{{taskId}}\",\n          \"headers\": {\n            \"User-Agent\": \"Mozilla/5.0\"\n          }\n        },\n        \"response\": {\n          \"taskId\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.request_id\"\n              },\n              {\n                \"$ref\": \"response.data.request_id\"\n              },\n              {\n                \"$ref\": \"response.video.request_id\"\n              },\n              {\n                \"$ref\": \"response.id\"\n              },\n              {\n                \"$ref\": \"response.data.id\"\n              },\n              {\n                \"$ref\": \"taskId\"\n              }\n            ]\n          },\n          \"status\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.status\"\n              },\n              \"pending\"\n            ]\n          },\n          \"message\": {\n            \"$ref\": \"response.error.message\"\n          },\n          \"videos\": {\n            \"$ref\": \"response.video.url\"\n          },\n          \"errorPaths\": [\n            \"error.code\"\n          ],\n          \"resultEphemeral\": true\n        }\n      }\n    ]\n  },\n  \"documentation\": \"<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>\"\n}\n```\n<!-- YINGCE_MANIFEST_CONTRACT_END -->\n"
+}
