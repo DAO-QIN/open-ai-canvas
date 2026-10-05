@@ -4,7 +4,13 @@ import { changeChannelModelCapability, initialChannelModelValues } from "../src/
 import type { ModelProtocolDefinition } from "../src/lib/model-protocols";
 
 describe("968API SD video defaults and selection", () => {
-    for (const [protocol, seconds, images, audios] of [["api968-sd20",15,9,3], ["api968-sdc2",15,9,3], ["api968-sd25",30,14,10], ["api968-sd25-15",15,9,0], ["api968-sdmini",8,9,3]] as const) {
+    for (const [protocol, seconds, images, audios] of [
+        ["api968-sd20", 15, 9, 3],
+        ["api968-sdc2", 15, 9, 3],
+        ["api968-sd25", 30, 14, 10],
+        ["api968-sd25-15", 15, 9, 0],
+        ["api968-sdmini", 8, 9, 3],
+    ] as const) {
         test(`${protocol} fills capabilities when selecting the protocol`, () => {
             const definition: ModelProtocolDefinition = { value: protocol, capability: "video", enabled: true, label: protocol, create: "POST /v1/videos/generations", contentType: "application/json", media: "url" };
             const draft = initialChannelModelValues(null, [definition]);
