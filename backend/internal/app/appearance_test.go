@@ -50,6 +50,43 @@ func TestAppearanceDefaultsPreserveBuiltInBrand(t *testing.T) {
 	}
 }
 
+func TestAppearanceRedeemPurchaseRequiresOperatorConfiguration(t *testing.T) {
+	svc, _, _, _ := newAppearanceTestService(t)
+	actor := &model.User{ID: "admin", Role: model.UserRoleAdmin, Status: model.UserStatusActive}
+	appearance, err := svc.Appearance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if appearance.RedeemPurchaseURL != "" {
+		t.Fatalf("unconfigured purchase link = %q", appearance.RedeemPurchaseURL)
+	}
+	value := defaultAppearanceSetting()
+	value.BrandName = "影绘"
+	value.RedeemPurchaseURL = "https://shop.example.test/redeem"
+	updated, err := svc.UpdateAppearance(actor, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Public.RedeemPurchaseURL != value.RedeemPurchaseURL || updated.Public.BrandName != value.BrandName {
+		t.Fatalf("configured appearance = %#v", updated.Public)
+	}
+	value.RedeemPurchaseURL = "http://shop.example.test/redeem"
+	if _, err := svc.UpdateAppearance(actor, value); err == nil {
+		t.Fatal("insecure purchase link was accepted")
+	}
+	value.RedeemPurchaseURL = ""
+	if _, err := svc.UpdateAppearance(actor, value); err != nil {
+		t.Fatal(err)
+	}
+	appearance, err = svc.Appearance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if appearance.RedeemPurchaseURL != "" || appearance.BrandName != value.BrandName {
+		t.Fatalf("cleared purchase link changed brand or remained visible: %#v", appearance)
+	}
+}
+
 func TestBuiltInAppearanceSkinAuthPalettesFollowMode(t *testing.T) {
 	for _, skin := range defaultAppearanceSkinThemes() {
 		if skin.Tokens.Light.AuthBackground == skin.Tokens.Dark.AuthBackground || skin.Tokens.Light.AuthCard == skin.Tokens.Dark.AuthCard {
