@@ -78,7 +78,7 @@ CANVAS_BACKEND_DATA_DIR=/明确的数据目录 ./migrate-schema repair-canvas-re
 
 ## 注册服务协议
 
-`POST /auth/register` 的 JSON 请求必须携带布尔值 `acceptedTerms: true`，首次创建管理员也适用。缺省、`false` 或 `null` 均按未同意处理，在创建用户、消费验证码和创建会话前返回 HTTP 400，提示“请先同意<协议名称>”。原有注册开放、邮箱白名单、验证码与限流校验继续生效。
+`POST /auth/register` 的 JSON 请求必须携带布尔值 `acceptedTerms: true`，首次创建管理员也适用。缺省、`false` 或 `null` 均按未同意处理，在创建用户、消费验证码和创建会话前返回 HTTP 400，提示“请先同意`<协议名称>`”。原有注册开放、邮箱白名单、验证码与限流校验继续生效。
 
 `GET /auth/linuxdo/start` 可携带 `acceptedTerms=true`，只有该精确值表示同意。服务端将标志写入一次性的 OAuth state；回调仅在新建 Linux.do 用户时要求该 state 已同意，不从回调参数重新取值。已有 Linux.do 用户可从登录页继续登录，无需传此参数；同意协议不绕过注册关闭策略。
 
