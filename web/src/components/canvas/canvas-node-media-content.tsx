@@ -389,7 +389,7 @@ export function ImageContent({
 }: Pick<CanvasNodeContentProps, "node" | "theme" | "isBatchRoot" | "batchCount" | "batchPreviewNodes" | "batchExpanded" | "batchOpening" | "batchRecovering" | "onToggleBatch">) {
     const imageContainerRef = useRef<HTMLDivElement>(null);
     const nearViewport = useNearViewport(imageContainerRef);
-    const { url, loading, originalWidth, originalHeight } = useNodeResourceUrl(node, nearViewport, "thumbnail");
+    const { url, loading, originalWidth, originalHeight } = useNodeResourceUrl(node, nearViewport, node.metadata?.imageLayer || node.metadata?.imageLayerGroup ? "original" : "thumbnail");
     const importedFromLibTV = node.metadata?.importSource?.provider === "libtv";
     const { updateMediaNode } = useCanvasNodeActions();
     const measuredSizeRef = useRef<{ width: number; height: number } | null>(null);
@@ -431,7 +431,15 @@ export function ImageContent({
 
     return (
         <BatchFrame batchPreviewNodes={batchPreviewNodes} batchCount={isBatchRoot ? batchCount : 0} batchExpanded={batchExpanded} batchOpening={batchOpening} batchRecovering={batchRecovering} theme={theme} onToggleBatch={onToggleBatch}>
-            <div ref={imageContainerRef} className="relative h-full w-full overflow-hidden rounded-[var(--node-radius)]">
+            <div
+                ref={imageContainerRef}
+                className="relative h-full w-full overflow-hidden rounded-[var(--node-radius)]"
+                style={
+                    node.metadata?.imageLayer || node.metadata?.imageLayerGroup
+                        ? { backgroundColor: theme.node.fill, backgroundImage: `conic-gradient(${theme.node.muted}22 25%, transparent 0 50%, ${theme.node.muted}22 0 75%, transparent 0)`, backgroundSize: "16px 16px" }
+                        : undefined
+                }
+            >
                 <RetainedCanvasImage
                     identity={`${getActiveUserScope()}:${node.id}:${node.metadata?.storageKey || node.metadata?.content || "empty"}`}
                     src={url}
@@ -444,6 +452,11 @@ export function ImageContent({
                     loading={loading}
                     theme={theme}
                 />
+                {node.metadata?.imageLayerGroup?.compositeStatus === "updating" || node.metadata?.imageLayerGroup?.compositeStatus === "error" ? (
+                    <div role="status" className="absolute inset-0 grid place-items-center bg-black/60 p-4 text-center text-xs text-white">
+                        {node.metadata.imageLayerGroup.compositeStatus === "updating" ? "正在更新合成图…" : node.metadata.imageLayerGroup.compositeError || "合成图更新失败，请在图层管理中重试"}
+                    </div>
+                ) : null}
             </div>
         </BatchFrame>
     );

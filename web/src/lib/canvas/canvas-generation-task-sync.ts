@@ -1,6 +1,6 @@
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
 import { commitCanvasGenerationResult } from "@/lib/canvas/canvas-generation-result";
-import { imageGenerationChildPosition } from "@/lib/canvas/canvas-generation-layout";
+import { findAvailableGenerationGroupPosition, imageGenerationChildPosition } from "@/lib/canvas/canvas-generation-layout";
 import { fitNodeSize, nodeSizeFromRatio, VIDEO_NODE_MAX_SIZE } from "@/lib/canvas/canvas-node-size";
 import { compositeEmotionImage } from "@/lib/canvas/canvas-emotion";
 import { storeGeneratedAudio } from "@/services/api/audio";
@@ -14,12 +14,14 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { applyGenerationConsumerEffect, generationEffectApplied } from "@/services/generation-consumer-dedupe";
 import { commitProducedModel } from "@/lib/canvas/produced-model";
+import { imageLayerCompositeSignature } from "@/lib/canvas/canvas-image-layers";
+import { decodeAndComposeImageLayers, inspectImageLayer } from "@/services/canvas-image-layer-compositor";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
 
 export function generationTaskInput(task: GenerationTask) {
     if (!task.inputJson) return null;
     try {
-        return JSON.parse(task.inputJson) as { mode?: CanvasGenerationMode; metadata?: { nodeId?: string; sourceNodeId?: string; domainProjectId?: string }; prompt?: string };
+        return JSON.parse(task.inputJson) as { mode?: CanvasGenerationMode; metadata?: { nodeId?: string; sourceNodeId?: string; domainProjectId?: string; layerDecomposition?: boolean }; prompt?: string };
     } catch {
         return null;
     }
@@ -129,6 +131,12 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
     const result = parseBackendGenerationResult(task);
 
     if (mode === "image") {
+        if (node.metadata?.layerExtraction) {
+            if (result.images?.length !== 1) throw new Error("逐层提取必须返回一张独立图片，不能返回拼版或多张候选图");
+            const info = await inspectImageLayer(result.images[0]);
+            if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
+            if (node.metadata.layerExtraction.index > 0 && !info.transparent) throw new Error("实验拆层失败：模型未返回真实透明背景，棋盘格或纯色背景不能作为图层");
+        }
         const image = result.images?.[outputIndex];
         if (!image?.dataUrl) throw new Error("后端任务没有返回图片");
         let resultDataUrl = image.dataUrl;
@@ -278,7 +286,7 @@ export async function applyMaterializedGenerationTaskResultToNodes(nodes: Canvas
     }
     const { node: updatedNode, additionalNodes } = await buildGenerationTaskNodeResults(node, { ...task, resultJson: JSON.stringify(result) }, nodes);
     const stamp = (item: CanvasNodeData) => ({ ...item, metadata: applyGenerationConsumerEffect(item.metadata || {}, effectKey, (metadata) => metadata).value });
-    const durableNode = stamp({ ...updatedNode, metadata: { ...updatedNode.metadata, assetId: updatedNode.metadata?.assetId || asset.id } });
+    const durableNode = stamp({ ...updatedNode, metadata: { ...updatedNode.metadata, assetId: updatedNode.metadata?.assetId || (updatedNode.metadata?.imageLayerGroup ? undefined : asset.id) } });
     const durableChildren = additionalNodes.map(stamp);
     return {
         nodes: commitCanvasGenerationResult(nodes, node, durableNode, task.id, durableChildren),
@@ -303,6 +311,7 @@ export function shouldRecoverCanvasImageOutputs(node: CanvasNodeData) {
 }
 
 async function buildGenerationTaskNodeResults(node: CanvasNodeData, task: GenerationTask, nodes: CanvasNodeData[]) {
+    if (generationTaskInput(task)?.metadata?.layerDecomposition) return buildImageLayerTaskResult(node, task, nodes);
     const resultNode = await buildGenerationTaskNodeResult(node, task, nodes);
     const images = generationTaskMode(task) === "image" ? parseBackendGenerationResult(task).images || [] : [];
     if (images.length <= 1) return { node: resultNode, additionalNodes: [] as CanvasNodeData[] };
@@ -344,6 +353,131 @@ async function buildGenerationTaskNodeResults(node: CanvasNodeData, task: Genera
             },
         },
         additionalNodes: children,
+    };
+}
+
+export async function buildImageLayerTaskResult(node: CanvasNodeData, task: GenerationTask, nodes: CanvasNodeData[]) {
+    const images = parseBackendGenerationResult(task).images || [];
+    if (node.metadata?.taskId === task.id && node.metadata.content && node.metadata.imageLayerGroup && node.metadata.generationOutputCount === images.length)
+        return {
+            node: node.metadata.status === "success" ? node : { ...node, metadata: { ...node.metadata, ...completedTaskMetadata(task), status: "success" as const } },
+            additionalNodes: [] as CanvasNodeData[],
+        };
+    const decoded = await decodeAndComposeImageLayers(images);
+    const size = fitNodeSize(decoded.width, decoded.height, node.width, node.height);
+    const firstPosition = imageGenerationChildPosition(node.position, size.width, size, 0);
+    const lastPosition = imageGenerationChildPosition(node.position, size.width, size, images.length - 1);
+    const secondPosition = imageGenerationChildPosition(node.position, size.width, size, 1);
+    const layoutPosition = findAvailableGenerationGroupPosition(nodes, firstPosition, {
+        width: secondPosition.x - firstPosition.x + size.width,
+        height: lastPosition.y - firstPosition.y + size.height,
+    });
+    const children: CanvasNodeData[] = [];
+    for (let index = 0; index < images.length; index += 1) {
+        const id = `${node.id}:task:${task.id}:layer:${index}`;
+        const existing = nodes.find((item) => item.id === id);
+        if (existing) {
+            children.push(existing);
+            continue;
+        }
+        const image = images[index];
+        const stored: UploadedImage = image.storageKey
+            ? {
+                  url: await resolveImageUrl(image.storageKey, image.dataUrl),
+                  storageKey: image.storageKey,
+                  width: decoded.width,
+                  height: decoded.height,
+                  bytes: image.bytes || decoded.layers[index].blob.size,
+                  mimeType: decoded.layers[index].blob.type || "image/png",
+              }
+            : await uploadImage(decoded.layers[index].blob);
+        if (stored.pendingRemoteUpload) throw new Error("图层仅缓存在本机，服务端保存未完成；请重试保存结果");
+        children.push({
+            id,
+            type: CanvasNodeType.Image,
+            title: decoded.layers[index].transparent ? `图层 ${index + 1}` : "底图",
+            ...size,
+            position: (() => {
+                const position = imageGenerationChildPosition(node.position, size.width, size, index);
+                return { x: position.x + layoutPosition.x - firstPosition.x, y: position.y + layoutPosition.y - firstPosition.y };
+            })(),
+            metadata: commitProducedModel(
+                {
+                    ...imageMetadata(stored),
+                    assetId: task.outputs?.find((output) => output.outputIndex === index)?.materializedAssetId,
+                    batchRootId: node.id,
+                    imageLayer: { groupId: node.id, outputIndex: index, kind: decoded.layers[index].transparent ? "transparent" : "base" },
+                    model: node.metadata?.model || task.model,
+                    producedModel: task.model,
+                },
+                task.model,
+            ),
+        });
+    }
+    const composite = await uploadImage(decoded.composite);
+    if (composite.pendingRemoteUpload) throw new Error("合成图仅缓存在本机，服务端保存未完成；请重试保存结果");
+    const group: NonNullable<CanvasNodeMetadata["imageLayerGroup"]> = {
+        width: decoded.width,
+        height: decoded.height,
+        compositeStatus: "ready",
+        layers: decoded.order.map((index) => ({ nodeId: children[index].id, x: 0, y: 0, visible: true })),
+    };
+    group.compositeSignature = imageLayerCompositeSignature(group, children);
+    return {
+        node: {
+            ...node,
+            ...size,
+            metadata: applyGeneratedMediaResultMetadata(
+                node,
+                imageMetadata(composite),
+                {
+                    ...completedTaskMetadata(task),
+                    imageLayerGroup: group,
+                    isBatchRoot: true,
+                    batchChildIds: group.layers.map((layer) => layer.nodeId),
+                    primaryImageId: undefined,
+                    imageBatchExpanded: node.metadata?.imageBatchExpanded ?? false,
+                    generationOutputCount: images.length,
+                },
+                task.model,
+            ),
+        },
+        additionalNodes: children,
+    };
+}
+
+/** 聚合逐层任务的真实资源，成功前不把普通图片伪装成透明图层组。 */
+export async function buildExperimentalImageLayerResult(root: CanvasNodeData, nodes: CanvasNodeData[]) {
+    const plan = root.metadata?.experimentalLayerPlan;
+    if (!plan || plan.requests.length < 2 || plan.requests.length > 8) throw new Error("实验拆层计划无效");
+    const children = plan.requests.map((request) => nodes.find((node) => node.id === request.nodeId));
+    if (children.some((node) => !node?.metadata?.content || node.metadata.status !== "success")) throw new Error("实验拆层尚未完成全部图层，未生成合成图");
+    const sources = children as CanvasNodeData[];
+    const decoded = await decodeAndComposeImageLayers(sources.map((node) => ({ dataUrl: node.metadata!.content!, storageKey: node.metadata?.storageKey })));
+    if (decoded.layers.slice(1).some((layer) => !layer.transparent)) throw new Error("实验拆层前景没有真实透明背景，未生成合成图");
+    const composite = await uploadImage(decoded.composite);
+    if (composite.pendingRemoteUpload) throw new Error("合成图尚未保存到服务端，请重试本地合成");
+    const updatedChildren = sources.map((node, index) => ({
+        ...node,
+        title: plan.requests[index].target,
+        metadata: { ...node.metadata, batchRootId: root.id, imageLayer: { groupId: root.id, outputIndex: index, kind: decoded.layers[index].transparent ? ("transparent" as const) : ("base" as const) } },
+    }));
+    const group: NonNullable<CanvasNodeMetadata["imageLayerGroup"]> = { width: decoded.width, height: decoded.height, compositeStatus: "ready", layers: decoded.order.map((index) => ({ nodeId: sources[index].id, x: 0, y: 0, visible: true })) };
+    group.compositeSignature = imageLayerCompositeSignature(group, updatedChildren);
+    return {
+        node: {
+            ...root,
+            ...fitNodeSize(decoded.width, decoded.height, root.width, root.height),
+            metadata: applyGeneratedMediaResultMetadata(root, imageMetadata(composite), {
+                imageLayerGroup: group,
+                isBatchRoot: true,
+                batchChildIds: group.layers.map((layer) => layer.nodeId),
+                imageBatchExpanded: false,
+                primaryImageId: undefined,
+                generationOutputCount: sources.length,
+            }),
+        },
+        additionalNodes: updatedChildren,
     };
 }
 

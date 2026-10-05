@@ -3,6 +3,7 @@ import { App } from "antd";
 
 import { buildNodeGenerationContext, hydrateNodeGenerationContext } from "@/components/canvas/canvas-node-generation";
 import { nodeGenerationPrompt } from "@/lib/canvas/generation-contract";
+import { layerDecompositionConfig, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { producedModelCandidateForGeneration } from "@/lib/canvas/produced-model";
 import type { CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
 import { buildEmotionImageArtifacts, emotionGenerationSize, emotionProviderMask, normalizeEmotionPromptForProvider, resolveEmotionEditPlan } from "@/lib/canvas/canvas-emotion";
@@ -77,6 +78,24 @@ export function useCanvasGenerationRetry({
 
     return useCallback(
         async (node: CanvasNodeData) => {
+            if (node.metadata?.experimentalLayerPlan && !node.metadata.imageLayerGroup) {
+                const complete = node.metadata.experimentalLayerPlan.requests.every((request) => {
+                    const child = nodesRef.current.find((item) => item.id === request.nodeId);
+                    return child?.metadata?.status === "success" && Boolean(child.metadata.content);
+                });
+                if (!complete) {
+                    message.info("实验拆层尚未完成，请检查各层结果；重新调用需从源图发起，不会自动扣费重试");
+                    return;
+                }
+                setNodes((current) =>
+                    current.map((item) =>
+                        item.id === node.id && item.metadata?.experimentalLayerPlan
+                            ? { ...item, metadata: { ...item.metadata, status: "loading", errorDetails: undefined, experimentalLayerPlan: { ...item.metadata.experimentalLayerPlan, errorSignature: undefined } } }
+                            : item,
+                    ),
+                );
+                return;
+            }
             // Canvas caches may predate the failure. Consult the original task
             // before deciding to submit another paid generation.
             let sourceTask: GenerationTask | undefined;
@@ -87,6 +106,14 @@ export function useCanvasGenerationRetry({
                     message.error(error instanceof Error ? error.message : "无法核对原任务，请稍后重试");
                     return;
                 }
+            }
+            if ((node.metadata?.layerDecomposition || node.metadata?.layerExtraction) && sourceTask?.status === "succeeded") {
+                try {
+                    await applyGenerationTaskResult(node.id, sourceTask);
+                } catch (error) {
+                    message.error(error instanceof Error ? error.message : "图层结果恢复失败");
+                }
+                return;
             }
             if (sourceTask?.mediaStage && sourceTask.status !== "cancelled") {
                 const controller = startGenerationRequest(node.id, node.id, node.id);
@@ -128,12 +155,17 @@ export function useCanvasGenerationRetry({
                           count: "1",
                       }
                     : { ...sourceGenerationConfig, count: "1" };
+            if (node.metadata?.layerDecomposition) generationConfig = layerDecompositionConfig(generationConfig, generationConfig.model);
+            if (node.metadata?.layerDecomposition && !supportsLayerDecomposition(generationConfig, generationConfig.model)) {
+                message.error("原拆层模型未配置专用拆层协议，无法重试");
+                return;
+            }
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
                 navigateToSettings({ continueCreation: true });
                 return;
             }
 
-            const retryPromptSource = nodeGenerationPrompt(sourceNode) || nodeGenerationPrompt(node);
+            const retryPromptSource = node.metadata?.layerDecomposition || node.metadata?.layerExtraction ? nodeGenerationPrompt(node) : nodeGenerationPrompt(sourceNode) || nodeGenerationPrompt(node);
             const retryContextPrompt = retryMode === "image" && sourceNode.metadata?.portraitTexture ? buildPortraitTexturePrompt(retryPromptSource, sourceNode.metadata.portraitTexture) : retryPromptSource;
             if (unchangedModeratedPrompt(node.metadata, retryPromptSource)) {
                 message.warning("该提示词未通过内容审核，请先修改提示词再重新生成");
@@ -421,6 +453,7 @@ export function useCanvasGenerationRetry({
                     metadata: {
                         retry: true,
                         sourceNodeId: sourceNode.id,
+                        layerDecomposition: Boolean(node.metadata?.layerDecomposition),
                         resolvedCharacterVersions: context?.resolvedCharacterVersions || [],
                         promptTemplateOperation: node.metadata?.promptTemplateOperation,
                         promptTemplateVariables: node.metadata?.promptTemplateVariables,

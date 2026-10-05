@@ -24,16 +24,11 @@ import { commitProducedModel } from "@/lib/canvas/produced-model";
 import { findAvailableGenerationGroupPosition, imageGenerationChildPosition, imageGenerationGroupSize } from "@/lib/canvas/canvas-generation-layout";
 import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-submission";
 import { cancelIncompleteImageBatch } from "@/lib/canvas/canvas-image-batch-retry";
+import { experimentalLayerPrompt, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { buildAngleLabel, buildAnglePrompt, createCanvasNode } from "@/lib/canvas/canvas-project-domain";
 import { validateVideoSegmentBatch } from "@/lib/canvas/canvas-video-regeneration";
 import { resolveCanvasStyleExecution } from "@/lib/canvas/canvas-style-execution";
-import {
-    buildGenerationConfig,
-    buildImageGenerationMetadata,
-    nodeReferenceImage,
-    isGenerationCanceled,
-    runBackendCanvasGenerationTask,
-} from "@/lib/canvas/canvas-project-generation";
+import { buildGenerationConfig, buildImageGenerationMetadata, nodeReferenceImage, isGenerationCanceled, runBackendCanvasGenerationTask, runCanvasGenerationTaskToConsumer } from "@/lib/canvas/canvas-project-generation";
 import { fitNodeSize, VIDEO_NODE_MAX_SIZE } from "@/lib/canvas/canvas-node-size";
 import { compositeEmotionImage, emotionGenerationSize, emotionProviderMask, normalizeEmotionPromptForProvider, resolveEmotionEditPlan } from "@/lib/canvas/canvas-emotion";
 import { DEFAULT_PORTRAIT_TEXTURE_SETTINGS } from "@/lib/canvas/canvas-portrait-texture";
@@ -85,6 +80,7 @@ type UseCanvasMediaToolsOptions = {
     startGenerationRequest: (targetNodeId: string, originNodeId: string, runningId?: string, controller?: AbortController) => AbortController;
     finishGenerationRequest: (targetNodeId: string, controller: AbortController) => void;
     bindGenerationTask: (targetNodeId: string, task: GenerationTask) => void;
+    applyGenerationTaskResult: (targetNodeId: string, task: GenerationTask) => Promise<void>;
 };
 
 const NODE_STATUS_LOADING = "loading" as const;
@@ -111,12 +107,14 @@ export function useCanvasMediaTools({
     startGenerationRequest,
     finishGenerationRequest,
     bindGenerationTask,
+    applyGenerationTaskResult,
 }: UseCanvasMediaToolsOptions) {
     const { message } = App.useApp();
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const extractingVideoFramesNodeIdRef = useRef<string | null>(null);
     const mergeVideoRunningRef = useRef(false);
+    const layerSubmissionIds = useRef(new Set<string>());
     const [cropNodeId, setCropNodeId] = useState<string | null>(null);
     const [annotationNodeId, setAnnotationNodeId] = useState<string | null>(null);
     const [annotationEditNodeId, setAnnotationEditNodeId] = useState<string | null>(null);
@@ -986,74 +984,152 @@ export function useCanvasMediaTools({
         setImageEditNodeId(node.id);
     }, []);
 
-    const decomposeImageLayers = useCallback(async (node: CanvasNodeData, payload: CanvasImageLayerDecompositionPayload) => {
-        if (!node.metadata?.content || !payload.prompt.trim()) return;
-        const baseGenerationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1" };
-        const selectedModel = payload.generationConfig?.model || payload.generationConfig?.imageModel || baseGenerationConfig.model;
-        const generationConfig = { ...baseGenerationConfig, ...payload.generationConfig, model: selectedModel, imageModel: payload.generationConfig?.imageModel || selectedModel, count: "1" };
-        if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-            navigateToSettings({ continueCreation: true });
-            return;
-        }
-        const source = nodeReferenceImage(node);
-        if (!source) return;
-        const prompt = payload.prompt.trim();
-        const taskNodeId = nanoid();
-        const imageSize = { width: node.width, height: node.height };
-        const position = { x: node.position.x + node.width + 96, y: node.position.y };
-        const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [source]);
-        const taskNode: CanvasNodeData = {
-            id: taskNodeId,
-            type: CanvasNodeType.Image,
-            title: "AI 图层拆分",
-            position,
-            width: imageSize.width,
-            height: imageSize.height,
-            metadata: { ...canvasGenerationPromptMetadata(prompt, prompt), status: NODE_STATUS_LOADING, pluginId: "image-tools", pluginNodeId: "layer-decomposition", ...generationMetadata },
-        };
-        setLayerDecompositionNodeId(null);
-        setRunningNodeId(taskNodeId);
-        setNodes((current) => [...current, taskNode]);
-        setConnections((current) => [...current, { id: nanoid(), fromNodeId: node.id, toNodeId: taskNodeId }]);
-        setSelectedNodeIds(new Set([taskNodeId]));
-        setSelectedConnectionId(null);
-        setDialogNodeId(null);
-        const controller = startGenerationRequest(taskNodeId, node.id, taskNodeId);
-        try {
-            const result = await runBackendCanvasGenerationTask({ projectId, nodeId: taskNodeId, mode: "image", prompt, config: generationConfig, referenceImages: [source], signal: controller.signal, metadata: { sourceNodeId: node.id, edit: "layer-decomposition", layerDecomposition: true }, onTaskCreated: (task) => bindGenerationTask(taskNodeId, task) });
-            const outputs = result.images?.filter((item) => item?.dataUrl) || [];
-            if (!outputs.length) throw new Error("图层拆分任务没有返回图片");
-            const layerNodes: CanvasNodeData[] = [];
-            for (let index = 0; index < outputs.length; index += 1) {
-                const uploaded = await uploadImage(outputs[index].dataUrl);
-                const size = fitNodeSize(uploaded.width, uploaded.height, imageSize.width, imageSize.height);
-                const id = index === 0 ? taskNodeId : nanoid();
-                layerNodes.push({
-                    id,
+    const decomposeImageLayers = useCallback(
+        async (node: CanvasNodeData, payload: CanvasImageLayerDecompositionPayload) => {
+            if (layerSubmissionIds.current.has(node.id)) return;
+            if (!node.metadata?.content || !payload.prompt.trim()) return;
+            const baseGenerationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1" };
+            const selectedModel = payload.generationConfig?.model || payload.generationConfig?.imageModel || baseGenerationConfig.model;
+            const generationConfig = layerDecompositionConfig(baseGenerationConfig, selectedModel, payload.generationConfig);
+            const experimental = Boolean(payload.experimentalTargets);
+            if (!supportsLayerDecomposition(generationConfig, selectedModel) && !(experimental && supportsExperimentalLayerExtraction(generationConfig, selectedModel))) {
+                message.error("请选择支持独立透明图层输出的专用拆层模型");
+                return;
+            }
+            if (!isAiConfigReady(generationConfig, generationConfig.model)) {
+                navigateToSettings({ continueCreation: true });
+                return;
+            }
+            const source = nodeReferenceImage(node);
+            if (!source) return;
+            const prompt = payload.prompt.trim();
+            let targets: string[] | undefined;
+            if (experimental) {
+                try {
+                    targets = parseExperimentalLayerTargets(payload.experimentalTargets!.join("\n"));
+                } catch (error) {
+                    message.error(error instanceof Error ? error.message : "拆层目标无效");
+                    return;
+                }
+            }
+            const taskNodeId = nanoid();
+            const imageSize = { width: node.width, height: node.height };
+            const position = findAvailableGenerationGroupPosition(nodesRef.current, { x: node.position.x + node.width + 96, y: node.position.y }, imageSize);
+            const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [source]);
+            layerSubmissionIds.current.add(node.id);
+            const requests = targets?.map((target) => ({ nodeId: nanoid(), target }));
+            const taskNode: CanvasNodeData = {
+                id: taskNodeId,
+                type: CanvasNodeType.Image,
+                title: "AI 图层拆分",
+                position,
+                width: imageSize.width,
+                height: imageSize.height,
+                metadata: {
+                    ...canvasGenerationPromptMetadata(prompt, prompt),
+                    status: NODE_STATUS_LOADING,
+                    pluginId: "image-tools",
+                    pluginNodeId: "layer-decomposition",
+                    ...(requests ? { experimentalLayerPlan: { sourceNodeId: node.id, requests } } : { layerDecomposition: { sourceNodeId: node.id } }),
+                    ...generationMetadata,
+                },
+            };
+            const extractionNodes: CanvasNodeData[] = (requests || []).map((request, index) => {
+                const extractionPrompt = experimentalLayerPrompt(prompt, targets!, index);
+                return {
+                    id: request.nodeId,
                     type: CanvasNodeType.Image,
-                    title: `${node.title || "图片"} · 图层 ${index + 1}`,
-                    position: { x: position.x + (index % 2) * (size.width + 48), y: position.y + Math.floor(index / 2) * (size.height + 48) },
-                    width: size.width,
-                    height: size.height,
-                    metadata: commitProducedModel({ ...imageMetadata(uploaded), prompt, status: NODE_STATUS_SUCCESS, pluginId: "image-tools", pluginNodeId: "layer-decomposition", pluginData: { layerIndex: index + 1, sourceNodeId: node.id }, ...generationMetadata }),
-                });
+                    title: `实验提取 ${index + 1} · ${request.target}`,
+                    ...imageSize,
+                    position: imageGenerationChildPosition(position, imageSize.width, imageSize, index),
+                    metadata: {
+                        ...canvasGenerationPromptMetadata(extractionPrompt, extractionPrompt),
+                        ...buildImageGenerationMetadata("edit", { ...generationConfig, transparentBackground: index > 0 ? "true" : "false" }, 1, [source]),
+                        status: NODE_STATUS_IDLE,
+                        layerExtraction: { sourceNodeId: node.id, groupId: taskNodeId, index },
+                    },
+                };
+            });
+            setLayerDecompositionNodeId(null);
+            setRunningNodeId(taskNodeId);
+            setNodes((current) => [...current, taskNode, ...extractionNodes]);
+            setConnections((current) => [...current, ...[taskNode, ...extractionNodes].map((item) => ({ id: nanoid(), fromNodeId: node.id, toNodeId: item.id }))]);
+            setSelectedNodeIds(new Set([taskNodeId]));
+            setSelectedConnectionId(null);
+            setDialogNodeId(null);
+            const controller = startGenerationRequest(taskNodeId, node.id, taskNodeId);
+            try {
+                if (requests && targets) {
+                    for (let index = 0; index < requests.length; index += 1) {
+                        const targetId = requests[index].nodeId;
+                        if (controller.signal.aborted) throw new DOMException("实验拆层已停止", "AbortError");
+                        if (index > 0 && (!nodesRef.current.some((item) => item.id === taskNodeId) || !nodesRef.current.some((item) => item.id === targetId))) throw new Error("实验拆层节点已删除，后续请求已停止");
+                        setNodes((current) => current.map((item) => (item.id === targetId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING } } : item)));
+                        startGenerationRequest(targetId, node.id, taskNodeId, controller);
+                        try {
+                            await runCanvasGenerationTaskToConsumer(
+                                {
+                                    projectId,
+                                    nodeId: targetId,
+                                    mode: "image",
+                                    prompt: experimentalLayerPrompt(prompt, targets, index),
+                                    config: { ...generationConfig, transparentBackground: index > 0 ? "true" : "false" },
+                                    referenceImages: [source],
+                                    signal: controller.signal,
+                                    metadata: { sourceNodeId: node.id, edit: "layer-extraction" },
+                                },
+                                { bindTask: (task) => bindGenerationTask(targetId, task), consumeTask: (task) => applyGenerationTaskResult(targetId, task) },
+                            );
+                        } catch (error) {
+                            setNodes((current) => current.map((item) => (item.id === targetId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: generationErrorMessage(error) } } : item)));
+                            throw error;
+                        } finally {
+                            finishGenerationRequest(targetId, controller);
+                        }
+                    }
+                    return;
+                }
+                await runCanvasGenerationTaskToConsumer(
+                    { projectId, nodeId: taskNodeId, mode: "image", prompt, config: generationConfig, referenceImages: [source], signal: controller.signal, metadata: { sourceNodeId: node.id, edit: "layer-decomposition", layerDecomposition: true } },
+                    { bindTask: (task) => bindGenerationTask(taskNodeId, task), consumeTask: (task) => applyGenerationTaskResult(taskNodeId, task) },
+                );
+                message.success("图层已拆分，可展开查看并独立编辑");
+            } catch (error) {
+                if (requests || !isGenerationCanceled(error)) {
+                    const details = isGenerationCanceled(error) ? "实验拆层已停止，未提交的图层不会继续调用" : generationErrorMessage(error);
+                    message.error(details);
+                    setNodes((current) =>
+                        current.map((item) =>
+                            item.id === taskNodeId || (requests?.some((request) => request.nodeId === item.id) && item.metadata?.status === NODE_STATUS_IDLE)
+                                ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: item.id === taskNodeId ? details : "前序图层未通过，未调用模型" } }
+                                : item,
+                        ),
+                    );
+                }
+            } finally {
+                finishGenerationRequest(taskNodeId, controller);
+                layerSubmissionIds.current.delete(node.id);
+                setRunningNodeId(null);
             }
-            setNodes((current) => [...current.filter((item) => item.id !== taskNodeId), ...layerNodes]);
-            setConnections((current) => [...current.filter((connection) => connection.toNodeId !== taskNodeId), ...layerNodes.map((layer) => ({ id: nanoid(), fromNodeId: node.id, toNodeId: layer.id }))]);
-            setSelectedNodeIds(new Set(layerNodes.map((layer) => layer.id)));
-            await persistMediaNodes(layerNodes);
-            message.success(`已拆分出 ${layerNodes.length} 个图片图层`);
-        } catch (error) {
-            if (!isGenerationCanceled(error)) {
-                const details = generationErrorMessage(error);
-                message.error(details);
-                setNodes((current) => current.map((item) => item.id === taskNodeId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: details } } : item));
-            }
-        } finally {
-            finishGenerationRequest(taskNodeId, controller);
-            setRunningNodeId(null);
-        }
-    }, [bindGenerationTask, effectiveConfig, finishGenerationRequest, isAiConfigReady, message, persistMediaNodes, projectId, setConnections, setDialogNodeId, setNodes, setRunningNodeId, setSelectedConnectionId, setSelectedNodeIds, startGenerationRequest]);
+        },
+        [
+            applyGenerationTaskResult,
+            bindGenerationTask,
+            effectiveConfig,
+            finishGenerationRequest,
+            isAiConfigReady,
+            message,
+            nodesRef,
+            projectId,
+            setConnections,
+            setDialogNodeId,
+            setNodes,
+            setRunningNodeId,
+            setSelectedConnectionId,
+            setSelectedNodeIds,
+            startGenerationRequest,
+        ],
+    );
 
     const openLayerDecomposition = useCallback((node: CanvasNodeData) => {
         setLayerDecompositionNodeId(node.id);

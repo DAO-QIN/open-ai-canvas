@@ -25,6 +25,10 @@ export function retireImageBatchChildren(root: CanvasNodeData, nodes: CanvasNode
                 delete metadata.batchChildIds;
                 delete metadata.primaryImageId;
                 delete metadata.batchFailedCount;
+                delete metadata.imageLayerGroup;
+                delete metadata.layerDecomposition;
+                delete metadata.experimentalLayerPlan;
+                delete metadata.layerExtraction;
                 if (!hasImageBatchResult(node)) metadata.status = "idle";
                 return { ...node, metadata };
             }
@@ -32,6 +36,8 @@ export function retireImageBatchChildren(root: CanvasNodeData, nodes: CanvasNode
             if (index < 0) return node;
             const metadata = { ...node.metadata };
             delete metadata.batchRootId;
+            delete metadata.imageLayer;
+            delete metadata.layerExtraction;
             return {
                 ...node,
                 position: { x: root.position.x - node.width - 48, y: root.position.y + index * (node.height + 24) },
@@ -135,6 +141,7 @@ export function restoreUnsubmittedImageBatchChild(current: CanvasNodeData, origi
 }
 
 export function reconcileImageBatchRoot(root: CanvasNodeData, nodes: CanvasNodeData[]) {
+    if (root.metadata?.imageLayerGroup) return root;
     if (root.type !== CanvasNodeType.Image || !root.metadata?.isBatchRoot) return root;
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const children = (root.metadata.batchChildIds || [])

@@ -280,7 +280,11 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
         async (node: CanvasNodeData, taskId: string, signal?: AbortSignal) => {
             const result = await retryCanvasAssetSyncAfterRateLimit(() => ensureCanvasNodeAsset({ canvasId: projectId, domainProjectId, node, source: "canvas-generation", taskId, signal }), { signal });
             if (signal?.aborted) return;
-            setNodes((current) => current.map((item) => (item.id === node.id && item.metadata?.taskId === taskId ? { ...item, metadata: { ...item.metadata, assetId: result.assetId } } : item)));
+            setNodes((current) =>
+                current.map((item) =>
+                    item.id === node.id && item.metadata?.taskId === taskId && (!node.metadata?.imageLayerGroup || item.metadata.storageKey === node.metadata.storageKey) ? { ...item, metadata: { ...item.metadata, assetId: result.assetId } } : item,
+                ),
+            );
             if (domainProjectId) await queryClient.invalidateQueries({ queryKey: ["project", domainProjectId] });
         },
         [domainProjectId, projectId, queryClient, setNodes],
@@ -380,6 +384,7 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
         async (startedProjectId: string, signal: AbortSignal, isCurrentProject: () => boolean) => {
             if (!isCurrentProject()) return;
             const recoveryNodes = nodesRef.current.filter((node) => {
+                if (node.metadata?.experimentalLayerPlan) return false;
                 const pendingAgentContinuation = node.metadata?.agentGenerationContinuation?.status === "pending";
                 const aggregateBatchRoot = node.metadata?.isBatchRoot && node.metadata.batchChildIds?.length;
                 if (aggregateBatchRoot && !pendingAgentContinuation) return false;
@@ -508,7 +513,7 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
         nodes.forEach((node) => {
             const taskId = node.metadata?.taskId;
             if (!taskId || !node.metadata?.content || node.metadata.status !== NODE_STATUS_SUCCESS || (node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Audio)) return;
-            const saveKey = `${taskId}:${node.id}:${domainProjectId || "personal"}`;
+            const saveKey = `${taskId}:${node.id}:${domainProjectId || "personal"}${node.metadata.imageLayerGroup ? `:${node.metadata.storageKey}` : ""}`;
             if (autoSavedTaskIdsRef.current.has(saveKey)) return;
             autoSavedTaskIdsRef.current.add(saveKey);
             void runGenerationConsumer(consumerControllerRef.current.signal, async (signal) => {
