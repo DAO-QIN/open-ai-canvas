@@ -131,11 +131,16 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
     const result = parseBackendGenerationResult(task);
 
     if (mode === "image") {
+        let extraction = node.metadata?.layerExtraction;
+        let needsRemoval = false;
         if (node.metadata?.layerExtraction) {
             if (result.images?.length !== 1) throw new Error("逐层提取必须返回一张独立图片，不能返回拼版或多张候选图");
             const info = await inspectImageLayer(result.images[0]);
             if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
-            if (node.metadata.layerExtraction.index > 0 && !info.transparent) throw new Error("实验拆层失败：模型未返回真实透明背景，棋盘格或纯色背景不能作为图层");
+            if (extraction?.canvas && (info.width !== extraction.canvas.width || info.height !== extraction.canvas.height)) throw new Error("图层尺寸与底图不一致，已停止后续调用");
+            needsRemoval = Boolean(extraction?.index && !info.transparent && extraction.allowBackgroundRemoval && extraction.phase === "extract");
+            if (extraction!.index > 0 && !info.transparent && !needsRemoval) throw new Error("拆层失败：模型未返回真实透明背景，棋盘格或纯色背景不能作为图层");
+            extraction = { ...extraction!, phase: needsRemoval ? "background-removal-required" : "complete", extractionTaskId: extraction?.phase === "extract" ? task.id : extraction?.extractionTaskId };
         }
         const image = result.images?.[outputIndex];
         if (!image?.dataUrl) throw new Error("后端任务没有返回图片");
@@ -168,7 +173,7 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
             width: imageSize.width,
             height: imageSize.height,
             position: { x: node.position.x + node.width / 2 - imageSize.width / 2, y: node.position.y + node.height / 2 - imageSize.height / 2 },
-            metadata: applyGeneratedMediaResultMetadata(node, imageMetadata(normalizedImage), { prompt, ...completedTaskMetadata(task), generationOutputCount: 1 }, task.model),
+            metadata: applyGeneratedMediaResultMetadata(node, imageMetadata(normalizedImage), { prompt, ...completedTaskMetadata(task), generationOutputCount: 1, ...(extraction ? { layerExtraction: extraction, status: needsRemoval ? "idle" : "success" } : {}) }, task.model),
         };
     }
 
@@ -298,6 +303,7 @@ export async function applyMaterializedGenerationTaskResultToNodes(nodes: Canvas
 }
 
 export function generationTaskOutputsApplied(node: CanvasNodeData, task: GenerationTask) {
+    if (node.metadata?.layerExtraction?.extractionTaskId === task.id && node.metadata.content) return true;
     if (node.metadata?.taskId !== task.id || node.metadata.status !== "success" || !node.metadata.content) return false;
     if (generationTaskMode(task) !== "image") return true;
     const count = parseBackendGenerationResult(task).images?.length || 1;

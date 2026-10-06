@@ -13,6 +13,7 @@ export function useCanvasImageLayerGroups({
     nodesRef,
     setNodes,
     runningNodeId,
+    activeLayerGroupIds,
 }: {
     projectId: string;
     enabled: boolean;
@@ -20,6 +21,7 @@ export function useCanvasImageLayerGroups({
     nodesRef: { current: CanvasNodeData[] };
     setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>;
     runningNodeId?: string | null;
+    activeLayerGroupIds?: ReadonlySet<string>;
 }) {
     const jobs = useRef(new Map<string, string>());
     const failed = useRef(new Map<string, string>());
@@ -39,7 +41,7 @@ export function useCanvasImageLayerGroups({
             if (!plan || root.metadata?.imageLayerGroup || jobs.current.has(root.id)) continue;
             const children = plan.requests.map((request) => nodes.find((node) => node.id === request.nodeId));
             if (children.some((node) => !node?.metadata?.content || node.metadata.status !== "success")) {
-                if (runningNodeId !== root.id && root.metadata?.status !== "error" && children.some((node) => !node || node.metadata?.status !== "loading" || !node.metadata.taskId)) {
+                if (!activeLayerGroupIds?.has(root.id) && runningNodeId !== root.id && root.metadata?.status !== "error" && children.some((node) => !node || node.metadata?.status !== "loading" || !node.metadata.taskId)) {
                     setNodes((current) =>
                         current.map((node) => (node.id === root.id ? { ...node, metadata: { ...node.metadata, status: "error", errorDetails: "实验拆层未完成：部分图层失败或尚未调用；不会自动继续扣费。请检查逐层任务结果后重新从源图发起。" } } : node)),
                     );
@@ -82,7 +84,7 @@ export function useCanvasImageLayerGroups({
                 }
             })();
         }
-    }, [enabled, nodes, runningNodeId, setNodes]);
+    }, [enabled, nodes, runningNodeId, activeLayerGroupIds, setNodes]);
     useEffect(() => {
         if (!enabled) return;
         for (const root of nodes) {

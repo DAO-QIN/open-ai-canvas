@@ -15,7 +15,7 @@ import {
 } from "@/lib/canvas/canvas-image-layers";
 import { isolateCopiedNodeMetadata } from "@/lib/canvas/canvas-node-copy";
 import { applyBatchPrimaryImage, removeCanvasNodes, isHiddenBatchChild } from "@/lib/canvas/canvas-project-domain";
-import { reconcileImageBatchRoot } from "@/lib/canvas/canvas-image-batch-retry";
+import { failedImageBatchChildren, reconcileImageBatchRoot } from "@/lib/canvas/canvas-image-batch-retry";
 import { buildImageLayerTaskResult } from "@/lib/canvas/canvas-generation-task-sync";
 import { canvasNodeToAsset, findCanvasNodeAsset } from "@/lib/canvas/canvas-node-asset";
 import type { Asset } from "@/stores/use-asset-store";
@@ -105,6 +105,14 @@ describe("独立透明图层验收", () => {
 });
 
 describe("图层组状态与画布操作", () => {
+    test("进行中或失败的拆层计划也收纳在组内，不把底图设为成功主图或批量收费重试", () => {
+        const { root, children, nodes } = sample();
+        const pending = { ...root, metadata: { isBatchRoot: true, batchChildIds: children.map((child) => child.id), imageBatchExpanded: false, status: "error" as const, experimentalLayerPlan: { sourceNodeId: "source", requests: children.map((child) => ({ nodeId: child.id, target: child.title })) } } };
+        expect(isHiddenBatchChild(children[0], [pending, ...children])).toBe(true);
+        expect(applyBatchPrimaryImage(pending, children[0])).toBe(pending);
+        expect(reconcileImageBatchRoot(pending, nodes)).toBe(pending);
+        expect(failedImageBatchChildren(pending, children.map((child) => ({ ...child, metadata: { ...child.metadata, status: "error" as const } })))).toHaveLength(0);
+    });
     test("合成资源更新后不沿用同一原任务的旧素材绑定", () => {
         const { root } = sample();
         const old = { ...canvasNodeToAsset(root, { canvasId: "canvas", source: "canvas-generation", taskId: "task" }), id: "old", createdAt: "", updatedAt: "" } as Asset;

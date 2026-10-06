@@ -22,7 +22,7 @@ export function LoadingContent({ node, theme, onOpenTaskDetails }: Pick<CanvasNo
     const showsProgress = Boolean(taskId) && generationTaskShowsProgress(displayTask);
     const progress = showsProgress && typeof node.metadata?.taskProgress === "number" ? Math.max(0, Math.min(100, Math.round(node.metadata.taskProgress))) : null;
     const statusLabel = taskId ? generationTaskStatusLabel(displayTask) : "等待任务状态";
-    const stageLabel = taskId ? generationTaskStageLabel(displayTask) : "正在创建任务";
+    const stageLabel = node.metadata?.experimentalLayerPlan?.progress || (taskId ? generationTaskStageLabel(displayTask) : "正在创建任务");
     const elapsed = useTaskElapsed(node.metadata?.taskCreatedAt);
     return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2.5 px-5 text-center" style={{ color: theme.node.activeStroke }}>

@@ -99,6 +99,7 @@ export function cancelIncompleteImageBatch(rootId: string, childIds: string[], n
 }
 
 export function failedImageBatchChildren(root: CanvasNodeData, nodes: CanvasNodeData[]) {
+    if (root.metadata?.experimentalLayerPlan) return [];
     if (root.type !== CanvasNodeType.Image || !root.metadata?.isBatchRoot) return [];
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     return (root.metadata.batchChildIds || [])
@@ -141,7 +142,7 @@ export function restoreUnsubmittedImageBatchChild(current: CanvasNodeData, origi
 }
 
 export function reconcileImageBatchRoot(root: CanvasNodeData, nodes: CanvasNodeData[]) {
-    if (root.metadata?.imageLayerGroup) return root;
+    if (root.metadata?.imageLayerGroup || root.metadata?.experimentalLayerPlan) return root;
     if (root.type !== CanvasNodeType.Image || !root.metadata?.isBatchRoot) return root;
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const children = (root.metadata.batchChildIds || [])

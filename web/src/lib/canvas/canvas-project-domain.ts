@@ -468,7 +468,7 @@ export function sameNodeSemanticData(left: CanvasNodeData, right: CanvasNodeData
 }
 
 export function applyBatchPrimaryImage(root: CanvasNodeData, primary: CanvasNodeData): CanvasNodeData {
-    if (root.metadata?.imageLayerGroup) return root;
+    if (root.metadata?.imageLayerGroup || root.metadata?.experimentalLayerPlan) return root;
     // 主图是根节点对媒体的完整代理；可选字段也必须显式覆盖，避免残留上一张图的存储身份。
     return {
         ...root,

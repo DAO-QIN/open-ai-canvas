@@ -7,6 +7,7 @@ import { CanvasNodeLayerDecompositionDialog, type CanvasImageLayerDecompositionP
 import { CanvasNodeTextEditDialog, type CanvasImageTextEditPayload } from "@/components/canvas/canvas-node-text-edit-dialog";
 import type { CanvasNodeData } from "@/types/canvas";
 import type { AiConfig } from "@/stores/use-config-store";
+import type { ImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
 
 type CanvasProjectMediaDialogsProps = {
     cropNode: CanvasNodeData | null;
@@ -33,6 +34,7 @@ type CanvasProjectMediaDialogsProps = {
     onUpscale: (node: CanvasNodeData, params: CanvasImageUpscaleParams) => void;
     onImageOperation: (node: CanvasNodeData, payload: CanvasImageEditPayload) => void;
     onLayerDecomposition: (node: CanvasNodeData, payload: CanvasImageLayerDecompositionPayload) => void;
+    onPlanImageLayers: (model: string, prompt: string, signal: AbortSignal) => Promise<ImageLayerPlan>;
     onDetectText: () => Promise<import("@/components/canvas/canvas-node-text-edit-dialog").CanvasImageTextLine[]>;
     onTextEdit: (node: CanvasNodeData, payload: CanvasImageTextEditPayload) => void;
     config: AiConfig;
@@ -63,6 +65,7 @@ export function CanvasProjectMediaDialogs({
     onUpscale,
     onImageOperation,
     onLayerDecomposition,
+    onPlanImageLayers,
     onDetectText,
     onTextEdit,
     config,
@@ -75,7 +78,7 @@ export function CanvasProjectMediaDialogs({
             {maskEditNode?.metadata?.content ? <CanvasNodeMaskEditDialog dataUrl={maskEditNode.metadata.content} config={{ ...config, model: maskEditNode.metadata.model || config.model, imageModel: maskEditNode.metadata.model || config.imageModel, size: maskEditNode.metadata.size || config.size, quality: maskEditNode.metadata.quality || config.quality, count: String(maskEditNode.metadata.count || config.count) }} open onClose={onCloseMaskEdit} onConfirm={(payload) => onMaskEdit(maskEditNode, payload)} /> : null}
             {upscaleNode?.metadata?.content ? <CanvasNodeUpscaleDialog dataUrl={upscaleNode.metadata.content} open onClose={onCloseUpscale} onConfirm={(params) => onUpscale(upscaleNode, params)} /> : null}
             {imageEditNode?.metadata?.content ? <CanvasNodeImageEditDialog dataUrl={imageEditNode.metadata.content} preset={imageEditPreset} config={{ ...config, model: imageEditNode.metadata.model || config.model, imageModel: imageEditNode.metadata.model || config.imageModel, size: imageEditNode.metadata.size || config.size, quality: imageEditNode.metadata.quality || config.quality }} open onClose={onCloseImageEdit} onConfirm={(payload) => onImageOperation(imageEditNode, payload)} /> : null}
-            {layerDecompositionNode?.metadata?.content ? <CanvasNodeLayerDecompositionDialog dataUrl={layerDecompositionNode.metadata.content} config={{ ...config, model: layerDecompositionNode.metadata.model || config.model, imageModel: layerDecompositionNode.metadata.model || config.imageModel, size: layerDecompositionNode.metadata.size || config.size, quality: layerDecompositionNode.metadata.quality || config.quality }} open onClose={onCloseLayerDecomposition} onConfirm={(payload) => onLayerDecomposition(layerDecompositionNode, payload)} /> : null}
+            {layerDecompositionNode?.metadata?.content ? <CanvasNodeLayerDecompositionDialog dataUrl={layerDecompositionNode.metadata.content} sourceSize={layerDecompositionNode.metadata.naturalWidth && layerDecompositionNode.metadata.naturalHeight ? { width: layerDecompositionNode.metadata.naturalWidth, height: layerDecompositionNode.metadata.naturalHeight } : undefined} config={{ ...config, model: layerDecompositionNode.metadata.model || config.model, imageModel: layerDecompositionNode.metadata.model || config.imageModel, size: layerDecompositionNode.metadata.size || config.size, quality: layerDecompositionNode.metadata.quality || config.quality }} open onClose={onCloseLayerDecomposition} onPlan={onPlanImageLayers} onConfirm={(payload) => onLayerDecomposition(layerDecompositionNode, payload)} /> : null}
             {textEditNode?.metadata?.content ? <CanvasNodeTextEditDialog dataUrl={textEditNode.metadata.content} open onClose={onCloseTextEdit} onDetect={onDetectText} onConfirm={(payload) => onTextEdit(textEditNode, payload)} /> : null}
         </>
     );

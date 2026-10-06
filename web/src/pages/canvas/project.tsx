@@ -534,7 +534,6 @@ function InfiniteCanvasPage() {
         nodesRef,
         setNodes,
     });
-    useCanvasImageLayerGroups({ projectId, enabled: projectLoaded, nodes, nodesRef, setNodes, runningNodeId });
 
     const cancelCanvasTask = useCallback(
         (task: import("@/services/api/task-center").GenerationTask) => {
@@ -864,6 +863,8 @@ function InfiniteCanvasPage() {
         openBackgroundRemoval,
         openLayerDecomposition,
         decomposeImageLayers,
+        planImageLayers,
+        activeLayerGroupIds,
         setLayerDecompositionNodeId,
         setTextEditNodeId,
         openTextEditNode,
@@ -899,6 +900,8 @@ function InfiniteCanvasPage() {
         bindGenerationTask,
         applyGenerationTaskResult,
     });
+
+    useCanvasImageLayerGroups({ projectId, enabled: projectLoaded, nodes, nodesRef, setNodes, runningNodeId, activeLayerGroupIds });
 
     const handleNodesDeleted = useCallback(
         (removedIds: Set<string>, nextNodes: CanvasNodeData[], removedNodes: CanvasNodeData[]) => {
@@ -3295,6 +3298,11 @@ function InfiniteCanvasPage() {
                             onMaskEdit={(node, payload) => void maskEditImageNode(node, payload)}
                             onImageOperation={(node, payload) => void editImageNode(node, payload)}
                             onLayerDecomposition={(node, payload) => void decomposeImageLayers(node, payload)}
+                            onPlanImageLayers={(model, prompt, signal) => {
+                                const source = layerDecompositionNodeId ? nodeById.get(layerDecompositionNodeId) : undefined;
+                                if (!source) return Promise.reject(new Error("拆层源图片不存在"));
+                                return planImageLayers(source, model, prompt, signal);
+                            }}
                             onDetectText={() => {
                                 const node = textEditNodeId ? nodeById.get(textEditNodeId) : null;
                                 return node ? detectImageText(node) : Promise.reject(new Error("图片节点已不存在"));

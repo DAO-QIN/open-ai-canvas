@@ -1,4 +1,5 @@
-import { resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
+import { configuredModelMatchesCapability, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
+import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
 import type { CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 
 export const LAYER_DECOMPOSITION_PROTOCOL = "image-tools-layer-decomposition";
@@ -11,7 +12,7 @@ export function supportsLayerDecomposition(config: AiConfig, model: string) {
 }
 
 export function supportsExperimentalLayerExtraction(config: AiConfig, model: string) {
-    return Boolean(model) && resolveModelRequestConfig(config, model).interfaceType === "openai-image";
+    return Boolean(model) && configuredModelMatchesCapability(config, model, "image") && (modelCapabilityConfigFor(config, model).image?.references.maxImages || 0) >= 1;
 }
 
 export function parseExperimentalLayerTargets(text: string) {
