@@ -2416,6 +2416,10 @@ function InfiniteCanvasPage() {
                 void generateScriptRows(node.id, prompt);
                 return;
             }
+            if (node.metadata?.experimentalLayerPlan || node.metadata?.layerExtraction) {
+                void handleRetryNode(node);
+                return;
+            }
             if (node.type === CanvasNodeType.Image && node.metadata?.isBatchRoot) {
                 const failedChildren = failedImageBatchChildren(node, nodesRef.current);
                 if (!failedChildren.length) {
