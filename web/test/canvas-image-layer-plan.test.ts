@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
+import { resolveImageRequestSize, validateImageSize } from "@/services/api/image-validation";
 import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanTargets, parseImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
 import { supportsExperimentalLayerExtraction } from "@/lib/canvas/canvas-image-layers";
 import { defaultConfig, createModelChannel, selectableModelsByCapability } from "@/stores/use-config-store";
@@ -24,6 +25,18 @@ function response(names = ["背景", "人物", "花束", "标题文字"]) {
 }
 
 describe("通用图层规划", () => {
+    test("原图比例在持久化任务前转为协议像素尺寸，提取与去背景都满足后端尺寸校验", () => {
+        const profile = defaultModelCapabilityConfig("openai", "image-2.5-flare").image!;
+        profile.size = { ...profile.size, parameter: "size", values: ["auto"], allowCustom: true };
+        for (const source of [{ width: 731, height: 412 }, { width: 600, height: 900 }]) {
+            const request = resolveImageRequestSize(profile, undefined, `${source.width}:${source.height}`)!;
+            expect(request.parameter).toBe("size");
+            expect(request.value).toMatch(/^\d+x\d+$/);
+            const [width, height] = request.value.split("x").map(Number);
+            expect(() => validateImageSize(width, height)).not.toThrow();
+            expect(Math.abs(width / height / (source.width / source.height) - 1)).toBeLessThan(0.01);
+        }
+    });
     test("文本模型保持可选，只有选中的无识图能力模型报错，不猜模型名", () => {
         expect(selectableModelsByCapability(config, "text")).toContain("models::visual");
         expect(selectableModelsByCapability(config, "text")).toContain("models::blind");

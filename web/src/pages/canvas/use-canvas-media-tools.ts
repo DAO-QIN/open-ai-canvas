@@ -1031,7 +1031,8 @@ export function useCanvasMediaTools({
                 generationConfig.size = imageLayerOutputSize(generationConfig, selectedModel, sourceCanvas);
                 if (!generationConfig.size) throw new Error("所选拆层模型没有支持原图比例的尺寸，请选择其他模型");
                 const profile = modelCapabilityConfigFor(generationConfig, selectedModel).image;
-                if (profile) resolveImageRequestSize(profile, generationConfig.quality, generationConfig.size);
+                // 持久化任务先经过服务端配置校验，必须提交已解析的协议尺寸，不能只校验后仍发送比例字符串。
+                if (profile) generationConfig.size = resolveImageRequestSize(profile, generationConfig.quality, generationConfig.size)?.value || "auto";
             } catch (error) { message.error(generationErrorMessage(error)); return; }
             if (layerSubmissionIds.current.has(node.id)) return;
             const liveSource = nodesRef.current.find((item) => item.id === node.id);
@@ -1047,7 +1048,7 @@ export function useCanvasMediaTools({
             if (removalSizeError) { message.error(removalSizeError); return; }
             try {
                 const profile = removalConfig && modelCapabilityConfigFor(removalConfig, removalConfig.model).image;
-                if (profile && removalConfig) resolveImageRequestSize(profile, removalConfig.quality, removalConfig.size);
+                if (profile && removalConfig) removalConfig.size = resolveImageRequestSize(profile, removalConfig.quality, removalConfig.size)?.value || "auto";
             } catch (error) { message.error(generationErrorMessage(error)); return; }
             const prompt = payload.prompt.trim();
             let targets: string[] | undefined;
