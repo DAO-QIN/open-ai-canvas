@@ -431,15 +431,7 @@ export function ImageContent({
 
     return (
         <BatchFrame batchPreviewNodes={batchPreviewNodes} batchCount={isBatchRoot ? batchCount : 0} batchExpanded={batchExpanded} batchOpening={batchOpening} batchRecovering={batchRecovering} theme={theme} onToggleBatch={onToggleBatch}>
-            <div
-                ref={imageContainerRef}
-                className="relative h-full w-full overflow-hidden rounded-[var(--node-radius)]"
-                style={
-                    node.metadata?.imageLayer || node.metadata?.imageLayerGroup
-                        ? { backgroundColor: theme.node.fill, backgroundImage: `conic-gradient(${theme.node.muted}22 25%, transparent 0 50%, ${theme.node.muted}22 0 75%, transparent 0)`, backgroundSize: "16px 16px" }
-                        : undefined
-                }
-            >
+            <div ref={imageContainerRef} className="relative h-full w-full overflow-hidden rounded-[var(--node-radius)]">
                 <RetainedCanvasImage
                     identity={`${getActiveUserScope()}:${node.id}:${node.metadata?.storageKey || node.metadata?.content || "empty"}`}
                     src={url}
