@@ -63,20 +63,22 @@ export function imageLayerPlanTargets(plan: ImageLayerPlan) {
     return plan.layers.map((layer) => `${layer.name}：${layer.description}${layer.bbox ? `，区域 <bbox>${layer.bbox.join(" ")}</bbox>` : ""}`);
 }
 
-/** 未确认的自定义尺寸不发给模型；优先选配置中与源图相符的比例或 auto。 */
+/** 尺寸来自源图，不能把未支持的比例静默回退成模型默认方图。 */
 export function imageLayerOutputSize(config: AiConfig, model: string, source?: { width: number; height: number }) {
     const size = modelCapabilityConfigFor(config, model).image?.size;
+    if (!source || !Number.isSafeInteger(source.width) || !Number.isSafeInteger(source.height) || source.width <= 0 || source.height <= 0) return "";
     if (!size || size.parameter === "none") return "auto";
     if (source && source.width > 0 && source.height > 0) {
         const exact = `${source.width}x${source.height}`;
         if (size.values.includes(exact)) return exact;
+        if (size.allowCustom) return `${source.width}:${source.height}`;
         const match = size.values.find((value) => {
             const pair = value.match(/^(\d+)(?::|x)(\d+)$/);
             return pair && Math.abs(Number(pair[1]) / Number(pair[2]) / (source.width / source.height) - 1) < 0.01;
         });
         if (match) return match;
     }
-    return size.values.includes("auto") ? "auto" : size.default;
+    return size.values.includes("auto") ? "auto" : "";
 }
 
 export function imageLayerRemovalPrompt(target: string) {

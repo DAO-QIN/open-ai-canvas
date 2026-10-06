@@ -25,7 +25,7 @@ import { findAvailableGenerationGroupPosition, imageGenerationChildPosition, ima
 import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-submission";
 import { cancelIncompleteImageBatch } from "@/lib/canvas/canvas-image-batch-retry";
 import { experimentalLayerPrompt, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
-import { imageLayerPlannerError, imageLayerPlanningPrompt, parseImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
+import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, parseImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
 import { buildAngleLabel, buildAnglePrompt, createCanvasNode } from "@/lib/canvas/canvas-project-domain";
 import { validateVideoSegmentBatch } from "@/lib/canvas/canvas-video-regeneration";
 import { resolveCanvasStyleExecution } from "@/lib/canvas/canvas-style-execution";
@@ -49,6 +49,8 @@ import { getMediaBlob, uploadMediaFile } from "@/services/file-storage";
 import { getImageBlob, uploadImage } from "@/services/image-storage";
 import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
 import { runImageLayerExtraction } from "@/services/canvas-image-layer-extraction";
+import { inspectImageLayer } from "@/services/canvas-image-layer-compositor";
+import { resolveImageRequestSize } from "@/services/api/image-validation";
 import { resetGenerationTaskMetadata } from "@/lib/canvas/canvas-task-state";
 import type { GenerationTask } from "@/services/api/task-center";
 
@@ -1019,18 +1021,34 @@ export function useCanvasMediaTools({
                 navigateToSettings({ continueCreation: true });
                 return;
             }
+            const source = nodeReferenceImage(node);
+            if (!source) return;
+            let sourceCanvas: { width: number; height: number };
+            try {
+                const info = await inspectImageLayer(source);
+                if (!info.nonempty) throw new Error("源图是完全透明的空图");
+                sourceCanvas = { width: info.width, height: info.height };
+                generationConfig.size = imageLayerOutputSize(generationConfig, selectedModel, sourceCanvas);
+                if (!generationConfig.size) throw new Error("所选拆层模型没有支持原图比例的尺寸，请选择其他模型");
+                const profile = modelCapabilityConfigFor(generationConfig, selectedModel).image;
+                if (profile) resolveImageRequestSize(profile, generationConfig.quality, generationConfig.size);
+            } catch (error) { message.error(generationErrorMessage(error)); return; }
+            if (layerSubmissionIds.current.has(node.id)) return;
+            const liveSource = nodesRef.current.find((item) => item.id === node.id);
+            if (!liveSource || liveSource.metadata?.content !== node.metadata.content || liveSource.metadata?.storageKey !== node.metadata.storageKey) { message.error("源图已更改或删除，请重新发起拆层"); return; }
             const removalConfig = payload.backgroundRemovalModel
-                ? layerDecompositionConfig({ ...baseGenerationConfig, ...defaultImageParamsForModel(baseGenerationConfig, payload.backgroundRemovalModel) }, payload.backgroundRemovalModel, { size: modelCapabilityConfigFor(baseGenerationConfig, payload.backgroundRemovalModel).image?.size.parameter === "none" ? "auto" : generationConfig.size })
+                ? layerDecompositionConfig({ ...baseGenerationConfig, ...defaultImageParamsForModel(baseGenerationConfig, payload.backgroundRemovalModel) }, payload.backgroundRemovalModel, { size: imageLayerOutputSize(baseGenerationConfig, payload.backgroundRemovalModel, sourceCanvas) })
                 : undefined;
             if (removalConfig && (!supportsExperimentalLayerExtraction(removalConfig, removalConfig.model) || !isAiConfigReady(removalConfig, removalConfig.model))) {
                 message.error("请选择可接收图片的可用去背景模型");
                 return;
             }
-            const removalSizeError = removalConfig && modelCapabilityConfigFor(removalConfig, removalConfig.model).image?.size.parameter !== "none"
-                ? modelCompatibilityError(removalConfig, removalConfig.model, { capability: "image", imageSize: generationConfig.size }) : "";
+            const removalSizeError = removalConfig && (!removalConfig.size ? "所选去背景模型没有支持原图比例的尺寸，请选择其他模型" : modelCompatibilityError(removalConfig, removalConfig.model, { capability: "image", imageSize: removalConfig.size }));
             if (removalSizeError) { message.error(removalSizeError); return; }
-            const source = nodeReferenceImage(node);
-            if (!source) return;
+            try {
+                const profile = removalConfig && modelCapabilityConfigFor(removalConfig, removalConfig.model).image;
+                if (profile && removalConfig) resolveImageRequestSize(profile, removalConfig.quality, removalConfig.size);
+            } catch (error) { message.error(generationErrorMessage(error)); return; }
             const prompt = payload.prompt.trim();
             let targets: string[] | undefined;
             if (experimental) {
@@ -1059,7 +1077,7 @@ export function useCanvasMediaTools({
                     status: NODE_STATUS_LOADING,
                     pluginId: "image-tools",
                     pluginNodeId: "layer-decomposition",
-                    ...(requests ? { experimentalLayerPlan: { sourceNodeId: node.id, requests, plannerModel: payload.planning?.model, planningTaskId: payload.planning?.taskId }, isBatchRoot: true, batchChildIds: requests.map((request) => request.nodeId), imageBatchExpanded: false } : { layerDecomposition: { sourceNodeId: node.id } }),
+                    ...(requests ? { experimentalLayerPlan: { sourceNodeId: node.id, requests, plannerModel: payload.planning?.model, planningTaskId: payload.planning?.taskId, progress: `并发拆层：0/${requests.length} 层完成` }, isBatchRoot: true, batchChildIds: requests.map((request) => request.nodeId), imageBatchExpanded: false } : { layerDecomposition: { sourceNodeId: node.id, canvas: sourceCanvas } }),
                     ...generationMetadata,
                 },
             };
@@ -1074,9 +1092,9 @@ export function useCanvasMediaTools({
                     metadata: {
                         ...canvasGenerationPromptMetadata(extractionPrompt, extractionPrompt),
                         ...buildImageGenerationMetadata("edit", { ...generationConfig, transparentBackground: index > 0 ? "true" : "false" }, 1, [source]),
-                        status: NODE_STATUS_IDLE,
+                        status: NODE_STATUS_LOADING,
                         batchRootId: taskNodeId,
-                        layerExtraction: { sourceNodeId: node.id, groupId: taskNodeId, index, phase: "extract", allowBackgroundRemoval: Boolean(removalConfig) },
+                        layerExtraction: { sourceNodeId: node.id, groupId: taskNodeId, index, phase: "extract", canvas: sourceCanvas, allowBackgroundRemoval: Boolean(removalConfig) },
                     },
                 };
             });
@@ -1091,17 +1109,24 @@ export function useCanvasMediaTools({
             const controller = startGenerationRequest(taskNodeId, node.id, taskNodeId);
             try {
                 if (requests && targets) {
-                    let submitted = false;
+                    let observedGroup = false;
+                    const phases = requests.map(() => "extract");
                     await runImageLayerExtraction({
                         source, targets, prompt, config: generationConfig, removalConfig, signal: controller.signal,
                         assertActive: (index) => {
-                            if (submitted && (!nodesRef.current.some((item) => item.id === taskNodeId) || !nodesRef.current.some((item) => item.id === requests[index].nodeId))) throw new Error("拆层节点已删除，后续请求已停止");
+                            const present = nodesRef.current.some((item) => item.id === taskNodeId);
+                            if (present) observedGroup = true;
+                            if (observedGroup && (!present || !nodesRef.current.some((item) => item.id === requests[index].nodeId))) throw new Error("拆层节点已删除，本层后续请求已停止");
+                        },
+                        onProgress: (index, phase) => {
+                            phases[index] = phase;
+                            const count = (value: string) => phases.filter((item) => item === value).length;
+                            const progress = `并发拆层：${count("complete")}/${requests.length} 层完成，提取 ${count("extract")}，去背景 ${count("remove-background")}${count("error") ? `，失败 ${count("error")}` : ""}`;
+                            setNodes((current) => current.map((item) => item.id === taskNodeId && item.metadata?.experimentalLayerPlan ? { ...item, metadata: { ...item.metadata, experimentalLayerPlan: { ...item.metadata.experimentalLayerPlan, progress } } } : item));
                         },
                         runStage: async ({ index, stage, prompt: stagePrompt, config: stageConfig, reference, canvas }) => {
                         const targetId = requests[index].nodeId;
-                        submitted = true;
                         setNodes((current) => current.map((item) => {
-                            if (item.id === taskNodeId && item.metadata?.experimentalLayerPlan) return { ...item, metadata: { ...item.metadata, experimentalLayerPlan: { ...item.metadata.experimentalLayerPlan, progress: `第 ${index + 1}/${requests.length} 层 · ${stage === "extract" ? "提取" : "去背景"}` } } };
                             if (item.id !== targetId) return item;
                             return { ...item, metadata: { ...resetGenerationTaskMetadata(item.metadata, "loading"), ...buildImageGenerationMetadata("edit", stageConfig, 1, [reference]), ...canvasGenerationPromptMetadata(stagePrompt, stagePrompt), layerExtraction: { ...item.metadata!.layerExtraction!, phase: stage, canvas, rejectedTaskId: undefined } } };
                         }));
@@ -1141,8 +1166,8 @@ export function useCanvasMediaTools({
                     message.error(details);
                     setNodes((current) =>
                         current.map((item) =>
-                            item.id === taskNodeId || (requests?.some((request) => request.nodeId === item.id) && item.metadata?.status === NODE_STATUS_IDLE)
-                                ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: item.id === taskNodeId ? details : "前序图层未通过，未调用模型" } }
+                            item.id === taskNodeId || (requests?.some((request) => request.nodeId === item.id) && (item.metadata?.status === NODE_STATUS_IDLE || item.metadata?.status === NODE_STATUS_LOADING))
+                                ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: item.id === taskNodeId ? details : "本层未完成，未自动重试或继续提交请求" } }
                                 : item,
                         ),
                     );

@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, Checkbox, Input, Select, Tag } from "antd";
+import { Button, Checkbox, Input, Tag } from "antd";
 import { Layers3, Plus, RotateCcw, X } from "lucide-react";
 
 import { ModelPicker } from "@/components/model-picker";
 import { selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
 import { defaultImageParamsForModel } from "@/lib/model-selection";
 import { modelCompatibilityError } from "@/lib/model-selection";
-import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
 import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanTargets, type ImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
 import { parseExperimentalLayerTargets, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { AppModal } from "@/components/ui/product/app-modal";
@@ -84,10 +83,10 @@ export function CanvasNodeLayerDecompositionDialog({
     const selectedModel = generationConfig.imageModel || generationConfig.model;
     const dedicated = supportsLayerDecomposition(config, selectedModel);
     const supported = dedicated || (experimental && supportsExperimentalLayerExtraction(config, selectedModel));
-    const imageSize = modelCapabilityConfigFor(config, selectedModel).image?.size;
+    const outputSizeError = generationConfig.size ? "" : "所选模型没有支持原图比例的尺寸，或源图尺寸尚未读取；请更换模型或重新打开图片";
     const plannerError = usePlanner && plannerModel ? imageLayerPlannerError(config, plannerModel) : "";
     const removalError = experimental && !dedicated && removeBackground
-        ? !removalModel || !supportsExperimentalLayerExtraction(config, removalModel) ? "请选择可接收图片的去背景模型" : modelCapabilityConfigFor(config, removalModel).image?.size.parameter === "none" ? "" : modelCompatibilityError(config, removalModel, { capability: "image", imageSize: generationConfig.size })
+        ? !removalModel || !supportsExperimentalLayerExtraction(config, removalModel) ? "请选择可接收图片的去背景模型" : !imageLayerOutputSize(config, removalModel, sourceSize) ? "去背景模型没有支持原图比例的尺寸" : modelCompatibilityError(config, removalModel, { capability: "image", imageSize: imageLayerOutputSize(config, removalModel, sourceSize) })
         : "";
     let experimentalTargets: string[] | undefined;
     let targetError = "";
@@ -193,7 +192,7 @@ export function CanvasNodeLayerDecompositionDialog({
                     <div className="space-y-2">
                         <div className="text-sm font-medium opacity-75">图层拆分模型</div>
                         <Checkbox checked={experimental} onChange={(event) => setExperimental(event.target.checked)}>
-                            逐层拆分（普通图片模型，可搭配去背景）
+                            并发拆分（普通图片模型，可搭配去背景）
                         </Checkbox>
                         <ModelPicker
                             config={{ ...config, model: selectedModel, imageModel: selectedModel }}
@@ -227,15 +226,15 @@ export function CanvasNodeLayerDecompositionDialog({
                             </> : null}
                             <div className="text-sm">拆层目标（每行一层，第一层为背景底图）</div>
                             <Input.TextArea aria-label="拆层目标" rows={4} readOnly={planning} value={targetText} placeholder="先识图规划，也可关闭规划后每行填写一层" onChange={(event) => setTargetText(event.target.value)} />
-                            {imageSize?.parameter !== "none" ? <Select aria-label="拆层输出尺寸" className="w-full" value={generationConfig.size} options={imageSize?.values.map((value) => ({ value, label: value }))} onChange={(size) => setGenerationConfig((current) => ({ ...current, size }))} /> : null}
-                            <p className="text-xs opacity-70">{sourceSize ? `源图 ${sourceSize.width}×${sourceSize.height}；` : ""}输出尺寸 {generationConfig.size || "auto"}。各层须与底图同尺寸；生成模型不保证保留原始像素坐标。</p>
+                            <p className="text-xs opacity-70">{sourceSize ? `锁定原图画布 ${sourceSize.width}×${sourceSize.height}；` : ""}模型请求尺寸 {generationConfig.size || "未支持"}。各层统一保存为原图尺寸与比例；仅归一化 1% 内的模型尺寸取整差，明显比例变化直接报错。生成模型仍不保证原始内容与坐标完全不变。</p>
                             <Checkbox checked={removeBackground} onChange={(event) => setRemoveBackground(event.target.checked)}>非透明前景层自动去背景（每层最多一次）</Checkbox>
                             {removeBackground ? <ModelPicker config={config} value={removalModel} capability="image" fullWidth placeholder="选择去背景模型" showSelectedPrice modelFilter={(model) => supportsExperimentalLayerExtraction(config, model) && !supportsLayerDecomposition(config, model)} onChange={setRemovalModel} /> : null}
                             {removalError ? <p role="alert" className="text-xs text-red-500">{removalError}</p> : null}
-                            <p className="text-xs opacity-70">拆分最多 {experimentalTargets ? experimentalTargets.length + (removeBackground ? experimentalTargets.length - 1 : 0) : removeBackground ? "3–15" : "2–8"} 次图片调用，提取与去背景分别计费。已有真实透明背景则跳过去背景；不合格立即停止，不自动付费重试。刷新不续发尚未提交的调用。结果收纳为一组，默认折叠。</p>
+                            <p className="text-xs opacity-70">各图层同时提交提取，本层需要时再去背景；最多 {experimentalTargets ? experimentalTargets.length + (removeBackground ? experimentalTargets.length - 1 : 0) : removeBackground ? "3–15" : "2–8"} 次图片调用，分别计费。一层失败不阻断其他已提交图层；不自动付费重试。实际执行受服务器及渠道并发额度限制。刷新不续发未提交阶段。结果收纳为一组，默认折叠。</p>
                             {targetError ? <p className="text-xs text-red-500">{targetError}</p> : null}
                         </div>
                     ) : null}
+                    {outputSizeError ? <p role="alert" className="text-xs text-red-500">{outputSizeError}</p> : null}
                     <div className="mt-auto flex justify-end gap-2">
                         <Button icon={<X className="size-4" />} onClick={onClose}>
                             取消
@@ -243,7 +242,7 @@ export function CanvasNodeLayerDecompositionDialog({
                         <Button
                             type="primary"
                             icon={<Layers3 className="size-4" />}
-                            disabled={!selectedPrompt || !supported || !dataUrl || Boolean(drawing) || Boolean(targetError) || Boolean(removalError) || planning || (experimental && !dedicated && (!experimentalTargets || (usePlanner && (!plan || Boolean(plannerError)))))}
+                            disabled={!selectedPrompt || !supported || !dataUrl || Boolean(drawing) || Boolean(targetError) || Boolean(outputSizeError) || Boolean(removalError) || planning || (experimental && !dedicated && (!experimentalTargets || (usePlanner && (!plan || Boolean(plannerError)))))}
                             onClick={() => onConfirm({ prompt: selectedPrompt, regions, experimentalTargets, backgroundRemovalModel: experimental && !dedicated && removeBackground ? removalModel : undefined, planning: usePlanner ? plan : undefined, generationConfig: { model: selectedModel, imageModel: selectedModel, size: generationConfig.size, quality: generationConfig.quality } })}
                         >
                             开始拆分

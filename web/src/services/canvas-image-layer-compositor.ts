@@ -2,7 +2,7 @@ import { inspectLayerAlpha, MAX_GROUP_PIXELS, MAX_IMAGE_LAYERS, MAX_LAYER_PIXELS
 import { getImageBlob } from "@/services/image-storage";
 import type { CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 
-type LayerInput = { dataUrl: string; storageKey?: string };
+type LayerInput = { dataUrl: string; storageKey?: string; width?: number; height?: number; bytes?: number; mimeType?: string };
 type DecodedLayer = { bitmap: ImageBitmap; blob: Blob; info: LayerRasterInfo };
 
 async function decodeLayer(input: LayerInput): Promise<DecodedLayer> {
@@ -38,6 +38,39 @@ export async function inspectImageLayer(input: LayerInput) {
     const decoded = await decodeLayer(input);
     try {
         return decoded.info;
+    } finally {
+        decoded.bitmap.close();
+    }
+}
+
+/** 模型尺寸取整最多允许 1% 比例差，保存时统一为源图画布；明显改构图的结果拒绝。 */
+export async function normalizeImageLayerCanvas(input: LayerInput, target?: { width: number; height: number }) {
+    const decoded = await decodeLayer(input);
+    try {
+        const { info } = decoded;
+        if (!target) return { image: { ...input, width: info.width, height: info.height }, info };
+        if (!Number.isSafeInteger(target.width) || !Number.isSafeInteger(target.height) || target.width <= 0 || target.height <= 0 || target.width * target.height > MAX_LAYER_PIXELS) throw new Error("源图画布尺寸无效或超过处理上限");
+        if (Math.abs(info.width / info.height / (target.width / target.height) - 1) > 0.01) throw new Error("模型结果比例与原图不一致，已拒绝该图层；不会拉伸或裁切来掩盖构图变化");
+        if (info.width === target.width && info.height === target.height) return { image: { ...input, width: info.width, height: info.height }, info };
+        const canvas = document.createElement("canvas");
+        canvas.width = target.width;
+        canvas.height = target.height;
+        try {
+            const context = canvas.getContext("2d", { willReadFrequently: true });
+            if (!context) throw new Error("浏览器不支持图层画布归一化");
+            context.drawImage(decoded.bitmap, 0, 0, target.width, target.height);
+            const normalized = inspectLayerAlpha(target.width, target.height, context.getImageData(0, 0, target.width, target.height).data);
+            const blob = await pngBlob(canvas);
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result));
+                reader.onerror = () => reject(new Error("无法读取归一化 PNG 图层"));
+                reader.readAsDataURL(blob);
+            });
+            return { image: { dataUrl, width: target.width, height: target.height, bytes: blob.size, mimeType: "image/png" }, info: normalized };
+        } finally {
+            canvas.width = canvas.height = 0;
+        }
     } finally {
         decoded.bitmap.close();
     }

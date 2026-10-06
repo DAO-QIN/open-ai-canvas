@@ -15,7 +15,7 @@ import { useAssetStore } from "@/stores/use-asset-store";
 import { applyGenerationConsumerEffect, generationEffectApplied } from "@/services/generation-consumer-dedupe";
 import { commitProducedModel } from "@/lib/canvas/produced-model";
 import { imageLayerCompositeSignature } from "@/lib/canvas/canvas-image-layers";
-import { decodeAndComposeImageLayers, inspectImageLayer } from "@/services/canvas-image-layer-compositor";
+import { decodeAndComposeImageLayers, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
 
 export function generationTaskInput(task: GenerationTask) {
@@ -135,11 +135,13 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
         let needsRemoval = false;
         if (node.metadata?.layerExtraction) {
             if (result.images?.length !== 1) throw new Error("逐层提取必须返回一张独立图片，不能返回拼版或多张候选图");
-            const info = await inspectImageLayer(result.images[0]);
+            const normalized = await normalizeImageLayerCanvas(result.images[0], extraction?.canvas);
+            const info = normalized.info;
+            result.images[0] = normalized.image;
             if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
             if (extraction?.canvas && (info.width !== extraction.canvas.width || info.height !== extraction.canvas.height)) throw new Error("图层尺寸与底图不一致，已停止后续调用");
             needsRemoval = Boolean(extraction?.index && !info.transparent && extraction.allowBackgroundRemoval && extraction.phase === "extract");
-            if (extraction!.index > 0 && !info.transparent && !needsRemoval) throw new Error(extraction?.phase === "remove-background" ? "去背景结果仍没有真实透明区域，已停止拆层，不自动付费重试" : "拆层失败：模型未返回真实透明背景，棋盘格或纯色背景不能作为图层");
+            if (extraction!.index > 0 && !info.transparent && !needsRemoval) throw new Error(extraction?.phase === "remove-background" ? "去背景结果仍没有真实透明区域，已停止本层，不自动付费重试" : "拆层失败：模型未返回真实透明背景，棋盘格或纯色背景不能作为图层");
             extraction = { ...extraction!, phase: needsRemoval ? "background-removal-required" : "complete", extractionTaskId: extraction?.phase === "extract" ? task.id : extraction?.extractionTaskId, rejectedTaskId: undefined };
         }
         const image = result.images?.[outputIndex];
@@ -369,7 +371,9 @@ export async function buildImageLayerTaskResult(node: CanvasNodeData, task: Gene
             node: node.metadata.status === "success" ? node : { ...node, metadata: { ...node.metadata, ...completedTaskMetadata(task), status: "success" as const } },
             additionalNodes: [] as CanvasNodeData[],
         };
-    const decoded = await decodeAndComposeImageLayers(images);
+    const layerImages = [];
+    for (const image of images) layerImages.push((await normalizeImageLayerCanvas(image, node.metadata?.layerDecomposition?.canvas)).image);
+    const decoded = await decodeAndComposeImageLayers(layerImages);
     const size = fitNodeSize(decoded.width, decoded.height, node.width, node.height);
     const firstPosition = imageGenerationChildPosition(node.position, size.width, size, 0);
     const lastPosition = imageGenerationChildPosition(node.position, size.width, size, images.length - 1);
