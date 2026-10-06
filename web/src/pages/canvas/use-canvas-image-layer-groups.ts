@@ -40,7 +40,7 @@ export function useCanvasImageLayerGroups({
             const plan = root.metadata?.experimentalLayerPlan;
             if (!plan || root.metadata?.imageLayerGroup || jobs.current.has(root.id)) continue;
             const children = plan.requests.map((request) => nodes.find((node) => node.id === request.nodeId));
-            if (children.some((node) => !node?.metadata?.content || node.metadata.status !== "success")) {
+            if (children.some((node) => !node?.metadata?.content || node.metadata.status !== "success" || (node.metadata.layerExtraction?.phase && node.metadata.layerExtraction.phase !== "complete"))) {
                 if (!activeLayerGroupIds?.has(root.id) && runningNodeId !== root.id && root.metadata?.status !== "error" && children.some((node) => !node || node.metadata?.status !== "loading" || !node.metadata.taskId)) {
                     setNodes((current) =>
                         current.map((node) => (node.id === root.id ? { ...node, metadata: { ...node.metadata, status: "error", errorDetails: "实验拆层未完成：部分图层失败或尚未调用；不会自动继续扣费。请检查逐层任务结果后重新从源图发起。" } } : node)),

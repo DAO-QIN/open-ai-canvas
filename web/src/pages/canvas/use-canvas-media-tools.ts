@@ -1103,7 +1103,7 @@ export function useCanvasMediaTools({
                         setNodes((current) => current.map((item) => {
                             if (item.id === taskNodeId && item.metadata?.experimentalLayerPlan) return { ...item, metadata: { ...item.metadata, experimentalLayerPlan: { ...item.metadata.experimentalLayerPlan, progress: `第 ${index + 1}/${requests.length} 层 · ${stage === "extract" ? "提取" : "去背景"}` } } };
                             if (item.id !== targetId) return item;
-                            return { ...item, metadata: { ...resetGenerationTaskMetadata(item.metadata, "loading"), ...buildImageGenerationMetadata("edit", stageConfig, 1, [reference]), ...canvasGenerationPromptMetadata(stagePrompt, stagePrompt), layerExtraction: { ...item.metadata!.layerExtraction!, phase: stage, canvas } } };
+                            return { ...item, metadata: { ...resetGenerationTaskMetadata(item.metadata, "loading"), ...buildImageGenerationMetadata("edit", stageConfig, 1, [reference]), ...canvasGenerationPromptMetadata(stagePrompt, stagePrompt), layerExtraction: { ...item.metadata!.layerExtraction!, phase: stage, canvas, rejectedTaskId: undefined } } };
                         }));
                         startGenerationRequest(targetId, node.id, taskNodeId, controller);
                         try {
@@ -1121,7 +1121,7 @@ export function useCanvasMediaTools({
                                 { bindTask: (task) => bindGenerationTask(targetId, task), consumeTask: (task) => applyGenerationTaskResult(targetId, task) },
                             );
                         } catch (error) {
-                            setNodes((current) => current.map((item) => (item.id === targetId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: generationErrorMessage(error) } } : item)));
+                            setNodes((current) => current.map((item) => (item.id === targetId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: generationErrorMessage(error), layerExtraction: { ...item.metadata!.layerExtraction!, rejectedTaskId: item.metadata?.taskId } } } : item)));
                             throw error;
                         } finally {
                             finishGenerationRequest(targetId, controller);

@@ -217,7 +217,7 @@ export function CanvasNodeLayerDecompositionDialog({
                     </div>
                     {experimental && !dedicated ? (
                         <div className="space-y-2">
-                            <Checkbox checked={usePlanner} onChange={(event) => setUsePlanner(event.target.checked)}>用文本模型识图规划</Checkbox>
+                            <Checkbox checked={usePlanner} onChange={(event) => { setUsePlanner(event.target.checked); invalidatePlan(); }}>用文本模型识图规划</Checkbox>
                             {usePlanner ? <>
                                 <ModelPicker config={config} value={plannerModel} capability="text" fullWidth showSelectedPrice placeholder="选择识图规划文本模型" onChange={(model) => { setPlannerModel(model); invalidatePlan(); }} />
                                 {plannerError ? <p role="alert" className="text-xs text-red-500">{plannerError}</p> : null}
@@ -226,7 +226,7 @@ export function CanvasNodeLayerDecompositionDialog({
                                 {planningError ? <p role="alert" className="text-xs text-red-500">{planningError}</p> : null}
                             </> : null}
                             <div className="text-sm">拆层目标（每行一层，第一层为背景底图）</div>
-                            <Input.TextArea aria-label="拆层目标" rows={4} value={targetText} placeholder="先识图规划，也可关闭规划后每行填写一层" onChange={(event) => setTargetText(event.target.value)} />
+                            <Input.TextArea aria-label="拆层目标" rows={4} readOnly={planning} value={targetText} placeholder="先识图规划，也可关闭规划后每行填写一层" onChange={(event) => setTargetText(event.target.value)} />
                             {imageSize?.parameter !== "none" ? <Select aria-label="拆层输出尺寸" className="w-full" value={generationConfig.size} options={imageSize?.values.map((value) => ({ value, label: value }))} onChange={(size) => setGenerationConfig((current) => ({ ...current, size }))} /> : null}
                             <p className="text-xs opacity-70">{sourceSize ? `源图 ${sourceSize.width}×${sourceSize.height}；` : ""}输出尺寸 {generationConfig.size || "auto"}。各层须与底图同尺寸；生成模型不保证保留原始像素坐标。</p>
                             <Checkbox checked={removeBackground} onChange={(event) => setRemoveBackground(event.target.checked)}>非透明前景层自动去背景（每层最多一次）</Checkbox>

@@ -5,7 +5,7 @@ import { App } from "antd";
 import { applyGenerationTaskResultToNodes, generationTaskCanReloadResource, generationTaskNodeId, generationTaskOutputsApplied, shouldRecoverCanvasImageOutputs } from "@/lib/canvas/canvas-generation-task-sync";
 import { commitCanvasGenerationResult } from "@/lib/canvas/canvas-generation-result";
 import { reconcileImageBatchRoot } from "@/lib/canvas/canvas-image-batch-retry";
-import { markCanvasTaskRecoveryUnconfirmed } from "@/lib/canvas/canvas-task-state";
+import { canvasTaskBindingStatus, markCanvasTaskRecoveryUnconfirmed } from "@/lib/canvas/canvas-task-state";
 import { applyCanvasGenerationTaskNodeEffect, isCanvasGenerationDurableAckError } from "@/services/canvas-generation-consumer";
 import { consumeGenerationTaskNode, ensureCanvasNodeAsset, retryCanvasAssetSyncAfterRateLimit } from "@/services/project-asset-sync";
 import { listGenerationTasks, listTaskLogs, queryGenerationTask, subscribeGenerationTasks, type GenerationTask, type TaskLog } from "@/services/api/task-center";
@@ -184,6 +184,8 @@ export async function recoverCanvasGenerationTaskNode(input: {
                               ...item.metadata,
                               status: input.continuationOnly ? item.metadata?.status : NODE_STATUS_ERROR,
                               ...(input.continuationOnly ? {} : failure),
+                              ...(item.metadata?.layerExtraction && item.metadata.taskId === input.completed.id && input.completed.status === "succeeded"
+                                  ? { layerExtraction: { ...item.metadata.layerExtraction, rejectedTaskId: input.completed.id } } : {}),
                               ...(item.metadata?.agentGenerationContinuation?.status === "pending"
                                   ? {
                                         agentGenerationContinuation: { ...item.metadata.agentGenerationContinuation, status: "failed" as const },
@@ -259,15 +261,16 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
                 current.map((node) => {
                     if (node.id !== targetNodeId) return node;
                     const failed = task.status === "failed" || task.status === "cancelled";
-                    const hasCompletedContent = task.status === "succeeded" && Boolean(node.metadata?.content || node.metadata?.storageKey);
+                    const extraction = node.metadata?.layerExtraction;
+                    const rejectedLayer = extraction?.rejectedTaskId === task.id;
                     const failure = failed ? generationFailureMetadata(task.error || (task.status === "cancelled" ? "任务已取消" : "任务失败"), nodeGenerationPrompt(node) || task.prompt || "") : undefined;
                     return {
                         ...node,
                         metadata: {
                             ...node.metadata,
                             ...generationTaskMetadata(task),
-                            status: failed ? NODE_STATUS_ERROR : hasCompletedContent ? NODE_STATUS_SUCCESS : NODE_STATUS_LOADING,
-                            ...(failure || { errorDetails: undefined, generationErrorCode: undefined, resourceReloadAvailable: undefined, failedPromptFingerprint: undefined }),
+                            status: canvasTaskBindingStatus(node, task),
+                            ...(failure || (rejectedLayer ? {} : { errorDetails: undefined, generationErrorCode: undefined, resourceReloadAvailable: undefined, failedPromptFingerprint: undefined })),
                         },
                     };
                 }),

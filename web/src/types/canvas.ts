@@ -323,7 +323,7 @@ export type CanvasNodeMetadata = {
     layerDecomposition?: { sourceNodeId: string };
     /** 普通生图模型逐层提取；刷新只恢复已提交任务，不自动提交下一次付费请求。 */
     experimentalLayerPlan?: { sourceNodeId: string; requests: Array<{ nodeId: string; target: string }>; errorSignature?: string; plannerModel?: string; planningTaskId?: string; progress?: string };
-    layerExtraction?: { sourceNodeId: string; groupId: string; index: number; allowBackgroundRemoval?: boolean; phase?: "extract" | "background-removal-required" | "remove-background" | "complete"; extractionTaskId?: string; canvas?: { width: number; height: number } };
+    layerExtraction?: { sourceNodeId: string; groupId: string; index: number; allowBackgroundRemoval?: boolean; phase?: "extract" | "background-removal-required" | "remove-background" | "complete"; extractionTaskId?: string; rejectedTaskId?: string; canvas?: { width: number; height: number } };
     imageLayerGroup?: {
         width: number;
         height: number;
