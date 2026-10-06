@@ -21,7 +21,7 @@ export type CanvasImageLayerDecompositionPayload = {
     generationConfig?: Partial<Pick<AiConfig, "model" | "imageModel" | "size" | "quality">>;
 };
 
-const DEFAULT_PROMPT = "保留完整场景结构，将主要主体提取为独立透明图层；场景底图只移除主体并补全遮挡，保持原图外观、画布比例和原始坐标。";
+const DEFAULT_PROMPT = "根据画面结构拆分适合独立编辑的主要对象、图形或文字；完整底图只移除需独立编辑的内容并补全遮挡，保留其他场景或设计结构，保持原图外观、画布比例和原始坐标。";
 
 export function CanvasNodeLayerDecompositionDialog({
     dataUrl,
@@ -137,7 +137,7 @@ export function CanvasNodeLayerDecompositionDialog({
         setDraft(null);
     };
 
-    const scopePrompt = `${prompt.trim()}\n${detailMode ? "详细拆分：可增加用户需要独立编辑的细节对象，细节默认保留在底图中作为场景结构，另提取备用素材。" : "主体与场景：优先只拆完整场景与主要主体两层；用户明确指定其他对象时才增加图层。"}`;
+    const scopePrompt = `${prompt.trim()}\n${detailMode ? "详细拆分：按内容增加适合独立编辑的文字或细节；备用细节可保留在底图，另提取素材。" : "自动拆分：根据实际图像结构选择必要图层，不固定题材或层数；保留完整底图，避免过度拆碎。"}`;
     const selectedPrompt = regions.length
         ? `${scopePrompt}\n\n重点处理用户框选的区域。选区坐标（图像 0-1000 坐标系）：${regions.map((region, index) => `区域${index + 1} <bbox>${region.join(" ")}</bbox>`).join("；")}`
         : scopePrompt;
@@ -189,9 +189,9 @@ export function CanvasNodeLayerDecompositionDialog({
                 <div className="flex flex-col gap-4">
                     <div>
                         <h3 className="text-lg font-semibold">拆分图片图层</h3>
-                        <p className="mt-1 text-sm opacity-60">默认拆出完整不透明场景与透明主体，收纳为一组，可叠放或展开。细节可进一步拆分，也可保留在场景中另提取备用素材。</p>
+                        <p className="mt-1 text-sm opacity-60">识图后按画面结构规划完整底图与透明对象，不固定题材或层数。结果收纳为一组，可叠放或展开；细节可继续拆分或提取备用素材。</p>
                     </div>
-                    <Segmented block aria-label="拆分范围" value={detailMode ? "detail" : "primary"} options={[{ label: "主体与场景", value: "primary" }, { label: "详细拆分", value: "detail" }]} onChange={(value) => { setDetailMode(value === "detail"); invalidatePlan(); }} />
+                    <Segmented block aria-label="拆分范围" value={detailMode ? "detail" : "primary"} options={[{ label: "自动拆分", value: "primary" }, { label: "详细拆分", value: "detail" }]} onChange={(value) => { setDetailMode(value === "detail"); invalidatePlan(); }} />
                     <div className="flex flex-wrap items-center gap-2">
                         <Tag color={regions.length ? "blue" : "default"}>{regions.length ? `已框选 ${regions.length} 个区域` : "未框选，按描述拆分"}</Tag>
                         {regions.length ? <Button size="small" icon={<RotateCcw className="size-3.5" />} onClick={() => { setRegions([]); invalidatePlan(); }}>清除选区</Button> : <span className="text-xs opacity-55"><Plus className="mr-1 inline size-3" />在左侧图片上拖动添加选区</span>}
