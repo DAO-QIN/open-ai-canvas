@@ -78,9 +78,13 @@ describe("独立透明图层验收", () => {
         expect(background).toContain("仅移除以下对象并补全被遮挡背景：猫");
         expect(background).toContain("仍保留在场景中");
         expect(background).toContain("alpha=255");
+        expect(background).toContain("0–1000 相对坐标，不是像素");
+        expect(background).toContain("剩余完整底图可以仅为原有底色或渐变");
+        expect(background).not.toContain("不要清空底图");
         const foreground = experimentalLayerPrompt("拆分", targets, 1, [false, true, false]);
         expect(foreground).not.toContain("房间：保留");
         expect(foreground).not.toContain("毛线球：保留");
+        expect(foreground).toContain("不做面板内部主体抠图");
         expect(experimentalLayerPrompt("拆分", targets, 0, [false, true, true])).not.toContain("仍保留在场景中");
         const model = "gpt-image-2.5-flare";
         const channel = createModelChannel({ id: "backup", models: [model], interfaceType: "openai-image" });

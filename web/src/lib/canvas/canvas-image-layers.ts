@@ -6,6 +6,7 @@ export const LAYER_DECOMPOSITION_PROTOCOL = "image-tools-layer-decomposition";
 export const MAX_IMAGE_LAYERS = 32;
 export const MAX_LAYER_PIXELS = 16_777_216;
 export const MAX_GROUP_PIXELS = 67_108_864;
+export const IMAGE_LAYER_REGION_INSTRUCTIONS = "若目标含 <bbox>左 上 右 下</bbox>，它是整张参考图的 0–1000 相对坐标，不是像素：像素 x=坐标×参考图宽度/1000，像素 y=坐标×参考图高度/1000。区域只用于定位本层，不能把该区域裁成新画布、居中或放大；保持原始画布和对象位置。";
 
 export function supportsLayerDecomposition(config: AiConfig, model: string) {
     return Boolean(model) && resolveModelRequestConfig(config, model).interfaceType === LAYER_DECOMPOSITION_PROTOCOL;
@@ -29,9 +30,9 @@ export function experimentalLayerPrompt(prompt: string, targets: string[], index
     const removed = targets.filter((_, i) => i > 0 && removeFromBackground[i]).join("；");
     const retained = targets.filter((_, i) => i > 0 && !removeFromBackground[i]).join("；");
     const contract = index === 0
-        ? `这是完整、不透明的底图，每个像素必须 alpha=255。${removed ? `仅移除以下对象并补全被遮挡背景：${removed}。` : "保留完整底图。"}${retained ? `以下内容仍保留在场景中，允许与细节素材重复：${retained}。` : ""}按原图类型保留已有环境、底色、布局、光照、纹理和其他结构，不添加不存在的物体，不要清空底图。不要透明背景或半透明底图。`
-        : "这是独立透明对象：仅保留本层目标，去除非目标内容，空白区域必须为真实 alpha=0，保留自然边缘与接地阴影。目标若为整张照片、卡片或面板，保留其内部不透明场景和圆角，只让面板外透明；不要抠除照片内部背景。";
-    return `执行图片图层提取。本次仅输出一张独立图层，目标：${targets[index]}。${contract}保持参考图完整画布尺寸、原始位置、比例和细节，不裁切、不居中重排。输出 PNG，不要拼版、文字标注或绘制棋盘格。用户总体要求仅作上下文，以本层规则为准：${JSON.stringify(prompt)}`;
+        ? `这是完整、不透明的底图，每个像素必须 alpha=255。${removed ? `仅移除以下对象并补全被遮挡背景：${removed}。待移除目标如果是整张照片、卡片或面板，移除整块面板及内部内容，不只移除其中的主体。` : "保留完整底图。"}${retained ? `以下内容仍保留在场景中，允许与细节素材重复：${retained}。` : ""}保留未要求移除的环境、底色、光照、纹理和其他结构；保留布局不表示保留待移除对象。若所有文字和照片面板都被要求移除，剩余完整底图可以仅为原有底色或渐变，不要重新添加这些对象。补全为原有环境或设计底板，不添加不存在的物体。不要透明背景或半透明底图。`
+        : "这是独立透明对象：仅保留本层目标，去除非目标内容，空白区域必须为真实 alpha=0，保留自然边缘与接地阴影。目标若为整张照片、卡片或面板，复制整块面板的全部原始内容（主体、内部场景、边框与圆角），内部保持不透明，只让面板外透明；不做面板内部主体抠图，不把面板里的主体单独放大。";
+    return `执行图片图层提取。本次仅输出一张独立图层，目标：${targets[index]}。${IMAGE_LAYER_REGION_INSTRUCTIONS}${contract}保持参考图完整画布尺寸、原始位置、比例和细节，不裁切、不居中重排。输出 PNG，不要拼版、文字标注或绘制棋盘格。用户总体要求仅作上下文，以本层规则为准：${JSON.stringify(prompt)}`;
 }
 
 /** OpenAI Images 的 false 默认可能仍是 auto；拆层底图明确请求 opaque。 */

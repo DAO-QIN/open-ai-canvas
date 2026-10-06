@@ -1,6 +1,7 @@
 import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
 import { configuredModelMatchesCapability, type AiConfig } from "@/stores/use-config-store";
 import type { GenerationTask } from "@/services/api/task-center";
+import { IMAGE_LAYER_REGION_INSTRUCTIONS } from "@/lib/canvas/canvas-image-layers";
 
 export type ImageLayerPlanningOptions = { input?: "preview" | "original"; history?: boolean };
 type ImageSize = { width: number; height: number };
@@ -106,5 +107,5 @@ export function imageLayerOutputSize(config: AiConfig, model: string, source?: {
 }
 
 export function imageLayerRemovalPrompt(target: string) {
-    return `移除图片背景，保留主体完整轮廓、细节和边缘，输出透明背景。主体为：${target}。本次参考图片已经提取了这一层，只去除非目标内容。目标若为整张照片、卡片或面板，保留其内部不透明场景和圆角，仅使面板外透明，不抠除照片内背景。保持参考图完整画布尺寸、主体位置、比例和接地阴影，不裁切、不居中、不重绘其他对象；输出 PNG，空白区域必须为 alpha=0，不要绘制棋盘格或纯色背景来冒充透明。`;
+    return `移除图片背景，保留本层目标完整轮廓、细节和边缘，输出透明背景。目标为：${target}。${IMAGE_LAYER_REGION_INSTRUCTIONS}本次参考图片已经提取了这一层，只去除非目标内容。目标若为整张照片、卡片或面板，保留整块面板及其内部全部不透明场景、主体、边框与圆角，仅使面板外透明，不做照片内部主体抠图。保持参考图完整画布尺寸、目标位置、比例和接地阴影，不裁切、不居中、不重绘其他对象；输出 PNG，空白区域必须为 alpha=0，不要绘制棋盘格或纯色背景来冒充透明。`;
 }
