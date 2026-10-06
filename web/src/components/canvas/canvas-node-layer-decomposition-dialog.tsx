@@ -6,7 +6,7 @@ import { ModelPicker } from "@/components/model-picker";
 import { selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
 import { defaultImageParamsForModel } from "@/lib/model-selection";
 import { modelCompatibilityError } from "@/lib/model-selection";
-import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanTargets, type ImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
+import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanTargets, type ImageLayerPlan, type ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
 import { parseExperimentalLayerTargets, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { navigateToSettings } from "@/lib/settings-navigation";
@@ -36,7 +36,7 @@ export function CanvasNodeLayerDecompositionDialog({
     open: boolean;
     config: AiConfig;
     sourceSize?: { width: number; height: number };
-    onPlan: (model: string, prompt: string, signal: AbortSignal) => Promise<ImageLayerPlan>;
+    onPlan: (model: string, prompt: string, signal: AbortSignal, options?: ImageLayerPlanningOptions) => Promise<ImageLayerPlan>;
     onClose: () => void;
     onConfirm: (payload: CanvasImageLayerDecompositionPayload) => void;
 }) {
@@ -54,6 +54,7 @@ export function CanvasNodeLayerDecompositionDialog({
     const [plan, setPlan] = useState<ImageLayerPlan>();
     const [planning, setPlanning] = useState(false);
     const [planningError, setPlanningError] = useState("");
+    const [planningInput, setPlanningInput] = useState<"preview" | "original">("preview");
     const [removeBackground, setRemoveBackground] = useState(true);
     const [removalModel, setRemovalModel] = useState("");
     const planningRequest = useRef<AbortController | null>(null);
@@ -80,6 +81,7 @@ export function CanvasNodeLayerDecompositionDialog({
         setPlan(undefined);
         setPlanning(false);
         setPlanningError("");
+        setPlanningInput("preview");
         setRemoveBackground(true);
         setRemovalModel(models.find((value) => supportsExperimentalLayerExtraction(current, value || "") && !supportsLayerDecomposition(current, value || "")) || "");
         return () => { planningRequest.current?.abort(); planningRequest.current = null; };
@@ -146,14 +148,14 @@ export function CanvasNodeLayerDecompositionDialog({
         planningRequest.current?.abort(); planningRequest.current = null;
         setPlanning(false); setPlan(undefined); setPlanningError("");
     };
-    const requestPlan = async () => {
-        const error = imageLayerPlannerError(config, plannerModel);
+    const requestPlan = async (history = false) => {
+        const error = history ? "" : imageLayerPlannerError(config, plannerModel);
         if (error) { setPlanningError(error); return; }
         if (planningRequest.current) return;
         const controller = new AbortController(); planningRequest.current = controller;
         setPlanning(true); setPlanningError(""); setPlan(undefined);
         try {
-            const result = await onPlan(plannerModel, selectedPrompt, controller.signal);
+            const result = await onPlan(plannerModel, selectedPrompt, controller.signal, { input: planningInput, history });
             if (controller.signal.aborted || planningRequest.current !== controller) return;
             setPlan(result); setTargetText(imageLayerPlanTargets(result).join("\n"));
             setBackgroundRemovals(result.layers.map((layer) => Boolean(layer.removeFromBackground)));
@@ -228,9 +230,13 @@ export function CanvasNodeLayerDecompositionDialog({
                             {usePlanner ? <>
                                 <ModelPicker config={config} value={plannerModel} capability="text" fullWidth showSelectedPrice placeholder="选择识图规划文本模型" onChange={(model) => { setPlannerModel(model); invalidatePlan(); }} />
                                 {plannerError ? <p role="alert" className="text-xs text-red-500">{plannerError}</p> : null}
+                                <Segmented block aria-label="识图输入" value={planningInput} options={[{ label: "兼容预览", value: "preview" }, { label: "原图", value: "original" }]} onChange={(value) => { setPlanningInput(value as "preview" | "original"); invalidatePlan(); }} />
+                                <p className="text-xs opacity-70">兼容预览仅将识图输入等比例缩至最长边 1000 像素，拆层仍使用原图。密集文字或小细节识别不清时可选原图再手动规划。</p>
                                 <Button loading={planning} disabled={!plannerModel || Boolean(plannerError) || !selectedPrompt} onClick={() => void requestPlan()}>识图规划</Button>
+                                <Button disabled={planning} onClick={() => void requestPlan(true)}>读取最近可用规划</Button>
                                 <p className="text-xs opacity-70">规划使用一次文本模型调用并按该模型计费。请核对目标与左侧原图一致；识图有误时更换模型或编辑计划，再开始拆分。</p>
-                                {planningError ? <p role="alert" className="text-xs text-red-500">{planningError}</p> : null}
+                                {planningError ? <p role="alert" className="text-xs text-red-500">{planningError}。没有提交拆图任务，不会自动付费重试。</p> : null}
+                                {plan?.warnings?.map((warning, index) => <p role="status" key={index} className="text-xs text-amber-600 dark:text-amber-400">{warning}</p>)}
                             </> : null}
                             <div className="text-sm">拆层目标（每行一层，第一层为背景底图）</div>
                             <Input.TextArea aria-label="拆层目标" rows={4} readOnly={planning} value={targetText} placeholder="先识图规划，也可关闭规划后每行填写一层" onChange={(event) => setTargetText(event.target.value)} />

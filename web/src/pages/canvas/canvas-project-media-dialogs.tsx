@@ -7,7 +7,7 @@ import { CanvasNodeLayerDecompositionDialog, type CanvasImageLayerDecompositionP
 import { CanvasNodeTextEditDialog, type CanvasImageTextEditPayload } from "@/components/canvas/canvas-node-text-edit-dialog";
 import type { CanvasNodeData } from "@/types/canvas";
 import type { AiConfig } from "@/stores/use-config-store";
-import type { ImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
+import type { ImageLayerPlan, ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
 
 type CanvasProjectMediaDialogsProps = {
     cropNode: CanvasNodeData | null;
@@ -34,7 +34,7 @@ type CanvasProjectMediaDialogsProps = {
     onUpscale: (node: CanvasNodeData, params: CanvasImageUpscaleParams) => void;
     onImageOperation: (node: CanvasNodeData, payload: CanvasImageEditPayload) => void;
     onLayerDecomposition: (node: CanvasNodeData, payload: CanvasImageLayerDecompositionPayload) => void;
-    onPlanImageLayers: (model: string, prompt: string, signal: AbortSignal) => Promise<ImageLayerPlan>;
+    onPlanImageLayers: (model: string, prompt: string, signal: AbortSignal, options?: ImageLayerPlanningOptions) => Promise<ImageLayerPlan>;
     onDetectText: () => Promise<import("@/components/canvas/canvas-node-text-edit-dialog").CanvasImageTextLine[]>;
     onTextEdit: (node: CanvasNodeData, payload: CanvasImageTextEditPayload) => void;
     config: AiConfig;

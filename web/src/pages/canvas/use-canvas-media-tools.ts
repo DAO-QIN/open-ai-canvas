@@ -25,7 +25,7 @@ import { findAvailableGenerationGroupPosition, imageGenerationChildPosition, ima
 import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-submission";
 import { cancelIncompleteImageBatch } from "@/lib/canvas/canvas-image-batch-retry";
 import { experimentalLayerPrompt, imageLayerProviderMetadata, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
-import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, parseImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
+import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, latestImageLayerPlan, parseImageLayerPlan, type ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
 import { buildAngleLabel, buildAnglePrompt, createCanvasNode } from "@/lib/canvas/canvas-project-domain";
 import { validateVideoSegmentBatch } from "@/lib/canvas/canvas-video-regeneration";
 import { resolveCanvasStyleExecution } from "@/lib/canvas/canvas-style-execution";
@@ -50,9 +50,10 @@ import { getImageBlob, uploadImage } from "@/services/image-storage";
 import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
 import { runImageLayerExtraction } from "@/services/canvas-image-layer-extraction";
 import { inspectImageLayer } from "@/services/canvas-image-layer-compositor";
+import { prepareImageLayerPlanningReference } from "@/services/canvas-image-layer-planning";
 import { resolveImageRequestSize } from "@/services/api/image-validation";
 import { resetGenerationTaskMetadata } from "@/lib/canvas/canvas-task-state";
-import type { GenerationTask } from "@/services/api/task-center";
+import { listGenerationTasks, type GenerationTask } from "@/services/api/task-center";
 
 function normalizeMaskEditQuality(quality: string | undefined, size: string | undefined) {
     const value = String(quality || "").trim().toLowerCase();
@@ -990,19 +991,28 @@ export function useCanvasMediaTools({
         setImageEditNodeId(node.id);
     }, []);
 
-    const planImageLayers = useCallback(async (node: CanvasNodeData, model: string, prompt: string, signal: AbortSignal) => {
+    const planImageLayers = useCallback(async (node: CanvasNodeData, model: string, prompt: string, signal: AbortSignal, options?: ImageLayerPlanningOptions) => {
+        if (options?.history) {
+            const tasks = await listGenerationTasks(50, { projectId }, undefined, signal);
+            signal.throwIfAborted();
+            const plan = latestImageLayerPlan(tasks, projectId, node.id, node.metadata?.storageKey);
+            if (!plan) throw new Error("最近 50 条任务中没有这张源图的可用规划，请重新识图或关闭规划后手工填写目标");
+            return plan;
+        }
         const config = { ...effectiveConfig, model, textModel: model, taskWorkflowProvider: "model" as const };
         const error = imageLayerPlannerError(config, model);
         if (error) throw new Error(error);
         if (!isAiConfigReady(config, model)) throw new Error("所选识图规划模型未配置可用渠道");
         const source = nodeReferenceImage(node);
         if (!source) throw new Error("源图为空，无法规划拆层");
+        const { reference, sourceSize } = await prepareImageLayerPlanningReference(source, options?.input || "preview", signal);
+        const referenceSize = { width: reference.width!, height: reference.height! };
         let taskId: string | undefined;
         const result = await runBackendCanvasGenerationTask({
-            projectId, nodeId: `${node.id}-layer-plan-${nanoid()}`, mode: "text", prompt: imageLayerPlanningPrompt(prompt), config,
-            referenceImages: [source], signal, metadata: { sourceNodeId: node.id, edit: "layer-planning" }, onTaskCreated: (task) => { taskId = task.id; },
+            projectId, nodeId: `${node.id}-layer-plan-${nanoid()}`, mode: "text", prompt: imageLayerPlanningPrompt(prompt, referenceSize), config,
+            referenceImages: [reference], signal, metadata: { sourceNodeId: node.id, sourceStorageKey: source.storageKey, sourceSize, planningReferenceSize: referenceSize, edit: "layer-planning" }, onTaskCreated: (task) => { taskId = task.id; },
         });
-        return { ...parseImageLayerPlan(result.text || ""), model, taskId };
+        return { ...parseImageLayerPlan(result.text || "", referenceSize), model, taskId };
     }, [effectiveConfig, isAiConfigReady, projectId]);
 
     const decomposeImageLayers = useCallback(

@@ -30,7 +30,7 @@ export function experimentalLayerPrompt(prompt: string, targets: string[], index
     const retained = targets.filter((_, i) => i > 0 && !removeFromBackground[i]).join("；");
     const contract = index === 0
         ? `这是完整、不透明的底图，每个像素必须 alpha=255。${removed ? `仅移除以下对象并补全被遮挡背景：${removed}。` : "保留完整底图。"}${retained ? `以下内容仍保留在场景中，允许与细节素材重复：${retained}。` : ""}按原图类型保留已有环境、底色、布局、光照、纹理和其他结构，不添加不存在的物体，不要清空底图。不要透明背景或半透明底图。`
-        : "这是独立透明对象：仅保留本层目标，去除非目标内容及背景，空白区域必须为真实 alpha=0，保留自然边缘与接地阴影。";
+        : "这是独立透明对象：仅保留本层目标，去除非目标内容，空白区域必须为真实 alpha=0，保留自然边缘与接地阴影。目标若为整张照片、卡片或面板，保留其内部不透明场景和圆角，只让面板外透明；不要抠除照片内部背景。";
     return `执行图片图层提取。本次仅输出一张独立图层，目标：${targets[index]}。${contract}保持参考图完整画布尺寸、原始位置、比例和细节，不裁切、不居中重排。输出 PNG，不要拼版、文字标注或绘制棋盘格。用户总体要求仅作上下文，以本层规则为准：${JSON.stringify(prompt)}`;
 }
 

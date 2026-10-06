@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
 import { resolveImageRequestSize, validateImageSize } from "@/services/api/image-validation";
-import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanTargets, parseImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
+import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, imageLayerPlanTargets, latestImageLayerPlan, parseImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
+import type { GenerationTask } from "@/services/api/task-center";
 import { supportsExperimentalLayerExtraction } from "@/lib/canvas/canvas-image-layers";
 import { defaultConfig, createModelChannel, selectableModelsByCapability } from "@/stores/use-config-store";
 
@@ -71,7 +72,7 @@ describe("通用图层规划", () => {
         expect(() => parseImageLayerPlan(JSON.stringify(response(["只有一层"])))).toThrow("2–8");
         expect(() => parseImageLayerPlan(JSON.stringify(response(Array.from({ length: 9 }, (_, index) => `层${index}`))))).toThrow("2–8");
     });
-    test("拒绝重复、背景顺序、越界和反向 bbox，未知字段不进入计划", () => {
+    test("拒绝无效语义，丢弃无效可选坐标而保留已识别图层", () => {
         expect(() => parseImageLayerPlan(JSON.stringify(response(["背景", "重复", "重复"])))).toThrow("重复");
         const wrong = response();
         wrong.layers[1].kind = "background";
@@ -83,9 +84,62 @@ describe("通用图层规划", () => {
         ]) {
             const bad = response();
             bad.layers[1].bbox = bbox;
-            expect(() => parseImageLayerPlan(JSON.stringify(bad))).toThrow("坐标");
+            const plan = parseImageLayerPlan(JSON.stringify(bad));
+            expect(plan.layers).toHaveLength(4);
+            expect(plan.layers[1]).not.toHaveProperty("bbox");
+            expect(plan.warnings?.[0]).toContain("坐标");
         }
         expect(parseImageLayerPlan(JSON.stringify({ ...response(), code: "ignored", model: "untrusted" }))).not.toHaveProperty("model");
+    });
+    test("四格海报部分旧坐标超过1000时，七层语义仍可用且不猜坐标单位", () => {
+        const names = ["底图背景", "主标题文字", "副标题文字", "左上照片", "右上照片", "左下照片", "右下照片"];
+        const value = response(names);
+        value.layers[1].bbox = [65, 30, 1010, 85];
+        value.layers[4].bbox = [547, 167, 1017, 547];
+        const plan = parseImageLayerPlan(JSON.stringify(value));
+        expect(plan.layers.map((layer) => layer.name)).toEqual(names);
+        expect(plan.warnings).toHaveLength(2);
+        expect(imageLayerPlanTargets(plan)[1]).not.toContain("bbox");
+        expect(plan.layers[2].bbox).toEqual([100, 200, 800, 900]);
+    });
+    test("显式单位与已知实际输入尺寸才转换像素坐标，保持归一化提示合同", () => {
+        const size = { width: 1600, height: 800 };
+        const value = response();
+        value.layers[1].bbox = [160, 160, 1280, 720];
+        const text = JSON.stringify({ ...value, coordinateSpace: "pixels", imageSize: size });
+        expect(parseImageLayerPlan(text, size).layers[1].bbox).toEqual([100, 200, 800, 900]);
+        expect(parseImageLayerPlan(text).layers[1]).not.toHaveProperty("bbox");
+        expect(parseImageLayerPlan(text, { width: 1000, height: 500 }).layers[1]).not.toHaveProperty("bbox");
+        value.layers[1].bbox = [0.1, 0.2, 0.8, 0.9];
+        expect(parseImageLayerPlan(JSON.stringify({ ...value, coordinateSpace: "relative" })).layers[1].bbox).toEqual([100, 200, 800, 900]);
+        expect(parseImageLayerPlan(JSON.stringify({ ...value, coordinateSpace: "unknown" })).layers[1]).not.toHaveProperty("bbox");
+        for (const bbox of [[1, 2, 3], [0, 0, "50", 60], [null, 0, 1000, 1000]]) {
+            expect(parseImageLayerPlan(JSON.stringify({ ...value, layers: value.layers.map((layer, index) => index === 1 ? { ...layer, bbox } : layer) })).layers[1]).not.toHaveProperty("bbox");
+        }
+    });
+    test("历史恢复跳过识图失败，只允许同画布同源图匹配资源", () => {
+        const task = (id: string, metadata: Record<string, unknown>, text: string, extra: Partial<GenerationTask> = {}): GenerationTask => ({ id, projectId: "project", type: "canvas_text", status: "succeeded", model: "vision", createdAt: id, updatedAt: id, prompt: "plan", attempts: 1, inputJson: JSON.stringify({ metadata }), resultJson: JSON.stringify({ text }), ...extra });
+        const metadata = { edit: "layer-planning", sourceNodeId: "source", sourceStorageKey: "image-key" };
+        const tasks = [
+            task("1", metadata, JSON.stringify(response())),
+            task("2", metadata, '{"canPlan":false,"reason":"无法读图"}'),
+            task("3", metadata, "broken"),
+            task("4", metadata, JSON.stringify(response()), { projectId: "other" }),
+            task("5", { ...metadata, sourceNodeId: "other" }, JSON.stringify(response())),
+            task("6", { ...metadata, sourceStorageKey: "replaced-key" }, JSON.stringify(response())),
+            task("7", metadata, JSON.stringify(response()), { type: "canvas_image" }),
+            task("8", metadata, JSON.stringify(response()), { status: "running" }),
+        ];
+        expect(latestImageLayerPlan(tasks, "project", "source", "image-key")?.taskId).toBe("1");
+        expect(latestImageLayerPlan(tasks, "none", "source", "image-key")).toBeUndefined();
+        const legacy = latestImageLayerPlan([task("1", { edit: "layer-planning", sourceNodeId: "source" }, JSON.stringify(response()))], "project", "source", "image-key");
+        expect(legacy?.warnings?.join(" ")).toContain("旧记录");
+    });
+    test("海报整张照片内部场景保留，坐标可省略且以实际参考图为准", () => {
+        const prompt = imageLayerPlanningPrompt("自动拆分", { width: 1000, height: 1000 });
+        expect(prompt).toContain("每张照片是独立场景");
+        expect(prompt).toContain('coordinateSpace="pixels"');
+        expect(prompt).toContain("1000×1000");
     });
     test("输出比例优先匹配源图配置合同，不把任意原像素尺寸发送给模型", () => {
         const profile = { ...image, image: { ...image.image!, size: { parameter: "size" as const, values: ["1:1", "16:9", "auto"], default: "1:1", allowCustom: false } } };

@@ -3302,10 +3302,10 @@ function InfiniteCanvasPage() {
                             onMaskEdit={(node, payload) => void maskEditImageNode(node, payload)}
                             onImageOperation={(node, payload) => void editImageNode(node, payload)}
                             onLayerDecomposition={(node, payload) => void decomposeImageLayers(node, payload)}
-                            onPlanImageLayers={(model, prompt, signal) => {
+                            onPlanImageLayers={(model, prompt, signal, options) => {
                                 const source = layerDecompositionNodeId ? nodeById.get(layerDecompositionNodeId) : undefined;
                                 if (!source) return Promise.reject(new Error("拆层源图片不存在"));
-                                return planImageLayers(source, model, prompt, signal);
+                                return planImageLayers(source, model, prompt, signal, options);
                             }}
                             onDetectText={() => {
                                 const node = textEditNodeId ? nodeById.get(textEditNodeId) : null;
