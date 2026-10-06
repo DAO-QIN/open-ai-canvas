@@ -58,6 +58,13 @@ describe("通用图层规划", () => {
         expect(imageLayerPlanTargets(plan)[1]).toContain("区域 <bbox>100 200 800 900</bbox>");
         expect(parseImageLayerPlan("```json\n" + JSON.stringify(response(["背景", "产品"])) + "\n```").layers).toHaveLength(2);
     });
+    test("主体默认从底图移除，细节默认保留；模型显式选项可覆盖且必须是布尔值", () => {
+        const planned = response();
+        expect(parseImageLayerPlan(JSON.stringify(planned)).layers.map((layer) => layer.removeFromBackground)).toEqual([undefined, true, false, false]);
+        const details = { ...planned, layers: planned.layers.map((layer, i) => ({ ...layer, ...(i ? { removeFromBackground: i === 2 } : {}) })) };
+        expect(parseImageLayerPlan(JSON.stringify(details)).layers.map((layer) => layer.removeFromBackground)).toEqual([undefined, false, true, false]);
+        expect(() => parseImageLayerPlan(JSON.stringify({ ...details, layers: details.layers.map((layer) => ({ ...layer, removeFromBackground: "true" })) }))).toThrow("移除选项");
+    });
     test("不能识图、空结果或非 JSON 不作为计划继续执行", () => {
         expect(() => parseImageLayerPlan('{"canPlan":false,"reason":"无法读取图片"}')).toThrow("无法读取图片");
         expect(() => parseImageLayerPlan("我建议分三层")).toThrow("JSON");

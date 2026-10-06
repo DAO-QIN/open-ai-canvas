@@ -24,7 +24,7 @@ import { commitProducedModel } from "@/lib/canvas/produced-model";
 import { findAvailableGenerationGroupPosition, imageGenerationChildPosition, imageGenerationGroupSize } from "@/lib/canvas/canvas-generation-layout";
 import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-submission";
 import { cancelIncompleteImageBatch } from "@/lib/canvas/canvas-image-batch-retry";
-import { experimentalLayerPrompt, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
+import { experimentalLayerPrompt, imageLayerProviderMetadata, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, parseImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
 import { buildAngleLabel, buildAnglePrompt, createCanvasNode } from "@/lib/canvas/canvas-project-domain";
 import { validateVideoSegmentBatch } from "@/lib/canvas/canvas-video-regeneration";
@@ -1065,7 +1065,8 @@ export function useCanvasMediaTools({
             const position = findAvailableGenerationGroupPosition(nodesRef.current, { x: node.position.x + node.width + 96, y: node.position.y }, imageSize);
             const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [source]);
             layerSubmissionIds.current.add(node.id);
-            const requests = targets?.map((target) => ({ nodeId: nanoid(), target }));
+            const removeFromBackground = targets?.map((_, index) => index > 0 && (payload.removeFromBackground?.[index] ?? index === 1));
+            const requests = targets?.map((target, index) => ({ nodeId: nanoid(), target, removeFromBackground: removeFromBackground![index] }));
             const taskNode: CanvasNodeData = {
                 id: taskNodeId,
                 type: CanvasNodeType.Image,
@@ -1083,7 +1084,7 @@ export function useCanvasMediaTools({
                 },
             };
             const extractionNodes: CanvasNodeData[] = (requests || []).map((request, index) => {
-                const extractionPrompt = experimentalLayerPrompt(prompt, targets!, index);
+                const extractionPrompt = experimentalLayerPrompt(prompt, targets!, index, removeFromBackground);
                 return {
                     id: request.nodeId,
                     type: CanvasNodeType.Image,
@@ -1095,7 +1096,7 @@ export function useCanvasMediaTools({
                         ...buildImageGenerationMetadata("edit", { ...generationConfig, transparentBackground: index > 0 ? "true" : "false" }, 1, [source]),
                         status: NODE_STATUS_LOADING,
                         batchRootId: taskNodeId,
-                        layerExtraction: { sourceNodeId: node.id, groupId: taskNodeId, index, phase: "extract", canvas: sourceCanvas, allowBackgroundRemoval: Boolean(removalConfig) },
+                        layerExtraction: { sourceNodeId: node.id, groupId: taskNodeId, index, phase: "extract", canvas: sourceCanvas, allowBackgroundRemoval: Boolean(removalConfig), backgroundRemovalModel: removalConfig?.model },
                     },
                 };
             });
@@ -1113,7 +1114,7 @@ export function useCanvasMediaTools({
                     let observedGroup = false;
                     const phases = requests.map(() => "extract");
                     await runImageLayerExtraction({
-                        source, targets, prompt, config: generationConfig, removalConfig, signal: controller.signal,
+                        source, targets, removeFromBackground, prompt, config: generationConfig, removalConfig, signal: controller.signal,
                         assertActive: (index) => {
                             const present = nodesRef.current.some((item) => item.id === taskNodeId);
                             if (present) observedGroup = true;
@@ -1142,7 +1143,7 @@ export function useCanvasMediaTools({
                                     config: stageConfig,
                                     referenceImages: [reference],
                                     signal: controller.signal,
-                                    metadata: { sourceNodeId: node.id, edit: stage === "extract" ? "layer-extraction" : "layer-background-removal" },
+                                    metadata: { sourceNodeId: node.id, edit: stage === "extract" ? "layer-extraction" : "layer-background-removal", ...imageLayerProviderMetadata(stageConfig, index) },
                                 },
                                 { bindTask: (task) => bindGenerationTask(targetId, task), consumeTask: (task) => applyGenerationTaskResult(targetId, task) },
                             );

@@ -10,6 +10,9 @@ import {
     experimentalLayerPrompt,
     experimentalLayerSignature,
     layerDecompositionConfig,
+    imageLayerProviderMetadata,
+    validateImageLayerRole,
+    hasUsableLayerTransparency,
     MAX_IMAGE_LAYERS,
     MAX_LAYER_PIXELS,
 } from "@/lib/canvas/canvas-image-layers";
@@ -56,6 +59,35 @@ function sample() {
 }
 
 describe("独立透明图层验收", () => {
+    test("背景必须全不透明；前景不能用单个透明像素冒充去背景", () => {
+        expect(() => validateImageLayerRole(opaque, 0)).not.toThrow();
+        expect(() => validateImageLayerRole(transparent, 0)).toThrow("背景底图");
+        const rgba = new Uint8ClampedArray(100 * 100 * 4).fill(255);
+        rgba[3] = 254;
+        expect(() => validateImageLayerRole(inspectLayerAlpha(100, 100, rgba), 0)).toThrow("半透明");
+        rgba[3] = 0;
+        const puncture = inspectLayerAlpha(100, 100, rgba);
+        expect(puncture.transparent).toBe(true);
+        expect(hasUsableLayerTransparency(puncture)).toBe(false);
+        expect(() => validateImageLayerRole(puncture, 1)).toThrow("零散");
+        expect(() => validateImageLayerRole(transparent, 1)).not.toThrow();
+    });
+    test("完整场景只移除勾选对象，细节允许重复；单层提示不混入其他层排除指令", () => {
+        const targets = ["房间：保留窗户、书架、地毯", "猫：保留轮廓", "毛线球：保留纹理"];
+        const background = experimentalLayerPrompt("拆分", targets, 0, [false, true, false]);
+        expect(background).toContain("仅移除以下对象并补全被遮挡背景：猫");
+        expect(background).toContain("仍保留在场景中");
+        expect(background).toContain("alpha=255");
+        const foreground = experimentalLayerPrompt("拆分", targets, 1, [false, true, false]);
+        expect(foreground).not.toContain("房间：保留");
+        expect(foreground).not.toContain("毛线球：保留");
+        expect(experimentalLayerPrompt("拆分", targets, 0, [false, true, true])).not.toContain("仍保留在场景中");
+        const model = "gpt-image-2.5-flare";
+        const channel = createModelChannel({ id: "backup", models: [model], interfaceType: "openai-image" });
+        const config = { ...defaultConfig, model: `backup::${model}`, channels: [channel] };
+        expect(imageLayerProviderMetadata(config, 0)).toEqual({ providerOptions: { "openai-image": { background: "opaque" } } });
+        expect(imageLayerProviderMetadata(config, 1)).toEqual({ providerOptions: { "openai-image": { background: "transparent" } } });
+    });
     test("实验提取明确协议、每层目标和透明背景；限制调用层数", () => {
         const model = "gpt-image-2.5-flare";
         const channel = createModelChannel({ id: "backup", models: [model], interfaceType: "openai-image" });

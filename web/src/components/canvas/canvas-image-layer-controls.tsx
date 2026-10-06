@@ -25,6 +25,7 @@ export function CanvasImageLayerControls({ node }: { node: CanvasNodeData }) {
     const panel = (
         <div className="w-64 space-y-2" data-canvas-no-zoom data-canvas-wheel-scroll onPointerDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()}>
             <div className="text-sm font-medium">图层顺序（上方在前）</div>
+            {group.incomplete ? <p role="status" className="text-xs text-amber-600 dark:text-amber-400">已收纳 {group.incomplete.completed}/{group.incomplete.total} 层，{group.incomplete.failed} 层尚未通过。{group.incomplete.missingBackground ? "当前预览缺少完整背景。" : "当前显示部分合成。"}展开查看失败层并单独重试。</p> : null}
             <div className="max-h-64 space-y-1 overflow-y-auto">
                 {[...group.layers].reverse().map((layer, reverseIndex) => {
                     const index = group.layers.length - 1 - reverseIndex;

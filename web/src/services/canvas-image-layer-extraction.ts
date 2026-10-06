@@ -1,4 +1,4 @@
-import { experimentalLayerPrompt, MAX_GROUP_PIXELS, parseExperimentalLayerTargets } from "@/lib/canvas/canvas-image-layers";
+import { experimentalLayerPrompt, hasUsableLayerTransparency, MAX_GROUP_PIXELS, parseExperimentalLayerTargets, validateImageLayerRole } from "@/lib/canvas/canvas-image-layers";
 import { imageLayerRemovalPrompt } from "@/lib/canvas/canvas-image-layer-plan";
 import { inspectImageLayer, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -19,6 +19,7 @@ export type ImageLayerStageRequest = {
 export async function runImageLayerExtraction({
     source,
     targets,
+    removeFromBackground,
     prompt,
     config,
     removalConfig,
@@ -29,6 +30,7 @@ export async function runImageLayerExtraction({
 }: {
     source: ReferenceImage;
     targets: string[];
+    removeFromBackground?: boolean[];
     prompt: string;
     config: AiConfig;
     removalConfig?: AiConfig;
@@ -58,10 +60,10 @@ export async function runImageLayerExtraction({
                 check(index);
                 onProgress?.(index, "extract");
                 let result = await inspect(
-                    (await runStage({ index, stage: "extract", prompt: experimentalLayerPrompt(prompt, targets, index), config: { ...config, count: "1", transparentBackground: index > 0 ? "true" : "false" }, reference: source, canvas })).images,
+                    (await runStage({ index, stage: "extract", prompt: experimentalLayerPrompt(prompt, targets, index, removeFromBackground), config: { ...config, count: "1", transparentBackground: index > 0 ? "true" : "false" }, reference: source, canvas })).images,
                 );
                 check(index);
-                if (index > 0 && !result.info.transparent) {
+                if (index > 0 && !hasUsableLayerTransparency(result.info)) {
                     if (!removalConfig) throw new Error("拆层失败：模型未返回真实透明背景，请配置去背景处理");
                     check(index);
                     onProgress?.(index, "remove-background");
@@ -78,8 +80,9 @@ export async function runImageLayerExtraction({
                         ).images,
                     );
                     check(index);
-                    if (!result.info.transparent) throw new Error("去背景结果仍没有真实透明区域，已停止本层，不自动付费重试");
+                    if (!hasUsableLayerTransparency(result.info)) throw new Error("去背景结果仍没有有效的真实透明区域，已停止本层，不自动付费重试");
                 }
+                validateImageLayerRole(result.info, index);
                 onProgress?.(index, "complete");
             } catch (error) {
                 onProgress?.(index, "error");

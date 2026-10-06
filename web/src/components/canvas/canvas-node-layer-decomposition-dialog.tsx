@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, Checkbox, Input, Tag } from "antd";
+import { Button, Checkbox, Input, Segmented, Tag } from "antd";
 import { Layers3, Plus, RotateCcw, X } from "lucide-react";
 
 import { ModelPicker } from "@/components/model-picker";
@@ -15,12 +15,13 @@ export type CanvasImageLayerDecompositionPayload = {
     prompt: string;
     regions?: Array<[number, number, number, number]>;
     experimentalTargets?: string[];
+    removeFromBackground?: boolean[];
     backgroundRemovalModel?: string;
     planning?: Pick<ImageLayerPlan, "model" | "taskId">;
     generationConfig?: Partial<Pick<AiConfig, "model" | "imageModel" | "size" | "quality">>;
 };
 
-const DEFAULT_PROMPT = "将图片拆分为可独立编辑的图层：识别主要主体、前景、背景和重要物体，输出一张底图与多张同尺寸透明 PNG 图层，保持原图外观、边缘细节和原始坐标，不要合并不同图层，透明图层按从底到顶的顺序输出。";
+const DEFAULT_PROMPT = "保留完整场景结构，将主要主体提取为独立透明图层；场景底图只移除主体并补全遮挡，保持原图外观、画布比例和原始坐标。";
 
 export function CanvasNodeLayerDecompositionDialog({
     dataUrl,
@@ -46,6 +47,8 @@ export function CanvasNodeLayerDecompositionDialog({
     const [draft, setDraft] = useState<[number, number, number, number] | null>(null);
     const [experimental, setExperimental] = useState(false);
     const [targetText, setTargetText] = useState("");
+    const [detailMode, setDetailMode] = useState(false);
+    const [backgroundRemovals, setBackgroundRemovals] = useState<boolean[]>([]);
     const [plannerModel, setPlannerModel] = useState("");
     const [usePlanner, setUsePlanner] = useState(true);
     const [plan, setPlan] = useState<ImageLayerPlan>();
@@ -70,6 +73,8 @@ export function CanvasNodeLayerDecompositionDialog({
         setDraft(null);
         setExperimental(!supportsLayerDecomposition(current, model));
         setTargetText("");
+        setDetailMode(false);
+        setBackgroundRemovals([]);
         setPlannerModel(current.textModel || selectableModelsByCapability(current, "text")[0] || "");
         setUsePlanner(true);
         setPlan(undefined);
@@ -132,9 +137,10 @@ export function CanvasNodeLayerDecompositionDialog({
         setDraft(null);
     };
 
+    const scopePrompt = `${prompt.trim()}\n${detailMode ? "详细拆分：可增加用户需要独立编辑的细节对象，细节默认保留在底图中作为场景结构，另提取备用素材。" : "主体与场景：优先只拆完整场景与主要主体两层；用户明确指定其他对象时才增加图层。"}`;
     const selectedPrompt = regions.length
-        ? `${prompt.trim()}\n\n重点处理用户框选的区域，并分别输出这些区域中的主体为独立透明 PNG 图层。选区坐标（图像 0-1000 坐标系）：${regions.map((region, index) => `区域${index + 1} <bbox>${region.join(" ")}</bbox>`).join("；")}`
-        : prompt.trim();
+        ? `${scopePrompt}\n\n重点处理用户框选的区域。选区坐标（图像 0-1000 坐标系）：${regions.map((region, index) => `区域${index + 1} <bbox>${region.join(" ")}</bbox>`).join("；")}`
+        : scopePrompt;
 
     const invalidatePlan = () => {
         planningRequest.current?.abort(); planningRequest.current = null;
@@ -150,6 +156,7 @@ export function CanvasNodeLayerDecompositionDialog({
             const result = await onPlan(plannerModel, selectedPrompt, controller.signal);
             if (controller.signal.aborted || planningRequest.current !== controller) return;
             setPlan(result); setTargetText(imageLayerPlanTargets(result).join("\n"));
+            setBackgroundRemovals(result.layers.map((layer) => Boolean(layer.removeFromBackground)));
         } catch (error) {
             if (!controller.signal.aborted) setPlanningError(error instanceof Error ? error.message : "识图规划失败，未提交拆图任务");
         } finally {
@@ -182,8 +189,9 @@ export function CanvasNodeLayerDecompositionDialog({
                 <div className="flex flex-col gap-4">
                     <div>
                         <h3 className="text-lg font-semibold">拆分图片图层</h3>
-                        <p className="mt-1 text-sm opacity-60">拆分为底图和独立透明图层，默认叠放显示合成图，可展开查看、编辑和下载各图层。框选区域作为模型提示，不保证精确分割。</p>
+                        <p className="mt-1 text-sm opacity-60">默认拆出完整不透明场景与透明主体，收纳为一组，可叠放或展开。细节可进一步拆分，也可保留在场景中另提取备用素材。</p>
                     </div>
+                    <Segmented block aria-label="拆分范围" value={detailMode ? "detail" : "primary"} options={[{ label: "主体与场景", value: "primary" }, { label: "详细拆分", value: "detail" }]} onChange={(value) => { setDetailMode(value === "detail"); invalidatePlan(); }} />
                     <div className="flex flex-wrap items-center gap-2">
                         <Tag color={regions.length ? "blue" : "default"}>{regions.length ? `已框选 ${regions.length} 个区域` : "未框选，按描述拆分"}</Tag>
                         {regions.length ? <Button size="small" icon={<RotateCcw className="size-3.5" />} onClick={() => { setRegions([]); invalidatePlan(); }}>清除选区</Button> : <span className="text-xs opacity-55"><Plus className="mr-1 inline size-3" />在左侧图片上拖动添加选区</span>}
@@ -226,6 +234,8 @@ export function CanvasNodeLayerDecompositionDialog({
                             </> : null}
                             <div className="text-sm">拆层目标（每行一层，第一层为背景底图）</div>
                             <Input.TextArea aria-label="拆层目标" rows={4} readOnly={planning} value={targetText} placeholder="先识图规划，也可关闭规划后每行填写一层" onChange={(event) => setTargetText(event.target.value)} />
+                            {experimentalTargets?.slice(1).map((target, i) => <Checkbox key={i} className="!flex text-xs" checked={backgroundRemovals[i + 1] ?? i === 0} onChange={(event) => setBackgroundRemovals(experimentalTargets!.map((_, index) => index === i + 1 ? event.target.checked : backgroundRemovals[index] ?? index === 1))}>从底图移除第 {i + 2} 层：{target.split(/[：:]/)[0].slice(0, 40)}</Checkbox>)}
+                            {experimentalTargets ? <p className="text-xs opacity-70">未勾选的细节仍保留在底图，透明副本可作叠加或备用素材。移动、替换或删除这类对象时，需另修补底图中的原对象；合成不保证逐像素还原。</p> : null}
                             <p className="text-xs opacity-70">{sourceSize ? `锁定原图画布 ${sourceSize.width}×${sourceSize.height}；` : ""}模型请求尺寸 {generationConfig.size || "未支持"}。各层统一保存为原图尺寸与比例；仅归一化 1% 内的模型尺寸取整差，明显比例变化直接报错。生成模型仍不保证原始内容与坐标完全不变。</p>
                             <Checkbox checked={removeBackground} onChange={(event) => setRemoveBackground(event.target.checked)}>非透明前景层自动去背景（每层最多一次）</Checkbox>
                             {removeBackground ? <ModelPicker config={config} value={removalModel} capability="image" fullWidth placeholder="选择去背景模型" showSelectedPrice modelFilter={(model) => supportsExperimentalLayerExtraction(config, model) && !supportsLayerDecomposition(config, model)} onChange={setRemovalModel} /> : null}
@@ -242,8 +252,8 @@ export function CanvasNodeLayerDecompositionDialog({
                         <Button
                             type="primary"
                             icon={<Layers3 className="size-4" />}
-                            disabled={!selectedPrompt || !supported || !dataUrl || Boolean(drawing) || Boolean(targetError) || Boolean(outputSizeError) || Boolean(removalError) || planning || (experimental && !dedicated && (!experimentalTargets || (usePlanner && (!plan || Boolean(plannerError)))))}
-                            onClick={() => onConfirm({ prompt: selectedPrompt, regions, experimentalTargets, backgroundRemovalModel: experimental && !dedicated && removeBackground ? removalModel : undefined, planning: usePlanner ? plan : undefined, generationConfig: { model: selectedModel, imageModel: selectedModel, size: generationConfig.size, quality: generationConfig.quality } })}
+                            disabled={!prompt.trim() || !supported || !dataUrl || Boolean(drawing) || Boolean(targetError) || Boolean(outputSizeError) || Boolean(removalError) || planning || (experimental && !dedicated && (!experimentalTargets || (usePlanner && (!plan || Boolean(plannerError)))))}
+                            onClick={() => onConfirm({ prompt: selectedPrompt, regions, experimentalTargets, removeFromBackground: experimentalTargets?.map((_, i) => i > 0 && (backgroundRemovals[i] ?? i === 1)), backgroundRemovalModel: experimental && !dedicated && removeBackground ? removalModel : undefined, planning: usePlanner ? plan : undefined, generationConfig: { model: selectedModel, imageModel: selectedModel, size: generationConfig.size, quality: generationConfig.quality } })}
                         >
                             开始拆分
                         </Button>

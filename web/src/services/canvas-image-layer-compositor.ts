@@ -1,4 +1,4 @@
-import { inspectLayerAlpha, MAX_GROUP_PIXELS, MAX_IMAGE_LAYERS, MAX_LAYER_PIXELS, validateLayerRasters, type LayerRasterInfo } from "@/lib/canvas/canvas-image-layers";
+import { inspectLayerAlpha, MAX_GROUP_PIXELS, MAX_IMAGE_LAYERS, MAX_LAYER_PIXELS, validateLayerRasters, validateImageLayerRole, type LayerRasterInfo } from "@/lib/canvas/canvas-image-layers";
 import { getImageBlob } from "@/services/image-storage";
 import type { CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 
@@ -50,7 +50,7 @@ export async function normalizeImageLayerCanvas(input: LayerInput, target?: { wi
         const { info } = decoded;
         if (!target) return { image: { ...input, width: info.width, height: info.height }, info };
         if (!Number.isSafeInteger(target.width) || !Number.isSafeInteger(target.height) || target.width <= 0 || target.height <= 0 || target.width * target.height > MAX_LAYER_PIXELS) throw new Error("源图画布尺寸无效或超过处理上限");
-        if (Math.abs(info.width / info.height / (target.width / target.height) - 1) > 0.01) throw new Error("模型结果比例与原图不一致，已拒绝该图层；不会拉伸或裁切来掩盖构图变化");
+        if (Math.abs(info.width / info.height / (target.width / target.height) - 1) > 0.01) throw new Error(`模型结果比例与原图不一致（原图 ${target.width}×${target.height}，实际 ${info.width}×${info.height}），已拒绝该图层；不会拉伸或裁切来掩盖构图变化`);
         if (info.width === target.width && info.height === target.height) return { image: { ...input, width: info.width, height: info.height }, info };
         const canvas = document.createElement("canvas");
         canvas.width = target.width;
@@ -77,8 +77,9 @@ export async function normalizeImageLayerCanvas(input: LayerInput, target?: { wi
 }
 
 /** 验收所有输出后一次提交；失败时不留下部分画布图层。 */
-export async function decodeAndComposeImageLayers(inputs: LayerInput[]) {
-    if (inputs.length < 2 || inputs.length > MAX_IMAGE_LAYERS) validateLayerRasters(inputs.map(() => ({ width: 1, height: 1, transparent: true, nonempty: true })));
+export async function decodeAndComposeImageLayers(inputs: LayerInput[], roles?: number[]) {
+    if (roles && (roles.length !== inputs.length || !inputs.length || inputs.length > MAX_IMAGE_LAYERS)) throw new Error("拆层合成角色或数量无效");
+    if (!roles && (inputs.length < 2 || inputs.length > MAX_IMAGE_LAYERS)) validateLayerRasters(inputs.map(() => ({ width: 1, height: 1, transparent: true, nonempty: true })));
     if (inputs.some((input) => !input || (!input.dataUrl && !input.storageKey))) throw new Error("拆层结果包含缺失的图层资源");
     const decoded: DecodedLayer[] = [];
     try {
@@ -89,7 +90,11 @@ export async function decodeAndComposeImageLayers(inputs: LayerInput[]) {
             pixels += layer.info.width * layer.info.height;
             if (pixels > MAX_GROUP_PIXELS) throw new Error("图层总像素量超过处理上限");
         }
-        const order = validateLayerRasters(decoded.map((layer) => layer.info));
+        const order = roles ? decoded.map((layer, index) => {
+            validateImageLayerRole(layer.info, roles[index]);
+            if (layer.info.width !== decoded[0].info.width || layer.info.height !== decoded[0].info.height) throw new Error("图层尺寸不一致，无法确定合成坐标");
+            return index;
+        }) : validateLayerRasters(decoded.map((layer) => layer.info));
         const { width, height } = decoded[0].info;
         const canvas = document.createElement("canvas");
         canvas.width = width;
@@ -122,7 +127,7 @@ export async function composeCanvasImageLayerGroup(group: NonNullable<CanvasNode
         const decoded = await decodeLayer({ dataUrl: node.metadata.content, storageKey: node.metadata.storageKey });
         try {
             if (decoded.info.width !== group.width || decoded.info.height !== group.height) throw new Error("编辑后的图层尺寸与图层组不一致，无法合成");
-            if (node.metadata.imageLayer?.kind === "transparent" && !decoded.info.transparent) throw new Error("编辑后的图层没有透明背景，请先去背景或替换为透明 PNG");
+            if (node.metadata.imageLayer?.kind) validateImageLayerRole(decoded.info, node.metadata.imageLayer.kind === "base" ? 0 : 1);
             context.drawImage(decoded.bitmap, layer.x, layer.y);
         } finally {
             decoded.bitmap.close();

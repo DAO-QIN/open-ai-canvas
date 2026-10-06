@@ -14,8 +14,8 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { applyGenerationConsumerEffect, generationEffectApplied } from "@/services/generation-consumer-dedupe";
 import { commitProducedModel } from "@/lib/canvas/produced-model";
-import { imageLayerCompositeSignature } from "@/lib/canvas/canvas-image-layers";
-import { decodeAndComposeImageLayers, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
+import { experimentalLayerSignature, hasUsableLayerTransparency, imageLayerCompositeSignature, validateImageLayerRole } from "@/lib/canvas/canvas-image-layers";
+import { composeCanvasImageLayerGroup, decodeAndComposeImageLayers, inspectImageLayer, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
 
 export function generationTaskInput(task: GenerationTask) {
@@ -140,8 +140,8 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
             result.images[0] = normalized.image;
             if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
             if (extraction?.canvas && (info.width !== extraction.canvas.width || info.height !== extraction.canvas.height)) throw new Error("图层尺寸与底图不一致，已停止后续调用");
-            needsRemoval = Boolean(extraction?.index && !info.transparent && extraction.allowBackgroundRemoval && extraction.phase === "extract");
-            if (extraction!.index > 0 && !info.transparent && !needsRemoval) throw new Error(extraction?.phase === "remove-background" ? "去背景结果仍没有真实透明区域，已停止本层，不自动付费重试" : "拆层失败：模型未返回真实透明背景，棋盘格或纯色背景不能作为图层");
+            needsRemoval = Boolean(extraction?.index && !hasUsableLayerTransparency(info) && extraction.allowBackgroundRemoval && extraction.phase === "extract");
+            if (!needsRemoval) validateImageLayerRole(info, extraction!.index);
             extraction = { ...extraction!, phase: needsRemoval ? "background-removal-required" : "complete", extractionTaskId: extraction?.phase === "extract" ? task.id : extraction?.extractionTaskId, rejectedTaskId: undefined };
         }
         const image = result.images?.[outputIndex];
@@ -456,23 +456,43 @@ export async function buildImageLayerTaskResult(node: CanvasNodeData, task: Gene
     };
 }
 
-/** 聚合逐层任务的真实资源，成功前不把普通图片伪装成透明图层组。 */
+/** 仅合成已验收的层，保留失败项身份；重试新增结果不会覆盖已有排序与可见性。 */
 export async function buildExperimentalImageLayerResult(root: CanvasNodeData, nodes: CanvasNodeData[]) {
     const plan = root.metadata?.experimentalLayerPlan;
-    if (!plan || plan.requests.length < 2 || plan.requests.length > 8) throw new Error("实验拆层计划无效");
-    const children = plan.requests.map((request) => nodes.find((node) => node.id === request.nodeId));
-    if (children.some((node) => !node?.metadata?.content || node.metadata.status !== "success")) throw new Error("实验拆层尚未完成全部图层，未生成合成图");
-    const sources = children as CanvasNodeData[];
-    const decoded = await decodeAndComposeImageLayers(sources.map((node) => ({ dataUrl: node.metadata!.content!, storageKey: node.metadata?.storageKey })));
-    if (decoded.layers.slice(1).some((layer) => !layer.transparent)) throw new Error("实验拆层前景没有真实透明背景，未生成合成图");
-    const composite = await uploadImage(decoded.composite);
-    if (composite.pendingRemoteUpload) throw new Error("合成图尚未保存到服务端，请重试本地合成");
+    if (!plan || !plan.requests.length || plan.requests.length > 8) throw new Error("实验拆层计划无效");
+    const candidates = plan.requests.flatMap((request, index) => {
+        const node = nodes.find((node) => node.id === request.nodeId);
+        return node?.metadata?.content && node.metadata.status === "success" && (!node.metadata.layerExtraction?.phase || node.metadata.layerExtraction.phase === "complete") ? [{ node, index: node.metadata.layerExtraction?.index ?? index }] : [];
+    });
+    const ready: typeof candidates = [];
+    const rejected: CanvasNodeData[] = [];
+    for (const item of candidates) {
+        try {
+            validateImageLayerRole(await inspectImageLayer({ dataUrl: item.node.metadata!.content!, storageKey: item.node.metadata?.storageKey }), item.index);
+            ready.push(item);
+        } catch (error) {
+            rejected.push({ ...item.node, metadata: { ...item.node.metadata, status: "error", errorDetails: error instanceof Error ? error.message : "图层资源验收失败", ...(item.node.metadata?.layerExtraction ? { layerExtraction: { ...item.node.metadata.layerExtraction, rejectedTaskId: item.node.metadata.taskId } } : {}) } });
+        }
+    }
+    if (!ready.length) throw new Error("没有已验收的图层可生成合成图");
+    const previous = root.metadata?.imageLayerGroup;
+    const order = previous?.layers.flatMap((layer) => ready.filter((item) => item.node.id === layer.nodeId)) || [];
+    for (const item of ready) {
+        if (order.some((existing) => existing.node.id === item.node.id)) continue;
+        const before = order.findIndex((existing) => existing.index > item.index);
+        order.splice(before < 0 ? order.length : before, 0, item);
+    }
+    const sources = order.map((item) => item.node);
+    const decoded = await decodeAndComposeImageLayers(sources.map((node) => ({ dataUrl: node.metadata!.content!, storageKey: node.metadata?.storageKey })), order.map((item) => item.index));
     const updatedChildren = sources.map((node, index) => ({
         ...node,
-        title: plan.requests[index].target,
-        metadata: { ...node.metadata, batchRootId: root.id, imageLayer: { groupId: root.id, outputIndex: index, kind: decoded.layers[index].transparent ? ("transparent" as const) : ("base" as const) } },
+        title: node.metadata?.imageLayer ? node.title : plan.requests.find((request) => request.nodeId === node.id)!.target,
+        metadata: { ...node.metadata, batchRootId: root.id, imageLayer: { groupId: root.id, outputIndex: order[index].index, kind: order[index].index === 0 ? ("base" as const) : ("transparent" as const) } },
     }));
-    const group: NonNullable<CanvasNodeMetadata["imageLayerGroup"]> = { width: decoded.width, height: decoded.height, compositeStatus: "ready", layers: decoded.order.map((index) => ({ nodeId: sources[index].id, x: 0, y: 0, visible: true })) };
+    const completed = sources.length;
+    const group: NonNullable<CanvasNodeMetadata["imageLayerGroup"]> = { width: decoded.width, height: decoded.height, compositeStatus: "ready", layers: decoded.order.map((index) => previous?.layers.find((layer) => layer.nodeId === sources[index].id) || { nodeId: sources[index].id, x: 0, y: 0, visible: true }), ...(completed < plan.requests.length ? { incomplete: { completed, total: plan.requests.length, failed: plan.requests.length - completed, missingBackground: !order.some((item) => item.index === 0) } } : {}) };
+    const composite = await uploadImage(previous ? await composeCanvasImageLayerGroup(group, updatedChildren) : decoded.composite);
+    if (composite.pendingRemoteUpload) throw new Error("合成图尚未保存到服务端，请重试本地合成");
     group.compositeSignature = imageLayerCompositeSignature(group, updatedChildren);
     return {
         node: {
@@ -481,13 +501,17 @@ export async function buildExperimentalImageLayerResult(root: CanvasNodeData, no
             metadata: applyGeneratedMediaResultMetadata(root, imageMetadata(composite), {
                 imageLayerGroup: group,
                 isBatchRoot: true,
-                batchChildIds: group.layers.map((layer) => layer.nodeId),
-                imageBatchExpanded: false,
+                batchChildIds: plan.requests.map((request) => request.nodeId),
+                imageBatchExpanded: root.metadata?.imageBatchExpanded ?? false,
                 primaryImageId: undefined,
+                experimentalLayerPlan: { ...plan, composedSignature: experimentalLayerSignature(root, nodes.map((node) => rejected.find((item) => item.id === node.id) || node)), errorSignature: undefined },
+                status: "success",
+                errorDetails: undefined,
+                batchFailedCount: plan.requests.length - completed,
                 generationOutputCount: sources.length,
             }),
         },
-        additionalNodes: updatedChildren,
+        additionalNodes: [...updatedChildren, ...rejected],
     };
 }
 

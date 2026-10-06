@@ -25,16 +25,26 @@ export function parseExperimentalLayerTargets(text: string) {
     return targets;
 }
 
-export function experimentalLayerPrompt(prompt: string, targets: string[], index: number) {
-    const exclusion = targets.filter((_, current) => current !== index).join("、");
-    return `${prompt}\n\n本次仅输出一张独立图层，目标：${targets[index]}。${index === 0 ? `这是背景底图：移除其他层（${exclusion}）中的对象，补全被遮挡背景。` : `这是透明图层：仅保留目标，移除其他层（${exclusion}）及全部背景；空白区域必须为真实 alpha=0。`}保持参考图的完整画布尺寸、目标原始位置、比例和边缘细节，不裁切、不居中重排。输出 PNG，不要拼版，不要文字标注，不要绘制棋盘格来代替透明度。`;
+export function experimentalLayerPrompt(prompt: string, targets: string[], index: number, removeFromBackground = targets.map((_, i) => i === 1)) {
+    const removed = targets.filter((_, i) => i > 0 && removeFromBackground[i]).join("；");
+    const retained = targets.filter((_, i) => i > 0 && !removeFromBackground[i]).join("；");
+    const contract = index === 0
+        ? `这是完整、不透明的场景底图，每个像素必须 alpha=255。${removed ? `仅移除以下对象并补全被遮挡背景：${removed}。` : "保留完整场景。"}${retained ? `以下内容仍保留在场景中，允许与细节素材重复：${retained}。` : ""}保留原有环境、家具、地面、道具、光照与纹理，不要将场景清空。不要透明背景或半透明底图。`
+        : "这是独立透明对象：仅保留本层目标，去除非目标内容及背景，空白区域必须为真实 alpha=0，保留自然边缘与接地阴影。";
+    return `执行图片图层提取。本次仅输出一张独立图层，目标：${targets[index]}。${contract}保持参考图完整画布尺寸、原始位置、比例和细节，不裁切、不居中重排。输出 PNG，不要拼版、文字标注或绘制棋盘格。用户总体要求仅作上下文，以本层规则为准：${JSON.stringify(prompt)}`;
+}
+
+/** OpenAI Images 的 false 默认可能仍是 auto；拆层底图明确请求 opaque。 */
+export function imageLayerProviderMetadata(config: AiConfig, index: number) {
+    const protocol = resolveModelRequestConfig(config, config.model).interfaceType;
+    return protocol === "openai-image" ? { providerOptions: { [protocol]: { background: index === 0 ? "opaque" : "transparent" } } } : {};
 }
 
 export function experimentalLayerSignature(root: CanvasNodeData, nodes: CanvasNodeData[]) {
     return JSON.stringify(
         root.metadata?.experimentalLayerPlan?.requests.map((request) => {
             const child = nodes.find((node) => node.id === request.nodeId);
-            return [request.nodeId, request.target, child?.metadata?.status, child?.metadata?.storageKey || child?.metadata?.content];
+            return [request.nodeId, request.target, child?.metadata?.status, child?.metadata?.layerExtraction?.phase, child?.metadata?.storageKey || child?.metadata?.content];
         }),
     );
 }
@@ -43,7 +53,7 @@ export function layerDecompositionConfig(config: AiConfig, model: string, parame
     return { ...config, ...parameters, model, imageModel: model, count: "1", taskWorkflowProvider: "model" };
 }
 
-export type LayerRasterInfo = { width: number; height: number; transparent: boolean; nonempty: boolean };
+export type LayerRasterInfo = { width: number; height: number; transparent: boolean; nonempty: boolean; opaque?: boolean; transparentPixels?: number };
 
 export function inspectLayerAlpha(width: number, height: number, rgba: Uint8ClampedArray): LayerRasterInfo {
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width * height > MAX_LAYER_PIXELS || rgba.length !== width * height * 4) {
@@ -51,11 +61,24 @@ export function inspectLayerAlpha(width: number, height: number, rgba: Uint8Clam
     }
     let transparent = false;
     let nonempty = false;
+    let opaque = true;
+    let transparentPixels = 0;
     for (let index = 3; index < rgba.length; index += 4) {
-        if (rgba[index] === 0) transparent = true;
+        if (rgba[index] === 0) { transparent = true; transparentPixels += 1; }
         if (rgba[index] > 0) nonempty = true;
+        if (rgba[index] !== 255) opaque = false;
     }
-    return { width, height, transparent, nonempty };
+    return { width, height, transparent, nonempty, opaque, transparentPixels };
+}
+
+export function hasUsableLayerTransparency(info: LayerRasterInfo) {
+    return info.transparent && (info.transparentPixels === undefined || info.transparentPixels >= Math.max(1, Math.ceil(info.width * info.height * 0.001)));
+}
+
+export function validateImageLayerRole(info: LayerRasterInfo, index: number) {
+    if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
+    if (index === 0 && info.opaque !== true) throw new Error("背景底图仍含透明或半透明像素，未形成完整不透明场景；请单独重新生成背景，不会自动付费重试");
+    if (index > 0 && !hasUsableLayerTransparency(info)) throw new Error("对象图层未返回有效的真实透明背景，棋盘格、纯色或零散透明像素不能作为去背景结果");
 }
 
 /** 底图可以不透明；其他图层必须有真实 alpha。允许阴影和半透明边缘相互叠加。 */

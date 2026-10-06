@@ -525,7 +525,9 @@ export function removeCanvasNodes(nodes: CanvasNodeData[], requestedIds: Set<str
         if (!cleaned.metadata?.isBatchRoot || childIds?.length === cleaned.metadata.batchChildIds?.length) return cleaned;
         const primaryImageId = childIds?.includes(cleaned.metadata.primaryImageId || "") ? cleaned.metadata.primaryImageId : childIds?.[0];
         const primaryNode = remainingNodes.find((item) => item.id === primaryImageId);
-        const batchRoot = { ...cleaned, metadata: { ...cleaned.metadata, batchChildIds: childIds, primaryImageId } };
+        const plan = cleaned.metadata.experimentalLayerPlan;
+        const requests = plan?.requests.filter((request) => !removedIds.has(request.nodeId));
+        const batchRoot = { ...cleaned, metadata: { ...cleaned.metadata, batchChildIds: childIds, primaryImageId, ...(plan ? { experimentalLayerPlan: requests?.length ? { ...plan, requests, composedSignature: undefined, errorSignature: undefined } : undefined } : {}) } };
         if (cleaned.metadata.imageLayerGroup)
             return {
                 ...batchRoot,
