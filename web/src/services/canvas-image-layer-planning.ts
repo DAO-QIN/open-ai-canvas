@@ -1,6 +1,22 @@
 import { MAX_LAYER_PIXELS } from "@/lib/canvas/canvas-image-layers";
+import { latestImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
+import { listGenerationTasks, queryGenerationTask } from "@/services/api/task-center";
 import { getImageBlob } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
+
+/** 列表只有安全摘要，按源节点筛选后通过已有鉴权详情接口读取计划。 */
+export async function readImageLayerPlanningHistory(projectId: string, sourceNodeId: string, sourceStorageKey: string | undefined, signal: AbortSignal) {
+    const tasks = await listGenerationTasks(50, { projectId }, undefined, signal);
+    const candidates = tasks.filter((task) => task.projectId === projectId && task.type === "canvas_text" && task.status === "succeeded" && task.clientContext?.nodeId?.startsWith(`${sourceNodeId}-layer-plan-`)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    for (const summary of candidates) {
+        signal.throwIfAborted();
+        const task = await queryGenerationTask(summary.id, { signal });
+        signal.throwIfAborted();
+        const plan = latestImageLayerPlan([task], projectId, sourceNodeId, sourceStorageKey);
+        if (plan) return plan;
+    }
+    throw new Error("最近 50 条任务中没有这张源图的可用规划，请重新识图或关闭规划后手工填写目标");
+}
 
 /** 只预处理识图输入，最终拆层仍使用完整源图；读取和上传沿用账号资源链路。 */
 export async function prepareImageLayerPlanningReference(source: ReferenceImage, input: "preview" | "original", signal: AbortSignal) {

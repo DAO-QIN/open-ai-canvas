@@ -25,7 +25,7 @@ import { findAvailableGenerationGroupPosition, imageGenerationChildPosition, ima
 import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-submission";
 import { cancelIncompleteImageBatch } from "@/lib/canvas/canvas-image-batch-retry";
 import { experimentalLayerPrompt, imageLayerProviderMetadata, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
-import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, latestImageLayerPlan, parseImageLayerPlan, type ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
+import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, parseImageLayerPlan, type ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
 import { buildAngleLabel, buildAnglePrompt, createCanvasNode } from "@/lib/canvas/canvas-project-domain";
 import { validateVideoSegmentBatch } from "@/lib/canvas/canvas-video-regeneration";
 import { resolveCanvasStyleExecution } from "@/lib/canvas/canvas-style-execution";
@@ -50,10 +50,10 @@ import { getImageBlob, uploadImage } from "@/services/image-storage";
 import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
 import { runImageLayerExtraction } from "@/services/canvas-image-layer-extraction";
 import { inspectImageLayer } from "@/services/canvas-image-layer-compositor";
-import { prepareImageLayerPlanningReference } from "@/services/canvas-image-layer-planning";
+import { prepareImageLayerPlanningReference, readImageLayerPlanningHistory } from "@/services/canvas-image-layer-planning";
 import { resolveImageRequestSize } from "@/services/api/image-validation";
 import { resetGenerationTaskMetadata } from "@/lib/canvas/canvas-task-state";
-import { listGenerationTasks, type GenerationTask } from "@/services/api/task-center";
+import type { GenerationTask } from "@/services/api/task-center";
 
 function normalizeMaskEditQuality(quality: string | undefined, size: string | undefined) {
     const value = String(quality || "").trim().toLowerCase();
@@ -993,11 +993,7 @@ export function useCanvasMediaTools({
 
     const planImageLayers = useCallback(async (node: CanvasNodeData, model: string, prompt: string, signal: AbortSignal, options?: ImageLayerPlanningOptions) => {
         if (options?.history) {
-            const tasks = await listGenerationTasks(50, { projectId }, undefined, signal);
-            signal.throwIfAborted();
-            const plan = latestImageLayerPlan(tasks, projectId, node.id, node.metadata?.storageKey);
-            if (!plan) throw new Error("最近 50 条任务中没有这张源图的可用规划，请重新识图或关闭规划后手工填写目标");
-            return plan;
+            return readImageLayerPlanningHistory(projectId, node.id, node.metadata?.storageKey, signal);
         }
         const config = { ...effectiveConfig, model, textModel: model, taskWorkflowProvider: "model" as const };
         const error = imageLayerPlannerError(config, model);
