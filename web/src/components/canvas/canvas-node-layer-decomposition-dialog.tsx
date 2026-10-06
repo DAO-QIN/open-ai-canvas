@@ -229,7 +229,7 @@ export function CanvasNodeLayerDecompositionDialog({
                                 <ModelPicker config={config} value={plannerModel} capability="text" fullWidth showSelectedPrice placeholder="选择识图规划文本模型" onChange={(model) => { setPlannerModel(model); invalidatePlan(); }} />
                                 {plannerError ? <p role="alert" className="text-xs text-red-500">{plannerError}</p> : null}
                                 <Button loading={planning} disabled={!plannerModel || Boolean(plannerError) || !selectedPrompt} onClick={() => void requestPlan()}>识图规划</Button>
-                                <p className="text-xs opacity-70">规划使用一次文本模型调用并按该模型计费；返回计划后可编辑，再开始拆分。</p>
+                                <p className="text-xs opacity-70">规划使用一次文本模型调用并按该模型计费。请核对目标与左侧原图一致；识图有误时更换模型或编辑计划，再开始拆分。</p>
                                 {planningError ? <p role="alert" className="text-xs text-red-500">{planningError}</p> : null}
                             </> : null}
                             <div className="text-sm">拆层目标（每行一层，第一层为背景底图）</div>
