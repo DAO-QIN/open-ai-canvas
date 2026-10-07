@@ -34,6 +34,20 @@ function response(names = ["背景", "人物", "花束", "标题文字"]) {
 }
 
 describe("通用图层规划", () => {
+    test("连续场景局部裁块不自动作为素材输出，不把可疑裁图改成收费重画", () => {
+        const layers = [
+            { name: "底图", description: "原图", kind: "background", extraction: { method: "source" } },
+            { name: "主要主体", description: "完整轮廓", kind: "object", editUnit: "object", extraction: { method: "generate" } },
+            { name: "背景局部", description: "画幅内一角", kind: "object", editUnit: "group", bbox: [100, 100, 400, 300], extraction: { method: "source-region", shape: "rect" } },
+        ];
+        const raw = parseImageLayerPlan(JSON.stringify({ canPlan: true, layout: "continuous", layers }));
+        const next = applyImageLayerPlanningPurpose(raw, "materials");
+        expect(next.layers.map((layer) => layer.name)).toEqual(["原图底板", "主要主体"]);
+        expect(next.warnings?.join(" ")).toContain("未自动裁成素材");
+        expect(applyImageLayerPlanningPurpose({ ...raw, layout: "composition" }, "materials").layers).toHaveLength(3);
+        expect(applyImageLayerPlanningPurpose({ ...raw, layout: "mixed" }, "materials").layers).toHaveLength(3);
+        expect(() => applyImageLayerPlanningPurpose({ ...raw, layers: [raw.layers[0], raw.layers[2]] }, "materials")).toThrow("没有可靠的独立素材");
+    });
     test("素材目的纠正模型重画底板和移除项，保留区域与主体各自的提取方式", () => {
         const raw = parseImageLayerPlan(JSON.stringify({ canPlan: true, layers: [
             { name: "底板", description: "清空内容", kind: "background", extraction: { method: "generate" } },

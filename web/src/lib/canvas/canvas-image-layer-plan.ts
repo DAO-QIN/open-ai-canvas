@@ -9,6 +9,7 @@ export type ImageLayerPlanningOptions = { input?: "preview" | "original"; histor
 type ImageSize = { width: number; height: number };
 
 export type ImageLayerPlan = {
+    layout?: "continuous" | "composition" | "mixed";
     layers: Array<{ name: string; description: string; kind: "background" | "object"; editUnit?: "scene" | "object" | "text" | "decoration" | "group"; removeFromBackground?: boolean; bbox?: [number, number, number, number]; extraction?: ImageLayerExtraction }>;
     reasoning?: { structure: string; editingGoal: string; strategy: string };
     model?: string;
@@ -32,11 +33,11 @@ export function imageLayerPlanningPrompt(instructions: string, referenceSize?: I
         purpose === "materials"
             ? '当前目的：提取素材。第一层保留完整原图（extraction.method="source"），其他层 removeFromBackground=false；收集素材无需删除原图中的内容，也无需重画底板。'
             : '当前目的：重组画面。只有需要独立移动、替换或删除的内容才 removeFromBackground=true，此时底图用 generate 修补；其余素材保留在底图，没有移除项时底图用 source。',
-        "判断单元：嵌入布局中的照片、插画、截图或完整内容容器，优先作为完整素材，保留内部场景、主体和有意义的标签；其内部对象不默认继续拆分。连续场景中的独立主体才按轮廓提取，不能把连续场景随意切块。混合图逐区域判断，允许混用工具。除非用户明确要求，保留遮挡与可见边界，不补画原图没有的内容。",
+        '先声明 layout：continuous=同一连续场景，composition=多个有独立边界的嵌入素材组成的排版，mixed=两者混合。只有实际存在独立外边界的照片、插画、截图或完整设计容器，才是可原像素裁取的素材；保留其内部主体、环境和标签。连续照片中的家具、织物、物件或背景一角不是嵌入面板，不能用矩形裁块冒充独立素材。连续场景优先提取完整主要主体的透明轮廓，背景支撑、被画幅截断的局部和缺少复用价值的小物体留在底板。默认不列举所有可见物，用户要求细分时才增加细节。不要补画原图未展示的内容。',
         '每层声明 editUnit：scene=嵌入的完整照片/场景，group=完整组件，object=独立主体，text=文字，decoration=装饰。extraction 工具：source 仅用于第一层；source-region 复制区域全部原像素，适用于完整规则素材，声明 shape=rect|rounded-rect|ellipse，圆角用 radiusRatio（占短边 0–0.5）；generate 用于需透明轮廓的主体/文字或明确请求的修补。完整 scene 禁止重画或内部去背景。边界不确定时保留 source-region 并省略 bbox，等待用户框选，不能改用 generate。',
         "按复用价值选择 2–8 层（含底图）。同一素材可保留副本；不是所有可见细节都值得拆出。超过上限按完整语义单元分组，支持之后继续拆分。name 简短唯一，description 仅描述本层需要保留的内容，不写坐标、提取工具或其他层的指令。",
         coordinates + " bbox 位于图层对象，与 extraction 同级；坐标须覆盖整个素材的边界，不能只框内部主体。不要虚构精确边界。",
-        '输出结构：{"canPlan":true,"coordinateSpace":"坐标单位","imageSize":{"width":参考图宽,"height":参考图高},"reasoning":{"structure":"实际图片结构","editingGoal":"哪些完整素材值得复用","strategy":"工具选择与边界不确定性"},"layers":[{"name":"简短名称","description":"本层内容","kind":"background或object","editUnit":"分类","removeFromBackground":false,"bbox":[左,上,右,下],"extraction":{"method":"工具","shape":"区域形状","radiusRatio":0.04}}]}。示意字段按工具填写：第一层 kind=background，其余 kind=object；没有区域或不确定时省略 bbox，非 source-region 省略 shape/radiusRatio；reasoning 各项不超过400字。',
+        '输出结构：{"canPlan":true,"layout":"continuous或composition或mixed","coordinateSpace":"坐标单位","imageSize":{"width":参考图宽,"height":参考图高},"reasoning":{"structure":"实际图片结构","editingGoal":"哪些完整素材值得复用","strategy":"工具选择与边界不确定性"},"layers":[{"name":"简短名称","description":"本层内容","kind":"background或object","editUnit":"分类","removeFromBackground":false,"bbox":[左,上,右,下],"extraction":{"method":"工具","shape":"区域形状","radiusRatio":0.04}}]}。示意字段按工具填写：第一层 kind=background，其余 kind=object；没有区域或不确定时省略 bbox，非 source-region 省略 shape/radiusRatio；reasoning 各项不超过400字。',
         '无法读取图片或没有可独立提取内容时返回 {"canPlan":false,"reason":"具体原因"}，不要根据描述猜测图片。',
         `用户补充要求：${JSON.stringify(instructions)}`,
     ].join("\n");
@@ -46,7 +47,15 @@ export function imageLayerPlanningPrompt(instructions: string, referenceSize?: I
 export function applyImageLayerPlanningPurpose(plan: ImageLayerPlan, purpose: ImageLayerPlanningPurpose): ImageLayerPlan {
     const warnings = [...(plan.warnings || [])];
     let preservedBase = false;
-    const layers = plan.layers.map((layer, index) => {
+    const eligible = plan.layers.filter((layer, index) => {
+        if (index > 0 && plan.layout === "continuous" && (layer.extraction?.method === "source-region" || layer.editUnit === "scene")) {
+            warnings.push(`“${layer.name}”是连续场景中的局部区域，未自动裁成素材，内容仍保留在底板；需要局部截图时可另行手动框选。`);
+            return false;
+        }
+        return true;
+    });
+    if (eligible.length < 2) throw new Error("规划只提出了连续场景的局部裁块，没有可靠的独立素材；请重新规划完整主体，或关闭识图后手动配置");
+    const layers = eligible.map((layer, index) => {
         if (index === 0 && purpose === "materials") {
             preservedBase = layer.extraction?.method !== "source" || plan.layers.some((item) => item.removeFromBackground);
             return { ...layer, name: "原图底板", description: "保留完整原图，提取的素材另存副本", extraction: { method: "source" as const } };
@@ -137,7 +146,9 @@ export function parseImageLayerPlan(text: string, referenceSize?: ImageSize): Im
     const reasoning = value.reasoning && fields.every((field) => typeof value.reasoning[field] === "string" && value.reasoning[field].trim().length > 0 && value.reasoning[field].length <= 400)
         ? Object.fromEntries(fields.map((field) => [field, value.reasoning[field].trim()])) as ImageLayerPlan["reasoning"] : undefined;
     if (value.reasoning && !reasoning) warnings.push("规划依据格式无效，已保留图层计划；请核对图像结构与提取方式。");
-    return { layers, ...(reasoning ? { reasoning } : {}), ...(warnings.length ? { warnings } : {}) };
+    const layout = ["continuous", "composition", "mixed"].includes(value.layout) ? value.layout as ImageLayerPlan["layout"] : undefined;
+    if (value.layout !== undefined && !layout) warnings.push("图片结构分类无效，请核对是否为连续场景或嵌入式排版。");
+    return { layers, ...(layout ? { layout } : {}), ...(reasoning ? { reasoning } : {}), ...(warnings.length ? { warnings } : {}) };
 }
 
 /** 仅复用同画布同源节点的已完成结果；历史识图失败不覆盖更早的可用计划。 */
