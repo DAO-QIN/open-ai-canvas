@@ -507,8 +507,8 @@ export async function buildExperimentalImageLayerResult(root: CanvasNodeData, no
         metadata: { ...node.metadata, batchRootId: root.id, imageLayer: { groupId: root.id, outputIndex: order[index].index, kind: order[index].index === 0 ? ("base" as const) : ("transparent" as const) } },
     }));
     const completed = sources.length;
-    const group: NonNullable<CanvasNodeMetadata["imageLayerGroup"]> = { width: decoded.width, height: decoded.height, compositeStatus: "ready", layers: decoded.order.map((index) => previous?.layers.find((layer) => layer.nodeId === sources[index].id) || { nodeId: sources[index].id, x: 0, y: 0, visible: true }), ...(completed < plan.requests.length ? { incomplete: { completed, total: plan.requests.length, failed: plan.requests.length - completed, missingBackground: !order.some((item) => item.index === 0) } } : {}) };
-    const composite = await uploadImage(previous ? await composeCanvasImageLayerGroup(group, updatedChildren) : decoded.composite);
+    const group: NonNullable<CanvasNodeMetadata["imageLayerGroup"]> = { width: decoded.width, height: decoded.height, compositeStatus: "ready", layers: decoded.order.map((index) => previous?.layers.find((layer) => layer.nodeId === sources[index].id) || { nodeId: sources[index].id, x: 0, y: 0, visible: !order.some((item) => item.index === 0) || order[index].index === 0 || plan.requests.find((request) => request.nodeId === sources[index].id)?.removeFromBackground !== false }), ...(completed < plan.requests.length ? { incomplete: { completed, total: plan.requests.length, failed: plan.requests.length - completed, missingBackground: !order.some((item) => item.index === 0) } } : {}) };
+    const composite = await uploadImage(previous || group.layers.some((layer) => !layer.visible) ? await composeCanvasImageLayerGroup(group, updatedChildren) : decoded.composite);
     if (composite.pendingRemoteUpload) throw new Error("合成图尚未保存到服务端，请重试本地合成");
     group.compositeSignature = imageLayerCompositeSignature(group, updatedChildren);
     return {

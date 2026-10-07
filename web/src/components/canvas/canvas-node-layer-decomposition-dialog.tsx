@@ -339,7 +339,7 @@ export function CanvasNodeLayerDecompositionDialog({
                             invalidatePlan();
                         }}
                     />
-                    <p className="text-xs opacity-70">{purpose === "materials" ? "保留原图底板，素材另存副本；无需为了提取素材重画整张底图。" : "规划需要移动或替换的内容，并修补其在底图中的原位置；请核对生成费用和效果。"}</p>
+                    <p className="text-xs opacity-70">{purpose === "materials" ? "保留原图底板，素材另存副本。副本默认不重复叠加到合成图，可在管理图层中开启预览。" : "规划需要移动或替换的内容，并修补其在底图中的原位置；请核对生成费用和效果。"}</p>
                     <Checkbox checked={independentMaterials} onChange={(event) => setIndependentMaterials(event.target.checked)}>
                         同时收纳独立素材（裁去透明留白，不调用模型）
                     </Checkbox>
