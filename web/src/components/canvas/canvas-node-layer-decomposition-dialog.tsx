@@ -209,7 +209,7 @@ export function CanvasNodeLayerDecompositionDialog({
         setDraft(null);
     };
 
-    const scopePrompt = `${prompt.trim()}\n${detailMode ? "详细拆分：按内容增加适合独立编辑的文字或细节；备用细节可保留在底图，另提取素材。" : "自动拆分：根据实际图像结构选择必要图层，不固定题材或层数；保留完整底图，避免过度拆碎。"}`;
+    const scopePrompt = `${prompt.trim()}\n${detailMode ? "详细拆分：按内容增加适合独立编辑的文字或细节；是否从底图移除遵循所选拆分目的。" : "自动拆分：根据实际图像结构选择必要图层，不固定题材或层数；保留完整底图，避免过度拆碎。"}`;
     const selectedPrompt = regions.length ? `${scopePrompt}\n\n重点处理用户框选的区域。选区坐标（图像 0-1000 坐标系）：${regions.map((region, index) => `区域${index + 1} <bbox>${region.join(" ")}</bbox>`).join("；")}` : scopePrompt;
 
     const invalidatePlan = () => {
@@ -493,7 +493,7 @@ export function CanvasNodeLayerDecompositionDialog({
                                             {i + 1}. {target.split(/[：:]/)[0].slice(0, 40)}
                                             {plan?.layers[i]?.editUnit ? <span className="ml-2 opacity-60">{({ scene: "完整场景", object: "独立对象", text: "文字", decoration: "装饰", group: "完整组件" })[plan.layers[i].editUnit!]}</span> : null}
                                         </div>
-                                        <p className="text-xs opacity-65">{choice.method === "source" ? "完整原图底板 · 不调用图片模型" : choice.method === "source-region" ? "复制原图可见素材 · 保留内部背景" : "模型提取透明轮廓 · 请核对生成结果"}</p>
+                                        <p className="text-xs opacity-65">{choice.method === "source" ? "完整原图底板 · 不调用图片模型" : choice.method === "source-region" ? "复制原图可见素材 · 保留内部背景" : i === 0 ? "模型修补完整不透明背景 · 请核对修补结果" : "模型提取透明轮廓 · 请核对生成结果"}</p>
                                         {choice.method === "source-region" && extractions?.[i].region ? <RegionPreview dataUrl={dataUrl} region={extractions[i].region!} sourceSize={previewSize} label={i + 1} /> : null}
                                         <details open={choice.method === "source-region" && !extractions?.[i].region}>
                                         <summary className="cursor-pointer text-xs opacity-75">调整提取方式与边界</summary>
@@ -509,7 +509,7 @@ export function CanvasNodeLayerDecompositionDialog({
                                                           { label: "保留原图底图（不移除对象）", value: "source" },
                                                       ]
                                                     : [
-                                                          { label: "模型提取（复杂轮廓、遮挡补全）", value: "generate" },
+                                                          { label: "模型提取（复杂轮廓）", value: "generate" },
                                                           { label: "原图区域提取（保留区域内全部像素）", value: "source-region" },
                                                       ]
                                             }
@@ -605,7 +605,7 @@ export function CanvasNodeLayerDecompositionDialog({
                                     {extractionError}。未提交模型请求。
                                 </p>
                             ) : null}
-                            {experimentalTargets ? <p className="text-xs opacity-70">未勾选的细节仍保留在底图，透明副本可作叠加或备用素材。移动、替换或删除这类对象时，需另修补底图中的原对象；合成不保证逐像素还原。</p> : null}
+                            {experimentalTargets ? <p className="text-xs opacity-70">{purpose === "recompose" ? "前景默认从底图移除并修补；可在高级设置逐层取消。取消移除的图层默认作为备用副本，移动它时底图仍保留原对象。" : "原图底板保留完整内容，提取副本默认不重复叠加；移动副本时底板仍保留原对象。"} 合成不保证逐像素还原。</p> : null}
                             <p className="text-xs opacity-70">
                                 {sourceSize ? `锁定原图画布 ${sourceSize.width}×${sourceSize.height}。` : ""}原图提取保持原始像素位置与大小；模型提取请求尺寸 {generationConfig.size || "未支持"}，保存时仅归一化 1%
                                 内的尺寸取整差，明显比例变化报错。模型提取仍可能改变内容与坐标。
