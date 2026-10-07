@@ -9,6 +9,8 @@ AI 拆图的编辑目的与语义工具约束位于 `web/src/lib/canvas/canvas-i
 
 ## 968API SD 视频
 
+AI 拆图每层的 `generation.prompt/background` 由 `canvas-image-layer-plan.ts` 要求规划模型填写，`canvas-image-layers.ts` 校验角色与允许字段并附加本层输出约束。`use-canvas-media-tools.ts` 保存编译后的独立提示词与配置，`canvas-image-layer-extraction.ts` 在收费调用前校验全部参数并原样传递本层提示词；不再拼接总体要求或其他层描述。`use-canvas-generation-retry.ts` 继续读取子节点保存的提示词与配置；已有界面和展示链路不变。
+
 - 插件合同：`plugin-packages/api968-sd-video/manifest.json`、`README.md`、`docs/interface.md` 与同名 `.yingce-plugin` 包；五个 Provider 各自校验模型 ID 与上游参数。
 - 选择协议的默认能力：`backend/internal/app/model_capability_api968.go` 与 `web/src/lib/model-capabilities.ts`；按分辨率的时长限制由前端生成入口和 `model_capability_validate.go` 校验。
 - “能力与参数”编辑：`web/src/components/model-capability-editor.tsx`；创建、查询和成片保存复用声明式协议宿主。协议及能力回归测试分别为 `api968_sd_video_test.go`、`model_capability_api968_test.go`、`web/test/api968-video.test.ts`。

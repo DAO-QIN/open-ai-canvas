@@ -36,8 +36,8 @@ test("编辑区域后背景提示与本地实际提取使用同一坐标", () =>
 
 test("规划声明结构化原图策略，像素坐标按实际参考尺寸换算", () => {
     const plan = parseImageLayerPlan(JSON.stringify({ canPlan: true, coordinateSpace: "pixels", imageSize: { width: 1000, height: 500 }, layers: [
-        { name: "完整底图", description: "保留全部内容", kind: "background", extraction: { method: "source" } },
-        { name: "规则区域", description: "完整独立区域", kind: "object", removeFromBackground: false, bbox: [100, 100, 600, 400], extraction: { method: "source-region", shape: "rounded-rect", radiusRatio: 0.05 } },
+        { name: "完整底图", description: "保留全部内容", kind: "background", generation: { prompt: "保留完整原图", background: "opaque" }, extraction: { method: "source" } },
+        { name: "规则区域", description: "完整独立区域", kind: "object", generation: { prompt: "复制完整规则区域", background: "transparent" }, removeFromBackground: false, bbox: [100, 100, 600, 400], extraction: { method: "source-region", shape: "rounded-rect", radiusRatio: 0.05 } },
     ] }), { width: 1000, height: 500 });
     expect(plan.layers[1].extraction?.region).toEqual({ bbox: [100, 200, 600, 800], shape: "rounded-rect", radiusRatio: 0.05 });
     expect(resolveImageLayerExtractions(2, plan.layers.map((layer) => layer.extraction!), [false, false])).toHaveLength(2);
@@ -45,8 +45,8 @@ test("规划声明结构化原图策略，像素坐标按实际参考尺寸换�
 
 test("无效可选坐标保留语义，但显式原图策略阻断付费回退", () => {
     const plan = parseImageLayerPlan(JSON.stringify({ canPlan: true, layers: [
-        { name: "底图", description: "完整底图", kind: "background" },
-        { name: "图形", description: "独立图形", kind: "object", bbox: [0, 0, 1001, 500], extraction: { method: "source-region", shape: "rect" } },
+        { name: "底图", description: "完整底图", kind: "background", generation: { prompt: "保留环境并修补遮挡", background: "opaque" } },
+        { name: "图形", description: "独立图形", kind: "object", generation: { prompt: "复制独立图形", background: "transparent" }, bbox: [0, 0, 1001, 500], extraction: { method: "source-region", shape: "rect" } },
     ] }));
     expect(plan.layers).toHaveLength(2);
     expect(plan.layers[1].extraction?.method).toBe("source-region");

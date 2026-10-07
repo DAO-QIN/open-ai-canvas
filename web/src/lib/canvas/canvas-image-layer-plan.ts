@@ -1,7 +1,7 @@
 import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
 import { configuredModelMatchesCapability, type AiConfig } from "@/stores/use-config-store";
 import type { GenerationTask } from "@/services/api/task-center";
-import { IMAGE_LAYER_REGION_INSTRUCTIONS } from "@/lib/canvas/canvas-image-layers";
+import { IMAGE_LAYER_REGION_INSTRUCTIONS, parseImageLayerGeneration, type ImageLayerGeneration } from "@/lib/canvas/canvas-image-layers";
 import type { ImageLayerExtraction } from "@/lib/canvas/canvas-image-layer-strategy";
 
 export type ImageLayerPlanningPurpose = "materials" | "recompose";
@@ -10,7 +10,7 @@ type ImageSize = { width: number; height: number };
 
 export type ImageLayerPlan = {
     layout?: "continuous" | "composition" | "mixed";
-    layers: Array<{ name: string; description: string; kind: "background" | "object"; editUnit?: "scene" | "object" | "text" | "decoration" | "group"; removeFromBackground?: boolean; bbox?: [number, number, number, number]; extraction?: ImageLayerExtraction }>;
+    layers: Array<{ name: string; description: string; kind: "background" | "object"; generation: ImageLayerGeneration; editUnit?: "scene" | "object" | "text" | "decoration" | "group"; removeFromBackground?: boolean; bbox?: [number, number, number, number]; extraction?: ImageLayerExtraction }>;
     reasoning?: { structure: string; editingGoal: string; strategy: string };
     model?: string;
     taskId?: string;
@@ -35,9 +35,10 @@ export function imageLayerPlanningPrompt(instructions: string, referenceSize?: I
             : '当前目的：拆分背景与前景，便于美工独立移动、替换或删除。第一层是移除已拆前景后完整、不透明的背景，extraction.method="generate"，保留其他环境、底色与设计结构并修补遮挡；不是原图副本。其余选中的对象、文字或完整场景全部 removeFromBackground=true，保持原位置和比例。只选择必要的独立编辑单元，不额外输出备用副本。',
         '先声明 layout：continuous=同一连续场景，composition=多个有独立边界的嵌入素材组成的排版，mixed=两者混合。只有实际存在独立外边界的照片、插画、截图或完整设计容器，才是可原像素裁取的素材；保留其内部主体、环境和标签。连续照片中的家具、织物、物件或背景一角不是嵌入面板，不能用矩形裁块冒充独立素材。连续场景优先提取完整主要主体的透明轮廓，背景支撑、被画幅截断的局部和缺少复用价值的小物体留在背景。默认不列举所有可见物，用户要求细分时才增加细节。前景及完整素材只保留原图可见内容；背景只修补被已拆前景遮挡的位置，不扩图或补画其他未展示内容。',
         '每层声明 editUnit：scene=嵌入的完整照片/场景，group=完整组件，object=独立主体，text=文字，decoration=装饰。extraction 工具：source 仅用于第一层；source-region 复制区域全部原像素，适用于完整规则素材，声明 shape=rect|rounded-rect|ellipse，圆角用 radiusRatio（占短边 0–0.5）；generate 用于需透明轮廓的主体/文字或明确请求的修补。完整 scene 禁止重画或内部去背景。边界不确定时保留 source-region 并省略 bbox，等待用户框选，不能改用 generate。',
-        "按复用价值选择 2–8 层（含底图）。同一素材可保留副本；不是所有可见细节都值得拆出。超过上限按完整语义单元分组，支持之后继续拆分。name 简短唯一，description 仅描述本层需要保留的内容，不写坐标、提取工具或其他层的指令。",
+        "按复用价值选择 2–8 层（含底图）。同一素材可保留副本；不是所有可见细节都值得拆出。超过上限按完整语义单元分组，支持之后继续拆分。name 简短唯一，description 仅描述对象外观、组成和位置，不写保留、移除、透明度或其他生成指令。",
+        '每张图分别声明 generation={"prompt":"只用于本层的完整执行指令","background":"opaque或transparent"}，执行时只会收到本层 prompt，不会收到其他层描述或用户总体要求，因此必须自行写清本层任务及有关位置。背景层 prompt 仅写应保留的背景、需移除对象的客观名称/外观/位置以及如何修补，不能粘贴前景的保留、透明边缘或输出要求；background 必须为 opaque。对象层 prompt 仅写本层对象及其保留范围，不能包含背景层修补任务或其他图层的输出要求；background 必须为 transparent。完整照片/面板保持内部全部内容，透明仅作用于面板外部。把用户要求分配到相关层，不原样复制混有其他层指令的总体要求。generation 只允许 prompt、background 两个字段，不能更改模型、画布尺寸、质量或张数；prompt 不超过2400字。source/source-region 层也给出各自独立参数，但执行仍使用原图像素，不付费重画。',
         coordinates + " bbox 位于图层对象，与 extraction 同级；坐标须覆盖整个素材的边界，不能只框内部主体。不要虚构精确边界。",
-        '输出结构：{"canPlan":true,"layout":"continuous或composition或mixed","coordinateSpace":"坐标单位","imageSize":{"width":参考图宽,"height":参考图高},"reasoning":{"structure":"实际图片结构","editingGoal":"需要独立编辑的完整单元","strategy":"工具选择与边界不确定性"},"layers":[{"name":"简短名称","description":"本层内容","kind":"background或object","editUnit":"分类","removeFromBackground":布尔值,"bbox":[左,上,右,下],"extraction":{"method":"工具","shape":"区域形状","radiusRatio":0.04}}]}。removeFromBackground 按当前目的填写。第一层 kind=background，其余 kind=object；没有区域或不确定时省略 bbox，非 source-region 省略 shape/radiusRatio；reasoning 各项不超过400字。',
+        '输出结构：{"canPlan":true,"layout":"continuous或composition或mixed","coordinateSpace":"坐标单位","imageSize":{"width":参考图宽,"height":参考图高},"reasoning":{"structure":"实际图片结构","editingGoal":"需要独立编辑的完整单元","strategy":"工具选择与边界不确定性"},"layers":[{"name":"简短名称","description":"对象外观和位置","kind":"background或object","generation":{"prompt":"仅本层执行指令","background":"opaque或transparent"},"editUnit":"分类","removeFromBackground":布尔值,"bbox":[左,上,右,下],"extraction":{"method":"工具","shape":"区域形状","radiusRatio":0.04}}]}。每层 generation 必填。removeFromBackground 按当前目的填写。第一层 kind=background，其余 kind=object；没有区域或不确定时省略 bbox，非 source-region 省略 shape/radiusRatio；reasoning 各项不超过400字。',
         '无法读取图片或没有可独立提取内容时返回 {"canPlan":false,"reason":"具体原因"}，不要根据描述猜测图片。',
         `用户补充要求：${JSON.stringify(instructions)}`,
     ].join("\n");
@@ -109,6 +110,8 @@ export function parseImageLayerPlan(text: string, referenceSize?: ImageSize): Im
         names.add(name);
         const kind = index === 0 ? ("background" as const) : ("object" as const);
         if (item.kind !== kind) throw new Error("识图规划第一层必须为背景底图，其他层必须为独立对象");
+        const generation = parseImageLayerGeneration(item.generation, index);
+        if (generation.prompt.length > 2400) throw new Error(`规划第 ${index + 1} 层的独立提示词过长，未提交拆图任务`);
         if (item.removeFromBackground !== undefined && typeof item.removeFromBackground !== "boolean") throw new Error("识图规划的底图移除选项无效");
         let bbox: [number, number, number, number] | undefined;
         const nestedBbox = item.extraction?.bbox;
@@ -142,7 +145,7 @@ export function parseImageLayerPlan(text: string, referenceSize?: ImageSize): Im
         const editUnits = ["scene", "object", "text", "decoration", "group"] as const;
         const editUnit = editUnits.find((unit) => unit === item.editUnit);
         if (item.editUnit !== undefined && !editUnit) warnings.push(`“${name}”的编辑单元分类无效，请核对内容；未改变提取方式。`);
-        return { name, description, kind, ...(editUnit ? { editUnit } : {}), ...(index ? { removeFromBackground: item.removeFromBackground ?? false } : {}), ...(bbox ? { bbox } : {}), ...(extraction ? { extraction } : {}) };
+        return { name, description, kind, generation, ...(editUnit ? { editUnit } : {}), ...(index ? { removeFromBackground: item.removeFromBackground ?? false } : {}), ...(bbox ? { bbox } : {}), ...(extraction ? { extraction } : {}) };
     });
     const fields = ["structure", "editingGoal", "strategy"] as const;
     const reasoning = value.reasoning && fields.every((field) => typeof value.reasoning[field] === "string" && value.reasoning[field].trim().length > 0 && value.reasoning[field].length <= 400)

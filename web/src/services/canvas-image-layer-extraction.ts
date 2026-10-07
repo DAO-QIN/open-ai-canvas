@@ -1,4 +1,4 @@
-import { experimentalLayerPrompt, hasUsableLayerTransparency, MAX_GROUP_PIXELS, parseExperimentalLayerTargets, validateImageLayerRole } from "@/lib/canvas/canvas-image-layers";
+import { hasUsableLayerTransparency, imageLayerGenerationConfig, MAX_GROUP_PIXELS, parseImageLayerGeneration, parseExperimentalLayerTargets, validateImageLayerRole, type ImageLayerGeneration } from "@/lib/canvas/canvas-image-layers";
 import { imageLayerRemovalPrompt } from "@/lib/canvas/canvas-image-layer-plan";
 import { inspectImageLayer, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -23,7 +23,7 @@ export async function runImageLayerExtraction({
     targets,
     extractions,
     removeFromBackground,
-    prompt,
+    generations,
     config,
     removalConfig,
     signal,
@@ -37,7 +37,7 @@ export async function runImageLayerExtraction({
     targets: string[];
     extractions?: ImageLayerExtraction[];
     removeFromBackground?: boolean[];
-    prompt: string;
+    generations: ImageLayerGeneration[];
     config: AiConfig;
     removalConfig?: AiConfig;
     signal: AbortSignal;
@@ -48,6 +48,8 @@ export async function runImageLayerExtraction({
     onLayerError?(index: number, error: unknown): void;
 }) {
     parseExperimentalLayerTargets(targets.join("\n"));
+    if (!Array.isArray(generations) || generations.length !== targets.length) throw new Error("每层独立生成参数数量与图层计划不一致，未提交拆图任务");
+    const layerGenerations = generations.map((generation, index) => parseImageLayerGeneration(generation, index));
     const methods = resolveImageLayerExtractions(targets.length, extractions, removeFromBackground);
     if (methods.some((extraction) => extraction.method !== "generate") && !onLocalResult) throw new Error("原图提取结果保存回调缺失，未提交模型请求");
     if (signal.aborted) throw new DOMException("拆层已停止", "AbortError");
@@ -79,7 +81,7 @@ export async function runImageLayerExtraction({
                     return;
                 }
                 let result = await inspect(
-                    (await runStage({ index, stage: "extract", prompt: experimentalLayerPrompt(prompt, targets, index, removeFromBackground), config: { ...config, count: "1", transparentBackground: index > 0 ? "true" : "false" }, reference: source, canvas })).images,
+                    (await runStage({ index, stage: "extract", prompt: layerGenerations[index].prompt, config: imageLayerGenerationConfig(config, layerGenerations[index], index), reference: source, canvas })).images,
                 );
                 check(index);
                 if (index > 0 && !hasUsableLayerTransparency(result.info)) {

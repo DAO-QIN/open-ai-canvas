@@ -24,7 +24,7 @@ import { commitProducedModel } from "@/lib/canvas/produced-model";
 import { findAvailableGenerationGroupPosition, imageGenerationChildPosition, imageGenerationGroupSize } from "@/lib/canvas/canvas-generation-layout";
 import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-submission";
 import { cancelIncompleteImageBatch } from "@/lib/canvas/canvas-image-batch-retry";
-import { experimentalLayerPrompt, imageLayerProviderMetadata, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
+import { experimentalLayerPrompt, imageLayerGenerationConfig, imageLayerProviderMetadata, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { applyImageLayerPlanningPurpose, imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, imageLayerPlanTargets, imageLayerTargetName, parseImageLayerPlan, type ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
 import { imageLayerBackgroundPatch, imageLayerExtractionTargets, resolveImageLayerExtractions, type ImageLayerExtraction } from "@/lib/canvas/canvas-image-layer-strategy";
 import { buildAngleLabel, buildAnglePrompt, createCanvasNode } from "@/lib/canvas/canvas-project-domain";
@@ -1096,7 +1096,7 @@ export function useCanvasMediaTools({
                     planning: plan,
                     ...(supportsLayerDecomposition(generationConfig, selectedModel)
                         ? {
-                              prompt: `${payload.prompt}\n\n视觉规划的拆分内容：\n${imageLayerPlanTargets(plan).join("\n")}`,
+                              prompt: `按以下独立图层规划拆分参考图片，各层只执行自己的 generation；第一层为完整不透明底图，其余层为独立透明素材。保持原图画布尺寸和位置。\n${JSON.stringify(plan.layers)}`,
                               backgroundRemovalModel: undefined,
                           }
                         : {
@@ -1189,6 +1189,7 @@ export function useCanvasMediaTools({
                     target,
                     removeFromBackground: removeFromBackground![index],
                     extraction: extractions![index],
+                    generation: { ...plan.layers[index].generation, prompt: experimentalLayerPrompt(plan.layers[index].generation, plan.layers[index].bbox) },
                 }));
                 pendingRequests = requests;
                 const backgroundPatch =
@@ -1251,7 +1252,7 @@ export function useCanvasMediaTools({
                     },
                 };
                 const extractionNodes: CanvasNodeData[] = (requests || []).map((request, index) => {
-                    const extractionPrompt = experimentalLayerPrompt(prompt, targets!, index, removeFromBackground);
+                    const extractionPrompt = request.generation.prompt;
                     return {
                         id: request.nodeId,
                         type: CanvasNodeType.Image,
@@ -1262,10 +1263,7 @@ export function useCanvasMediaTools({
                             ...canvasGenerationPromptMetadata(extractionPrompt, extractionPrompt),
                             ...buildImageGenerationMetadata(
                                 "edit",
-                                {
-                                    ...generationConfig,
-                                    transparentBackground: index > 0 ? "true" : "false",
-                                },
+                                imageLayerGenerationConfig(generationConfig, request.generation, index),
                                 1,
                                 [source],
                             ),
@@ -1310,7 +1308,7 @@ export function useCanvasMediaTools({
                         targets,
                         extractions,
                         removeFromBackground,
-                        prompt,
+                        generations: requests.map((request) => request.generation),
                         config: generationConfig,
                         removalConfig,
                         signal: controller.signal,

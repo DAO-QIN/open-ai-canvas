@@ -26,13 +26,29 @@ export function parseExperimentalLayerTargets(text: string) {
     return targets;
 }
 
-export function experimentalLayerPrompt(prompt: string, targets: string[], index: number, removeFromBackground = targets.map((_, i) => i === 1)) {
-    const removed = targets.filter((_, i) => i > 0 && removeFromBackground[i]).join("；");
-    const retained = targets.filter((_, i) => i > 0 && !removeFromBackground[i]).join("；");
-    const contract = index === 0
-        ? `这是完整、不透明的底图，每个像素必须 alpha=255。${removed ? `仅移除以下对象并补全被遮挡背景：${removed}。待移除目标如果是整张照片、卡片或面板，移除整块面板及内部内容，不只移除其中的主体。` : "保留完整底图。"}${retained ? `以下内容仍保留在场景中，允许与细节素材重复：${retained}。` : ""}保留未要求移除的环境、底色、光照、纹理和其他结构；保留布局不表示保留待移除对象。若所有文字和照片面板都被要求移除，剩余完整底图可以仅为原有底色或渐变，不要重新添加这些对象。补全为原有环境或设计底板，不添加不存在的物体。不要透明背景或半透明底图。`
+export type ImageLayerGeneration = { prompt: string; background: "opaque" | "transparent" };
+
+/** 每层只有本层提示词和透明度；模型、尺寸、质量和张数仍由用户配置及源图决定。 */
+export function parseImageLayerGeneration(value: unknown, index: number): ImageLayerGeneration {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`规划第 ${index + 1} 层缺少独立生成参数，未提交拆图任务`);
+    const item = value as Record<string, unknown>;
+    if (typeof item.prompt !== "string" || !item.prompt.trim() || item.prompt.length > 3200) throw new Error(`规划第 ${index + 1} 层的独立提示词无效，未提交拆图任务`);
+    const background = index === 0 ? "opaque" : "transparent";
+    if (item.background !== background) throw new Error(`规划第 ${index + 1} 层的透明度参数与图层角色冲突，未提交拆图任务`);
+    if (Object.keys(item).some((key) => key !== "prompt" && key !== "background")) throw new Error(`规划第 ${index + 1} 层包含不支持的生成参数，未提交拆图任务`);
+    return { prompt: item.prompt.trim(), background };
+}
+
+export function imageLayerGenerationConfig(config: AiConfig, generation: ImageLayerGeneration, index: number): AiConfig {
+    const validated = parseImageLayerGeneration(generation, index);
+    return { ...config, count: "1", transparentBackground: validated.background === "transparent" ? "true" : "false" };
+}
+
+export function experimentalLayerPrompt(generation: ImageLayerGeneration, bbox?: [number, number, number, number]) {
+    const contract = generation.background === "opaque"
+        ? "这是完整、不透明的背景底图，每个像素必须 alpha=255。移除指定对象并补全遮挡处，保留其他环境、底色、光照、纹理和设计结构。待移除对象若是完整照片、卡片或面板，移除整块及内部内容；补全为原有底色或环境，不重新添加已移除对象，不添加不存在的物体。不要透明背景或半透明底图。"
         : "这是独立透明对象：仅保留本层目标，去除非目标内容，空白区域必须为真实 alpha=0，保留自然边缘与接地阴影。目标若为整张照片、卡片或面板，复制整块面板的全部原始内容（主体、内部场景、边框与圆角），内部保持不透明，只让面板外透明；不做面板内部主体抠图，不把面板里的主体单独放大。";
-    return `执行图片图层提取。本次仅输出一张独立图层，目标：${targets[index]}。${IMAGE_LAYER_REGION_INSTRUCTIONS}${contract}保持参考图完整画布尺寸、原始位置、比例和细节，不裁切、不居中重排。输出 PNG，不要拼版、文字标注或绘制棋盘格。用户总体要求仅作上下文，以本层规则为准：${JSON.stringify(prompt)}`;
+    return `本次仅输出一张独立图层。${contract}\n本层任务：${generation.prompt}${bbox ? `\n本层定位区域 <bbox>${bbox.join(" ")}</bbox>。` : ""}\n${IMAGE_LAYER_REGION_INSTRUCTIONS}保持参考图完整画布尺寸、原始位置、比例和细节，不扩图、不裁切、不居中重排。输出 PNG，不要拼版、文字标注或绘制棋盘格。`;
 }
 
 /** OpenAI Images 的 false 默认可能仍是 auto；拆层底图明确请求 opaque。 */

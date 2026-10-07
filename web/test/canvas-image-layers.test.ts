@@ -74,18 +74,18 @@ describe("独立透明图层验收", () => {
     });
     test("完整场景只移除勾选对象，细节允许重复；单层提示不混入其他层排除指令", () => {
         const targets = ["房间：保留窗户、书架、地毯", "猫：保留轮廓", "毛线球：保留纹理"];
-        const background = experimentalLayerPrompt("拆分", targets, 0, [false, true, false]);
-        expect(background).toContain("仅移除以下对象并补全被遮挡背景：猫");
-        expect(background).toContain("仍保留在场景中");
+        const background = experimentalLayerPrompt({ prompt: "移除猫并补全遮挡；保留窗户、书架、地毯与毛线球", background: "opaque" });
+        expect(background).toContain("移除猫并补全遮挡");
+        expect(background).toContain("保留窗户、书架、地毯与毛线球");
         expect(background).toContain("alpha=255");
         expect(background).toContain("0–1000 相对坐标，不是像素");
-        expect(background).toContain("剩余完整底图可以仅为原有底色或渐变");
+        expect(background).toContain("补全为原有底色或环境");
         expect(background).not.toContain("不要清空底图");
-        const foreground = experimentalLayerPrompt("拆分", targets, 1, [false, true, false]);
+        const foreground = experimentalLayerPrompt({ prompt: targets[1], background: "transparent" });
         expect(foreground).not.toContain("房间：保留");
         expect(foreground).not.toContain("毛线球：保留");
         expect(foreground).toContain("不做面板内部主体抠图");
-        expect(experimentalLayerPrompt("拆分", targets, 0, [false, true, true])).not.toContain("仍保留在场景中");
+        expect(background).not.toContain("保留自然边缘与接地阴影");
         const model = "gpt-image-2.5-flare";
         const channel = createModelChannel({ id: "backup", models: [model], interfaceType: "openai-image" });
         const config = { ...defaultConfig, model: `backup::${model}`, channels: [channel] };
@@ -99,9 +99,9 @@ describe("独立透明图层验收", () => {
         expect(supportsLayerDecomposition({ ...defaultConfig, channels: [channel] }, `backup::${model}`)).toBe(false);
         const targets = parseExperimentalLayerTargets("背景\n汽车\n前景");
         expect(targets).toEqual(["背景", "汽车", "前景"]);
-        expect(experimentalLayerPrompt("拆层", targets, 0)).toContain("补全被遮挡背景");
-        expect(experimentalLayerPrompt("拆层", targets, 1)).toContain("alpha=0");
-        expect(experimentalLayerPrompt("拆层", targets, 1)).toContain("目标：汽车");
+        expect(experimentalLayerPrompt({ prompt: "补全被遮挡背景", background: "opaque" })).toContain("补全被遮挡背景");
+        expect(experimentalLayerPrompt({ prompt: "目标：汽车", background: "transparent" })).toContain("alpha=0");
+        expect(experimentalLayerPrompt({ prompt: "目标：汽车", background: "transparent" })).toContain("目标：汽车");
         expect(() => parseExperimentalLayerTargets("汽车")).toThrow("2–8");
         expect(() => parseExperimentalLayerTargets("汽车\n汽车")).toThrow("重复");
         expect(() => parseExperimentalLayerTargets(Array.from({ length: 9 }, (_, i) => String(i)).join("\n"))).toThrow("2–8");

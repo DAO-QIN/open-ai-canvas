@@ -326,7 +326,7 @@ export type CanvasNodeMetadata = {
     /** 普通生图模型逐层提取；刷新只恢复已提交任务，不自动提交下一次付费请求。 */
     experimentalLayerPlan?: {
         sourceNodeId: string;
-        requests: Array<{ nodeId: string; target: string; removeFromBackground?: boolean; extraction?: import("@/lib/canvas/canvas-image-layer-strategy").ImageLayerExtraction }>;
+        requests: Array<{ nodeId: string; target: string; removeFromBackground?: boolean; extraction?: import("@/lib/canvas/canvas-image-layer-strategy").ImageLayerExtraction; generation?: import("@/lib/canvas/canvas-image-layers").ImageLayerGeneration }>;
         errorSignature?: string;
         composedSignature?: string;
         plannerModel?: string;
