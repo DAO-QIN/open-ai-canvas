@@ -139,7 +139,7 @@ export function CanvasNodeLayerDecompositionDialog({
                         <p className="mt-2 text-sm opacity-60">可在图片上拖拽框选重点区域，AI 将规划并拆出完整背景与独立图层，在画布中收纳为一组。</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <Tag color={regions.length ? "blue" : "default"}>{regions.length ? `已框选 ${regions.length} 个区域` : "未框选，按描述拆分"}</Tag>
+                        <Tag variant="filled" color={regions.length ? "blue" : undefined}>{regions.length ? `已框选 ${regions.length} 个区域` : "未框选，按描述拆分"}</Tag>
                         {regions.length ? (
                             <Button size="small" icon={<RotateCcw className="size-3.5" />} onClick={() => setRegions([])}>
                                 清除选区
