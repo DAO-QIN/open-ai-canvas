@@ -29,6 +29,7 @@ export function retireImageBatchChildren(root: CanvasNodeData, nodes: CanvasNode
                 delete metadata.layerDecomposition;
                 delete metadata.experimentalLayerPlan;
                 delete metadata.layerExtraction;
+                delete metadata.imageLayerMaterials;
                 if (!hasImageBatchResult(node)) metadata.status = "idle";
                 return { ...node, metadata };
             }

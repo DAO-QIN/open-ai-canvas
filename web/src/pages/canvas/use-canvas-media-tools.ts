@@ -51,6 +51,7 @@ import { getImageBlob, uploadImage } from "@/services/image-storage";
 import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
 import { runImageLayerExtraction } from "@/services/canvas-image-layer-extraction";
 import { inspectImageLayer } from "@/services/canvas-image-layer-compositor";
+import { calibrateImageLayerPlan } from "@/services/canvas-image-layer-source";
 import { prepareImageLayerPlanningReference, readImageLayerPlanningHistory } from "@/services/canvas-image-layer-planning";
 import { resolveImageRequestSize } from "@/services/api/image-validation";
 import { resetGenerationTaskMetadata } from "@/lib/canvas/canvas-task-state";
@@ -993,15 +994,16 @@ export function useCanvasMediaTools({
     }, []);
 
     const planImageLayers = useCallback(async (node: CanvasNodeData, model: string, prompt: string, signal: AbortSignal, options?: ImageLayerPlanningOptions) => {
+        const source = nodeReferenceImage(node);
+        if (!source) throw new Error("源图为空，无法规划拆层");
         if (options?.history) {
-            return readImageLayerPlanningHistory(projectId, node.id, node.metadata?.storageKey, signal);
+            const plan = await readImageLayerPlanningHistory(projectId, node.id, node.metadata?.storageKey, signal);
+            return calibrateImageLayerPlan(source, plan);
         }
         const config = { ...effectiveConfig, model, textModel: model, taskWorkflowProvider: "model" as const };
         const error = imageLayerPlannerError(config, model);
         if (error) throw new Error(error);
         if (!isAiConfigReady(config, model)) throw new Error("所选识图规划模型未配置可用渠道");
-        const source = nodeReferenceImage(node);
-        if (!source) throw new Error("源图为空，无法规划拆层");
         const { reference, sourceSize } = await prepareImageLayerPlanningReference(source, options?.input || "preview", signal);
         const referenceSize = { width: reference.width!, height: reference.height! };
         let taskId: string | undefined;
@@ -1009,7 +1011,9 @@ export function useCanvasMediaTools({
             projectId, nodeId: `${node.id}-layer-plan-${nanoid()}`, mode: "text", prompt: imageLayerPlanningPrompt(prompt, referenceSize), config,
             referenceImages: [reference], signal, metadata: { sourceNodeId: node.id, sourceStorageKey: source.storageKey, sourceSize, planningReferenceSize: referenceSize, edit: "layer-planning" }, onTaskCreated: (task) => { taskId = task.id; },
         });
-        return { ...parseImageLayerPlan(result.text || "", referenceSize), model, taskId };
+        const plan = { ...parseImageLayerPlan(result.text || "", referenceSize), model, taskId };
+        if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+        return calibrateImageLayerPlan(source, plan);
     }, [effectiveConfig, isAiConfigReady, projectId]);
 
     const decomposeImageLayers = useCallback(
@@ -1091,6 +1095,7 @@ export function useCanvasMediaTools({
                     status: NODE_STATUS_LOADING,
                     pluginId: "image-tools",
                     pluginNodeId: "layer-decomposition",
+                    imageLayerMaterials: payload.independentMaterials ? { auto: true } : undefined,
                     ...(requests ? { experimentalLayerPlan: { sourceNodeId: node.id, requests, plannerModel: payload.planning?.model, planningTaskId: payload.planning?.taskId, progress: `并发拆层：0/${requests.length} 层完成` }, isBatchRoot: true, batchChildIds: requests.map((request) => request.nodeId), imageBatchExpanded: false } : { layerDecomposition: { sourceNodeId: node.id, canvas: sourceCanvas } }),
                     ...generationMetadata,
                     ...(!needsModel ? { model: undefined, producedModelCandidate: undefined } : {}),

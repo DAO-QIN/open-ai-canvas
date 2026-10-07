@@ -22,7 +22,8 @@ export function imageLayerPlannerError(config: AiConfig, model: string) {
 }
 
 export function imageLayerPlanningPrompt(instructions: string, referenceSize?: ImageSize) {
-    const strategies = "每层额外返回 extraction。按几何结构和编辑用途决定提取方式，不按图片题材或名称硬套模板：1）完整矩形、圆角矩形面板或椭圆形区域，且需保留区域内全部像素时，使用 extraction={method:\"source-region\",shape:\"rect\"|\"rounded-rect\"|\"ellipse\",radiusRatio:0.04}，同层必须提供精确包围整个区域的 bbox；圆角比例以区域短边为基准，只对圆角矩形填写。应用直接从原图复制像素，区域外透明，区域内的场景保持原样，不会补画遮挡或抠除区域内部背景。2）人物、动物、产品等不规则轮廓、透明文字字形、边界不确定或需要补全被遮挡内容时，使用 extraction={method:\"generate\"}，不以矩形裁取冒充主体抠图。3）底图如需移除任何对象，使用 generate；没有对象需要移除时使用 extraction={method:\"source\"} 保留完整原图底图，允许叠加备用副本。只有用户要求移动、替换或去掉对象时才必须移除；保留外观并拆为素材时可以不移除。原图提取的 bbox 是实际操作区域，不是宽松位置提示；不确定时选择 generate，不能虚构精确边界。";
+    const strategies =
+        '目标是美工能复用的完整编辑单元，而非一律抠除背景：先识别独立照片、插画场景、完整卡片、文字和装饰；完整场景保留内部背景及全部主体，默认不继续拆内部小物体。任意题材、排列、数量和画幅均按实际结构判断，没有独立面板的自然照片才拆环境与对象。每层额外返回 extraction。按几何结构和编辑用途决定提取方式：1）完整矩形、圆角矩形面板或椭圆形区域，且需保留区域内全部像素时，使用 extraction={method:"source-region",shape:"rect"|"rounded-rect"|"ellipse",radiusRatio:0.04}，同层提供包围整个区域的 bbox，包括面板最下缘、边框和圆角，不得只框主体或把相邻面板收入。圆角比例以短边为基准。应用直接复制原图像素，面板外透明、内部背景不透明，另裁去外部透明留白收纳独立素材；不扩展场景、不去圆角、不补画原图未展示或被遮挡的内容。规则面板坐标会经过免费边界校准并给用户预览；能识别面板但无法确定边界时保留 source-region 并省略 bbox，让用户框选，不因坐标不确定而付费重画完整场景。2）仅需提取不规则轮廓、透明文字字形或用户明确要求模型补全时使用 extraction={method:"generate"}，不以矩形裁取冒充主体抠图。3）底图如需移除对象，使用 generate；没有对象需要移除时使用 extraction={method:"source"} 保留完整原图底图，允许叠加备用副本。只有明确要移动、替换或去掉对象时才移除；收集独立素材时默认 removeFromBackground=false，保留底图中的原内容。原图提取 bbox 是实际操作区域，不能虚构精确边界。';
     const coordinates = referenceSize
         ? `本次识图参考图实际尺寸为 ${referenceSize.width}×${referenceSize.height}。使用这张参考图的像素坐标 [左,上,右,下]，根对象声明 coordinateSpace="pixels"、imageSize={"width":${referenceSize.width},"height":${referenceSize.height}}。应用将统一换算为 0–1000；不要自行换算或使用原图尺寸。模型生成层 bbox 可省略，原图区域提取必须提供。${strategies}`
         : `bbox 使用 0–1000 坐标，模型生成层可省略，原图区域提取必须提供。${strategies}`;
@@ -95,8 +96,15 @@ export function latestImageLayerPlan(tasks: GenerationTask[], projectId: string,
             if (metadata?.edit !== "layer-planning" || metadata.sourceNodeId !== sourceNodeId) continue;
             if (metadata.sourceStorageKey && metadata.sourceStorageKey !== sourceStorageKey) continue;
             const plan = parseImageLayerPlan(JSON.parse(task.resultJson || "{}").text || "", metadata.planningReferenceSize);
-            return { ...plan, taskId: task.id, model: task.model, warnings: [...(plan.warnings || []), `已读取 ${task.createdAt} 的已有规划，没有新增模型调用；请核对当前原图和拆层要求。`, ...(!metadata.sourceStorageKey ? ["旧记录未保存源图资源标识，请确认图片没有被替换。"] : [])] };
-        } catch { /* 跳过未形成可用计划的旧记录，不创建或重试任务。 */ }
+            return {
+                ...plan,
+                taskId: task.id,
+                model: task.model,
+                warnings: [...(plan.warnings || []), `已读取 ${task.createdAt} 的已有规划，没有新增模型调用；请核对当前原图和拆层要求。`, ...(!metadata.sourceStorageKey ? ["旧记录未保存源图资源标识，请确认图片没有被替换。"] : [])],
+            };
+        } catch {
+            /* 跳过未形成可用计划的旧记录，不创建或重试任务。 */
+        }
     }
 }
 
