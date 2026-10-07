@@ -21,6 +21,22 @@ const channel = createModelChannel({
     ],
 });
 const config = { ...defaultConfig, channels: [channel] };
+
+test("默认背景前景拆分将旧副本规划转为修补背景，保留完整场景的原像素提取", () => {
+    const oldCopy = parseImageLayerPlan(JSON.stringify({ canPlan: true, layout: "composition", layers: [
+        { name: "原图底板", description: "保留原图", kind: "background", extraction: { method: "source" } },
+        { name: "场景", description: "保留内部背景", kind: "object", editUnit: "scene", removeFromBackground: false, bbox: [100, 200, 600, 800], extraction: { method: "source-region", shape: "rect" } },
+        { name: "标题", description: "标题文字", kind: "object", editUnit: "text", removeFromBackground: false, extraction: { method: "generate" } },
+    ] }));
+    const split = applyImageLayerPlanningPurpose(oldCopy, "recompose");
+    expect(split.layers.map((layer) => layer.removeFromBackground)).toEqual([undefined, true, true]);
+    expect(split.layers.map((layer) => layer.extraction?.method)).toEqual(["generate", "source-region", "generate"]);
+    expect(split.layers[1].extraction?.region?.bbox).toEqual([100, 200, 600, 800]);
+    expect(oldCopy.layers[0].extraction?.method).toBe("source");
+    expect(oldCopy.layers[1].removeFromBackground).toBe(false);
+    expect(imageLayerPlanningPrompt("自动拆分")).toContain("不是原图副本");
+    expect(imageLayerPlanningPrompt("自动拆分", undefined, "materials")).toContain("无需重画底板");
+});
 test("规划依据与编辑单元可检查；无效可选字段不破坏已有计划", () => {
     const layers = [{name:"底图",description:"保留原图",kind:"background",extraction:{method:"source"}}, {name:"面板",description:"完整内部场景",kind:"object",editUnit:"scene",removeFromBackground:false,extraction:{method:"source-region",shape:"rect"}}];
     const reasoning = {structure:"两个独立容器",editingGoal:"复用完整组件",strategy:"复制场景原像素，边界由用户框选"};

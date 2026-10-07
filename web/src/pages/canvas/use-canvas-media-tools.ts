@@ -998,7 +998,7 @@ export function useCanvasMediaTools({
         if (!source) throw new Error("源图为空，无法规划拆层");
         if (options?.history) {
             const plan = await readImageLayerPlanningHistory(projectId, node.id, node.metadata?.storageKey, signal);
-            return calibrateImageLayerPlan(source, applyImageLayerPlanningPurpose(plan, options?.purpose || "materials"));
+            return calibrateImageLayerPlan(source, applyImageLayerPlanningPurpose(plan, options?.purpose || "recompose"));
         }
         const config = { ...effectiveConfig, model, textModel: model, taskWorkflowProvider: "model" as const };
         const error = imageLayerPlannerError(config, model);
@@ -1013,7 +1013,7 @@ export function useCanvasMediaTools({
         });
         const plan = { ...parseImageLayerPlan(result.text || "", referenceSize), model, taskId };
         if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-        return calibrateImageLayerPlan(source, applyImageLayerPlanningPurpose(plan, options?.purpose || "materials"));
+        return calibrateImageLayerPlan(source, applyImageLayerPlanningPurpose(plan, options?.purpose || "recompose"));
     }, [effectiveConfig, isAiConfigReady, projectId]);
 
     const decomposeImageLayers = useCallback(

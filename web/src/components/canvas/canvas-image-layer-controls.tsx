@@ -52,7 +52,7 @@ export function CanvasImageLayerControls({ node }: { node: CanvasNodeData }) {
             <p className="text-xs opacity-60">隐藏和排序只更新合成图，不调用模型。拖动画布节点不会改变合成坐标。</p>
             {extractLayerMaterials ? (
                 <button type="button" disabled={node.metadata?.imageLayerMaterials?.status === "loading"} className="text-xs underline disabled:opacity-50" onClick={() => void extractLayerMaterials(node)}>
-                    {node.metadata?.imageLayerMaterials?.status === "loading" ? "正在收纳独立素材…" : node.metadata?.imageLayerMaterials?.groupId ? "重新生成独立素材（免费）" : "生成独立素材（免费）"}
+                    {node.metadata?.imageLayerMaterials?.status === "loading" ? "正在另存独立素材…" : node.metadata?.imageLayerMaterials?.groupId ? "重新另存独立素材（免费）" : "另存独立素材（免费）"}
                 </button>
             ) : null}
             <p className="text-xs opacity-60">独立素材只裁去外部透明留白，保留场景内部背景；原位图层保持不变。</p>

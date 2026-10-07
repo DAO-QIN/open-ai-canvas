@@ -26,7 +26,7 @@ export type CanvasImageLayerDecompositionPayload = {
 };
 
 const DEFAULT_PROMPT =
-    "识别值得复用的完整素材；框内照片、场景或组件保留内部内容与背景，不拆碎。独立主体按轮廓提取。保留原始比例、位置和可见内容，不补画原图未展示的部分。";
+    "拆出完整不透明背景和必要的独立前景。背景移除已拆内容并修补，保留其他环境与设计结构；框内完整照片或场景保留内部内容，不拆碎。前景保持原始比例、位置和细节，使用真实透明背景；不扩展原图画幅。";
 
 export function CanvasNodeLayerDecompositionDialog({
     dataUrl,
@@ -57,8 +57,7 @@ export function CanvasNodeLayerDecompositionDialog({
     const [experimental, setExperimental] = useState(false);
     const [targetText, setTargetText] = useState("");
     const [detailMode, setDetailMode] = useState(false);
-    const [purpose, setPurpose] = useState<ImageLayerPlanningPurpose>("materials");
-    const [independentMaterials, setIndependentMaterials] = useState(true);
+    const [purpose, setPurpose] = useState<ImageLayerPlanningPurpose>("recompose");
     const [calibrating, setCalibrating] = useState<number | null>(null);
     const [calibrationMessage, setCalibrationMessage] = useState("");
     const calibrationEpoch = useRef(0);
@@ -93,8 +92,7 @@ export function CanvasNodeLayerDecompositionDialog({
         setExperimental(!supportsLayerDecomposition(current, model));
         setTargetText("");
         setDetailMode(false);
-        setPurpose("materials");
-        setIndependentMaterials(true);
+        setPurpose("recompose");
         setCalibrating(null);
         setCalibrationMessage("");
         calibrationEpoch.current++;
@@ -129,7 +127,7 @@ export function CanvasNodeLayerDecompositionDialog({
             targetError = targetText.trim() ? (error instanceof Error ? error.message : "拆层目标无效") : "";
         }
     }
-    const removals = experimentalTargets?.map((_, i) => i > 0 && (backgroundRemovals[i] ?? false));
+    const removals = experimentalTargets?.map((_, i) => i > 0 && (backgroundRemovals[i] ?? purpose === "recompose"));
     let extractions: ImageLayerExtraction[] | undefined;
     let extractionError = "";
     if (experimentalTargets) {
@@ -323,26 +321,23 @@ export function CanvasNodeLayerDecompositionDialog({
                 </div>
                 <div className="flex flex-col gap-4">
                     <div>
-                        <h3 className="text-lg font-semibold">提取可复用素材</h3>
-                        <p className="mt-1 text-sm opacity-60">先识别完整素材，再核对边界。框内场景保留内部背景，独立主体按轮廓提取；同时保留用于叠放的原位图层。</p>
+                        <h3 className="text-lg font-semibold">拆分背景与前景</h3>
+                        <p className="mt-1 text-sm opacity-60">输出完整背景与独立图层，保持原图比例和位置，收纳为一组并默认折叠。框内完整场景保留内部背景。</p>
                     </div>
                     <Segmented
                         block
                         aria-label="拆分目的"
                         value={purpose}
                         options={[
-                            { label: "提取素材", value: "materials" },
-                            { label: "重组画面", value: "recompose" },
+                            { label: "背景与前景", value: "recompose" },
+                            { label: "保留原图副本", value: "materials" },
                         ]}
                         onChange={(value) => {
                             setPurpose(value as ImageLayerPlanningPurpose);
                             invalidatePlan();
                         }}
                     />
-                    <p className="text-xs opacity-70">{purpose === "materials" ? "保留原图底板，素材另存副本。副本默认不重复叠加到合成图，可在管理图层中开启预览。" : "规划需要移动或替换的内容，并修补其在底图中的原位置；请核对生成费用和效果。"}</p>
-                    <Checkbox checked={independentMaterials} onChange={(event) => setIndependentMaterials(event.target.checked)}>
-                        同时收纳独立素材（裁去透明留白，不调用模型）
-                    </Checkbox>
+                    <p className="text-xs opacity-70">{purpose === "materials" ? "保留完整原图，提取图层作为副本；副本默认不重复叠加，可在管理图层中开启。" : "已拆内容从背景移除并修补，前景图层默认参与合成。请核对模型修补效果。"} 如需裁去透明留白，可在完成后通过「管理图层」手动另存素材。</p>
                     <div className="flex flex-wrap items-center gap-2">
                         <Tag color={regions.length ? "blue" : "default"}>{regions.length ? `已框选 ${regions.length} 个区域` : "未框选，按描述拆分"}</Tag>
                         {regions.length ? (
@@ -584,7 +579,7 @@ export function CanvasNodeLayerDecompositionDialog({
                                                 checked={removals![i]}
                                                 disabled={planning}
                                                 onChange={(event) => {
-                                                    setBackgroundRemovals(experimentalTargets.map((_, index) => (index === i ? event.target.checked : (backgroundRemovals[index] ?? false))));
+                                                    setBackgroundRemovals(experimentalTargets.map((_, index) => (index === i ? event.target.checked : (backgroundRemovals[index] ?? purpose === "recompose"))));
                                                     if (event.target.checked) setExtractionChoices((current) => experimentalTargets.map((_, index) => index === 0 ? { method: "generate" } : current[index] || { method: "generate" }));
                                                 }}
                                             >
@@ -674,7 +669,7 @@ export function CanvasNodeLayerDecompositionDialog({
                                     regions,
                                     experimentalTargets,
                                     extractions,
-                                    independentMaterials,
+                                    independentMaterials: false,
                                     removeFromBackground: removals,
                                     backgroundRemovalModel: experimental && !dedicated && removeBackground && generatedObjects ? removalModel : undefined,
                                     planning: usePlanner ? plan : undefined,
