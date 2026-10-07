@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
 import { resolveImageRequestSize, validateImageSize } from "@/services/api/image-validation";
-import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, imageLayerPlanTargets, latestImageLayerPlan, parseImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
+import { applyImageLayerPlanningPurpose, imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, imageLayerPlanTargets, imageLayerTargetName, latestImageLayerPlan, parseImageLayerPlan } from "@/lib/canvas/canvas-image-layer-plan";
 import type { GenerationTask } from "@/services/api/task-center";
 import { supportsExperimentalLayerExtraction } from "@/lib/canvas/canvas-image-layers";
 import { defaultConfig, createModelChannel, selectableModelsByCapability } from "@/stores/use-config-store";
@@ -34,6 +34,43 @@ function response(names = ["背景", "人物", "花束", "标题文字"]) {
 }
 
 describe("通用图层规划", () => {
+    test("素材目的纠正模型重画底板和移除项，保留区域与主体各自的提取方式", () => {
+        const raw = parseImageLayerPlan(JSON.stringify({ canPlan: true, layers: [
+            { name: "底板", description: "清空内容", kind: "background", extraction: { method: "generate" } },
+            { name: "完整插图", description: "完整内部环境", kind: "object", editUnit: "scene", removeFromBackground: true, bbox: [50, 150, 480, 540], extraction: { method: "source-region", shape: "rounded-rect", radiusRatio: 0.06 } },
+            { name: "不规则主体", description: "主体轮廓", kind: "object", editUnit: "object", removeFromBackground: true, extraction: { method: "generate" } },
+        ] }));
+        const plan = applyImageLayerPlanningPurpose(raw, "materials");
+        expect(plan.layers[0].extraction).toEqual({ method: "source" });
+        expect(plan.layers[1].extraction).toEqual(raw.layers[1].extraction);
+        expect(plan.layers[2].extraction).toEqual({ method: "generate" });
+        expect(plan.layers.slice(1).every((layer) => layer.removeFromBackground === false)).toBe(true);
+        expect(raw.layers[0].extraction?.method).toBe("generate");
+        const recomposed = applyImageLayerPlanningPurpose(raw, "recompose");
+        expect(recomposed.layers[0].extraction?.method).toBe("generate");
+        expect(recomposed.layers[1].removeFromBackground).toBe(true);
+    });
+    test("完整场景分类与付费重画冲突时等待框选，不猜形状、不静默生成", () => {
+        for (const extraction of [undefined, { method: "generate" }]) {
+            const raw = parseImageLayerPlan(JSON.stringify({ canPlan: true, layers: [
+                { name: "底图", description: "保留", kind: "background", extraction: { method: "source" } },
+                { name: "完整场景", description: "照片", kind: "object", editUnit: "scene", bbox: [100, 100, 500, 700], extraction },
+            ] }));
+            const planned = applyImageLayerPlanningPurpose(raw, "materials");
+            expect(planned.layers[1].extraction).toEqual({ method: "source-region" });
+            expect(planned.warnings?.join(" ")).toContain("请框选完整边界");
+        }
+    });
+    test("重组目的存在移除项时不能原样复制底图，未知分类不冒充完整场景", () => {
+        const plan = parseImageLayerPlan(JSON.stringify({ canPlan: true, layers: [
+            { name: "底图", description: "保留", kind: "background", extraction: { method: "source" } },
+            { name: "复杂组合", description: "重叠轮廓", kind: "object", editUnit: "group", removeFromBackground: true, extraction: { method: "generate" } },
+        ] }));
+        const next = applyImageLayerPlanningPurpose(plan, "recompose");
+        expect(next.layers[0].extraction?.method).toBe("generate");
+        expect(next.layers[1].extraction?.method).toBe("generate");
+        expect(imageLayerTargetName("场景名称：内部描述，区域 <bbox>0 0 200 500</bbox>")).toBe("场景名称");
+    });
     test("识图模型的 extraction 内坐标仍按显式单位校验，冲突坐标不得静默选择", () => {
         const size = { width: 1000, height: 500 };
         const layer = { name: "场景", description: "完整场景与内部背景", kind: "object", editUnit: "scene", removeFromBackground: false, extraction: { method: "source-region", shape: "rounded-rect", radiusRatio: 0.04, bbox: [50, 100, 450, 400] } };
@@ -81,9 +118,9 @@ describe("通用图层规划", () => {
         expect(imageLayerPlanTargets(plan)[1]).toContain("区域 <bbox>100 200 800 900</bbox>");
         expect(parseImageLayerPlan("```json\n" + JSON.stringify(response(["背景", "产品"])) + "\n```").layers).toHaveLength(2);
     });
-    test("主体默认从底图移除，细节默认保留；模型显式选项可覆盖且必须是布尔值", () => {
+    test("未声明移除时保留原内容；模型显式选项必须是布尔值", () => {
         const planned = response();
-        expect(parseImageLayerPlan(JSON.stringify(planned)).layers.map((layer) => layer.removeFromBackground)).toEqual([undefined, true, false, false]);
+        expect(parseImageLayerPlan(JSON.stringify(planned)).layers.map((layer) => layer.removeFromBackground)).toEqual([undefined, false, false, false]);
         const details = { ...planned, layers: planned.layers.map((layer, i) => ({ ...layer, ...(i ? { removeFromBackground: i === 2 } : {}) })) };
         expect(parseImageLayerPlan(JSON.stringify(details)).layers.map((layer) => layer.removeFromBackground)).toEqual([undefined, false, true, false]);
         expect(() => parseImageLayerPlan(JSON.stringify({ ...details, layers: details.layers.map((layer) => ({ ...layer, removeFromBackground: "true" })) }))).toThrow("移除选项");
@@ -159,7 +196,7 @@ describe("通用图层规划", () => {
     });
     test("海报整张照片内部场景保留，坐标可省略且以实际参考图为准", () => {
         const prompt = imageLayerPlanningPrompt("自动拆分", { width: 1000, height: 1000 });
-        expect(prompt).toContain("每张照片是独立场景");
+        expect(prompt).toContain("完整 scene 禁止重画或内部去背景");
         expect(prompt).toContain('coordinateSpace="pixels"');
         expect(prompt).toContain("1000×1000");
     });

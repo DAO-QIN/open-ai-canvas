@@ -6,7 +6,7 @@ import { ModelPicker } from "@/components/model-picker";
 import { selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
 import { defaultImageParamsForModel } from "@/lib/model-selection";
 import { modelCompatibilityError } from "@/lib/model-selection";
-import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanTargets, type ImageLayerPlan, type ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
+import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanTargets, imageLayerTargetName, type ImageLayerPlan, type ImageLayerPlanningOptions, type ImageLayerPlanningPurpose } from "@/lib/canvas/canvas-image-layer-plan";
 import { parseExperimentalLayerTargets, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { navigateToSettings } from "@/lib/settings-navigation";
@@ -26,7 +26,7 @@ export type CanvasImageLayerDecompositionPayload = {
 };
 
 const DEFAULT_PROMPT =
-    "为美工复用素材而拆层：按画面结构识别完整场景、主要对象、图形和文字；完整照片或插画面板保留内部背景与内容，不默认拆碎。完整底图只移除需独立移动或替换的内容并补全遮挡，备用素材可保留在底图。原位图层保持原图外观、画布比例和坐标，另提供裁去外部透明留白的独立素材，不补画原图未展示的内容。";
+    "识别值得复用的完整素材；框内照片、场景或组件保留内部内容与背景，不拆碎。独立主体按轮廓提取。保留原始比例、位置和可见内容，不补画原图未展示的部分。";
 
 export function CanvasNodeLayerDecompositionDialog({
     dataUrl,
@@ -57,6 +57,7 @@ export function CanvasNodeLayerDecompositionDialog({
     const [experimental, setExperimental] = useState(false);
     const [targetText, setTargetText] = useState("");
     const [detailMode, setDetailMode] = useState(false);
+    const [purpose, setPurpose] = useState<ImageLayerPlanningPurpose>("materials");
     const [independentMaterials, setIndependentMaterials] = useState(true);
     const [calibrating, setCalibrating] = useState<number | null>(null);
     const [calibrationMessage, setCalibrationMessage] = useState("");
@@ -92,6 +93,7 @@ export function CanvasNodeLayerDecompositionDialog({
         setExperimental(!supportsLayerDecomposition(current, model));
         setTargetText("");
         setDetailMode(false);
+        setPurpose("materials");
         setIndependentMaterials(true);
         setCalibrating(null);
         setCalibrationMessage("");
@@ -127,7 +129,7 @@ export function CanvasNodeLayerDecompositionDialog({
             targetError = targetText.trim() ? (error instanceof Error ? error.message : "拆层目标无效") : "";
         }
     }
-    const removals = experimentalTargets?.map((_, i) => i > 0 && (backgroundRemovals[i] ?? i === 1));
+    const removals = experimentalTargets?.map((_, i) => i > 0 && (backgroundRemovals[i] ?? false));
     let extractions: ImageLayerExtraction[] | undefined;
     let extractionError = "";
     if (experimentalTargets) {
@@ -135,7 +137,7 @@ export function CanvasNodeLayerDecompositionDialog({
             extractions = resolveImageLayerExtractions(
                 experimentalTargets.length,
                 experimentalTargets.map((_, i) => {
-                    const choice = extractionChoices[i] || { method: "generate" as const };
+                    const choice = extractionChoices[i] || { method: i === 0 && purpose === "materials" ? "source" as const : "generate" as const };
                     if (choice.method !== "source-region") return choice;
                     return { ...choice, region: { shape: choice.region?.shape || "rect", radiusRatio: choice.region?.radiusRatio, bbox: parseRegionText(regionTexts[i] || "") } };
                 }),
@@ -160,7 +162,7 @@ export function CanvasNodeLayerDecompositionDialog({
 
     const changeExtraction = (index: number, method: ImageLayerExtraction["method"]) => {
         setExtractionChoices((current) =>
-            experimentalTargets!.map((_, i) => (i === index ? { method, ...(method === "source-region" ? { region: current[i]?.region || { shape: "rect", bbox: parseRegionText(regionTexts[i] || "") } } : {}) } : current[i] || { method: "generate" })),
+                experimentalTargets!.map((_, i) => (i === index ? { method, ...(method === "source-region" ? { region: current[i]?.region || { shape: "rect", bbox: parseRegionText(regionTexts[i] || "") } } : {}) } : current[i] || { method: i === 0 && purpose === "materials" ? "source" : "generate" })),
         );
         setEditingRegion(null);
         if (index === 0 && method === "source") setBackgroundRemovals(experimentalTargets!.map(() => false));
@@ -259,7 +261,7 @@ export function CanvasNodeLayerDecompositionDialog({
         setPlanningError("");
         setPlan(undefined);
         try {
-            const result = await onPlan(plannerModel, selectedPrompt, controller.signal, { input: planningInput, history });
+            const result = await onPlan(plannerModel, selectedPrompt, controller.signal, { input: planningInput, history, purpose });
             if (controller.signal.aborted || planningRequest.current !== controller) return;
             setPlan(result);
             setTargetText(imageLayerPlanTargets(result).join("\n"));
@@ -321,22 +323,23 @@ export function CanvasNodeLayerDecompositionDialog({
                 </div>
                 <div className="flex flex-col gap-4">
                     <div>
-                        <h3 className="text-lg font-semibold">拆分图片图层</h3>
-                        <p className="mt-1 text-sm opacity-60">按可复用的编辑单元拆分：完整场景保留内部背景，独立对象与文字按需提取。原位图层用于叠放、合成；独立素材便于美工复用。两组默认折叠，不固定题材或层数。</p>
+                        <h3 className="text-lg font-semibold">提取可复用素材</h3>
+                        <p className="mt-1 text-sm opacity-60">先识别完整素材，再核对边界。框内场景保留内部背景，独立主体按轮廓提取；同时保留用于叠放的原位图层。</p>
                     </div>
                     <Segmented
                         block
-                        aria-label="拆分范围"
-                        value={detailMode ? "detail" : "primary"}
+                        aria-label="拆分目的"
+                        value={purpose}
                         options={[
-                            { label: "自动拆分", value: "primary" },
-                            { label: "详细拆分", value: "detail" },
+                            { label: "提取素材", value: "materials" },
+                            { label: "重组画面", value: "recompose" },
                         ]}
                         onChange={(value) => {
-                            setDetailMode(value === "detail");
+                            setPurpose(value as ImageLayerPlanningPurpose);
                             invalidatePlan();
                         }}
                     />
+                    <p className="text-xs opacity-70">{purpose === "materials" ? "保留原图底板，素材另存副本；无需为了提取素材重画整张底图。" : "规划需要移动或替换的内容，并修补其在底图中的原位置；请核对生成费用和效果。"}</p>
                     <Checkbox checked={independentMaterials} onChange={(event) => setIndependentMaterials(event.target.checked)}>
                         同时收纳独立素材（裁去透明留白，不调用模型）
                     </Checkbox>
@@ -360,6 +363,9 @@ export function CanvasNodeLayerDecompositionDialog({
                             </span>
                         )}
                     </div>
+                    <details>
+                    <summary className="cursor-pointer text-sm opacity-75">补充要求与拆分细节</summary>
+                    <Checkbox checked={detailMode} onChange={(event) => { setDetailMode(event.target.checked); invalidatePlan(); }}>增加有复用价值的文字与细节</Checkbox>
                     <Input.TextArea
                         rows={4}
                         value={prompt}
@@ -369,6 +375,7 @@ export function CanvasNodeLayerDecompositionDialog({
                             invalidatePlan();
                         }}
                     />
+                    </details>
                     <div className="space-y-2">
                         <div className="text-sm font-medium opacity-75">图层拆分模型</div>
                         <Checkbox checked={experimental} onChange={(event) => setExperimental(event.target.checked)}>
@@ -463,7 +470,8 @@ export function CanvasNodeLayerDecompositionDialog({
                                     </div> : null}
                                 </>
                             ) : null}
-                            <div className="text-sm">拆层目标（每行一层，第一层为背景底图）</div>
+                            <details open={!plan}>
+                            <summary className="cursor-pointer text-sm opacity-75">编辑素材描述（每行一层，第一层为底图）</summary>
                             <Input.TextArea
                                 aria-label="拆层目标"
                                 rows={4}
@@ -472,21 +480,28 @@ export function CanvasNodeLayerDecompositionDialog({
                                 placeholder="先识图规划，也可关闭规划后每行填写一层"
                                 onChange={(event) => {
                                     setTargetText(event.target.value);
-                                    setExtractionChoices([]);
-                                    setRegionTexts([]);
-                                    setEditingRegion(null);
-                                    setBackgroundRemovals([]);
+                                    const nextTargets = event.target.value.split("\n").filter((line) => line.trim());
+                                    if (nextTargets.length !== experimentalTargets?.length || nextTargets.some((target, i) => imageLayerTargetName(target) !== imageLayerTargetName(experimentalTargets![i]))) {
+                                        invalidatePlan();
+                                        if (usePlanner) setPlanningError("素材名称或数量已改变，请重新规划；也可关闭识图规划后手动配置提取方式");
+                                        return;
+                                    }
                                     setPlan((current) => current ? { ...current, reasoning: undefined, layers: current.layers.map((layer) => ({ ...layer, editUnit: undefined })) } : current);
                                 }}
                             />
+                            </details>
                             {experimentalTargets?.map((target, i) => {
-                                const choice = extractionChoices[i] || { method: "generate" as const };
+                                const choice = extractionChoices[i] || { method: i === 0 && purpose === "materials" ? "source" as const : "generate" as const };
                                 return (
                                     <div key={i} className="space-y-2 rounded-lg border border-[var(--border-default)] p-2">
                                         <div className="text-xs font-medium">
                                             {i + 1}. {target.split(/[：:]/)[0].slice(0, 40)}
                                             {plan?.layers[i]?.editUnit ? <span className="ml-2 opacity-60">{({ scene: "完整场景", object: "独立对象", text: "文字", decoration: "装饰", group: "完整组件" })[plan.layers[i].editUnit!]}</span> : null}
                                         </div>
+                                        <p className="text-xs opacity-65">{choice.method === "source" ? "完整原图底板 · 不调用图片模型" : choice.method === "source-region" ? "复制原图可见素材 · 保留内部背景" : "模型提取透明轮廓 · 请核对生成结果"}</p>
+                                        {choice.method === "source-region" && extractions?.[i].region ? <RegionPreview dataUrl={dataUrl} region={extractions[i].region!} sourceSize={previewSize} label={i + 1} /> : null}
+                                        <details open={choice.method === "source-region" && !extractions?.[i].region}>
+                                        <summary className="cursor-pointer text-xs opacity-75">调整提取方式与边界</summary>
                                         <Select
                                             aria-label={`第${i + 1}层提取方式`}
                                             className="w-full"
@@ -560,7 +575,6 @@ export function CanvasNodeLayerDecompositionDialog({
                                                 <Button size="small" disabled={planning || calibrating !== null || !extractions?.[i].region || choice.region?.shape === "ellipse"} loading={calibrating === i} onClick={() => void calibrate(i)}>
                                                     校准第 {i + 1} 层规则边界（免费）
                                                 </Button>
-                                                {extractions?.[i].region ? <RegionPreview dataUrl={dataUrl} region={extractions[i].region!} sourceSize={previewSize} label={i + 1} /> : null}
                                                 <p className="text-xs opacity-70">区域内场景保持原样，区域外透明；不会抠除区域内部背景或补画遮挡。请核对边界。</p>
                                             </>
                                         ) : null}
@@ -570,13 +584,14 @@ export function CanvasNodeLayerDecompositionDialog({
                                                 checked={removals![i]}
                                                 disabled={planning}
                                                 onChange={(event) => {
-                                                    setBackgroundRemovals(experimentalTargets.map((_, index) => (index === i ? event.target.checked : (backgroundRemovals[index] ?? index === 1))));
-                                                    if (event.target.checked && extractionChoices[0]?.method === "source") setExtractionChoices((current) => current.map((item, index) => (index === 0 ? { method: "generate" } : item)));
+                                                    setBackgroundRemovals(experimentalTargets.map((_, index) => (index === i ? event.target.checked : (backgroundRemovals[index] ?? false))));
+                                                    if (event.target.checked) setExtractionChoices((current) => experimentalTargets.map((_, index) => index === 0 ? { method: "generate" } : current[index] || { method: "generate" }));
                                                 }}
                                             >
                                                 从底图移除第 {i + 1} 层
                                             </Checkbox>
                                         ) : null}
+                                        </details>
                                     </div>
                                 );
                             })}

@@ -17,6 +17,7 @@ import { commitProducedModel } from "@/lib/canvas/produced-model";
 import { experimentalLayerSignature, hasUsableLayerTransparency, imageLayerCompositeSignature, validateImageLayerRole } from "@/lib/canvas/canvas-image-layers";
 import { composeCanvasImageLayerGroup, decodeAndComposeImageLayers, inspectImageLayer, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
 import { patchImageLayerBackground } from "@/services/canvas-image-layer-source";
+import { imageLayerTargetName } from "@/lib/canvas/canvas-image-layer-plan";
 import { resetGenerationTaskMetadata } from "@/lib/canvas/canvas-task-state";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
 
@@ -502,7 +503,7 @@ export async function buildExperimentalImageLayerResult(root: CanvasNodeData, no
     const decoded = await decodeAndComposeImageLayers(sources.map((node) => ({ dataUrl: node.metadata!.content!, storageKey: node.metadata?.storageKey })), order.map((item) => item.index));
     const updatedChildren = sources.map((node, index) => ({
         ...node,
-        title: node.metadata?.imageLayer ? node.title : plan.requests.find((request) => request.nodeId === node.id)!.target,
+        title: node.metadata?.imageLayer ? node.title : imageLayerTargetName(plan.requests.find((request) => request.nodeId === node.id)!.target),
         metadata: { ...node.metadata, batchRootId: root.id, imageLayer: { groupId: root.id, outputIndex: order[index].index, kind: order[index].index === 0 ? ("base" as const) : ("transparent" as const) } },
     }));
     const completed = sources.length;

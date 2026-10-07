@@ -25,7 +25,7 @@ import { findAvailableGenerationGroupPosition, imageGenerationChildPosition, ima
 import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-submission";
 import { cancelIncompleteImageBatch } from "@/lib/canvas/canvas-image-batch-retry";
 import { experimentalLayerPrompt, imageLayerProviderMetadata, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
-import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, parseImageLayerPlan, type ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
+import { applyImageLayerPlanningPurpose, imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, imageLayerTargetName, parseImageLayerPlan, type ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
 import { imageLayerBackgroundPatch, imageLayerExtractionTargets, resolveImageLayerExtractions, type ImageLayerExtraction } from "@/lib/canvas/canvas-image-layer-strategy";
 import { buildAngleLabel, buildAnglePrompt, createCanvasNode } from "@/lib/canvas/canvas-project-domain";
 import { validateVideoSegmentBatch } from "@/lib/canvas/canvas-video-regeneration";
@@ -998,7 +998,7 @@ export function useCanvasMediaTools({
         if (!source) throw new Error("源图为空，无法规划拆层");
         if (options?.history) {
             const plan = await readImageLayerPlanningHistory(projectId, node.id, node.metadata?.storageKey, signal);
-            return calibrateImageLayerPlan(source, plan);
+            return calibrateImageLayerPlan(source, applyImageLayerPlanningPurpose(plan, options?.purpose || "materials"));
         }
         const config = { ...effectiveConfig, model, textModel: model, taskWorkflowProvider: "model" as const };
         const error = imageLayerPlannerError(config, model);
@@ -1008,12 +1008,12 @@ export function useCanvasMediaTools({
         const referenceSize = { width: reference.width!, height: reference.height! };
         let taskId: string | undefined;
         const result = await runBackendCanvasGenerationTask({
-            projectId, nodeId: `${node.id}-layer-plan-${nanoid()}`, mode: "text", prompt: imageLayerPlanningPrompt(prompt, referenceSize), config,
+            projectId, nodeId: `${node.id}-layer-plan-${nanoid()}`, mode: "text", prompt: imageLayerPlanningPrompt(prompt, referenceSize, options?.purpose), config,
             referenceImages: [reference], signal, metadata: { sourceNodeId: node.id, sourceStorageKey: source.storageKey, sourceSize, planningReferenceSize: referenceSize, edit: "layer-planning" }, onTaskCreated: (task) => { taskId = task.id; },
         });
         const plan = { ...parseImageLayerPlan(result.text || "", referenceSize), model, taskId };
         if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-        return calibrateImageLayerPlan(source, plan);
+        return calibrateImageLayerPlan(source, applyImageLayerPlanningPurpose(plan, options?.purpose || "materials"));
     }, [effectiveConfig, isAiConfigReady, projectId]);
 
     const decomposeImageLayers = useCallback(
@@ -1106,7 +1106,7 @@ export function useCanvasMediaTools({
                 return {
                     id: request.nodeId,
                     type: CanvasNodeType.Image,
-                    title: `${request.extraction.method === "generate" ? "模型提取" : "原图提取"} ${index + 1} · ${request.target}`,
+                    title: imageLayerTargetName(request.target),
                     ...imageSize,
                     position: imageGenerationChildPosition(position, imageSize.width, imageSize, index),
                     metadata: {

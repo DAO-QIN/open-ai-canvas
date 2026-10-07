@@ -5,6 +5,8 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+AI 拆图的编辑目的与语义工具约束位于 `web/src/lib/canvas/canvas-image-layer-plan.ts`（`applyImageLayerPlanningPurpose`）；页面 `use-canvas-media-tools.ts` 对新规划和历史规划使用同一约束后再进行边界校准。弹窗只编排选择、预览与高级设置。节点标题由 `imageLayerTargetName` 提取短名称，生成计划仍保留完整描述；不增加后端或模型协议。
+
 ## 968API SD 视频
 
 - 插件合同：`plugin-packages/api968-sd-video/manifest.json`、`README.md`、`docs/interface.md` 与同名 `.yingce-plugin` 包；五个 Provider 各自校验模型 ID 与上游参数。
