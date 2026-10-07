@@ -83,7 +83,10 @@ export async function calibrateImageLayerPlan(source: LayerInput, plan: ImageLay
     indices.forEach((index, n) => {
         const region = proposals[n];
         // A calibration must not grow into another planned panel.
-        const crossesPanel = region && regions.some((other, j) => j !== n && Math.min(region.bbox[2], other.bbox[2]) - Math.max(region.bbox[0], other.bbox[0]) > 2 && Math.min(region.bbox[3], other.bbox[3]) - Math.max(region.bbox[1], other.bbox[1]) > 2);
+        const crossesPanel = region && regions.some((original, j) => {
+            const other = proposals[j] || original;
+            return j !== n && Math.min(region.bbox[2], other.bbox[2]) - Math.max(region.bbox[0], other.bbox[0]) > 2 && Math.min(region.bbox[3], other.bbox[3]) - Math.max(region.bbox[1], other.bbox[1]) > 2;
+        });
         if (region && !crossesPanel) {
             layers[index] = { ...layers[index], bbox: region.bbox, extraction: { method: "source-region", region } };
             warnings.push(`“${layers[index].name}”已按规则区域边缘校准，请核对完整场景预览；校准不是精确分割。`);
