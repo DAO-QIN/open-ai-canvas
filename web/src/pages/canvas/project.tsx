@@ -864,7 +864,6 @@ function InfiniteCanvasPage() {
         openBackgroundRemoval,
         openLayerDecomposition,
         decomposeImageLayers,
-        planImageLayers,
         activeLayerGroupIds,
         setLayerDecompositionNodeId,
         setTextEditNodeId,
@@ -2410,6 +2409,12 @@ function InfiniteCanvasPage() {
     );
     const retryCanvasNode = useCallback(
         (node: CanvasNodeData) => {
+            if (node.metadata?.imageLayerWorkflow && !node.metadata.experimentalLayerPlan && !node.metadata.layerDecomposition) {
+                const source = nodesRef.current.find((item) => item.id === node.metadata!.imageLayerWorkflow!.sourceNodeId);
+                if (source?.metadata?.content) setLayerDecompositionNodeId(source.id);
+                else message.error("拆层源图片已不存在，请重新选择图片");
+                return;
+            }
             if (node.type === CanvasNodeType.Script) {
                 const prompt = (node.metadata?.composerContent || node.metadata?.prompt || "").trim();
                 if (!prompt) {
@@ -2439,7 +2444,7 @@ function InfiniteCanvasPage() {
             }
             void handleRetryNode(node);
         },
-        [generateScriptRows, handleRetryNode, message, nodesRef, retryImageBatchChildren],
+        [generateScriptRows, handleRetryNode, message, nodesRef, retryImageBatchChildren, setLayerDecompositionNodeId],
     );
     const openCanvasNodeTaskDetails = useCallback(
         (node: CanvasNodeData) => {
@@ -3305,11 +3310,6 @@ function InfiniteCanvasPage() {
                             onMaskEdit={(node, payload) => void maskEditImageNode(node, payload)}
                             onImageOperation={(node, payload) => void editImageNode(node, payload)}
                             onLayerDecomposition={(node, payload) => void decomposeImageLayers(node, payload)}
-                            onPlanImageLayers={(model, prompt, signal, options) => {
-                                const source = layerDecompositionNodeId ? nodeById.get(layerDecompositionNodeId) : undefined;
-                                if (!source) return Promise.reject(new Error("拆层源图片不存在"));
-                                return planImageLayers(source, model, prompt, signal, options);
-                            }}
                             onDetectText={() => {
                                 const node = textEditNodeId ? nodeById.get(textEditNodeId) : null;
                                 return node ? detectImageText(node) : Promise.reject(new Error("图片节点已不存在"));

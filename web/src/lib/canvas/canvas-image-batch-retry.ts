@@ -27,6 +27,7 @@ export function retireImageBatchChildren(root: CanvasNodeData, nodes: CanvasNode
                 delete metadata.batchFailedCount;
                 delete metadata.imageLayerGroup;
                 delete metadata.layerDecomposition;
+                delete metadata.imageLayerWorkflow;
                 delete metadata.experimentalLayerPlan;
                 delete metadata.layerExtraction;
                 delete metadata.imageLayerMaterials;

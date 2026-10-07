@@ -37,6 +37,10 @@ export function useCanvasImageLayerGroups({
     useEffect(() => {
         if (!enabled) return;
         for (const root of nodes) {
+            if (root.metadata?.status === "loading" && root.metadata.imageLayerWorkflow?.stage === "planning" && !activeLayerGroupIds?.has(root.id)) {
+                setNodes((current) => current.map((node) => node.id === root.id ? { ...node, metadata: { ...node.metadata, status: "error", errorDetails: "拆解规划等待已中断，未自动提交拆图任务；请重新发起拆分。" } } : node));
+                continue;
+            }
             const plan = root.metadata?.experimentalLayerPlan;
             if (!plan || jobs.current.has(root.id)) continue;
             const children = plan.requests.map((request) => nodes.find((node) => node.id === request.nodeId));

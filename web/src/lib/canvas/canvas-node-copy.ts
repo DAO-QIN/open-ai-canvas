@@ -65,6 +65,7 @@ export function isolateCopiedNodeMetadata(node: CanvasNodeData, idMap: ReadonlyM
     delete metadata.imageBatchExpanded;
     delete metadata.batchUsesReferenceImages;
     delete metadata.layerDecomposition;
+    delete metadata.imageLayerWorkflow;
     delete metadata.experimentalLayerPlan;
     delete metadata.layerExtraction;
     delete metadata.imageLayerMaterials;

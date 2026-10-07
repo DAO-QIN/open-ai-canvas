@@ -321,6 +321,8 @@ export type CanvasNodeMetadata = {
     imageBatchExpanded?: boolean;
     /** 拆层请求身份与画布展开位置分离，恢复任务时沿用同一结果消费流程。 */
     layerDecomposition?: { sourceNodeId: string; canvas?: { width: number; height: number } };
+    /** 一次拆分从视觉规划起计时；刷新不续发尚未提交的拆图请求。 */
+    imageLayerWorkflow?: { sourceNodeId: string; startedAt: string; stage: "planning" | "extract"; total?: number; plannerModel: string; planningTaskId?: string };
     /** 普通生图模型逐层提取；刷新只恢复已提交任务，不自动提交下一次付费请求。 */
     experimentalLayerPlan?: {
         sourceNodeId: string;
