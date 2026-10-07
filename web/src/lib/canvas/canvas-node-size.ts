@@ -10,7 +10,7 @@ export function fitImageMaterialNodeSize(width: number, height: number) {
     return { width: Math.max(MEDIA_NODE_MIN_SIZE.width, fitted.width), height: Math.max(MEDIA_NODE_MIN_SIZE.height, fitted.height) };
 }
 
-export function fitNodeSize(width: number, height: number, maxWidth = 720, maxHeight = 520, minWidth = MEDIA_NODE_MIN_SIZE.width, minHeight = MEDIA_NODE_MIN_SIZE.height) {
+export function fitNodeSize(width: number, height: number, maxWidth = 720, maxHeight = 520, minWidth: number = MEDIA_NODE_MIN_SIZE.width, minHeight: number = MEDIA_NODE_MIN_SIZE.height) {
     const w = Math.max(1, width);
     const h = Math.max(1, height);
     // 媒体节点既要保留原始比例，也要给生成状态、操作按钮留下稳定的可读空间。
