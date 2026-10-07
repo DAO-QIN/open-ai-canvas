@@ -34,6 +34,20 @@ function response(names = ["背景", "人物", "花束", "标题文字"]) {
 }
 
 describe("通用图层规划", () => {
+    test("识图模型的 extraction 内坐标仍按显式单位校验，冲突坐标不得静默选择", () => {
+        const size = { width: 1000, height: 500 };
+        const layer = { name: "场景", description: "完整场景与内部背景", kind: "object", editUnit: "scene", removeFromBackground: false, extraction: { method: "source-region", shape: "rounded-rect", radiusRatio: 0.04, bbox: [50, 100, 450, 400] } };
+        const value = { canPlan: true, coordinateSpace: "pixels", imageSize: size, layers: [{ name: "底图", description: "保留原图", kind: "background", extraction: { method: "source" } }, layer] };
+        const plan = parseImageLayerPlan(JSON.stringify(value), size);
+        expect(plan.layers[1].extraction?.region?.bbox).toEqual([50, 200, 450, 800]);
+        expect(plan.layers[1].extraction?.region?.shape).toBe("rounded-rect");
+        expect(parseImageLayerPlan(JSON.stringify(value)).layers[1].extraction?.region).toBeUndefined();
+        expect(parseImageLayerPlan(JSON.stringify(value), { width: 500, height: 250 }).layers[1].extraction?.region).toBeUndefined();
+        const conflict = parseImageLayerPlan(JSON.stringify({ ...value, layers: [value.layers[0], { ...layer, bbox: [60, 100, 450, 400] }] }), size);
+        expect(conflict.layers[1].extraction?.region).toBeUndefined();
+        expect(conflict.warnings?.join(" ")).toContain("冲突");
+        expect(parseImageLayerPlan(JSON.stringify({ ...value, layers: [value.layers[0], { ...layer, bbox: layer.extraction.bbox }] }), size).layers[1].bbox).toEqual([50, 200, 450, 800]);
+    });
     test("原图比例在持久化任务前转为协议像素尺寸，提取与去背景都满足后端尺寸校验", () => {
         const profile = defaultModelCapabilityConfig("openai", "image-2.5-flare").image!;
         profile.size = { ...profile.size, parameter: "size", values: ["auto"], allowCustom: true };
