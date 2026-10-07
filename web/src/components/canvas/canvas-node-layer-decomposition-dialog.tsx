@@ -455,6 +455,12 @@ export function CanvasNodeLayerDecompositionDialog({
                                             {warning}
                                         </p>
                                     ))}
+                                    {plan?.reasoning ? <div aria-label="识图规划依据" className="space-y-1 rounded-lg border border-[var(--border-default)] p-2 text-xs">
+                                        <div className="font-medium">识图规划依据</div>
+                                        <p>图片结构：{plan.reasoning.structure}</p>
+                                        <p>编辑目标：{plan.reasoning.editingGoal}</p>
+                                        <p>提取策略：{plan.reasoning.strategy}</p>
+                                    </div> : null}
                                 </>
                             ) : null}
                             <div className="text-sm">拆层目标（每行一层，第一层为背景底图）</div>
@@ -470,6 +476,7 @@ export function CanvasNodeLayerDecompositionDialog({
                                     setRegionTexts([]);
                                     setEditingRegion(null);
                                     setBackgroundRemovals([]);
+                                    setPlan((current) => current ? { ...current, reasoning: undefined, layers: current.layers.map((layer) => ({ ...layer, editUnit: undefined })) } : current);
                                 }}
                             />
                             {experimentalTargets?.map((target, i) => {
@@ -478,6 +485,7 @@ export function CanvasNodeLayerDecompositionDialog({
                                     <div key={i} className="space-y-2 rounded-lg border border-[var(--border-default)] p-2">
                                         <div className="text-xs font-medium">
                                             {i + 1}. {target.split(/[：:]/)[0].slice(0, 40)}
+                                            {plan?.layers[i]?.editUnit ? <span className="ml-2 opacity-60">{({ scene: "完整场景", object: "独立对象", text: "文字", decoration: "装饰", group: "完整组件" })[plan.layers[i].editUnit!]}</span> : null}
                                         </div>
                                         <Select
                                             aria-label={`第${i + 1}层提取方式`}

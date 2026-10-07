@@ -21,6 +21,14 @@ const channel = createModelChannel({
     ],
 });
 const config = { ...defaultConfig, channels: [channel] };
+test("规划依据与编辑单元可检查；无效可选字段不破坏已有计划", () => {
+    const layers = [{name:"底图",description:"保留原图",kind:"background",extraction:{method:"source"}}, {name:"面板",description:"完整内部场景",kind:"object",editUnit:"scene",removeFromBackground:false,extraction:{method:"source-region",shape:"rect"}}];
+    const reasoning = {structure:"两个独立容器",editingGoal:"复用完整组件",strategy:"复制场景原像素，边界由用户框选"};
+    const plan=parseImageLayerPlan(JSON.stringify({canPlan:true,layers,reasoning}));
+    expect(plan.reasoning).toEqual(reasoning);expect(plan.layers[1].editUnit).toBe("scene");expect(plan.layers[1].extraction?.method).toBe("source-region");expect(plan.layers[1].extraction?.region).toBeUndefined();
+    const invalid=parseImageLayerPlan(JSON.stringify({canPlan:true,layers:[layers[0],{...layers[1],editUnit:"anything"}],reasoning:{structure:8}}));
+    expect(invalid.layers).toHaveLength(2);expect(invalid.reasoning).toBeUndefined();expect(invalid.layers[1].editUnit).toBeUndefined();expect(invalid.warnings?.length).toBeGreaterThan(1);
+});
 function response(names = ["背景", "人物", "花束", "标题文字"]) {
     return { canPlan: true, layers: names.map((name, index) => ({ name, description: `只保留${name}，排除其他层`, kind: index === 0 ? "background" : "object", ...(index ? { bbox: [100, 200, 800, 900] } : {}) })) };
 }
