@@ -18,7 +18,7 @@ import { bindCanvasVideoHoverPreview } from "@/lib/canvas/canvas-video-hover-pre
 import { resolveMediaUrl } from "@/services/file-storage";
 import { hydrateCanvasVideoPreview } from "@/services/canvas-video-preview";
 import { type CanvasTheme } from "@/lib/canvas-theme";
-import { fitNodeSize } from "@/lib/canvas/canvas-node-size";
+import { fitImageMaterialNodeSize, fitNodeSize } from "@/lib/canvas/canvas-node-size";
 import { getActiveUserScope } from "@/lib/user-scope";
 import { prepareCanvasImage } from "@/services/canvas-image-loader";
 import { getResourceAccess, resolveResourceAccessURL } from "@/services/api/resources";
@@ -418,7 +418,9 @@ export function ImageContent({
             if (current.metadata?.freeResize || current.metadata?.manualSize) {
                 return needsMetadata ? { ...current, metadata: { ...metadata, naturalWidth, naturalHeight } } : current;
             }
-            const size = fitNodeSize(naturalWidth, naturalHeight);
+            // 独立素材使用有界预览框；解码回调不能重新把细长文字放大成超宽节点。
+            const materialPreview = metadata?.imageLayerMaterial || (metadata?.isBatchRoot && batchPreviewNodes?.some((child) => child.metadata?.imageLayerMaterial));
+            const size = materialPreview ? fitImageMaterialNodeSize(naturalWidth, naturalHeight) : fitNodeSize(naturalWidth, naturalHeight);
             const needsResize = Math.abs(size.width - current.width) >= 1 || Math.abs(size.height - current.height) >= 1;
             if (!needsMetadata && !needsResize) return current;
             return {
