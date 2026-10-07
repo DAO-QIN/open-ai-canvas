@@ -1,5 +1,17 @@
 import { expect, test } from "bun:test";
 import { imageLayerAlphaBounds, suggestImageLayerRegion } from "../src/lib/canvas/canvas-image-layer-region";
+import { ensureMediaNodeMinimumSize, fitImageMaterialNodeSize } from "../src/lib/canvas/canvas-node-size";
+import { CanvasNodeType } from "../src/types/canvas";
+
+test("extreme material ratios use bounded preview frames and remain stable after reload", () => {
+    for (const [width, height] of [[1408, 79], [12, 1400], [701, 626], [10, 8]]) {
+        const size = fitImageMaterialNodeSize(width, height);
+        expect(size.width).toBeLessThanOrEqual(720);
+        expect(size.height).toBeLessThanOrEqual(520);
+        const node = { id: "material", type: CanvasNodeType.Image, title: "素材", position: { x: 10, y: 20 }, ...size, metadata: { content: "/material.png", naturalWidth: width, naturalHeight: height } };
+        expect(ensureMediaNodeMinimumSize(node)).toEqual(node);
+    }
+});
 
 test("alpha bounds keep soft edges and reject empty/invalid rasters", () => {
     const pixels = new Uint8ClampedArray(12 * 8 * 4);

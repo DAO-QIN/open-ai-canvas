@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData } from "@/types/canvas";
 import { imageMetadata } from "@/lib/canvas/canvas-generation-task-sync";
 import { findAvailableGenerationGroupPosition, imageGenerationChildPosition, imageGenerationGroupSize } from "@/lib/canvas/canvas-generation-layout";
-import { fitNodeSize } from "@/lib/canvas/canvas-node-size";
+import { fitImageMaterialNodeSize } from "@/lib/canvas/canvas-node-size";
 import { cropImageLayerMaterial } from "@/services/canvas-image-layer-source";
 import { uploadImage } from "@/services/image-storage";
 import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
@@ -64,7 +64,7 @@ export function useCanvasImageLayerMaterials({
                         const image = await uploadImage(cropped.dataUrl);
                         if (image.pendingRemoteUpload) throw new Error("素材尚未保存到服务端");
                         if (!active()) return;
-                        const size = fitNodeSize(image.width, image.height, root.width, root.height);
+                        const size = fitImageMaterialNodeSize(image.width, image.height);
                         const material: CanvasNodeData = {
                             id: nanoid(),
                             type: CanvasNodeType.Image,
