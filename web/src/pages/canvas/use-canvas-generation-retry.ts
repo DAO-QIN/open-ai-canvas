@@ -5,6 +5,9 @@ import { buildNodeGenerationContext, hydrateNodeGenerationContext } from "@/comp
 import { nodeGenerationPrompt } from "@/lib/canvas/generation-contract";
 import { imageLayerProviderMetadata, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { imageLayerOutputSize, imageLayerRemovalPrompt } from "@/lib/canvas/canvas-image-layer-plan";
+import { extractImageLayerFromSource } from "@/services/canvas-image-layer-source";
+import { buildSourceImageLayerNodeResult } from "@/lib/canvas/canvas-generation-task-sync";
+import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
 import { resolveImageRequestSize } from "@/services/api/image-validation";
 import { producedModelCandidateForGeneration } from "@/lib/canvas/produced-model";
 import type { CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
@@ -101,6 +104,28 @@ export function useCanvasGenerationRetry({
             // Canvas caches may predate the failure. Consult the original task
             // before deciding to submit another paid generation.
             let sourceTask: GenerationTask | undefined;
+            const localExtraction = node.metadata?.layerExtraction;
+            if (localExtraction?.strategy && localExtraction.strategy.method !== "generate") {
+                if (!localExtraction.source || !localExtraction.canvas) { message.error("本层原图资源或区域已丢失，请重新规划；没有提交模型请求"); return; }
+                const controller = startGenerationRequest(node.id, localExtraction.sourceNodeId, node.id);
+                setRunningNodeId(node.id);
+                setNodes((current) => current.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, status: "loading", errorDetails: undefined } } : item));
+                try {
+                    const image = await extractImageLayerFromSource(localExtraction.source, localExtraction.strategy, localExtraction.canvas);
+                    const completed = await buildSourceImageLayerNodeResult(node, image, controller.signal);
+                    if (!nodesRef.current.some((item) => item.id === node.id)) return;
+                    setNodes((current) => current.map((item) => item.id === node.id ? completed : item));
+                    try {
+                        const asset = await ensureCanvasNodeAsset({ canvasId: projectId, domainProjectId, node: completed, source: "canvas-manual" });
+                        if (!controller.signal.aborted) setNodes((current) => current.map((item) => item.id === node.id && item.metadata?.storageKey === completed.metadata?.storageKey ? { ...item, metadata: { ...item.metadata, assetId: asset.assetId } } : item));
+                    } catch (error) { message.warning(`图层已保存，但素材库写入失败：${error instanceof Error ? error.message : "未知错误"}`); }
+                } catch (error) {
+                    const details = error instanceof Error ? error.message : "原图提取失败";
+                    if (!controller.signal.aborted) message.error(details);
+                    setNodes((current) => current.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, status: "error", errorDetails: details } } : item));
+                } finally { finishGenerationRequest(node.id, controller); setRunningNodeId((current) => current === node.id ? null : current); }
+                return;
+            }
             if (node.metadata?.taskId) {
                 try {
                     sourceTask = await queryGenerationTask(node.metadata.taskId);
@@ -121,7 +146,7 @@ export function useCanvasGenerationRetry({
                 const extraction = node.metadata.layerExtraction;
                 const removing = extraction.phase === "background-removal-required" || extraction.phase === "remove-background";
                 const source = removing ? node : nodesRef.current.find((item) => item.id === extraction.sourceNodeId);
-                if (!source?.metadata?.content || !extraction.canvas) { message.error("本层源图或画布尺寸已丢失，无法单独重试"); return; }
+                if ((!source?.metadata?.content && (removing || !extraction.source)) || !extraction.canvas) { message.error("本层源图或画布尺寸已丢失，无法单独重试"); return; }
                 const model = removing ? extraction.backgroundRemovalModel || node.metadata.model : node.metadata.model;
                 if (!model) { message.error("本层未保存可用模型，请重新从源图规划"); return; }
                 const config = layerDecompositionConfig(buildGenerationConfig(effectiveConfig, node, "image"), model, { size: imageLayerOutputSize(effectiveConfig, model, extraction.canvas) });
@@ -134,8 +159,8 @@ export function useCanvasGenerationRetry({
                 const parent = nodesRef.current.find((item) => item.id === extraction.groupId);
                 const target = parent?.metadata?.experimentalLayerPlan?.requests.find((request) => request.nodeId === node.id)?.target || node.title;
                 const prompt = removing ? imageLayerRemovalPrompt(target) : nodeGenerationPrompt(node);
-                const reference = { id: source.id, name: `${source.title || "图层"}.png`, type: source.metadata.mimeType || "image/png", dataUrl: source.metadata.content, storageKey: source.metadata.storageKey };
-                const controller = startGenerationRequest(node.id, source.id, node.id);
+                const reference = !removing && extraction.source ? { id: extraction.sourceNodeId, name: "原图", type: extraction.source.mimeType || "image/png", ...extraction.source } : { id: source!.id, name: `${source!.title || "图层"}.png`, type: source!.metadata!.mimeType || "image/png", dataUrl: source!.metadata!.content!, storageKey: source!.metadata!.storageKey };
+                const controller = startGenerationRequest(node.id, extraction.sourceNodeId, node.id);
                 setRunningNodeId(node.id);
                 try {
                     if (sourceTask && (sourceTask.status === "queued" || sourceTask.status === "running")) {

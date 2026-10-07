@@ -322,8 +322,8 @@ export type CanvasNodeMetadata = {
     /** 拆层请求身份与画布展开位置分离，恢复任务时沿用同一结果消费流程。 */
     layerDecomposition?: { sourceNodeId: string; canvas?: { width: number; height: number } };
     /** 普通生图模型逐层提取；刷新只恢复已提交任务，不自动提交下一次付费请求。 */
-    experimentalLayerPlan?: { sourceNodeId: string; requests: Array<{ nodeId: string; target: string; removeFromBackground?: boolean }>; errorSignature?: string; composedSignature?: string; plannerModel?: string; planningTaskId?: string; progress?: string };
-    layerExtraction?: { sourceNodeId: string; groupId: string; index: number; allowBackgroundRemoval?: boolean; backgroundRemovalModel?: string; phase?: "extract" | "background-removal-required" | "remove-background" | "complete"; extractionTaskId?: string; rejectedTaskId?: string; canvas?: { width: number; height: number } };
+    experimentalLayerPlan?: { sourceNodeId: string; requests: Array<{ nodeId: string; target: string; removeFromBackground?: boolean; extraction?: import("@/lib/canvas/canvas-image-layer-strategy").ImageLayerExtraction }>; errorSignature?: string; composedSignature?: string; plannerModel?: string; planningTaskId?: string; progress?: string };
+    layerExtraction?: { sourceNodeId: string; groupId: string; index: number; strategy?: import("@/lib/canvas/canvas-image-layer-strategy").ImageLayerExtraction; source?: import("@/lib/canvas/canvas-image-layer-strategy").ImageLayerSource; backgroundPatch?: import("@/lib/canvas/canvas-image-layer-strategy").ImageLayerBackgroundPatch; allowBackgroundRemoval?: boolean; backgroundRemovalModel?: string; phase?: "extract" | "background-removal-required" | "remove-background" | "complete"; extractionTaskId?: string; rejectedTaskId?: string; canvas?: { width: number; height: number } };
     imageLayerGroup?: {
         width: number;
         height: number;

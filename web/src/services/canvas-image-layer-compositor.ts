@@ -2,10 +2,10 @@ import { inspectLayerAlpha, MAX_GROUP_PIXELS, MAX_IMAGE_LAYERS, MAX_LAYER_PIXELS
 import { getImageBlob } from "@/services/image-storage";
 import type { CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 
-type LayerInput = { dataUrl: string; storageKey?: string; width?: number; height?: number; bytes?: number; mimeType?: string };
+export type LayerInput = { dataUrl: string; storageKey?: string; width?: number; height?: number; bytes?: number; mimeType?: string };
 type DecodedLayer = { bitmap: ImageBitmap; blob: Blob; info: LayerRasterInfo };
 
-async function decodeLayer(input: LayerInput): Promise<DecodedLayer> {
+export async function decodeLayer(input: LayerInput): Promise<DecodedLayer> {
     let blob = input.storageKey ? await getImageBlob(input.storageKey) : null;
     if (!blob) {
         const response = await fetch(input.dataUrl);
@@ -30,7 +30,7 @@ async function decodeLayer(input: LayerInput): Promise<DecodedLayer> {
     }
 }
 
-function pngBlob(canvas: HTMLCanvasElement) {
+export function pngBlob(canvas: HTMLCanvasElement) {
     return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("图层合成 PNG 失败"))), "image/png"));
 }
 

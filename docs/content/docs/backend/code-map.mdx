@@ -61,6 +61,7 @@ description: 从产品功能快速定位主要代码入口
 | 历史树与独立只读预览 | `web/src/pages/canvas/canvas-version-history.tsx`、`canvas-version-preview.tsx`；后端 `internal/canvas/canvas_history.go` 与 `repository/canvas_history.go`，Agent 写入桥接在 `app/canvas_bridge.go` |
 | Patch 历史、生成任务和重试控制 | `web/src/pages/canvas/use-canvas-history.ts`、`use-canvas-generation.ts`、`use-canvas-generation-executor.ts`、`use-canvas-generation-retry.ts` |
 | 文本、图片、视频和音频生成执行 | `web/src/pages/canvas/canvas-*-generation-executor*.ts` |
+| AI 图层规划、原图提取与合成 | `web/src/lib/canvas/canvas-image-layer-plan.ts`、`canvas-image-layer-strategy.ts` 负责结构化计划与强校验；`web/src/services/canvas-image-layer-source.ts` 负责原图区域 PNG 与底图局部修补，`canvas-image-layer-extraction.ts` 负责并发及条件去背景，`canvas-image-layer-compositor.ts` 负责解码/尺寸/alpha/合成；弹窗编辑计划，`use-canvas-media-tools.ts` 编排，`canvas-generation-task-sync.ts` 消费持久任务，`use-canvas-generation-retry.ts` 区分免费原图重提取与模型重试 |
 | 云端 Agent、助手面板、导演台和全局快捷键控制 | `web/src/components/canvas/canvas-cloud-agent-panel.tsx`、`web/src/pages/canvas/use-canvas-assistant-visibility.ts`、`use-canvas-director.ts`、`use-canvas-keyboard.ts`；画布操作契约在 `web/src/lib/canvas/canvas-operation-contract.ts` |
 | 选择拖拽与连线控制 | `web/src/pages/canvas/use-canvas-selection-controller.ts`、`use-canvas-connection-controller.ts` |
 | 上传、素材插入、媒体工具和短剧编排 | `web/src/pages/canvas/use-canvas-upload.ts`、`use-canvas-timeline-asset-insert.ts`、`use-canvas-media-tools.ts`、`use-canvas-storyboard.ts`、`use-canvas-generation-batches.ts`、`use-canvas-short-drama.ts` |

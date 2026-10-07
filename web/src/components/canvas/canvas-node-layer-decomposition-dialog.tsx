@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, Checkbox, Input, Segmented, Tag } from "antd";
+import { Button, Checkbox, Input, Segmented, Select, Tag } from "antd";
 import { Layers3, Plus, RotateCcw, X } from "lucide-react";
 
 import { ModelPicker } from "@/components/model-picker";
@@ -10,11 +10,13 @@ import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanTargets, ty
 import { parseExperimentalLayerTargets, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { navigateToSettings } from "@/lib/settings-navigation";
+import { imageLayerModelCalls, resolveImageLayerExtractions, type ImageLayerExtraction, type ImageLayerRegion } from "@/lib/canvas/canvas-image-layer-strategy";
 
 export type CanvasImageLayerDecompositionPayload = {
     prompt: string;
     regions?: Array<[number, number, number, number]>;
     experimentalTargets?: string[];
+    extractions?: ImageLayerExtraction[];
     removeFromBackground?: boolean[];
     backgroundRemovalModel?: string;
     planning?: Pick<ImageLayerPlan, "model" | "taskId">;
@@ -49,6 +51,9 @@ export function CanvasNodeLayerDecompositionDialog({
     const [targetText, setTargetText] = useState("");
     const [detailMode, setDetailMode] = useState(false);
     const [backgroundRemovals, setBackgroundRemovals] = useState<boolean[]>([]);
+    const [extractionChoices, setExtractionChoices] = useState<ImageLayerExtraction[]>([]);
+    const [regionTexts, setRegionTexts] = useState<string[]>([]);
+    const [editingRegion, setEditingRegion] = useState<number | null>(null);
     const [plannerModel, setPlannerModel] = useState("");
     const [usePlanner, setUsePlanner] = useState(true);
     const [plan, setPlan] = useState<ImageLayerPlan>();
@@ -76,6 +81,7 @@ export function CanvasNodeLayerDecompositionDialog({
         setTargetText("");
         setDetailMode(false);
         setBackgroundRemovals([]);
+        setExtractionChoices([]); setRegionTexts([]); setEditingRegion(null);
         setPlannerModel(current.textModel || selectableModelsByCapability(current, "text")[0] || "");
         setUsePlanner(true);
         setPlan(undefined);
@@ -89,12 +95,7 @@ export function CanvasNodeLayerDecompositionDialog({
 
     const selectedModel = generationConfig.imageModel || generationConfig.model;
     const dedicated = supportsLayerDecomposition(config, selectedModel);
-    const supported = dedicated || (experimental && supportsExperimentalLayerExtraction(config, selectedModel));
-    const outputSizeError = generationConfig.size ? "" : "所选模型没有支持原图比例的尺寸，或源图尺寸尚未读取；请更换模型或重新打开图片";
     const plannerError = usePlanner && plannerModel ? imageLayerPlannerError(config, plannerModel) : "";
-    const removalError = experimental && !dedicated && removeBackground
-        ? !removalModel || !supportsExperimentalLayerExtraction(config, removalModel) ? "请选择可接收图片的去背景模型" : !imageLayerOutputSize(config, removalModel, sourceSize) ? "去背景模型没有支持原图比例的尺寸" : modelCompatibilityError(config, removalModel, { capability: "image", imageSize: imageLayerOutputSize(config, removalModel, sourceSize) })
-        : "";
     let experimentalTargets: string[] | undefined;
     let targetError = "";
     if (experimental && !dedicated) {
@@ -104,6 +105,31 @@ export function CanvasNodeLayerDecompositionDialog({
             targetError = targetText.trim() ? error instanceof Error ? error.message : "拆层目标无效" : "";
         }
     }
+    const removals = experimentalTargets?.map((_, i) => i > 0 && (backgroundRemovals[i] ?? i === 1));
+    let extractions: ImageLayerExtraction[] | undefined;
+    let extractionError = "";
+    if (experimentalTargets) {
+        try {
+            extractions = resolveImageLayerExtractions(experimentalTargets.length, experimentalTargets.map((_, i) => {
+                const choice = extractionChoices[i] || { method: "generate" as const };
+                if (choice.method !== "source-region") return choice;
+                return { ...choice, region: { shape: choice.region?.shape || "rect", radiusRatio: choice.region?.radiusRatio, bbox: parseRegionText(regionTexts[i] || "") } };
+            }), removals);
+        } catch (error) { extractionError = error instanceof Error ? error.message : "提取方式无效"; }
+    }
+    const needsModel = !experimentalTargets || (extractions || extractionChoices).some((extraction) => extraction.method === "generate") || !extractions;
+    const generatedObjects = extractions?.some((extraction, i) => i > 0 && extraction.method === "generate") ?? true;
+    const supported = !needsModel || dedicated || (experimental && supportsExperimentalLayerExtraction(config, selectedModel));
+    const outputSizeError = !needsModel || generationConfig.size ? "" : "所选模型没有支持原图比例的尺寸，或源图尺寸尚未读取；请更换模型或重新打开图片";
+    const removalError = experimental && !dedicated && removeBackground && generatedObjects
+        ? !removalModel || !supportsExperimentalLayerExtraction(config, removalModel) ? "请选择可接收图片的去背景模型" : !imageLayerOutputSize(config, removalModel, sourceSize) ? "去背景模型没有支持原图比例的尺寸" : modelCompatibilityError(config, removalModel, { capability: "image", imageSize: imageLayerOutputSize(config, removalModel, sourceSize) })
+        : "";
+
+    const changeExtraction = (index: number, method: ImageLayerExtraction["method"]) => {
+        setExtractionChoices((current) => experimentalTargets!.map((_, i) => i === index ? { method, ...(method === "source-region" ? { region: current[i]?.region || { shape: "rect", bbox: parseRegionText(regionTexts[i] || "") } } : {}) } : current[i] || { method: "generate" }));
+        setEditingRegion(null);
+        if (index === 0 && method === "source") setBackgroundRemovals(experimentalTargets!.map(() => false));
+    };
 
     const point = (event: ReactPointerEvent<HTMLDivElement>) => {
         const rect = imageFrameRef.current?.getBoundingClientRect();
@@ -134,7 +160,13 @@ export function CanvasNodeLayerDecompositionDialog({
     const finishBox = () => {
         if (!draft) return;
         const [x1, y1, x2, y2] = draft;
-        if (x2 - x1 >= 2 && y2 - y1 >= 2) { setRegions((current) => [...current, [Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2)]]); invalidatePlan(); }
+        if (x2 - x1 >= 2 && y2 - y1 >= 2) {
+            const box = [Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2)] as ImageLayerRegion["bbox"];
+            if (editingRegion !== null) {
+                setRegionTexts((current) => experimentalTargets!.map((_, i) => i === editingRegion ? box.join(" ") : current[i] || ""));
+                setEditingRegion(null);
+            } else { setRegions((current) => [...current, box]); invalidatePlan(); }
+        }
         setDrawing(null);
         setDraft(null);
     };
@@ -147,6 +179,7 @@ export function CanvasNodeLayerDecompositionDialog({
     const invalidatePlan = () => {
         planningRequest.current?.abort(); planningRequest.current = null;
         setPlanning(false); setPlan(undefined); setPlanningError("");
+        setExtractionChoices([]); setRegionTexts([]); setEditingRegion(null); setBackgroundRemovals([]);
     };
     const requestPlan = async (history = false) => {
         const error = history ? "" : imageLayerPlannerError(config, plannerModel);
@@ -159,6 +192,9 @@ export function CanvasNodeLayerDecompositionDialog({
             if (controller.signal.aborted || planningRequest.current !== controller) return;
             setPlan(result); setTargetText(imageLayerPlanTargets(result).join("\n"));
             setBackgroundRemovals(result.layers.map((layer) => Boolean(layer.removeFromBackground)));
+            setExtractionChoices(result.layers.map((layer) => layer.extraction || { method: "generate" }));
+            setRegionTexts(result.layers.map((layer) => (layer.extraction?.region?.bbox || layer.bbox)?.join(" ") || ""));
+            setEditingRegion(null);
         } catch (error) {
             if (!controller.signal.aborted) setPlanningError(error instanceof Error ? error.message : "识图规划失败，未提交拆图任务");
         } finally {
@@ -169,7 +205,7 @@ export function CanvasNodeLayerDecompositionDialog({
     return (
         <AppModal flush open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} centered width={900} title="AI 图层拆分">
             <div className="grid max-h-[82vh] gap-5 overflow-y-auto p-5 md:grid-cols-[minmax(0,1fr)_360px]" data-canvas-no-zoom>
-                <div className="grid min-h-[340px] place-items-center overflow-hidden rounded-xl bg-black/5 p-3 dark:bg-white/[0.04]">
+                <div className="grid min-h-[340px] place-items-center overflow-hidden rounded-xl bg-black/5 p-3 dark:bg-white/[0.04] md:sticky md:top-0 md:self-start">
                     <div
                         ref={imageFrameRef}
                         className="relative inline-block max-h-[60vh] max-w-full touch-none select-none"
@@ -184,6 +220,7 @@ export function CanvasNodeLayerDecompositionDialog({
                         <img src={dataUrl} alt="待拆分图片" className="block max-h-[60vh] max-w-full object-contain" draggable={false} />
                         <div className="pointer-events-none absolute inset-0">
                             {regions.map((region, index) => <RegionBox key={`${region.join("-")}-${index}`} region={region} label={index + 1} />)}
+                            {extractions?.map((extraction, index) => extraction.method === "source-region" && extraction.region ? <RegionBox key={`layer-${index}`} region={extraction.region.bbox} label={index + 1} shape={extraction.region.shape} radiusRatio={extraction.region.radiusRatio} imageAspect={sourceSize ? sourceSize.width / sourceSize.height : 1} /> : null)}
                             {draft ? <RegionBox region={draft} label={regions.length + 1} draft /> : null}
                         </div>
                     </div>
@@ -191,7 +228,7 @@ export function CanvasNodeLayerDecompositionDialog({
                 <div className="flex flex-col gap-4">
                     <div>
                         <h3 className="text-lg font-semibold">拆分图片图层</h3>
-                        <p className="mt-1 text-sm opacity-60">识图后按画面结构规划完整底图与透明对象，不固定题材或层数。结果收纳为一组，可叠放或展开；细节可继续拆分或提取备用素材。</p>
+                        <p className="mt-1 text-sm opacity-60">按结构选择原图区域提取或模型提取，保留完整底图与透明对象，不固定题材或层数。结果默认折叠为一组，可合成、展开并独立编辑。</p>
                     </div>
                     <Segmented block aria-label="拆分范围" value={detailMode ? "detail" : "primary"} options={[{ label: "自动拆分", value: "primary" }, { label: "详细拆分", value: "detail" }]} onChange={(value) => { setDetailMode(value === "detail"); invalidatePlan(); }} />
                     <div className="flex flex-wrap items-center gap-2">
@@ -239,14 +276,30 @@ export function CanvasNodeLayerDecompositionDialog({
                                 {plan?.warnings?.map((warning, index) => <p role="status" key={index} className="text-xs text-amber-600 dark:text-amber-400">{warning}</p>)}
                             </> : null}
                             <div className="text-sm">拆层目标（每行一层，第一层为背景底图）</div>
-                            <Input.TextArea aria-label="拆层目标" rows={4} readOnly={planning} value={targetText} placeholder="先识图规划，也可关闭规划后每行填写一层" onChange={(event) => setTargetText(event.target.value)} />
-                            {experimentalTargets?.slice(1).map((target, i) => <Checkbox key={i} className="!flex text-xs" checked={backgroundRemovals[i + 1] ?? i === 0} onChange={(event) => setBackgroundRemovals(experimentalTargets!.map((_, index) => index === i + 1 ? event.target.checked : backgroundRemovals[index] ?? index === 1))}>从底图移除第 {i + 2} 层：{target.split(/[：:]/)[0].slice(0, 40)}</Checkbox>)}
+                            <Input.TextArea aria-label="拆层目标" rows={4} readOnly={planning} value={targetText} placeholder="先识图规划，也可关闭规划后每行填写一层" onChange={(event) => { setTargetText(event.target.value); setExtractionChoices([]); setRegionTexts([]); setEditingRegion(null); setBackgroundRemovals([]); }} />
+                            {experimentalTargets?.map((target, i) => {
+                                const choice = extractionChoices[i] || { method: "generate" as const };
+                                return <div key={i} className="space-y-2 rounded-lg border border-[var(--border-default)] p-2">
+                                    <div className="text-xs font-medium">{i + 1}. {target.split(/[：:]/)[0].slice(0, 40)}</div>
+                                    <Select aria-label={`第${i + 1}层提取方式`} className="w-full" value={choice.method} disabled={planning} options={i === 0 ? [{ label: "模型修补完整底图", value: "generate" }, { label: "保留原图底图（不移除对象）", value: "source" }] : [{ label: "模型提取（复杂轮廓、遮挡补全）", value: "generate" }, { label: "原图区域提取（保留区域内全部像素）", value: "source-region" }]} onChange={(method) => changeExtraction(i, method)} />
+                                    {choice.method === "source-region" ? <>
+                                        <Select aria-label={`第${i + 1}层区域形状`} className="w-full" value={choice.region?.shape || "rect"} disabled={planning} options={[{ label: "矩形", value: "rect" }, { label: "圆角矩形", value: "rounded-rect" }, { label: "椭圆", value: "ellipse" }]} onChange={(shape) => setExtractionChoices((current) => current.map((item, index) => index === i ? { ...item, region: { bbox: parseRegionText(regionTexts[i] || ""), shape, ...(shape === "rounded-rect" ? { radiusRatio: item.region?.radiusRatio ?? 0.04 } : {}) } } : item))} />
+                                        <label className="block text-xs opacity-70">区域坐标（0–1000：左 上 右 下）<input aria-label={`第${i + 1}层区域坐标`} className="mt-1 w-full rounded border border-[var(--border-default)] bg-transparent px-2 py-1" value={regionTexts[i] || ""} disabled={planning} onChange={(event) => setRegionTexts((current) => experimentalTargets.map((_, index) => index === i ? event.target.value : current[index] || ""))} /></label>
+                                        {choice.region?.shape === "rounded-rect" ? <label className="block text-xs opacity-70">圆角占短边比例（0–0.5）<input aria-label={`第${i + 1}层圆角比例`} className="ml-2 w-20 rounded border border-[var(--border-default)] bg-transparent px-2 py-1" type="number" min={0} max={0.5} step={0.01} value={choice.region.radiusRatio ?? ""} onChange={(event) => setExtractionChoices((current) => current.map((item, index) => index === i ? { ...item, region: { ...item.region!, radiusRatio: event.target.value === "" ? undefined : Number(event.target.value) } } : item))} /></label> : null}
+                                        <Button size="small" aria-pressed={editingRegion === i} disabled={planning} onClick={() => setEditingRegion((current) => current === i ? null : i)}>在原图框选第 {i + 1} 层</Button>
+                                        <p className="text-xs opacity-70">区域内场景保持原样，区域外透明；不会抠除区域内部背景或补画遮挡。请核对边界。</p>
+                                    </> : null}
+                                    {i > 0 ? <Checkbox className="!flex text-xs" checked={removals![i]} disabled={planning} onChange={(event) => { setBackgroundRemovals(experimentalTargets.map((_, index) => index === i ? event.target.checked : backgroundRemovals[index] ?? index === 1)); if (event.target.checked && extractionChoices[0]?.method === "source") setExtractionChoices((current) => current.map((item, index) => index === 0 ? { method: "generate" } : item)); }}>从底图移除第 {i + 1} 层</Checkbox> : null}
+                                </div>;
+                            })}
+                            {editingRegion !== null ? <p role="status" className="text-xs opacity-70">在左侧拖动框选第 {editingRegion + 1} 层的完整区域；本次框选替换该层坐标。</p> : null}
+                            {extractionError ? <p role="alert" className="text-xs text-red-500">{extractionError}。未提交模型请求。</p> : null}
                             {experimentalTargets ? <p className="text-xs opacity-70">未勾选的细节仍保留在底图，透明副本可作叠加或备用素材。移动、替换或删除这类对象时，需另修补底图中的原对象；合成不保证逐像素还原。</p> : null}
-                            <p className="text-xs opacity-70">{sourceSize ? `锁定原图画布 ${sourceSize.width}×${sourceSize.height}；` : ""}模型请求尺寸 {generationConfig.size || "未支持"}。各层统一保存为原图尺寸与比例；仅归一化 1% 内的模型尺寸取整差，明显比例变化直接报错。生成模型仍不保证原始内容与坐标完全不变。</p>
-                            <Checkbox checked={removeBackground} onChange={(event) => setRemoveBackground(event.target.checked)}>非透明前景层自动去背景（每层最多一次）</Checkbox>
-                            {removeBackground ? <ModelPicker config={config} value={removalModel} capability="image" fullWidth placeholder="选择去背景模型" showSelectedPrice modelFilter={(model) => supportsExperimentalLayerExtraction(config, model) && !supportsLayerDecomposition(config, model)} onChange={setRemovalModel} /> : null}
+                            <p className="text-xs opacity-70">{sourceSize ? `锁定原图画布 ${sourceSize.width}×${sourceSize.height}。` : ""}原图提取保持原始像素位置与大小；模型提取请求尺寸 {generationConfig.size || "未支持"}，保存时仅归一化 1% 内的尺寸取整差，明显比例变化报错。模型提取仍可能改变内容与坐标。</p>
+                            <Checkbox checked={removeBackground} disabled={!generatedObjects} onChange={(event) => setRemoveBackground(event.target.checked)}>非透明前景层自动去背景（每层最多一次）</Checkbox>
+                            {removeBackground && generatedObjects ? <ModelPicker config={config} value={removalModel} capability="image" fullWidth placeholder="选择去背景模型" showSelectedPrice modelFilter={(model) => supportsExperimentalLayerExtraction(config, model) && !supportsLayerDecomposition(config, model)} onChange={setRemovalModel} /> : null}
                             {removalError ? <p role="alert" className="text-xs text-red-500">{removalError}</p> : null}
-                            <p className="text-xs opacity-70">各图层同时提交提取，本层需要时再去背景；最多 {experimentalTargets ? experimentalTargets.length + (removeBackground ? experimentalTargets.length - 1 : 0) : removeBackground ? "3–15" : "2–8"} 次图片调用，分别计费。一层失败不阻断其他已提交图层；不自动付费重试。实际执行受服务器及渠道并发额度限制。刷新不续发未提交阶段。结果收纳为一组，默认折叠。</p>
+                            <p className="text-xs opacity-70">各层并发处理；原图提取不调用图片模型。{extractions ? `最多 ${imageLayerModelCalls(extractions, removeBackground)} 次图片模型调用` : "图片调用上限将在计划有效后显示"}，按实际调用分别计费。模型前景层需要时再去背景。一层失败保留其他结果，不自动付费重试；实际执行受服务器及渠道并发额度限制。刷新不续发未提交阶段。结果收纳为一组，默认折叠。</p>
                             {targetError ? <p className="text-xs text-red-500">{targetError}</p> : null}
                         </div>
                     ) : null}
@@ -258,8 +311,8 @@ export function CanvasNodeLayerDecompositionDialog({
                         <Button
                             type="primary"
                             icon={<Layers3 className="size-4" />}
-                            disabled={!prompt.trim() || !supported || !dataUrl || Boolean(drawing) || Boolean(targetError) || Boolean(outputSizeError) || Boolean(removalError) || planning || (experimental && !dedicated && (!experimentalTargets || (usePlanner && (!plan || Boolean(plannerError)))))}
-                            onClick={() => onConfirm({ prompt: selectedPrompt, regions, experimentalTargets, removeFromBackground: experimentalTargets?.map((_, i) => i > 0 && (backgroundRemovals[i] ?? i === 1)), backgroundRemovalModel: experimental && !dedicated && removeBackground ? removalModel : undefined, planning: usePlanner ? plan : undefined, generationConfig: { model: selectedModel, imageModel: selectedModel, size: generationConfig.size, quality: generationConfig.quality } })}
+                            disabled={!prompt.trim() || !supported || !dataUrl || Boolean(drawing) || editingRegion !== null || Boolean(targetError) || Boolean(extractionError) || Boolean(outputSizeError) || Boolean(removalError) || planning || (experimental && !dedicated && (!experimentalTargets || (usePlanner && (!plan || Boolean(plannerError)))))}
+                            onClick={() => onConfirm({ prompt: selectedPrompt, regions, experimentalTargets, extractions, removeFromBackground: removals, backgroundRemovalModel: experimental && !dedicated && removeBackground && generatedObjects ? removalModel : undefined, planning: usePlanner ? plan : undefined, generationConfig: { model: selectedModel, imageModel: selectedModel, size: generationConfig.size, quality: generationConfig.quality } })}
                         >
                             开始拆分
                         </Button>
@@ -270,7 +323,12 @@ export function CanvasNodeLayerDecompositionDialog({
     );
 }
 
-function RegionBox({ region, label, draft = false }: { region: [number, number, number, number]; label: number; draft?: boolean }) {
+function parseRegionText(value: string) {
+    return value.trim().split(/[,，\s]+/).filter(Boolean).map(Number) as ImageLayerRegion["bbox"];
+}
+
+function RegionBox({ region, label, draft = false, shape, radiusRatio, imageAspect = 1 }: { region: [number, number, number, number]; label: number; draft?: boolean; shape?: ImageLayerRegion["shape"]; radiusRatio?: number; imageAspect?: number }) {
     const [x1, y1, x2, y2] = region;
-    return <div className={`absolute rounded-sm border-2 ${draft ? "border-dashed border-blue-500 bg-blue-500/10" : "border-solid border-amber-400 bg-amber-400/10"}`} style={{ left: `${x1 / 10}%`, top: `${y1 / 10}%`, width: `${(x2 - x1) / 10}%`, height: `${(y2 - y1) / 10}%` }}><span className="absolute -left-0.5 -top-0.5 grid size-5 -translate-y-1/2 -translate-x-1/2 place-items-center rounded-full bg-amber-400 text-[11px] font-semibold text-black shadow">{label}</span></div>;
+    const w = (x2 - x1) * imageAspect, h = y2 - y1, radius = Math.min(w, h) * (radiusRatio || 0);
+    return <div className={`absolute rounded-sm border-2 ${draft ? "border-dashed border-blue-500 bg-blue-500/10" : "border-solid border-amber-400 bg-amber-400/10"}`} style={{ left: `${x1 / 10}%`, top: `${y1 / 10}%`, width: `${(x2 - x1) / 10}%`, height: `${(y2 - y1) / 10}%`, ...(shape === "ellipse" ? { borderRadius: "50%" } : shape === "rounded-rect" ? { borderRadius: `${radius / w * 100}% / ${radius / h * 100}%` } : {}) }}><span className="absolute -left-0.5 -top-0.5 grid size-5 -translate-y-1/2 -translate-x-1/2 place-items-center rounded-full bg-amber-400 text-[11px] font-semibold text-black shadow">{label}</span></div>;
 }

@@ -19,13 +19,14 @@ import type { CanvasVideoFrameParams } from "@/components/canvas/canvas-video-fr
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
 import { cropDataUrl, splitDataUrl, upscaleDataUrl } from "@/lib/canvas/canvas-image-data";
 import { isValidGridSplit, layoutGridSplitCells } from "@/lib/canvas/canvas-grid-split";
-import { audioMetadata, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-generation-task-sync";
+import { audioMetadata, buildSourceImageLayerNodeResult, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-generation-task-sync";
 import { commitProducedModel } from "@/lib/canvas/produced-model";
 import { findAvailableGenerationGroupPosition, imageGenerationChildPosition, imageGenerationGroupSize } from "@/lib/canvas/canvas-generation-layout";
 import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-submission";
 import { cancelIncompleteImageBatch } from "@/lib/canvas/canvas-image-batch-retry";
 import { experimentalLayerPrompt, imageLayerProviderMetadata, parseExperimentalLayerTargets, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { imageLayerOutputSize, imageLayerPlannerError, imageLayerPlanningPrompt, parseImageLayerPlan, type ImageLayerPlanningOptions } from "@/lib/canvas/canvas-image-layer-plan";
+import { imageLayerBackgroundPatch, imageLayerExtractionTargets, resolveImageLayerExtractions, type ImageLayerExtraction } from "@/lib/canvas/canvas-image-layer-strategy";
 import { buildAngleLabel, buildAnglePrompt, createCanvasNode } from "@/lib/canvas/canvas-project-domain";
 import { validateVideoSegmentBatch } from "@/lib/canvas/canvas-video-regeneration";
 import { resolveCanvasStyleExecution } from "@/lib/canvas/canvas-style-execution";
@@ -1019,11 +1020,24 @@ export function useCanvasMediaTools({
             const selectedModel = payload.generationConfig?.model || payload.generationConfig?.imageModel || baseGenerationConfig.model;
             const generationConfig = layerDecompositionConfig(baseGenerationConfig, selectedModel, payload.generationConfig);
             const experimental = Boolean(payload.experimentalTargets);
-            if (!supportsLayerDecomposition(generationConfig, selectedModel) && !(experimental && supportsExperimentalLayerExtraction(generationConfig, selectedModel))) {
+            let targets: string[] | undefined;
+            let extractions: ImageLayerExtraction[] | undefined;
+            let removeFromBackground: boolean[] | undefined;
+            try {
+                if (experimental) {
+                    targets = parseExperimentalLayerTargets(payload.experimentalTargets!.join("\n"));
+                    removeFromBackground = targets.map((_, index) => index > 0 && (payload.removeFromBackground?.[index] ?? index === 1));
+                    extractions = resolveImageLayerExtractions(targets.length, payload.extractions, removeFromBackground);
+                    targets = imageLayerExtractionTargets(targets, extractions);
+                }
+            } catch (error) { message.error(generationErrorMessage(error)); return; }
+            const needsModel = !experimental || extractions!.some((extraction) => extraction.method === "generate");
+            const hasGeneratedObjects = extractions?.some((extraction, index) => index > 0 && extraction.method === "generate");
+            if (needsModel && !supportsLayerDecomposition(generationConfig, selectedModel) && !(experimental && supportsExperimentalLayerExtraction(generationConfig, selectedModel))) {
                 message.error("请选择支持独立透明图层输出的专用拆层模型");
                 return;
             }
-            if (!isAiConfigReady(generationConfig, generationConfig.model)) {
+            if (needsModel && !isAiConfigReady(generationConfig, generationConfig.model)) {
                 navigateToSettings({ continueCreation: true });
                 return;
             }
@@ -1034,16 +1048,17 @@ export function useCanvasMediaTools({
                 const info = await inspectImageLayer(source);
                 if (!info.nonempty) throw new Error("源图是完全透明的空图");
                 sourceCanvas = { width: info.width, height: info.height };
-                generationConfig.size = imageLayerOutputSize(generationConfig, selectedModel, sourceCanvas);
-                if (!generationConfig.size) throw new Error("所选拆层模型没有支持原图比例的尺寸，请选择其他模型");
-                const profile = modelCapabilityConfigFor(generationConfig, selectedModel).image;
+                generationConfig.size = needsModel ? imageLayerOutputSize(generationConfig, selectedModel, sourceCanvas) : `${info.width}x${info.height}`;
+                if (needsModel && !generationConfig.size) throw new Error("所选拆层模型没有支持原图比例的尺寸，请选择其他模型");
+                if (extractions?.[0].method === "source" && !info.opaque) throw new Error("原图含透明区域，不能直接作为完整不透明底图，请选择模型修补底图");
+                const profile = needsModel && modelCapabilityConfigFor(generationConfig, selectedModel).image;
                 // 持久化任务先经过服务端配置校验，必须提交已解析的协议尺寸，不能只校验后仍发送比例字符串。
                 if (profile) generationConfig.size = resolveImageRequestSize(profile, generationConfig.quality, generationConfig.size)?.value || "auto";
             } catch (error) { message.error(generationErrorMessage(error)); return; }
             if (layerSubmissionIds.current.has(node.id)) return;
             const liveSource = nodesRef.current.find((item) => item.id === node.id);
             if (!liveSource || liveSource.metadata?.content !== node.metadata.content || liveSource.metadata?.storageKey !== node.metadata.storageKey) { message.error("源图已更改或删除，请重新发起拆层"); return; }
-            const removalConfig = payload.backgroundRemovalModel
+            const removalConfig = hasGeneratedObjects && payload.backgroundRemovalModel
                 ? layerDecompositionConfig({ ...baseGenerationConfig, ...defaultImageParamsForModel(baseGenerationConfig, payload.backgroundRemovalModel) }, payload.backgroundRemovalModel, { size: imageLayerOutputSize(baseGenerationConfig, payload.backgroundRemovalModel, sourceCanvas) })
                 : undefined;
             if (removalConfig && (!supportsExperimentalLayerExtraction(removalConfig, removalConfig.model) || !isAiConfigReady(removalConfig, removalConfig.model))) {
@@ -1057,22 +1072,13 @@ export function useCanvasMediaTools({
                 if (profile && removalConfig) removalConfig.size = resolveImageRequestSize(profile, removalConfig.quality, removalConfig.size)?.value || "auto";
             } catch (error) { message.error(generationErrorMessage(error)); return; }
             const prompt = payload.prompt.trim();
-            let targets: string[] | undefined;
-            if (experimental) {
-                try {
-                    targets = parseExperimentalLayerTargets(payload.experimentalTargets!.join("\n"));
-                } catch (error) {
-                    message.error(error instanceof Error ? error.message : "拆层目标无效");
-                    return;
-                }
-            }
             const taskNodeId = nanoid();
             const imageSize = { width: node.width, height: node.height };
             const position = findAvailableGenerationGroupPosition(nodesRef.current, { x: node.position.x + node.width + 96, y: node.position.y }, imageSize);
             const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [source]);
             layerSubmissionIds.current.add(node.id);
-            const removeFromBackground = targets?.map((_, index) => index > 0 && (payload.removeFromBackground?.[index] ?? index === 1));
-            const requests = targets?.map((target, index) => ({ nodeId: nanoid(), target, removeFromBackground: removeFromBackground![index] }));
+            const requests = targets?.map((target, index) => ({ nodeId: nanoid(), target, removeFromBackground: removeFromBackground![index], extraction: extractions![index] }));
+            const backgroundPatch = extractions && imageLayerBackgroundPatch({ dataUrl: source.dataUrl, storageKey: source.storageKey }, extractions, removeFromBackground!);
             const taskNode: CanvasNodeData = {
                 id: taskNodeId,
                 type: CanvasNodeType.Image,
@@ -1087,6 +1093,7 @@ export function useCanvasMediaTools({
                     pluginNodeId: "layer-decomposition",
                     ...(requests ? { experimentalLayerPlan: { sourceNodeId: node.id, requests, plannerModel: payload.planning?.model, planningTaskId: payload.planning?.taskId, progress: `并发拆层：0/${requests.length} 层完成` }, isBatchRoot: true, batchChildIds: requests.map((request) => request.nodeId), imageBatchExpanded: false } : { layerDecomposition: { sourceNodeId: node.id, canvas: sourceCanvas } }),
                     ...generationMetadata,
+                    ...(!needsModel ? { model: undefined, producedModelCandidate: undefined } : {}),
                 },
             };
             const extractionNodes: CanvasNodeData[] = (requests || []).map((request, index) => {
@@ -1094,7 +1101,7 @@ export function useCanvasMediaTools({
                 return {
                     id: request.nodeId,
                     type: CanvasNodeType.Image,
-                    title: `实验提取 ${index + 1} · ${request.target}`,
+                    title: `${request.extraction.method === "generate" ? "模型提取" : "原图提取"} ${index + 1} · ${request.target}`,
                     ...imageSize,
                     position: imageGenerationChildPosition(position, imageSize.width, imageSize, index),
                     metadata: {
@@ -1102,7 +1109,7 @@ export function useCanvasMediaTools({
                         ...buildImageGenerationMetadata("edit", { ...generationConfig, transparentBackground: index > 0 ? "true" : "false" }, 1, [source]),
                         status: NODE_STATUS_LOADING,
                         batchRootId: taskNodeId,
-                        layerExtraction: { sourceNodeId: node.id, groupId: taskNodeId, index, phase: "extract", canvas: sourceCanvas, allowBackgroundRemoval: Boolean(removalConfig), backgroundRemovalModel: removalConfig?.model },
+                        layerExtraction: { sourceNodeId: node.id, groupId: taskNodeId, index, phase: "extract", canvas: sourceCanvas, strategy: request.extraction, source: { dataUrl: source.dataUrl, storageKey: source.storageKey, mimeType: source.type }, ...(index === 0 && backgroundPatch ? { backgroundPatch } : {}), allowBackgroundRemoval: Boolean(removalConfig) && request.extraction.method === "generate", backgroundRemovalModel: removalConfig?.model },
                     },
                 };
             });
@@ -1120,7 +1127,7 @@ export function useCanvasMediaTools({
                     let observedGroup = false;
                     const phases = requests.map(() => "extract");
                     await runImageLayerExtraction({
-                        source, targets, removeFromBackground, prompt, config: generationConfig, removalConfig, signal: controller.signal,
+                        source, targets, extractions, removeFromBackground, prompt, config: generationConfig, removalConfig, signal: controller.signal,
                         assertActive: (index) => {
                             const present = nodesRef.current.some((item) => item.id === taskNodeId);
                             if (present) observedGroup = true;
@@ -1131,6 +1138,17 @@ export function useCanvasMediaTools({
                             const count = (value: string) => phases.filter((item) => item === value).length;
                             const progress = `并发拆层：${count("complete")}/${requests.length} 层完成，提取 ${count("extract")}，去背景 ${count("remove-background")}${count("error") ? `，失败 ${count("error")}` : ""}`;
                             setNodes((current) => current.map((item) => item.id === taskNodeId && item.metadata?.experimentalLayerPlan ? { ...item, metadata: { ...item.metadata, experimentalLayerPlan: { ...item.metadata.experimentalLayerPlan, progress } } } : item));
+                        },
+                        onLocalResult: async (index, image) => {
+                            const targetId = requests[index].nodeId;
+                            const current = nodesRef.current.find((item) => item.id === targetId) || extractionNodes[index];
+                            const completed = await buildSourceImageLayerNodeResult(current, image, controller.signal);
+                            if (!nodesRef.current.some((item) => item.id === targetId) || controller.signal.aborted) throw new Error("拆层节点已删除或停止，本层结果不再写入");
+                            setNodes((items) => items.map((item) => item.id === targetId ? completed : item));
+                            await persistMediaNodes([completed]);
+                        },
+                        onLayerError: (index, error) => {
+                            setNodes((current) => current.map((item) => item.id === requests[index].nodeId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: generationErrorMessage(error) } } : item));
                         },
                         runStage: async ({ index, stage, prompt: stagePrompt, config: stageConfig, reference, canvas }) => {
                         const targetId = requests[index].nodeId;
@@ -1196,6 +1214,7 @@ export function useCanvasMediaTools({
             message,
             nodesRef,
             projectId,
+            persistMediaNodes,
             setConnections,
             setDialogNodeId,
             setNodes,

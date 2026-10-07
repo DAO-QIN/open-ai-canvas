@@ -3,6 +3,8 @@ import { imageLayerRemovalPrompt } from "@/lib/canvas/canvas-image-layer-plan";
 import { inspectImageLayer, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
 import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
+import { resolveImageLayerExtractions, type ImageLayerExtraction } from "@/lib/canvas/canvas-image-layer-strategy";
+import { extractImageLayerFromSource } from "@/services/canvas-image-layer-source";
 
 export type ImageLayerStage = "extract" | "remove-background";
 type LayerImage = { dataUrl: string; storageKey?: string; width?: number; height?: number; bytes?: number; mimeType?: string };
@@ -19,6 +21,7 @@ export type ImageLayerStageRequest = {
 export async function runImageLayerExtraction({
     source,
     targets,
+    extractions,
     removeFromBackground,
     prompt,
     config,
@@ -27,9 +30,12 @@ export async function runImageLayerExtraction({
     assertActive,
     runStage,
     onProgress,
+    onLocalResult,
+    onLayerError,
 }: {
     source: ReferenceImage;
     targets: string[];
+    extractions?: ImageLayerExtraction[];
     removeFromBackground?: boolean[];
     prompt: string;
     config: AiConfig;
@@ -38,8 +44,13 @@ export async function runImageLayerExtraction({
     assertActive(index: number): void;
     runStage(request: ImageLayerStageRequest): Promise<{ images?: LayerImage[] }>;
     onProgress?(index: number, phase: ImageLayerStage | "complete" | "error"): void;
+    onLocalResult?(index: number, image: LayerImage): Promise<void>;
+    onLayerError?(index: number, error: unknown): void;
 }) {
     parseExperimentalLayerTargets(targets.join("\n"));
+    const methods = resolveImageLayerExtractions(targets.length, extractions, removeFromBackground);
+    if (methods.some((extraction) => extraction.method !== "generate") && !onLocalResult) throw new Error("原图提取结果保存回调缺失，未提交模型请求");
+    if (signal.aborted) throw new DOMException("拆层已停止", "AbortError");
     const sourceInfo = await inspectImageLayer(source);
     if (!sourceInfo.nonempty) throw new Error("源图是完全透明的空图");
     const canvas = { width: sourceInfo.width, height: sourceInfo.height };
@@ -59,6 +70,14 @@ export async function runImageLayerExtraction({
             try {
                 check(index);
                 onProgress?.(index, "extract");
+                if (methods[index].method !== "generate") {
+                    const image = await extractImageLayerFromSource(source, methods[index], canvas);
+                    check(index);
+                    await onLocalResult!(index, image);
+                    check(index);
+                    onProgress?.(index, "complete");
+                    return;
+                }
                 let result = await inspect(
                     (await runStage({ index, stage: "extract", prompt: experimentalLayerPrompt(prompt, targets, index, removeFromBackground), config: { ...config, count: "1", transparentBackground: index > 0 ? "true" : "false" }, reference: source, canvas })).images,
                 );
@@ -85,6 +104,7 @@ export async function runImageLayerExtraction({
                 validateImageLayerRole(result.info, index);
                 onProgress?.(index, "complete");
             } catch (error) {
+                onLayerError?.(index, error);
                 onProgress?.(index, "error");
                 throw error;
             }

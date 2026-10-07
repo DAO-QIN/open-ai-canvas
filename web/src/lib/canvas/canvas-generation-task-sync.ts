@@ -16,6 +16,8 @@ import { applyGenerationConsumerEffect, generationEffectApplied } from "@/servic
 import { commitProducedModel } from "@/lib/canvas/produced-model";
 import { experimentalLayerSignature, hasUsableLayerTransparency, imageLayerCompositeSignature, validateImageLayerRole } from "@/lib/canvas/canvas-image-layers";
 import { composeCanvasImageLayerGroup, decodeAndComposeImageLayers, inspectImageLayer, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
+import { patchImageLayerBackground } from "@/services/canvas-image-layer-source";
+import { resetGenerationTaskMetadata } from "@/lib/canvas/canvas-task-state";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
 
 export function generationTaskInput(task: GenerationTask) {
@@ -125,6 +127,19 @@ export function applyGeneratedMediaResultMetadata(node: CanvasNodeData, media: C
     }, fallbackModel);
 }
 
+export async function buildSourceImageLayerNodeResult(node: CanvasNodeData, image: { dataUrl: string }, signal: AbortSignal): Promise<CanvasNodeData> {
+    const extraction = node.metadata?.layerExtraction;
+    if (!extraction?.strategy || extraction.strategy.method === "generate") throw new Error("本层不是原图提取结果");
+    if ((extraction.index === 0) !== (extraction.strategy.method === "source")) throw new Error("原图提取方式与本层角色不一致");
+    if (signal.aborted) throw new DOMException("拆层已停止", "AbortError");
+    const uploaded = await uploadImage(image.dataUrl);
+    if (signal.aborted) throw new DOMException("拆层已停止", "AbortError");
+    return { ...node, metadata: applyGeneratedMediaResultMetadata({ ...node, metadata: resetGenerationTaskMetadata(node.metadata) }, imageMetadata(uploaded), {
+        model: undefined, producedModelCandidate: undefined, producedModel: undefined,
+        layerExtraction: { ...extraction, phase: "complete", rejectedTaskId: undefined, extractionTaskId: undefined },
+    }) };
+}
+
 export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: GenerationTask, nodes: CanvasNodeData[] = [node], outputIndex = 0): Promise<CanvasNodeData> {
     const mode = generationTaskMode(task, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image");
     const prompt = node.metadata?.prompt || task.prompt;
@@ -142,6 +157,7 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
             if (extraction?.canvas && (info.width !== extraction.canvas.width || info.height !== extraction.canvas.height)) throw new Error("图层尺寸与底图不一致，已停止后续调用");
             needsRemoval = Boolean(extraction?.index && !hasUsableLayerTransparency(info) && extraction.allowBackgroundRemoval && extraction.phase === "extract");
             if (!needsRemoval) validateImageLayerRole(info, extraction!.index);
+            if (extraction?.index === 0 && extraction.backgroundPatch) result.images[0] = await patchImageLayerBackground(normalized.image, extraction.backgroundPatch);
             extraction = { ...extraction!, phase: needsRemoval ? "background-removal-required" : "complete", extractionTaskId: extraction?.phase === "extract" ? task.id : extraction?.extractionTaskId, rejectedTaskId: undefined };
         }
         const image = result.images?.[outputIndex];
@@ -293,7 +309,7 @@ export async function applyMaterializedGenerationTaskResultToNodes(nodes: Canvas
     }
     const { node: updatedNode, additionalNodes } = await buildGenerationTaskNodeResults(node, { ...task, resultJson: JSON.stringify(result) }, nodes);
     const stamp = (item: CanvasNodeData) => ({ ...item, metadata: applyGenerationConsumerEffect(item.metadata || {}, effectKey, (metadata) => metadata).value });
-    const durableNode = stamp({ ...updatedNode, metadata: { ...updatedNode.metadata, assetId: updatedNode.metadata?.assetId || (updatedNode.metadata?.imageLayerGroup ? undefined : asset.id) } });
+    const durableNode = stamp({ ...updatedNode, metadata: { ...updatedNode.metadata, assetId: updatedNode.metadata?.assetId || (updatedNode.metadata?.imageLayerGroup || (updatedNode.metadata?.layerExtraction && updatedNode.metadata.storageKey !== asset.data.storageKey) ? undefined : asset.id) } });
     const durableChildren = additionalNodes.map(stamp);
     return {
         nodes: commitCanvasGenerationResult(nodes, node, durableNode, task.id, durableChildren),
