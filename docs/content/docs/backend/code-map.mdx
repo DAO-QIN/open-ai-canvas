@@ -5,7 +5,7 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
-AI 拆图的编辑目的与语义工具约束位于 `web/src/lib/canvas/canvas-image-layer-plan.ts`（`applyImageLayerPlanningPurpose`）；页面 `use-canvas-media-tools.ts` 对新规划和历史规划使用同一约束后再进行边界校准。连续照片不自动输出局部矩形碎片，完整嵌入场景保留原像素。弹窗只编排选择、预览与高级设置。节点标题由 `imageLayerTargetName` 提取短名称，生成计划仍保留完整描述。`canvas-generation-task-sync.ts` 按移除标记设置初始可见性并据此生成首张合成图。`canvas-node-size.ts` 的 `fitImageMaterialNodeSize` 在素材创建和 `canvas-node-media-content.tsx` 解码后复用，避免极宽素材撑大布局；不增加后端或模型协议。
+AI 拆图的编辑目的与语义工具约束位于 `web/src/lib/canvas/canvas-image-layer-plan.ts`（`applyImageLayerPlanningPurpose`）；页面 `use-canvas-media-tools.ts` 对新规划和历史规划使用同一约束后再进行边界校准。默认 `recompose` 输出修补后的不透明背景与必要前景；明确选择 `materials` 才保留原图副本。连续照片不自动输出局部矩形碎片，完整嵌入场景保留原像素。弹窗只编排选择、预览与高级设置，默认不自动另存第二组素材；`canvas-image-layer-controls.tsx` 提供完成后免费另存入口。节点标题由 `imageLayerTargetName` 提取短名称，生成计划仍保留完整描述。`canvas-generation-task-sync.ts` 按移除标记设置初始可见性并据此生成首张合成图。`canvas-node-size.ts` 的 `fitImageMaterialNodeSize` 在素材创建和 `canvas-node-media-content.tsx` 解码后复用，避免极宽素材撑大布局；不增加后端或模型协议。
 
 ## 968API SD 视频
 
