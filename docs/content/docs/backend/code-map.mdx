@@ -159,6 +159,7 @@ HTTP 请求 -> handler -> service（稳定导入面 / 别名）-> app（组合�
 - 旧版 `canvas-agent/` 和 Codex App/MCP 插件已删除；Agent 运行统一由后端云端控制面承载。
 - `docs/content/docs/`：产品、操作、开发和进度文档。
 - `docker-compose.local.yml`：本地前后端编排；`nginx.conf`：生产静态资源和 API 代理。
+- `/inspirations` 与 `/inspirations/` 精确匹配 SPA 页面，`/inspirations/*.json` 继续提供静态目录内容，避免页面刷新被同名目录重定向到容器端口。部署前可运行 `python3 scripts/test_nginx_spa_routes.py --image <已构建的 Web 镜像>`，使用真实产物验证页面、目录 JSON 和入口资源；测试容器不暴露端口。
 
 ## 修改原则
 
