@@ -282,7 +282,7 @@ async function connectCdp(cdpPort) {
             if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return null;
             const hit = document.elementFromPoint(x, y);
             if (!hit || (hit !== el && !el.contains(hit))) return null;
-            return { x: Math.round(x), y: Math.round(y) };
+            return { x: Math.round(x), y: Math.round(y), button: el.textContent?.trim().slice(0, 50), hit: hit.tagName, hitText: hit.textContent?.trim().slice(0, 50), animations: el.getAnimations().map(a => ({playState:a.playState,currentTime:a.currentTime})) };
         })()`);
         // 目标必须"站稳"再点：AntD 弹窗/抽屉有约 200ms 入场动画，只要求相邻两次读数相同
         // 会在动画刚开始、坐标还没动的那一拍就下判定，真正派发鼠标事件时控件已经移位 ——
@@ -313,6 +313,7 @@ async function connectCdp(cdpPort) {
         await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point, buttons: 0 });
         await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, buttons: 1, clickCount: 1 });
         await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, buttons: 0, clickCount: 1 });
+        if (label.includes("留在预演台")) console.log("F6 target geometry", JSON.stringify(box));
         return true;
     };
 
@@ -697,6 +698,15 @@ async function saveFailureCloseGuard(cdp, baseUrl) {
     console.log("\n=== F. save failure and close guard ===");
     await cdp.navigateFresh(`${baseUrl}/dev/previs-repro`);
 
+    await cdp.evaluate(`(() => {
+        window.__previsClickEvidence = [];
+        for (const type of ['pointerdown', 'pointerup', 'click']) document.addEventListener(type, (e) => {
+            const button = e.target.closest?.('button');
+            window.__previsClickEvidence.push({type, trusted:e.isTrusted, x:e.clientX, y:e.clientY, tag:e.target.tagName, button:button?.textContent?.trim().slice(0,50), modal:!!e.target.closest?.('.ant-modal-confirm')});
+        }, true);
+        return true;
+    })()`);
+
     const toggledFailure = await cdp.click('[data-testid="force-save-failure"]');
     if (!toggledFailure) throw new Error("F: force-save-failure switch not clickable");
     const failureOn = await cdp.poll(`document.querySelector('[data-testid="force-save-failure"]')?.getAttribute('aria-checked') === 'true'`, "failure switch on", 15000);
@@ -739,6 +749,7 @@ async function saveFailureCloseGuard(cdp, baseUrl) {
         20000,
     );
     assert(modalGone, "F6 confirm dialog dismissed after choosing 留在预演台");
+    console.log("F6 click evidence", JSON.stringify(await cdp.evaluate(`({events:window.__previsClickEvidence, modals:[...document.querySelectorAll('.ant-modal-confirm')].map(m=>({rect:m.getBoundingClientRect().toJSON(),display:getComputedStyle(m).display,visibility:getComputedStyle(m).visibility,opacity:getComputedStyle(m).opacity,classes:m.className,ancestors:[m.parentElement,m.parentElement?.parentElement].filter(Boolean).map(p=>({classes:p.className,display:getComputedStyle(p).display,visibility:getComputedStyle(p).visibility,opacity:getComputedStyle(p).opacity})),animations:m.getAnimations({subtree:true}).map(a=>({playState:a.playState,currentTime:a.currentTime}))}))})`)));
 
     await sleep(1000);
     const stillOpen = await cdp.evaluate(`document.querySelectorAll('.previs-viewport-shell').length`);
