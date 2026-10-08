@@ -41,14 +41,7 @@ export function InspirationDetailModal({
     const custom = item ? isCustomInspiration(catalogIdOf(item)) : false;
 
     return (
-        <AppModal
-            open={Boolean(item)}
-            onCancel={onClose}
-            width={880}
-            title={null}
-            footer={null}
-            styles={{ body: { padding: 0 } }}
-        >
+        <AppModal open={Boolean(item)} onCancel={onClose} width={880} title={null} footer={null}>
             {item ? (
                 <div className="flex max-h-[76vh] flex-col">
                     <div className="relative shrink-0 overflow-hidden" style={{ borderRadius: "var(--r-xl, 14px)" }}>
@@ -68,22 +61,36 @@ export function InspirationDetailModal({
                                     </button>
                                 </Tooltip>
                                 <Tooltip title="编辑">
-                                    <button type="button" className="inspiration-icon-button" onClick={() => onEdit(item)}><Pencil className="size-4" /></button>
+                                    <button type="button" className="inspiration-icon-button" onClick={() => onEdit(item)}>
+                                        <Pencil className="size-4" />
+                                    </button>
                                 </Tooltip>
                                 <Tooltip title={custom ? "删除" : "从库中隐藏"}>
-                                    <button type="button" className="inspiration-icon-button" onClick={() => onDelete(item)}><Trash2 className="size-4" /></button>
+                                    <button type="button" className="inspiration-icon-button" onClick={() => onDelete(item)}>
+                                        <Trash2 className="size-4" />
+                                    </button>
                                 </Tooltip>
                             </div>
                         </div>
 
                         <div className="flex flex-col gap-1.5">
-                            <MetaRow label="来源">{source?.name ?? "原创"}{item.credit ? ` · ${item.credit}` : ""}</MetaRow>
+                            <MetaRow label="来源">
+                                {source?.name ?? "原创"}
+                                {item.credit ? ` · ${item.credit}` : ""}
+                            </MetaRow>
                             <MetaRow label="分类">{categoryLabel(item)}</MetaRow>
-                            <MetaRow label="类型">{modeLabels[item.mode]}{item.ratio ? ` · ${item.ratio}` : ""}</MetaRow>
+                            <MetaRow label="类型">
+                                {modeLabels[item.mode]}
+                                {item.ratio ? ` · ${item.ratio}` : ""}
+                            </MetaRow>
                             {item.tags?.length ? (
                                 <MetaRow label="标签">
                                     <span className="flex flex-wrap gap-1.5">
-                                        {item.tags.map((tag) => <span key={tag} className="inspiration-chip">{tag}</span>)}
+                                        {item.tags.map((tag) => (
+                                            <span key={tag} className="inspiration-chip">
+                                                {tag}
+                                            </span>
+                                        ))}
                                     </span>
                                 </MetaRow>
                             ) : null}
@@ -102,7 +109,9 @@ export function InspirationDetailModal({
 
                     <div className="flex shrink-0 items-center justify-end gap-2 border-t border-foreground/8 px-5 py-3">
                         <Button onClick={onClose}>关闭</Button>
-                        <Button type="primary" icon={<Wand2 className="size-4" />} onClick={() => onUse(item)}>用这个创意创作</Button>
+                        <Button type="primary" icon={<Wand2 className="size-4" />} onClick={() => onUse(item)}>
+                            用这个创意创作
+                        </Button>
                     </div>
                 </div>
             ) : null}
@@ -115,7 +124,9 @@ function PromptSection({ label, text, onCopy }: { label: string; text: string; o
         <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
                 <h3 className="text-xs font-medium text-foreground/58">{label}</h3>
-                <Button size="small" icon={<Copy className="size-3.5" />} onClick={() => onCopy(text, label)}>复制</Button>
+                <Button size="small" icon={<Copy className="size-3.5" />} onClick={() => onCopy(text, label)}>
+                    复制
+                </Button>
             </div>
             <div className="inspiration-prompt-block">{text}</div>
         </section>

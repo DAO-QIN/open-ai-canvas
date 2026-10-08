@@ -3,10 +3,10 @@ package auth
 import (
 	"encoding/json"
 	"errors"
-	"yingce/backend/internal/kernel"
 	"strings"
 	"testing"
 	"time"
+	"yingce/backend/internal/kernel"
 
 	"yingce/backend/internal/model"
 	"yingce/backend/internal/repository"

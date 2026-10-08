@@ -90,13 +90,21 @@ export default function InspirationsPage() {
         let cancelled = false;
         setLoadError("");
         loadInspirationCatalog()
-            .then((loaded) => { if (!cancelled) setCatalog(loaded); })
-            .catch((error) => { if (!cancelled) setLoadError(error instanceof Error ? error.message : "灵感目录加载失败"); });
-        return () => { cancelled = true; };
+            .then((loaded) => {
+                if (!cancelled) setCatalog(loaded);
+            })
+            .catch((error) => {
+                if (!cancelled) setLoadError(error instanceof Error ? error.message : "灵感目录加载失败");
+            });
+        return () => {
+            cancelled = true;
+        };
     }, [reloadKey]);
 
     // 筛选条件一变就回第一页，否则会停在一个已经不存在的位置上。
-    useEffect(() => { setPage(1); }, [source, modeFilter, category, view, sort, debouncedSearch, pageSize]);
+    useEffect(() => {
+        setPage(1);
+    }, [source, modeFilter, category, view, sort, debouncedSearch, pageSize]);
 
     const overlay = useMemo(() => ({ custom, overrides, hidden }), [custom, hidden, overrides]);
     const resolved = useMemo(() => (catalog ? resolveInspirations(catalog.entries, overlay) : []), [catalog, overlay]);
@@ -136,9 +144,7 @@ export default function InspirationsPage() {
                 merged.set(option.id, { label: option.label, count: (current?.count ?? 0) + option.count });
             }
         }
-        return [...merged.entries()]
-            .sort((left, right) => right[1].count - left[1].count || left[1].label.localeCompare(right[1].label, "zh-Hans-CN"))
-            .map(([value, { label, count }]) => ({ value, label, count }));
+        return [...merged.entries()].sort((left, right) => right[1].count - left[1].count || left[1].label.localeCompare(right[1].label, "zh-Hans-CN")).map(([value, { label, count }]) => ({ value, label, count }));
     }, [catalog, source]);
 
     const sourceCounts = useMemo(() => {
@@ -194,75 +200,101 @@ export default function InspirationsPage() {
 
     const paged = useMemo(() => visible.slice((page - 1) * pageSize, page * pageSize), [visible, page, pageSize]);
 
-    const handleUse = useCallback((item: CreationInspiration) => {
-        navigate("/create", { state: { inspirationPrompt: fillablePrompt(item), inspirationMode: item.mode } });
-    }, [navigate]);
+    const handleUse = useCallback(
+        (item: CreationInspiration) => {
+            navigate("/create", { state: { inspirationPrompt: fillablePrompt(item), inspirationMode: item.mode } });
+        },
+        [navigate],
+    );
 
-    const handleCopy = useCallback((text: string, label: string) => {
-        void navigator.clipboard.writeText(text).then(
-            () => message.success(`${label}已复制`),
-            () => message.error("复制失败，请手动选中文本"),
-        );
-    }, [message]);
+    const handleCopy = useCallback(
+        (text: string, label: string) => {
+            void navigator.clipboard.writeText(text).then(
+                () => message.success(`${label}已复制`),
+                () => message.error("复制失败，请手动选中文本"),
+            );
+        },
+        [message],
+    );
 
-    const handleDelete = useCallback((item: CreationInspiration) => {
-        const id = catalogIdOf(item);
-        const isCustom = isCustomInspiration(id);
-        modal.confirm({
-            className: "workspace-modal workspace-modal-compact",
-            title: isCustom ? "删除这条灵感？" : "从库中隐藏这条灵感？",
-            content: isCustom
-                ? `「${item.title}」会从本地灵感库移除，此操作不可撤销。`
-                : `「${item.title}」来自外部目录，不能真正删除；隐藏后可用「已隐藏」视图恢复，重新导入外部目录也不会让它复现。`,
-            okText: isCustom ? "删除" : "隐藏",
-            okButtonProps: { danger: true },
-            cancelText: "保留",
-            onOk: () => {
-                removeEntry(id);
-                if (detail && catalogIdOf(detail) === id) setDetail(null);
-                message.success(isCustom ? "已删除" : "已隐藏");
-            },
-        });
-    }, [detail, message, modal, removeEntry]);
+    const handleDelete = useCallback(
+        (item: CreationInspiration) => {
+            const id = catalogIdOf(item);
+            const isCustom = isCustomInspiration(id);
+            modal.confirm({
+                className: "workspace-modal workspace-modal-compact",
+                title: isCustom ? "删除这条灵感？" : "从库中隐藏这条灵感？",
+                content: isCustom ? `「${item.title}」会从本地灵感库移除，此操作不可撤销。` : `「${item.title}」来自外部目录，不能真正删除；隐藏后可用「已隐藏」视图恢复，重新导入外部目录也不会让它复现。`,
+                okText: isCustom ? "删除" : "隐藏",
+                okButtonProps: { danger: true },
+                cancelText: "保留",
+                onOk: () => {
+                    removeEntry(id);
+                    if (detail && catalogIdOf(detail) === id) setDetail(null);
+                    message.success(isCustom ? "已删除" : "已隐藏");
+                },
+            });
+        },
+        [detail, message, modal, removeEntry],
+    );
 
-    const handleSubmit = useCallback((draft: Parameters<typeof createEntry>[0]) => {
-        if (editing) {
-            updateEntry(catalogIdOf(editing), draft);
-            message.success("已保存修改");
-            setDetail((current) => (current && catalogIdOf(current) === catalogIdOf(editing) ? { ...current, ...draft } : current));
-            setEditing(null);
-            return;
-        }
-        createEntry(draft);
-        // 新建后把筛选整体清掉：自建条目的来源固定是「原创」、分类也常和当前筛选不符，
-        // 不清的话用户刚点完"创建"却看不到自己建的东西。
-        setSource("all");
-        setModeFilter("all");
-        setCategory("all");
-        setView("all");
-        setSearch("");
-        message.success("灵感已创建");
-    }, [createEntry, editing, message, updateEntry]);
+    const handleSubmit = useCallback(
+        (draft: Parameters<typeof createEntry>[0]) => {
+            if (editing) {
+                updateEntry(catalogIdOf(editing), draft);
+                message.success("已保存修改");
+                setDetail((current) => (current && catalogIdOf(current) === catalogIdOf(editing) ? { ...current, ...draft } : current));
+                setEditing(null);
+                return;
+            }
+            createEntry(draft);
+            // 新建后把筛选整体清掉：自建条目的来源固定是「原创」、分类也常和当前筛选不符，
+            // 不清的话用户刚点完"创建"却看不到自己建的东西。
+            setSource("all");
+            setModeFilter("all");
+            setCategory("all");
+            setView("all");
+            setSearch("");
+            message.success("灵感已创建");
+        },
+        [createEntry, editing, message, updateEntry],
+    );
 
     const handleExport = useCallback(() => {
         downloadText(exportPayload(), exportFileName());
         message.success("已导出本地改动（自建条目 / 改写 / 隐藏 / 收藏）");
     }, [exportPayload, message]);
 
-    const handleImportFile = useCallback(async (file: File) => {
-        try {
-            const result = importPayload(await file.text());
-            message.success(`导入完成：新增 ${result.created}，覆盖 ${result.updated}${result.skipped ? `，跳过 ${result.skipped} 条无效数据` : ""}`);
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : "导入失败");
-        }
-    }, [importPayload, message]);
+    const handleImportFile = useCallback(
+        async (file: File) => {
+            try {
+                const result = importPayload(await file.text());
+                message.success(`导入完成：新增 ${result.created}，覆盖 ${result.updated}${result.skipped ? `，跳过 ${result.skipped} 条无效数据` : ""}`);
+            } catch (error) {
+                message.error(error instanceof Error ? error.message : "导入失败");
+            }
+        },
+        [importPayload, message],
+    );
 
     const headerActions = (
         <>
-            <Button icon={<Import className="size-4" />} onClick={() => importRef.current?.click()}>导入</Button>
-            <Button icon={<Download className="size-4" />} onClick={handleExport}>导出</Button>
-            <Button type="primary" icon={<Plus className="size-4" />} onClick={() => { setEditing(null); setEditorOpen(true); }}>新建灵感</Button>
+            <Button icon={<Import className="size-4" />} onClick={() => importRef.current?.click()}>
+                导入
+            </Button>
+            <Button icon={<Download className="size-4" />} onClick={handleExport}>
+                导出
+            </Button>
+            <Button
+                type="primary"
+                icon={<Plus className="size-4" />}
+                onClick={() => {
+                    setEditing(null);
+                    setEditorOpen(true);
+                }}
+            >
+                新建灵感
+            </Button>
             <input
                 ref={importRef}
                 type="file"
@@ -282,11 +314,7 @@ export default function InspirationsPage() {
 
     return (
         <WorkspacePage>
-            <PageHeader
-                title="灵感库"
-                description={`${total} 条提示词，按来源、分类和创作类型挑，点开可以一键带去创作页`}
-                actions={headerActions}
-            />
+            <PageHeader title="灵感库" description={`${total} 条提示词，按来源、分类和创作类型挑，点开可以一键带去创作页`} actions={headerActions} />
 
             {loadError ? (
                 <WorkspaceErrorState title="灵感目录加载失败" description={loadError} onRetry={() => setReloadKey((key) => key + 1)} />
@@ -307,13 +335,7 @@ export default function InspirationsPage() {
                             <span className="inspiration-chip-count">{source === "all" ? resolved.length : (sourceCounts.get(source) ?? 0)}</span>
                         </button>
                         {categoryChoices.slice(0, 16).map((choice) => (
-                            <button
-                                key={choice.value}
-                                type="button"
-                                className="inspiration-chip"
-                                aria-pressed={category === choice.value}
-                                onClick={() => setCategory(category === choice.value ? "all" : choice.value)}
-                            >
+                            <button key={choice.value} type="button" className="inspiration-chip" aria-pressed={category === choice.value} onClick={() => setCategory(category === choice.value ? "all" : choice.value)}>
                                 {choice.label}
                                 <span className="inspiration-chip-count">{choice.count}</span>
                             </button>
@@ -321,14 +343,7 @@ export default function InspirationsPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <Input
-                            allowClear
-                            prefix={<Search className="size-4 text-foreground/40" />}
-                            placeholder="搜标题、描述或标签"
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            className="max-w-xs"
-                        />
+                        <Input allowClear prefix={<Search className="size-4 text-foreground/40" />} placeholder="搜标题、描述或标签" value={search} onChange={(event) => setSearch(event.target.value)} className="max-w-xs" />
                         <SegmentedControl options={VIEW_OPTIONS} value={view} onChange={(value) => setView(value as ViewFilter)} />
                         <Select
                             options={[
@@ -339,7 +354,10 @@ export default function InspirationsPage() {
                                 })),
                             ]}
                             value={source}
-                            onChange={(value) => { setSource(value as SourceFilter); setCategory("all"); }}
+                            onChange={(value) => {
+                                setSource(value as SourceFilter);
+                                setCategory("all");
+                            }}
                             className="w-52"
                         />
                         <Select options={SORT_OPTIONS} value={sort} onChange={(value) => setSort(value as SortKey)} className="w-32" />
@@ -370,13 +388,28 @@ export default function InspirationsPage() {
                                             <span className="inspiration-card-source">{inspirationSourceOf(item).label}</span>
                                             <div className="inspiration-card-actions">
                                                 <Tooltip title={favorite ? "取消收藏" : "收藏"}>
-                                                    <button type="button" className="inspiration-card-action" aria-pressed={favorite} onClick={(event) => { event.stopPropagation(); toggleFavorite(id); }}>
+                                                    <button
+                                                        type="button"
+                                                        className="inspiration-card-action"
+                                                        aria-pressed={favorite}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            toggleFavorite(id);
+                                                        }}
+                                                    >
                                                         <Heart className="size-3.5" fill={favorite ? "currentColor" : "none"} />
                                                     </button>
                                                 </Tooltip>
                                                 {view === "hidden" ? (
                                                     <Tooltip title="恢复显示">
-                                                        <button type="button" className="inspiration-card-action" onClick={(event) => { event.stopPropagation(); restoreEntry(id); }}>
+                                                        <button
+                                                            type="button"
+                                                            className="inspiration-card-action"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                restoreEntry(id);
+                                                            }}
+                                                        >
                                                             <RotateCcw className="size-3.5" />
                                                         </button>
                                                     </Tooltip>
@@ -390,7 +423,10 @@ export default function InspirationsPage() {
                                                             ],
                                                             onClick: ({ key, domEvent }) => {
                                                                 domEvent.stopPropagation();
-                                                                if (key === "edit") { setEditing(item); setEditorOpen(true); }
+                                                                if (key === "edit") {
+                                                                    setEditing(item);
+                                                                    setEditorOpen(true);
+                                                                }
                                                                 if (key === "delete") handleDelete(item);
                                                             },
                                                         }}
@@ -423,7 +459,15 @@ export default function InspirationsPage() {
                         />
                     )}
 
-                    <PaginationBar current={page} pageSize={pageSize} total={visible.length} onChange={(next, size) => { setPage(next); setPageSize(size); }} />
+                    <PaginationBar
+                        current={page}
+                        pageSize={pageSize}
+                        total={visible.length}
+                        onChange={(next, size) => {
+                            setPage(next);
+                            setPageSize(size);
+                        }}
+                    />
                 </div>
             )}
 
@@ -435,7 +479,11 @@ export default function InspirationsPage() {
                 onUse={handleUse}
                 onCopy={handleCopy}
                 onToggleFavorite={(item) => toggleFavorite(catalogIdOf(item))}
-                onEdit={(item) => { setDetail(null); setEditing(item); setEditorOpen(true); }}
+                onEdit={(item) => {
+                    setDetail(null);
+                    setEditing(item);
+                    setEditorOpen(true);
+                }}
                 onDelete={handleDelete}
             />
 
@@ -443,7 +491,10 @@ export default function InspirationsPage() {
                 open={editorOpen}
                 item={editing}
                 categoryOptions={categoryChoices}
-                onClose={() => { setEditorOpen(false); setEditing(null); }}
+                onClose={() => {
+                    setEditorOpen(false);
+                    setEditing(null);
+                }}
                 onSubmit={handleSubmit}
             />
         </WorkspacePage>

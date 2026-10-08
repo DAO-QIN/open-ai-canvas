@@ -25,8 +25,12 @@ export function useCanvasNodeResize(node: CanvasNodeData, scale: number, minimum
         let previous = origin;
         const minimum = getNodeMinSize(node.type);
         const snapshot = {
-            position: { ...node.position }, width: node.width, height: node.height, corner,
-            minimumWidth: minimum.width, minimumHeight: minimumHeight ?? minimum.height,
+            position: { ...node.position },
+            width: node.width,
+            height: node.height,
+            corner,
+            minimumWidth: minimum.width,
+            minimumHeight: minimumHeight ?? minimum.height,
             ratio: shouldKeepAspectRatio(node) ? (node.metadata?.naturalWidth || node.width) / (node.metadata?.naturalHeight || node.height || 1) : undefined,
         };
         const listeners = new AbortController();
@@ -43,12 +47,32 @@ export function useCanvasNodeResize(node: CanvasNodeData, scale: number, minimum
         };
         target.setPointerCapture(pointer);
         target.addEventListener("pointermove", move, { signal: listeners.signal });
-        target.addEventListener("pointerup", (next) => {
-            if (next.pointerId !== pointer) return;
-            try { move(next); } finally { stop(); }
-        }, { signal: listeners.signal });
-        target.addEventListener("pointercancel", (next) => { if (next.pointerId === pointer) stop(); }, { signal: listeners.signal });
-        target.addEventListener("lostpointercapture", (next) => { if (next.pointerId === pointer) stop(); }, { signal: listeners.signal });
+        target.addEventListener(
+            "pointerup",
+            (next) => {
+                if (next.pointerId !== pointer) return;
+                try {
+                    move(next);
+                } finally {
+                    stop();
+                }
+            },
+            { signal: listeners.signal },
+        );
+        target.addEventListener(
+            "pointercancel",
+            (next) => {
+                if (next.pointerId === pointer) stop();
+            },
+            { signal: listeners.signal },
+        );
+        target.addEventListener(
+            "lostpointercapture",
+            (next) => {
+                if (next.pointerId === pointer) stop();
+            },
+            { signal: listeners.signal },
+        );
         window.addEventListener("blur", stop, { signal: listeners.signal });
         dispose.current = stop;
     };

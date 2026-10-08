@@ -77,12 +77,26 @@ export function InspirationEditorModal({
             open={open}
             title={item ? "编辑灵感" : "新建灵感"}
             width={720}
-            onCancel={() => { form.resetFields(); onClose(); }}
-            afterOpenChange={(visible) => { if (visible) form.setFieldsValue(toFormValues(item)); }}
+            onCancel={() => {
+                form.resetFields();
+                onClose();
+            }}
+            afterOpenChange={(visible) => {
+                if (visible) form.setFieldsValue(toFormValues(item));
+            }}
             footer={
                 <div className="flex justify-end gap-2">
-                    <Button onClick={() => { form.resetFields(); onClose(); }}>取消</Button>
-                    <Button type="primary" onClick={() => void handleOk()}>{item ? "保存" : "创建"}</Button>
+                    <Button
+                        onClick={() => {
+                            form.resetFields();
+                            onClose();
+                        }}
+                    >
+                        取消
+                    </Button>
+                    <Button type="primary" onClick={() => void handleOk()}>
+                        {item ? "保存" : "创建"}
+                    </Button>
                 </div>
             }
         >

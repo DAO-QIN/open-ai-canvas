@@ -49,9 +49,7 @@ const THUMB_DIR = "inspiration-thumbs";
  * 上游封面不可用的条目：封面本身是影片片头白板，画面上只有一个白底和 "MUDA / FILM 01"，
  * 放在画廊里就是一块空白。清单按 slug 写死，重新同步不会把它带回来。
  */
-const EXCLUDED_SEEDANCE_SLUGS = new Set([
-    "seedance-make-a-modern-slick-and-punchy-video-for-a-modern-startup-that-works-on-infere-07ba4673539c",
-]);
+const EXCLUDED_SEEDANCE_SLUGS = new Set(["seedance-make-a-modern-slick-and-punchy-video-for-a-modern-startup-that-works-on-infere-07ba4673539c"]);
 
 /**
  * 上游模板分类的中文标签。id 来自 awesome-seedance 的 data/case-taxonomy.json，
@@ -131,7 +129,9 @@ function clip(value, limit) {
 }
 
 function sanitizeFileName(value) {
-    return String(value).replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 90);
+    return String(value)
+        .replace(/[^a-zA-Z0-9._-]/g, "-")
+        .slice(0, 90);
 }
 
 async function fetchText(url, { accept } = {}) {
@@ -373,7 +373,9 @@ function renderSourceRevisions(revisions) {
 // 各来源同步时的上游版本号，供灵感页与画廊署名展示。
 
 export const HIGHLIGHT_REVISIONS = {
-${Object.entries(revisions).map(([name, value]) => `    ${name}: ${JSON.stringify(value)},`).join("\n")}
+${Object.entries(revisions)
+    .map(([name, value]) => `    ${name}: ${JSON.stringify(value)},`)
+    .join("\n")}
 };
 `;
 }
@@ -533,11 +535,7 @@ async function main() {
         pruned += pruneOrphanThumbs(pipeline.name, thumbNames);
         highlights[pipeline.name] = thumbed;
 
-        writeFileSync(
-            join(PUBLIC_DIR, pipeline.file),
-            JSON.stringify({ source: pipeline.name, revision: loaded.revision, count: entries.length, categories: loaded.categories ?? {}, entries: entries.map(toCatalogEntry) }),
-            "utf8",
-        );
+        writeFileSync(join(PUBLIC_DIR, pipeline.file), JSON.stringify({ source: pipeline.name, revision: loaded.revision, count: entries.length, categories: loaded.categories ?? {}, entries: entries.map(toCatalogEntry) }), "utf8");
 
         console.log(`${pipeline.name.padEnd(12)}: ${loaded.note} → 入库 ${entries.length} 条，本地缩略图 ${thumbed.length} 张`);
     }
@@ -547,9 +545,7 @@ async function main() {
 
     const manifest = {
         generatedAt: new Date().toISOString(),
-        sources: Object.fromEntries(
-            Object.entries(revisions).map(([name, revision]) => [name, { revision, count: counts[name], categories: categoriesBySource[name] ?? {} }]),
-        ),
+        sources: Object.fromEntries(Object.entries(revisions).map(([name, revision]) => [name, { revision, count: counts[name], categories: categoriesBySource[name] ?? {} }])),
     };
     writeFileSync(join(PUBLIC_DIR, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8");
 
