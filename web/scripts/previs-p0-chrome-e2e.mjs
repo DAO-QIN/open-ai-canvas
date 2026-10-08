@@ -749,7 +749,14 @@ async function saveFailureCloseGuard(cdp, baseUrl) {
         20000,
     );
     assert(modalGone, "F6 confirm dialog dismissed after choosing 留在预演台");
-    console.log("F6 click evidence", JSON.stringify(await cdp.evaluate(`({events:window.__previsClickEvidence, modals:[...document.querySelectorAll('.ant-modal-confirm')].map(m=>({rect:m.getBoundingClientRect().toJSON(),display:getComputedStyle(m).display,visibility:getComputedStyle(m).visibility,opacity:getComputedStyle(m).opacity,classes:m.className,ancestors:[m.parentElement,m.parentElement?.parentElement].filter(Boolean).map(p=>({classes:p.className,display:getComputedStyle(p).display,visibility:getComputedStyle(p).visibility,opacity:getComputedStyle(p).opacity})),animations:m.getAnimations({subtree:true}).map(a=>({playState:a.playState,currentTime:a.currentTime}))}))})`)));
+    console.log(
+        "F6 click evidence",
+        JSON.stringify(
+            await cdp.evaluate(
+                `({events:window.__previsClickEvidence, modals:[...document.querySelectorAll('.ant-modal-confirm')].map(m=>({rect:m.getBoundingClientRect().toJSON(),display:getComputedStyle(m).display,visibility:getComputedStyle(m).visibility,opacity:getComputedStyle(m).opacity,classes:m.className,ancestors:[m.parentElement,m.parentElement?.parentElement].filter(Boolean).map(p=>({classes:p.className,display:getComputedStyle(p).display,visibility:getComputedStyle(p).visibility,opacity:getComputedStyle(p).opacity})),animations:m.getAnimations({subtree:true}).map(a=>({playState:a.playState,currentTime:a.currentTime}))}))})`,
+            ),
+        ),
+    );
 
     await sleep(1000);
     const stillOpen = await cdp.evaluate(`document.querySelectorAll('.previs-viewport-shell').length`);
