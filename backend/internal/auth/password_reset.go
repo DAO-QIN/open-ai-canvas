@@ -3,10 +3,10 @@ package auth
 import (
 	"crypto/hmac"
 	"errors"
-	"yingce/backend/internal/kernel"
 	"log"
 	"strings"
 	"time"
+	"yingce/backend/internal/kernel"
 
 	"yingce/backend/internal/model"
 	"yingce/backend/internal/repository"

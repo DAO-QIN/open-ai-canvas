@@ -2,11 +2,11 @@ package canvas
 
 import (
 	"encoding/json"
-	"yingce/backend/internal/assets"
-	"yingce/backend/internal/kernel"
 	"net/http"
 	"strconv"
 	"strings"
+	"yingce/backend/internal/assets"
+	"yingce/backend/internal/kernel"
 
 	"yingce/backend/internal/model"
 )

@@ -5,13 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"yingce/backend/internal/kernel"
-	"yingce/backend/internal/repository"
 	"log"
 	"net/mail"
 	"regexp"
 	"strings"
 	"time"
+	"yingce/backend/internal/kernel"
+	"yingce/backend/internal/repository"
 
 	"yingce/backend/internal/model"
 

@@ -205,13 +205,7 @@ export function CreationInspirationTunnel({ mode, onStartPrompt }: { mode: Creat
     if (!shots.length) return null;
 
     return (
-        <div
-            className="creation-inspiration-tunnel"
-            onPointerEnter={() => setPaused(true)}
-            onPointerLeave={() => setPaused(false)}
-            onFocusCapture={() => setPaused(true)}
-            onBlurCapture={() => setPaused(false)}
-        >
+        <div className="creation-inspiration-tunnel" onPointerEnter={() => setPaused(true)} onPointerLeave={() => setPaused(false)} onFocusCapture={() => setPaused(true)} onBlurCapture={() => setPaused(false)}>
             <div ref={stageRef} className="creation-gallery-stage" aria-hidden="true">
                 {shots.map((inspiration, index) => {
                     const id = catalogIdOf(inspiration);
@@ -269,10 +263,14 @@ export function CreationInspirationTunnel({ mode, onStartPrompt }: { mode: Creat
                 用 !important 改写 color / background 并把 transform 顶成 translateY(-1px)，
                 按钮会当场掉半个身位。带 span 的按钮不在那条规则的射程内。 */}
             <button type="button" className="creation-gallery-arrow is-prev" aria-label="上一张灵感" onClick={() => step(-1)}>
-                <span className="creation-gallery-arrow-icon"><ChevronLeft aria-hidden="true" /></span>
+                <span className="creation-gallery-arrow-icon">
+                    <ChevronLeft aria-hidden="true" />
+                </span>
             </button>
             <button type="button" className="creation-gallery-arrow is-next" aria-label="下一张灵感" onClick={() => step(1)}>
-                <span className="creation-gallery-arrow-icon"><ChevronRight aria-hidden="true" /></span>
+                <span className="creation-gallery-arrow-icon">
+                    <ChevronRight aria-hidden="true" />
+                </span>
             </button>
 
             {/* 卡片本身对辅助技术隐藏，切换结果靠这条播报传达。 */}

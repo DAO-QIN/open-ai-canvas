@@ -15,7 +15,7 @@ setGlobalDispatcher(new Agent({
   bodyTimeout: 0,
 }));
 
-const providerID = "yingce";
+const providerID = "infinite-canvas";
 const api = "openai-completions";
 
 

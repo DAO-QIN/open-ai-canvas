@@ -3,8 +3,9 @@ import type { StateStorage } from "zustand/middleware";
 
 import { isUserScopedPersistenceSuppressed, scopedStorageKey } from "@/lib/user-scope";
 
+// 存储标识保持稳定，避免模块重命名后已有离线画布、草稿和素材不可见。
 localforage.config({
-    name: "yingce",
+    name: "infinite-canvas",
     storeName: "app_state",
 });
 

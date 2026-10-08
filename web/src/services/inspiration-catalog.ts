@@ -69,9 +69,7 @@ async function buildCatalog(): Promise<InspirationCatalog> {
             const category = entry.category?.trim();
             if (category) counts.set(category, (counts.get(category) ?? 0) + 1);
         }
-        categoriesBySource[sourceId] = [...counts.entries()]
-            .map(([id, count]) => ({ id, label: labels[id] ?? id, count }))
-            .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "zh-Hans-CN"));
+        categoriesBySource[sourceId] = [...counts.entries()].map(([id, count]) => ({ id, label: labels[id] ?? id, count })).sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, "zh-Hans-CN"));
     }
 
     return {
