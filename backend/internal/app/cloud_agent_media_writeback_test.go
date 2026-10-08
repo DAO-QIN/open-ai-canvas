@@ -13,6 +13,9 @@ func TestCloudAgentMediaCleanupUsesPersistedTaskTarget(t *testing.T) {
 	for _, missingTarget := range []bool{false, true} {
 		t.Run(map[bool]string{false: "known target", true: "unknown target"}[missingTarget], func(t *testing.T) {
 			s, db, args := agentMediaFixture(t)
+			// Cleanup owns the task transition in this test. A background approval
+			// waiter would race the intentionally corrupted runtime checkpoint.
+			s.closeApprovedCloudAgentMediaWaiters()
 			run, _ := agentMediaRun(t, s, args, "request_approval")
 			if err := s.advanceCloudAgentByID("user", run.ID); err != nil {
 				t.Fatal(err)
