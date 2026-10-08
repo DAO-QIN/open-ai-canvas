@@ -23,6 +23,6 @@ test("Agent 对话和设置复用创作页模型选择器，并且只展示文�
 
     const twoPane = pickerCss.match(/\.creation-model-picker-menu\.is-model-list \.canvas-model-picker-two-pane \{[^}]+\}/)?.[0] || "";
     expect(twoPane).toContain("min-height: 0");
-    expect(twoPane).toContain("align-items: start");
+    expect(twoPane).not.toContain("align-items: start");
     expect(twoPane).not.toContain("min-height: 300px");
 });
