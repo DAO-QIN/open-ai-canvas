@@ -3,7 +3,15 @@ import { canvasNodeToAsset, findCanvasNodeAsset, requiresMaterializedCanvasAsset
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 import type { Asset } from "@/stores/use-asset-store";
 
-const original: CanvasNodeData = { id: "layer", type: CanvasNodeType.Image, title: "前景", position: { x: 0, y: 0 }, width: 400, height: 300, metadata: { taskId: "generation", content: "/original.png", storageKey: "resource:original", layerExtraction: { sourceNodeId: "source", groupId: "group", index: 1, phase: "complete" } } };
+const original: CanvasNodeData = {
+    id: "layer",
+    type: CanvasNodeType.Image,
+    title: "前景",
+    position: { x: 0, y: 0 },
+    width: 400,
+    height: 300,
+    metadata: { taskId: "generation", content: "/original.png", storageKey: "resource:original", layerExtraction: { sourceNodeId: "source", groupId: "group", index: 1, phase: "complete" } },
+};
 
 test("原生生成图层仍须复用服务端素材，不能因缓存缺失重复登记", () => {
     expect(requiresMaterializedCanvasAsset(original)).toBe(true);
