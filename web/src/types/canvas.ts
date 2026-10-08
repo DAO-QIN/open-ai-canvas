@@ -348,6 +348,8 @@ export type CanvasNodeMetadata = {
         backgroundRemovalModel?: string;
         phase?: "extract" | "background-removal-required" | "remove-background" | "complete";
         extractionTaskId?: string;
+        /** 原任务资源与本地归一化/修补后的资源分开登记，不能沿用原素材身份。 */
+        sourceResultStorageKey?: string;
         rejectedTaskId?: string;
         canvas?: { width: number; height: number };
     };

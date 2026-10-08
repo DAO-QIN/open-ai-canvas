@@ -152,6 +152,7 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
     const result = parseBackendGenerationResult(task);
 
     if (mode === "image") {
+        const sourceResultStorageKey = result.images?.[outputIndex]?.storageKey;
         let extraction = node.metadata?.layerExtraction;
         let needsRemoval = false;
         if (node.metadata?.layerExtraction) {
@@ -183,6 +184,7 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
                 ? { url: await resolveImageUrl(image.storageKey, image.dataUrl), storageKey: image.storageKey, width: image.width || 1024, height: image.height || 1024, bytes: image.bytes || 0, mimeType: image.mimeType || "image/png" }
                 : await uploadImage(resultDataUrl);
         const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
+        if (extraction) extraction = { ...extraction, sourceResultStorageKey: uploaded.storageKey !== sourceResultStorageKey ? sourceResultStorageKey : undefined };
         const requestedImageSize = nodeSizeFromRatio(node.metadata?.size || "auto", imageConfig.width, imageConfig.height);
         const imageSizeBounds = requestedImageSize || { width: node.width || imageConfig.width, height: node.height || imageConfig.height };
         const hasReportedImageSize = Boolean(image.width && image.width > 0 && image.height && image.height > 0);
