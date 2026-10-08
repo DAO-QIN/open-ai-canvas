@@ -1,4 +1,4 @@
-import { hasUsableLayerTransparency, imageLayerGenerationConfig, MAX_GROUP_PIXELS, parseImageLayerGeneration, parseExperimentalLayerTargets, validateImageLayerRole, type ImageLayerGeneration } from "@/lib/canvas/canvas-image-layers";
+import { hasUsableLayerTransparency, imageLayerGenerationConfig, MAX_GROUP_PIXELS, parseImageLayerGeneration, parseExperimentalLayerTargets, validateImageLayerOutput, type ImageLayerGeneration } from "@/lib/canvas/canvas-image-layers";
 import { imageLayerRemovalPrompt } from "@/lib/canvas/canvas-image-layer-plan";
 import { inspectImageLayer, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -84,8 +84,7 @@ export async function runImageLayerExtraction({
                     (await runStage({ index, stage: "extract", prompt: layerGenerations[index].prompt, config: imageLayerGenerationConfig(config, layerGenerations[index], index), reference: source, canvas })).images,
                 );
                 check(index);
-                if (index > 0 && !hasUsableLayerTransparency(result.info)) {
-                    if (!removalConfig) throw new Error("拆层失败：模型未返回真实透明背景，请配置去背景处理");
+                if (index > 0 && !hasUsableLayerTransparency(result.info) && removalConfig) {
                     check(index);
                     onProgress?.(index, "remove-background");
                     result = await inspect(
@@ -101,9 +100,8 @@ export async function runImageLayerExtraction({
                         ).images,
                     );
                     check(index);
-                    if (!hasUsableLayerTransparency(result.info)) throw new Error("去背景结果仍没有有效的真实透明区域，已停止本层，不自动付费重试");
                 }
-                validateImageLayerRole(result.info, index);
+                validateImageLayerOutput(result.info);
                 onProgress?.(index, "complete");
             } catch (error) {
                 onLayerError?.(index, error);

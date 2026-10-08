@@ -9,6 +9,8 @@ AI 拆图的编辑目的与语义工具约束位于 `web/src/lib/canvas/canvas-i
 
 AI 拆图每层的 `generation.prompt/background` 由 `canvas-image-layer-plan.ts` 要求规划模型填写，`canvas-image-layers.ts` 校验角色与允许字段并附加本层输出约束。`use-canvas-media-tools.ts` 保存编译后的独立提示词与配置，`canvas-image-layer-extraction.ts` 在收费调用前校验全部参数并原样传递本层提示词；不再拼接总体要求或其他层描述。`use-canvas-generation-retry.ts` 继续读取子节点保存的提示词与配置；已有界面和展示链路不变。
 
+最终拆图显示与合成使用 `canvas-image-layers.ts` 的 `validateImageLayerOutput`，只拒绝完全透明空图，不再按背景/前景 alpha 拦截有效产出。`hasUsableLayerTransparency` 的既有阈值仍用于条件去背景；任务消费、提取服务、原图提取、局部修补产出和组重合成都使用同一最终验收。原图局部修补的输入仍保留不透明底板校验，尺寸、资源、数量、像素上限及取消检查不变。原生多图返回多张不透明候选时保留输出顺序，不猜角色或修改像素。
+
 ## 968API SD 视频
 
 - 插件合同：`plugin-packages/api968-sd-video/manifest.json`、`README.md`、`docs/interface.md` 与同名 `.yingce-plugin` 包；五个 Provider 各自校验模型 ID 与上游参数。

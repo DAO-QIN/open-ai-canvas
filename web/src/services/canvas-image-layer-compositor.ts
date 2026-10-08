@@ -1,4 +1,4 @@
-import { inspectLayerAlpha, MAX_GROUP_PIXELS, MAX_IMAGE_LAYERS, MAX_LAYER_PIXELS, validateLayerRasters, validateImageLayerRole, type LayerRasterInfo } from "@/lib/canvas/canvas-image-layers";
+import { inspectLayerAlpha, MAX_GROUP_PIXELS, MAX_IMAGE_LAYERS, MAX_LAYER_PIXELS, validateLayerRasters, validateImageLayerOutput, type LayerRasterInfo } from "@/lib/canvas/canvas-image-layers";
 import { getImageBlob } from "@/services/image-storage";
 import type { CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 
@@ -91,7 +91,7 @@ export async function decodeAndComposeImageLayers(inputs: LayerInput[], roles?: 
             if (pixels > MAX_GROUP_PIXELS) throw new Error("图层总像素量超过处理上限");
         }
         const order = roles ? decoded.map((layer, index) => {
-            validateImageLayerRole(layer.info, roles[index]);
+            validateImageLayerOutput(layer.info);
             if (layer.info.width !== decoded[0].info.width || layer.info.height !== decoded[0].info.height) throw new Error("图层尺寸不一致，无法确定合成坐标");
             return index;
         }) : validateLayerRasters(decoded.map((layer) => layer.info));
@@ -127,7 +127,7 @@ export async function composeCanvasImageLayerGroup(group: NonNullable<CanvasNode
         const decoded = await decodeLayer({ dataUrl: node.metadata.content, storageKey: node.metadata.storageKey });
         try {
             if (decoded.info.width !== group.width || decoded.info.height !== group.height) throw new Error("编辑后的图层尺寸与图层组不一致，无法合成");
-            if (node.metadata.imageLayer?.kind) validateImageLayerRole(decoded.info, node.metadata.imageLayer.kind === "base" ? 0 : 1);
+            if (node.metadata.imageLayer?.kind) validateImageLayerOutput(decoded.info);
             context.drawImage(decoded.bitmap, layer.x, layer.y);
         } finally {
             decoded.bitmap.close();

@@ -1,4 +1,4 @@
-import { inspectLayerAlpha, validateImageLayerRole } from "@/lib/canvas/canvas-image-layers";
+import { inspectLayerAlpha, validateImageLayerRole, validateImageLayerOutput } from "@/lib/canvas/canvas-image-layers";
 import { validateImageLayerRegion, type ImageLayerBackgroundPatch, type ImageLayerExtraction, type ImageLayerRegion } from "@/lib/canvas/canvas-image-layer-strategy";
 import { decodeLayer, pngBlob, type LayerInput } from "@/services/canvas-image-layer-compositor";
 import { imageLayerAlphaBounds, suggestImageLayerRegion } from "@/lib/canvas/canvas-image-layer-region";
@@ -115,7 +115,7 @@ export async function extractImageLayerFromSource(source: LayerInput, extraction
         }
         context.drawImage(decoded.bitmap, 0, 0);
         const info = inspectLayerAlpha(width, height, context.getImageData(0, 0, width, height).data);
-        validateImageLayerRole(info, extraction.method === "source" ? 0 : 1);
+        validateImageLayerOutput(info);
         return await encode(canvas);
     } finally {
         decoded.bitmap.close();
@@ -133,7 +133,7 @@ export async function patchImageLayerBackground(generated: LayerInput, patch: Im
         validateImageLayerRole(source.info, 0);
         const result = await decodeLayer(generated);
         try {
-            validateImageLayerRole(result.info, 0);
+            validateImageLayerOutput(result.info);
             const { width, height } = source.info;
             if (result.info.width !== width || result.info.height !== height) throw new Error("底图修补结果与原图尺寸不一致");
             canvas.width = width;

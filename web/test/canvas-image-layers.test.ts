@@ -12,6 +12,7 @@ import {
     layerDecompositionConfig,
     imageLayerProviderMetadata,
     validateImageLayerRole,
+    validateImageLayerOutput,
     hasUsableLayerTransparency,
     MAX_IMAGE_LAYERS,
     MAX_LAYER_PIXELS,
@@ -59,7 +60,7 @@ function sample() {
 }
 
 describe("独立透明图层验收", () => {
-    test("背景必须全不透明；前景不能用单个透明像素冒充去背景", () => {
+    test("原图底板输入仍要求不透明，去背景触发仍不能用单个透明像素冒充", () => {
         expect(() => validateImageLayerRole(opaque, 0)).not.toThrow();
         expect(() => validateImageLayerRole(transparent, 0)).toThrow("背景底图");
         const rgba = new Uint8ClampedArray(100 * 100 * 4).fill(255);
@@ -71,6 +72,13 @@ describe("独立透明图层验收", () => {
         expect(hasUsableLayerTransparency(puncture)).toBe(false);
         expect(() => validateImageLayerRole(puncture, 1)).toThrow("零散");
         expect(() => validateImageLayerRole(transparent, 1)).not.toThrow();
+    });
+    test("最终显示接受半透明背景与不透明前景，仍拒绝完全透明空图", () => {
+        for (const info of [opaque, transparent, { ...opaque, opaque: false }]) {
+            expect(() => validateImageLayerOutput(info)).not.toThrow();
+        }
+        expect(() => validateImageLayerOutput({ ...transparent, nonempty: false })).toThrow("空图层");
+        expect(hasUsableLayerTransparency(opaque)).toBe(false);
     });
     test("完整场景只移除勾选对象，细节允许重复；单层提示不混入其他层排除指令", () => {
         const targets = ["房间：保留窗户、书架、地毯", "猫：保留轮廓", "毛线球：保留纹理"];
@@ -119,9 +127,10 @@ describe("独立透明图层验收", () => {
         expect(validateLayerRasters([transparent, opaque, transparent])).toEqual([1, 0, 2]);
         expect(validateLayerRasters([transparent, transparent])).toEqual([0, 1]);
     });
-    test("拒绝单张拼版、多张不透明图、空图层、不同尺寸及超限输出", () => {
+    test("多张不透明图保留返回顺序；仍拒绝单张拼版、空图层、不同尺寸及超限输出", () => {
         expect(() => validateLayerRasters([opaque])).toThrow("至少需要两张");
-        expect(() => validateLayerRasters([opaque, opaque])).toThrow("不透明");
+        expect(validateLayerRasters([opaque, opaque])).toEqual([0, 1]);
+        expect(validateLayerRasters([transparent, opaque, opaque])).toEqual([0, 1, 2]);
         expect(() => validateLayerRasters([opaque, { ...transparent, nonempty: false }])).toThrow("空图层");
         expect(() => validateLayerRasters([opaque, { ...transparent, width: 3 }])).toThrow("尺寸不一致");
         expect(() => validateLayerRasters(Array(MAX_IMAGE_LAYERS + 1).fill(transparent))).toThrow("数量");

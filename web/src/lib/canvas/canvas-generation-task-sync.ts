@@ -14,7 +14,7 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { applyGenerationConsumerEffect, generationEffectApplied } from "@/services/generation-consumer-dedupe";
 import { commitProducedModel } from "@/lib/canvas/produced-model";
-import { experimentalLayerSignature, hasUsableLayerTransparency, imageLayerCompositeSignature, validateImageLayerRole } from "@/lib/canvas/canvas-image-layers";
+import { experimentalLayerSignature, hasUsableLayerTransparency, imageLayerCompositeSignature, validateImageLayerOutput } from "@/lib/canvas/canvas-image-layers";
 import { composeCanvasImageLayerGroup, decodeAndComposeImageLayers, inspectImageLayer, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
 import { patchImageLayerBackground } from "@/services/canvas-image-layer-source";
 import { imageLayerTargetName } from "@/lib/canvas/canvas-image-layer-plan";
@@ -157,7 +157,7 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
             if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
             if (extraction?.canvas && (info.width !== extraction.canvas.width || info.height !== extraction.canvas.height)) throw new Error("图层尺寸与底图不一致，已停止后续调用");
             needsRemoval = Boolean(extraction?.index && !hasUsableLayerTransparency(info) && extraction.allowBackgroundRemoval && extraction.phase === "extract");
-            if (!needsRemoval) validateImageLayerRole(info, extraction!.index);
+            if (!needsRemoval) validateImageLayerOutput(info);
             if (extraction?.index === 0 && extraction.backgroundPatch) result.images[0] = await patchImageLayerBackground(normalized.image, extraction.backgroundPatch);
             extraction = { ...extraction!, phase: needsRemoval ? "background-removal-required" : "complete", extractionTaskId: extraction?.phase === "extract" ? task.id : extraction?.extractionTaskId, rejectedTaskId: undefined };
         }
@@ -485,7 +485,7 @@ export async function buildExperimentalImageLayerResult(root: CanvasNodeData, no
     const rejected: CanvasNodeData[] = [];
     for (const item of candidates) {
         try {
-            validateImageLayerRole(await inspectImageLayer({ dataUrl: item.node.metadata!.content!, storageKey: item.node.metadata?.storageKey }), item.index);
+            validateImageLayerOutput(await inspectImageLayer({ dataUrl: item.node.metadata!.content!, storageKey: item.node.metadata?.storageKey }));
             ready.push(item);
         } catch (error) {
             rejected.push({ ...item.node, metadata: { ...item.node.metadata, status: "error", errorDetails: error instanceof Error ? error.message : "图层资源验收失败", ...(item.node.metadata?.layerExtraction ? { layerExtraction: { ...item.node.metadata.layerExtraction, rejectedTaskId: item.node.metadata.taskId } } : {}) } });

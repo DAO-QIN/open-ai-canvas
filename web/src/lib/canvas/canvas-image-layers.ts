@@ -92,13 +92,19 @@ export function hasUsableLayerTransparency(info: LayerRasterInfo) {
     return info.transparent && (info.transparentPixels === undefined || info.transparentPixels >= Math.max(1, Math.ceil(info.width * info.height * 0.001)));
 }
 
+/** 最终产出保留原始 alpha；透明度只决定是否走既有去背景流程，不阻止显示和合成。 */
+export function validateImageLayerOutput(info: LayerRasterInfo) {
+    if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
+}
+
+/** 原图底板修补的输入仍要求完整不透明，避免改变区域外原像素。 */
 export function validateImageLayerRole(info: LayerRasterInfo, index: number) {
     if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
     if (index === 0 && info.opaque !== true) throw new Error("背景底图仍含透明或半透明像素，未形成完整不透明场景；请单独重新生成背景，不会自动付费重试");
     if (index > 0 && !hasUsableLayerTransparency(info)) throw new Error("对象图层未返回有效的真实透明背景，棋盘格、纯色或零散透明像素不能作为去背景结果");
 }
 
-/** 底图可以不透明；其他图层必须有真实 alpha。允许阴影和半透明边缘相互叠加。 */
+/** 最终图层只按资源、尺寸和数量验收，保留其真实 alpha。 */
 export function validateLayerRasters(layers: LayerRasterInfo[]) {
     if (layers.length < 2) throw new Error("拆层至少需要两张独立图片，单张拼版图不能作为图层结果");
     if (layers.length > MAX_IMAGE_LAYERS) throw new Error(`图层数量超过 ${MAX_IMAGE_LAYERS} 层处理上限`);
@@ -107,8 +113,8 @@ export function validateLayerRasters(layers: LayerRasterInfo[]) {
     if (layers.some((layer) => layer.width !== width || layer.height !== height)) throw new Error("图层尺寸不一致，无法确定合成坐标；请使用同尺寸透明图层输出");
     if (width * height > MAX_LAYER_PIXELS || width * height * layers.length > MAX_GROUP_PIXELS) throw new Error("图层总像素量超过处理上限");
     const opaque = layers.flatMap((layer, index) => (layer.transparent ? [] : [index]));
-    if (opaque.length > 1) throw new Error("拆层结果包含多张不透明图片，未返回独立透明图层");
-    // API 未提供位置或语义名称。仅把唯一不透明底图放到底部，透明层保留返回顺序。
+    // 只有唯一候选底图时沿用置底规则；多张候选不猜角色，保留模型输出顺序。
+    if (opaque.length !== 1) return layers.map((_, index) => index);
     return [...opaque, ...layers.flatMap((layer, index) => (layer.transparent ? [index] : []))];
 }
 
