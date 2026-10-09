@@ -17,6 +17,7 @@ import (
 	"yingce/backend/internal/kernel"
 
 	"golang.org/x/net/http/httpproxy"
+	"golang.org/x/net/proxy"
 )
 
 const (
@@ -98,6 +99,30 @@ func ValidateCustomRelayURL(rawURL string) (*url.URL, error) {
 func OutboundHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Transport: outboundTransport,
+		Timeout:   timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= maxOutboundRedirects {
+				return errors.New("外部服务重定向次数过多")
+			}
+			_, err := ValidateOutboundURL(req.URL.String())
+			return err
+		},
+	}
+}
+
+// OutboundHTTPClientWithProxy 创建使用指定代理的出站客户端。
+// proxyURL 支持 socks5://、http://、https:// 格式；空字符串时回退到全局客户端。
+func OutboundHTTPClientWithProxy(timeout time.Duration, proxyURL string) *http.Client {
+	proxyURL = strings.TrimSpace(proxyURL)
+	if proxyURL == "" {
+		return OutboundHTTPClient(timeout)
+	}
+	transport := newOutboundTransportWithProxy(proxyURL)
+	if transport == nil {
+		return OutboundHTTPClient(timeout)
+	}
+	return &http.Client{
+		Transport: transport,
 		Timeout:   timeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= maxOutboundRedirects {
@@ -282,6 +307,50 @@ func outboundProxyFromEnvironment(req *http.Request) (*url.URL, error) {
 		return nil, nil
 	}
 	return httpproxy.FromEnvironment().ProxyFunc()(req.URL)
+}
+
+// newOutboundTransportWithProxy 创建使用指定代理的 Transport。
+// 支持 socks5://、socks5h://、http://、https://；返回 nil 表示代理 URL 无效。
+// 目标主机名不做本地解析，直接交给代理服务器远端解析（socks5 与 socks5h 同义）。
+// 本地 DNS 在 TUN/VPN 模式下会返回 fake-ip，若先本地解析再经代
+// 理连接会导致远端拿到不可达的假 IP；交给远端解析可避免此问题。
+func newOutboundTransportWithProxy(proxyURL string) *http.Transport {
+	parsed, err := url.Parse(proxyURL)
+	if err != nil || parsed.Host == "" {
+		return nil
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	forwardDialer := &net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}
+
+	transport := &http.Transport{
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   20,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   15 * time.Second,
+		ExpectContinueTimeout: time.Second,
+	}
+
+	switch scheme {
+	case "socks5", "socks5h":
+		transport.Proxy = nil
+		d, derr := proxy.FromURL(parsed, forwardDialer)
+		if derr != nil {
+			return nil
+		}
+		contextDialer, ok := d.(proxy.ContextDialer)
+		if !ok {
+			return nil
+		}
+		transport.DialContext = contextDialer.DialContext
+	case "http", "https":
+		transport.Proxy = http.ProxyURL(parsed)
+		transport.DialContext = forwardDialer.DialContext
+	default:
+		return nil
+	}
+
+	return transport
 }
 
 func configuredProxyHost(host string) bool {

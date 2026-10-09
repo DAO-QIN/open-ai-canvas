@@ -25,6 +25,7 @@ type ChannelFormValues = {
     useGlobalConcurrency?: boolean;
     concurrencyLimit?: number;
     enabled?: boolean;
+    proxyUrl?: string;
 };
 
 export function adminChannelSavePayload(values: ChannelFormValues) {
@@ -37,6 +38,7 @@ export function adminChannelSavePayload(values: ChannelFormValues) {
         useGlobalConcurrency: values.useGlobalConcurrency !== false,
         concurrencyLimit: values.useGlobalConcurrency === false ? values.concurrencyLimit : undefined,
         enabled: values.enabled !== false,
+        proxyUrl: values.proxyUrl?.trim() || "",
     };
 }
 
@@ -129,8 +131,9 @@ export default function ChannelsPage() {
                       useGlobalConcurrency: !channel.concurrencyLimit,
                       concurrencyLimit: channel.concurrencyLimit || undefined,
                       enabled: channel.enabled !== false,
+                      proxyUrl: channel.proxyUrl || "",
                   }
-                : { name: "", baseUrl: "", apiKey: "", secretKey: "", headers: [], useGlobalConcurrency: true, concurrencyLimit: undefined, enabled: true },
+                : { name: "", baseUrl: "", apiKey: "", secretKey: "", headers: [], useGlobalConcurrency: true, concurrencyLimit: undefined, enabled: true, proxyUrl: "" },
         );
         setDrawerOpen(true);
     };
@@ -393,6 +396,13 @@ export default function ChannelsPage() {
                             <ChannelHeadersEditor />
                         </Form.Item>
                     </div>
+                    <Form.Item
+                        name="proxyUrl"
+                        label="代理地址"
+                        extra="为该渠道单独配置出站代理，支持 socks5://、http://、https://。留空则使用全局环境变量代理。"
+                    >
+                        <Input placeholder="例如：socks5://127.0.0.1:1080 或 http://127.0.0.1:7890" />
+                    </Form.Item>
                     <Form.Item name="useGlobalConcurrency" label="跟随系统并发配置" valuePropName="checked">
                         <Switch />
                     </Form.Item>

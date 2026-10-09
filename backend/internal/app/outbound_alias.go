@@ -30,6 +30,10 @@ func OutboundHTTPClient(timeout time.Duration) *http.Client {
 	return outbound.OutboundHTTPClient(timeout)
 }
 
+func OutboundHTTPClientWithProxy(timeout time.Duration, proxyURL string) *http.Client {
+	return outbound.OutboundHTTPClientWithProxy(timeout, proxyURL)
+}
+
 func ApplyDefaultOutboundHeaders(req *http.Request) {
 	outbound.ApplyDefaultOutboundHeaders(req)
 }
