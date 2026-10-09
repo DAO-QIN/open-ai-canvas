@@ -189,7 +189,11 @@ func (s *Service) channelFromRequest(req ChannelRequest, channel model.ModelChan
 	}
 	channel.ModelsJSON = string(modelsJSON)
 	channel.HeadersJSON = headersJSON
-	channel.ProxyURL = strings.TrimSpace(req.ProxyURL)
+	proxyURL := strings.TrimSpace(req.ProxyURL)
+	if _, err := ValidateProxyURL(proxyURL); err != nil {
+		return channel, err
+	}
+	channel.ProxyURL = proxyURL
 	if req.Enabled != nil {
 		channel.Enabled = *req.Enabled
 	}

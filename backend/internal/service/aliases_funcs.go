@@ -60,6 +60,7 @@ var (
 	ValidateCapabilitySpec                     = app.ValidateCapabilitySpec
 	ValidateChannelModelPrice                  = app.ValidateChannelModelPrice
 	ValidateCustomRelayURL                     = app.ValidateCustomRelayURL
+	ValidateProxyURL                           = app.ValidateProxyURL
 	ValidateLogicalModelPrice                  = app.ValidateLogicalModelPrice
 	ValidateOutboundHost                       = app.ValidateOutboundHost
 	ValidateOutboundURL                        = app.ValidateOutboundURL

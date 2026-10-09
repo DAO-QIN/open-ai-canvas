@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"yingce/backend/internal/model"
@@ -186,6 +187,24 @@ func TestChannelFromRequestStoresAndClearsHeaders(t *testing.T) {
 	}
 	if channel.HeadersJSON != `[]` {
 		t.Fatalf("cleared HeadersJSON = %q", channel.HeadersJSON)
+	}
+}
+
+func TestChannelFromRequestValidatesProxyURL(t *testing.T) {
+	limit := 4
+	base := model.ModelChannel{}
+	channel, err := channelFromRequest(ChannelRequest{Name: "Proxy", BaseURL: "https://93.184.216.34/v1", ProxyURL: "socks5://user:secret@127.0.0.1:1080", ConcurrencyLimit: &limit}, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if channel.ProxyURL != "socks5://user:secret@127.0.0.1:1080" {
+		t.Fatalf("proxy URL = %q", channel.ProxyURL)
+	}
+	for _, proxyURL := range []string{"ftp://127.0.0.1:1080", "socks5://", "socks5://127.0.0.1:1080#fragment", "http://" + strings.Repeat("a", 506)} {
+		_, err := channelFromRequest(ChannelRequest{Name: "Proxy", BaseURL: "https://93.184.216.34/v1", ProxyURL: proxyURL, ConcurrencyLimit: &limit}, base)
+		if err == nil {
+			t.Fatalf("invalid proxy URL %q was accepted", proxyURL)
+		}
 	}
 }
 

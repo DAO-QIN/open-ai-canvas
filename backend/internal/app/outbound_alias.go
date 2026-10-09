@@ -26,6 +26,11 @@ func ValidateCustomRelayURL(rawURL string) (*url.URL, error) {
 	return parsed, mapOutboundError(err)
 }
 
+func ValidateProxyURL(rawURL string) (*url.URL, error) {
+	parsed, err := outbound.ValidateProxyURL(rawURL)
+	return parsed, mapOutboundError(err)
+}
+
 func OutboundHTTPClient(timeout time.Duration) *http.Client {
 	return outbound.OutboundHTTPClient(timeout)
 }

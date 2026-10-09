@@ -24,6 +24,7 @@ const (
 	maxOutboundRedirects     = 5
 	maxOutboundHeaderCount   = 32
 	maxOutboundHeaderBytes   = 16 << 10
+	maxProxyURLBytes         = 512
 	CustomRelayHeadersHeader = "X-Canvas-Upstream-Headers"
 	DefaultOutboundUserAgent = "CanvasViewport/1.0 (+https://github.com/ddcat-ai/open-ai-canvas)"
 )
@@ -96,6 +97,30 @@ func ValidateCustomRelayURL(rawURL string) (*url.URL, error) {
 	return parsed, nil
 }
 
+// ValidateProxyURL 校验渠道级代理地址。代理可以使用认证信息和私网地址，
+// 因为它是管理员配置的出口，而不是用户可控的上游 URL。
+func ValidateProxyURL(rawURL string) (*url.URL, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return nil, nil
+	}
+	if len(rawURL) > maxProxyURLBytes {
+		return nil, BadAuthRequest("渠道代理地址过长")
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil || !parsed.IsAbs() || parsed.Hostname() == "" {
+		return nil, BadAuthRequest("渠道代理地址无效")
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "socks5" && scheme != "socks5h" && scheme != "http" && scheme != "https" {
+		return nil, BadAuthRequest("渠道代理只支持 socks5/socks5h/http/https")
+	}
+	if parsed.Fragment != "" {
+		return nil, BadAuthRequest("渠道代理地址不允许包含片段")
+	}
+	return parsed, nil
+}
+
 func OutboundHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
 		Transport: outboundTransport,
@@ -119,7 +144,7 @@ func OutboundHTTPClientWithProxy(timeout time.Duration, proxyURL string) *http.C
 	}
 	transport := newOutboundTransportWithProxy(proxyURL)
 	if transport == nil {
-		return OutboundHTTPClient(timeout)
+		return &http.Client{Transport: rejectingTransport{err: errors.New("渠道代理地址无效")}, Timeout: timeout}
 	}
 	return &http.Client{
 		Transport: transport,
@@ -132,6 +157,12 @@ func OutboundHTTPClientWithProxy(timeout time.Duration, proxyURL string) *http.C
 			return err
 		},
 	}
+}
+
+type rejectingTransport struct{ err error }
+
+func (t rejectingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, t.err
 }
 
 func CustomRelayHTTPClient(timeout time.Duration) *http.Client {
@@ -315,8 +346,8 @@ func outboundProxyFromEnvironment(req *http.Request) (*url.URL, error) {
 // 本地 DNS 在 TUN/VPN 模式下会返回 fake-ip，若先本地解析再经代
 // 理连接会导致远端拿到不可达的假 IP；交给远端解析可避免此问题。
 func newOutboundTransportWithProxy(proxyURL string) *http.Transport {
-	parsed, err := url.Parse(proxyURL)
-	if err != nil || parsed.Host == "" {
+	parsed, err := ValidateProxyURL(proxyURL)
+	if err != nil || parsed == nil {
 		return nil
 	}
 	scheme := strings.ToLower(parsed.Scheme)
