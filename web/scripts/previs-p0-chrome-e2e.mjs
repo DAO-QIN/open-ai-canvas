@@ -277,6 +277,13 @@ async function connectCdp(cdpPort) {
             const rect = el.getBoundingClientRect();
             const style = getComputedStyle(el);
             if (rect.width <= 0 || rect.height <= 0 || style.display === "none" || style.visibility === "hidden" || style.pointerEvents === "none" || Number(style.opacity) <= 0 || el.matches(":disabled") || el.getAttribute("aria-disabled") === "true") return null;
+            // 入场缩放作用在弹窗祖先上，按钮本身的 opacity 和动画可能都是正常值。
+            // 软件渲染可延迟首帧，让初始缩放坐标看似稳定；必须检查整条祖先链。
+            for (let ancestor = el; ancestor; ancestor = ancestor.parentElement) {
+                const ancestorStyle = getComputedStyle(ancestor);
+                if (ancestorStyle.display === "none" || ancestorStyle.visibility === "hidden" || Number(ancestorStyle.opacity) <= 0) return null;
+                if (ancestor.getAnimations().some((animation) => animation.pending || animation.playState === "running")) return null;
+            }
             const x = rect.left + rect.width / 2;
             const y = rect.top + rect.height / 2;
             if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return null;
@@ -289,6 +296,7 @@ async function connectCdp(cdpPort) {
         // 点击落到遮罩上（mask.closable=false）就完全无效（"留在预演台" 曾这样偶发失败）。
         const deadline = Date.now() + 8000;
         let previous = null;
+        let hovered = null;
         let stableSince = 0;
         let box = null;
         while (Date.now() < deadline) {
@@ -296,8 +304,13 @@ async function connectCdp(cdpPort) {
             if (next && previous && next.x === previous.x && next.y === previous.y) {
                 if (!stableSince) stableSince = Date.now();
                 if (Date.now() - stableSince >= 300) {
-                    box = next;
-                    break;
+                    if (hovered && hovered.x === next.x && hovered.y === next.y) {
+                        box = next;
+                        break;
+                    }
+                    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: next.x, y: next.y, button: "left", buttons: 0 });
+                    hovered = next;
+                    stableSince = 0;
                 }
             } else {
                 stableSince = 0;
@@ -310,7 +323,7 @@ async function connectCdp(cdpPort) {
             return false;
         }
         const point = { x: box.x, y: box.y, button: "left", pointerType: "mouse" };
-        await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point, buttons: 0 });
+        // 移入鼠标后已重新等待动画和坐标稳定，避免 hover 引起的位移造成误点。
         await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, buttons: 1, clickCount: 1 });
         await sleep(50);
         await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, buttons: 0, clickCount: 1 });
