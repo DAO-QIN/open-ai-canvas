@@ -6,11 +6,17 @@ import { ImageSizePresetsEditor } from "../src/components/image-size-presets-edi
 import { ModelCapabilityEditor } from "../src/components/model-capability-editor";
 import { defaultImageCapabilityConfig, normalizeImageValue, normalizeModelCapabilityConfig } from "../src/lib/model-capabilities";
 import { IMAGE_RATIOS, IMAGE_RESOLUTIONS, imagePresetForRatio, imagePresetValue, imageQualityForSelection, imageQualityForTier, imageSizeConfigWithPresets, imageSizePresets, imageTierAvailable } from "../src/lib/image-size-presets";
+import { imageQualityLabel } from "../src/lib/image-quality";
 import { buildImageResolutionOptions } from "../src/lib/image-resolution-tiers";
 import { resolveImageRequestSize, validateImageSize } from "../src/services/api/image-validation";
 import { buildGeminiImageGenerationConfig } from "../src/lib/gemini-image";
 
 describe("统一图片分辨率与宽高比", () => {
+    test("画质公共映射覆盖创作与画布使用的 xhigh、max", () => {
+        expect(imageQualityLabel("xhigh")).toBe("超高");
+        expect(imageQualityLabel("MAX")).toBe("最高");
+    });
+
     test("管理员档位开关按已有比例启用，部分比例不显示为关闭", () => {
         for (const model of ["midjourney-1k", "midjourney-2k"]) {
             const profile = defaultImageCapabilityConfig("cangyuan-midjourney-v82", model);

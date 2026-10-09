@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSP
 import { Check, ChevronDown, Coins } from "lucide-react";
 import { Popover } from "antd";
 
+import { imageQualityLabel } from "@/lib/image-quality";
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { modelCapabilityConfigFor, videoDurationOptions } from "@/lib/model-capabilities";
 import { formatPriceRange, modelQuoteDescription, modelQuoteRequest, normalizeTierResolution, priceTierSummaryLabel, priceTiersForCurrentSelection } from "@/lib/model-pricing";
@@ -485,7 +486,8 @@ function tierSpecificationLabel(tier: NonNullable<NonNullable<AiConfig["channels
     const operation = selector.operation && selector.operation !== "*" ? operationLabels[selector.operation] || selector.operation : "";
     const details = [
         operation,
-        selector.quality && selector.quality !== "*" ? selector.quality.toUpperCase() : "",
+        selector.quality && selector.quality !== "*" ? imageQualityLabel(selector.quality) : "",
+        selector.resolution && selector.resolution !== "*" ? imageQualityLabel(selector.resolution) : "",
         selector.size && selector.size !== "*" ? selector.size : "",
         tier.resolution !== "*" ? tierResolutionLabel(tier.resolution) : "",
         tier.videoSeconds ? tierDurationLabel(tier.videoSeconds) : "",
