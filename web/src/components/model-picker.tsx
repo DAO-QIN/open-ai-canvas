@@ -31,6 +31,7 @@ type ModelPickerProps = {
     variant?: "default" | "creation";
     requirements?: ModelRequirements;
     showConfiguredModelName?: boolean;
+    modelFilter?: (model: string) => boolean;
 };
 
 export function ModelPicker({
@@ -48,6 +49,7 @@ export function ModelPicker({
     variant = "creation",
     requirements,
     showConfiguredModelName = false,
+    modelFilter,
 }: ModelPickerProps) {
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const pickerId = useId();
@@ -59,7 +61,7 @@ export function ModelPicker({
     const [activeGroupKey, setActiveGroupKey] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
-    const options = useMemo(() => Array.from(new Set(selectableModelsByCapability(config, capability).filter(Boolean))), [capability, config]);
+    const options = useMemo(() => Array.from(new Set(selectableModelsByCapability(config, capability).filter((model) => Boolean(model) && (!modelFilter || modelFilter(model))))), [capability, config, modelFilter]);
     const optionGroups = useMemo(() => groupModelsForPicker(config, options), [config, options]);
     const storedCurrent = value?.trim() || "";
     // 参数档位会在选中模型后由调用方归一到其能力配置，不能因为旧模型留下的参数而禁止切换。
