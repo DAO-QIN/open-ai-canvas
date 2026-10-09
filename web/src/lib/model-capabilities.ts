@@ -446,6 +446,14 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.resolutions = mini ? ["480p", "720p"] : ["720p"];
         video.operations.push("reference_to_video");
     }
+    if (["yuxibox-sd20", "yuxibox-sd25", "yuxibox-sd25-per-request"].includes(protocol || "")) {
+        const sd20 = protocol === "yuxibox-sd20";
+        video.references = { promptMaxChars: 16000, minImages: 0, maxImages: sd20 ? 9 : 30, maxImageBytes: 0, maxVideos: sd20 ? 3 : 10, maxVideoBytes: 0, maxVideoDurationSeconds: 0, maxAudios: sd20 ? 3 : 10, maxAudioBytes: 0, maxAudioDurationSeconds: 0 };
+        video.duration = sd20 ? { selection: "enum", values: [5, 10, 15], default: 15 } : { selection: "range", min: 4, max: 30, step: 1, default: 30 };
+        video.ratios = ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"];
+        video.resolutions = ["720p"];
+        video.operations.push("reference_to_video", "audio_to_video");
+    }
     return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video };
 }
 

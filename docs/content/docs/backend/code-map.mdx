@@ -5,6 +5,12 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+## YuxiBox SD 视频
+
+- 三个 Provider 的声明式合同与独立包：`plugin-packages/yuxibox-sd-video/`；生成入口 `generate-yuxibox-sd-video.mjs`，完整文档嵌入后生成 `.yingce-plugin` ZIP。
+- 默认能力：`backend/internal/app/model_capability_yuxibox.go` 和 `web/src/lib/model-capabilities.ts`；管理端协议切换沿用 `changeChannelModelCapability`，不自动改积分售价。
+- 协议、后端能力和管理端切换回归：`yuxibox_sd_video_test.go`、`model_capability_yuxibox_test.go`、`web/test/yuxibox-video.test.ts`。管理端连接测试采用当前模型的默认时长，避免固定 6 秒误伤枚举模型。
+
 预演台 Chrome 验收位于 `web/scripts/previs-p0-chrome-e2e.mjs`，使用真实 DEV 复现台与浏览器鼠标事件。点击驱动检查按钮及祖先的可见性、动画和命中位置，移入鼠标后再次等待坐标稳定，避免弹窗入场缩放把「留在预演台」点击送到遮罩。保存失败的关闭保护仍由 `canvas-previs-workbench.tsx` 和保存协调器处理。
 
 AI 拆图的编辑目的与语义工具约束位于 `web/src/lib/canvas/canvas-image-layer-plan.ts`（`applyImageLayerPlanningPurpose`）；页面 `use-canvas-media-tools.ts` 对新规划和历史规划使用同一约束后再进行边界校准。默认 `recompose` 要求修补后的不透明背景与必要前景；明确选择 `materials` 才保留原图副本。连续照片不自动输出局部矩形碎片，完整嵌入场景保留原像素。简洁弹窗提供原图框选、补充要求、视觉规划模型与拆分模型选择，页面自动先规划再拆分，默认不自动另存第二组素材；`canvas-image-layer-controls.tsx` 提供完成后免费另存入口。节点标题由 `imageLayerTargetName` 提取短名称，生成计划仍保留完整描述。`canvas-generation-task-sync.ts` 按移除标记设置初始可见性并据此生成首张合成图。`canvas-node-size.ts` 的 `fitImageMaterialNodeSize` 在素材创建和 `canvas-node-media-content.tsx` 解码后复用，避免极宽素材撑大布局；不增加后端或模型协议。

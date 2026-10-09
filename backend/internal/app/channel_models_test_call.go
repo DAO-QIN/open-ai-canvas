@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,6 +74,11 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 		}
 		videoProfile = profile.Video
 		videoRatio, videoResolution = videoTestDefaults(videoProfile)
+		// 使用模型已校验的默认时长，避免固定 6 秒误伤枚举时长协议。
+		if videoProfile.Duration.Default > 0 {
+			videoSecondsValue = videoProfile.Duration.Default
+			videoSeconds = strconv.Itoa(videoSecondsValue)
+		}
 	}
 	input := canvasGenerationInput{
 		Mode:   capability,

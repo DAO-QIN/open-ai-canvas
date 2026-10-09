@@ -1,0 +1,1254 @@
+{
+  "apiVersion": "yingce.plugin/v2",
+  "id": "yuxibox-sd-video",
+  "name": "YuxiBox SD 视频",
+  "version": "1.0.0",
+  "author": "YuxiBox / 影策",
+  "description": "YuxiBox Seedance 2.0、2.5 按秒及按次的声明式视频协议。",
+  "permissions": [
+    "generation.run",
+    "media.read"
+  ],
+  "configuration": {
+    "fields": [
+      {
+        "name": "apiKey",
+        "type": "secret",
+        "label": "API Key",
+        "required": true
+      }
+    ]
+  },
+  "contributes": {
+    "providers": [
+      {
+        "id": "yuxibox-sd20",
+        "label": "YuxiBox Seedance 2.0（按秒）",
+        "description": "seedance-2.0（YX） 专属协议；POST /v1/videos，GET /v1/videos/{id}，GET /v1/videos/{id}/content。",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://yuxibox.cn",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model",
+            "description": "当前协议对应的官方模型 ID，保留全角括号。"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt",
+            "description": "1–16000 字符。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "required": false,
+            "mapping": "seconds",
+            "description": "2.0 支持 5/10/15 秒，默认 15；2.5 支持 4–30 秒，默认 30。"
+          },
+          {
+            "name": "aspectRatio",
+            "type": "string",
+            "required": false,
+            "mapping": "ratio",
+            "description": "默认 16:9；使用 ratio 时不发送 size。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "required": false,
+            "mapping": "fixed 720P",
+            "description": "固定 720P，只校验，不发送未公开的分辨率字段。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "required": false,
+            "mapping": "reference_images[]",
+            "description": "按素材顺序发送图片 URL，不发送未经声明的 role。"
+          },
+          {
+            "name": "videos",
+            "type": "media[]",
+            "required": false,
+            "mapping": "videos[]",
+            "description": "按素材顺序发送参考视频 URL。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "required": false,
+            "mapping": "audios[]",
+            "description": "按素材顺序发送参考音频 URL。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.model"
+                },
+                "seedance-2.0（YX）"
+              ]
+            },
+            "message": "当前 YuxiBox 协议只适用于 seedance-2.0（YX）"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$len": {
+                        "$ref": "request.prompt"
+                      }
+                    },
+                    1
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$len": {
+                        "$ref": "request.prompt"
+                      }
+                    },
+                    16000
+                  ]
+                }
+              ]
+            },
+            "message": "YuxiBox 视频提示词须为 1–16000 字符"
+          },
+          {
+            "assert": {
+              "$gte": [
+                {
+                  "$ref": "request.duration"
+                },
+                0
+              ]
+            },
+            "message": "YuxiBox 视频时长不能为负数"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$if": {
+                    "condition": {
+                      "$gt": [
+                        {
+                          "$ref": "request.duration"
+                        },
+                        0
+                      ]
+                    },
+                    "then": {
+                      "$ref": "request.duration"
+                    },
+                    "else": 15
+                  }
+                },
+                [
+                  5,
+                  10,
+                  15
+                ]
+              ]
+            },
+            "message": "YuxiBox seedance-2.0（YX） 视频时长超出支持范围"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$lower": {
+                    "$coalesce": [
+                      {
+                        "$ref": "request.resolution"
+                      },
+                      "720p"
+                    ]
+                  }
+                },
+                [
+                  "720p"
+                ]
+              ]
+            },
+            "message": "YuxiBox 输出固定为 720P"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.aspectRatio"
+                    },
+                    "16:9"
+                  ]
+                },
+                [
+                  "adaptive",
+                  "16:9",
+                  "9:16",
+                  "1:1",
+                  "4:3",
+                  "3:4",
+                  "21:9"
+                ]
+              ]
+            },
+            "message": "YuxiBox 不支持当前画面比例"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                9
+              ]
+            },
+            "message": "YuxiBox seedance-2.0（YX） 参考图片超出上限"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
+                  }
+                },
+                3
+              ]
+            },
+            "message": "YuxiBox seedance-2.0（YX） 参考视频超出上限"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                3
+              ]
+            },
+            "message": "YuxiBox seedance-2.0（YX） 参考音频超出上限"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.generateAudio"
+                },
+                false
+              ]
+            },
+            "message": "YuxiBox 未公开生成音频开关"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.watermark"
+                },
+                false
+              ]
+            },
+            "message": "YuxiBox 未公开水印开关"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v1/videos",
+          "contentType": "application/json",
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "prompt": {
+              "$ref": "request.prompt"
+            },
+            "seconds": {
+              "$toString": {
+                "$if": {
+                  "condition": {
+                    "$gt": [
+                      {
+                        "$ref": "request.duration"
+                      },
+                      0
+                    ]
+                  },
+                  "then": {
+                    "$ref": "request.duration"
+                  },
+                  "else": 15
+                }
+              }
+            },
+            "ratio": {
+              "$coalesce": [
+                {
+                  "$ref": "request.aspectRatio"
+                },
+                "16:9"
+              ]
+            },
+            "reference_images": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.images"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$ref": "media.value"
+                  }
+                }
+              }
+            },
+            "videos": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.videos"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$ref": "media.value"
+                  }
+                }
+              }
+            },
+            "audios": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.audios"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$ref": "media.value"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/v1/videos/{{taskId}}"
+        },
+        "result": {
+          "method": "GET",
+          "path": "/v1/videos/{{taskId}}/content",
+          "headers": {
+            "Accept": "video/mp4"
+          }
+        },
+        "response": {
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          },
+          "status": {
+            "$coalesce": [
+              {
+                "$ref": "response.status"
+              },
+              "queued"
+            ]
+          },
+          "message": {
+            "$ref": "response.error.message"
+          },
+          "errorPaths": [
+            "error.code"
+          ],
+          "videos": {
+            "$coalesce": [
+              {
+                "$ref": "response.video_url"
+              },
+              {
+                "$ref": "response.download_url"
+              }
+            ]
+          },
+          "resultEphemeral": true
+        }
+      },
+      {
+        "id": "yuxibox-sd25",
+        "label": "YuxiBox Seedance 2.5（按秒）",
+        "description": "seedance-2.5（YX） 专属协议；POST /v1/videos，GET /v1/videos/{id}，GET /v1/videos/{id}/content。",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://yuxibox.cn",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model",
+            "description": "当前协议对应的官方模型 ID，保留全角括号。"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt",
+            "description": "1–16000 字符。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "required": false,
+            "mapping": "seconds",
+            "description": "2.0 支持 5/10/15 秒，默认 15；2.5 支持 4–30 秒，默认 30。"
+          },
+          {
+            "name": "aspectRatio",
+            "type": "string",
+            "required": false,
+            "mapping": "ratio",
+            "description": "默认 16:9；使用 ratio 时不发送 size。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "required": false,
+            "mapping": "fixed 720P",
+            "description": "固定 720P，只校验，不发送未公开的分辨率字段。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "required": false,
+            "mapping": "reference_images[]",
+            "description": "按素材顺序发送图片 URL，不发送未经声明的 role。"
+          },
+          {
+            "name": "videos",
+            "type": "media[]",
+            "required": false,
+            "mapping": "videos[]",
+            "description": "按素材顺序发送参考视频 URL。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "required": false,
+            "mapping": "audios[]",
+            "description": "按素材顺序发送参考音频 URL。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.model"
+                },
+                "seedance-2.5（YX）"
+              ]
+            },
+            "message": "当前 YuxiBox 协议只适用于 seedance-2.5（YX）"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$len": {
+                        "$ref": "request.prompt"
+                      }
+                    },
+                    1
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$len": {
+                        "$ref": "request.prompt"
+                      }
+                    },
+                    16000
+                  ]
+                }
+              ]
+            },
+            "message": "YuxiBox 视频提示词须为 1–16000 字符"
+          },
+          {
+            "assert": {
+              "$gte": [
+                {
+                  "$ref": "request.duration"
+                },
+                0
+              ]
+            },
+            "message": "YuxiBox 视频时长不能为负数"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 30
+                      }
+                    },
+                    4
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 30
+                      }
+                    },
+                    30
+                  ]
+                }
+              ]
+            },
+            "message": "YuxiBox seedance-2.5（YX） 视频时长超出支持范围"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$lower": {
+                    "$coalesce": [
+                      {
+                        "$ref": "request.resolution"
+                      },
+                      "720p"
+                    ]
+                  }
+                },
+                [
+                  "720p"
+                ]
+              ]
+            },
+            "message": "YuxiBox 输出固定为 720P"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.aspectRatio"
+                    },
+                    "16:9"
+                  ]
+                },
+                [
+                  "adaptive",
+                  "16:9",
+                  "9:16",
+                  "1:1",
+                  "4:3",
+                  "3:4",
+                  "21:9"
+                ]
+              ]
+            },
+            "message": "YuxiBox 不支持当前画面比例"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                30
+              ]
+            },
+            "message": "YuxiBox seedance-2.5（YX） 参考图片超出上限"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
+                  }
+                },
+                10
+              ]
+            },
+            "message": "YuxiBox seedance-2.5（YX） 参考视频超出上限"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                10
+              ]
+            },
+            "message": "YuxiBox seedance-2.5（YX） 参考音频超出上限"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.generateAudio"
+                },
+                false
+              ]
+            },
+            "message": "YuxiBox 未公开生成音频开关"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.watermark"
+                },
+                false
+              ]
+            },
+            "message": "YuxiBox 未公开水印开关"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v1/videos",
+          "contentType": "application/json",
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "prompt": {
+              "$ref": "request.prompt"
+            },
+            "seconds": {
+              "$toString": {
+                "$if": {
+                  "condition": {
+                    "$gt": [
+                      {
+                        "$ref": "request.duration"
+                      },
+                      0
+                    ]
+                  },
+                  "then": {
+                    "$ref": "request.duration"
+                  },
+                  "else": 30
+                }
+              }
+            },
+            "ratio": {
+              "$coalesce": [
+                {
+                  "$ref": "request.aspectRatio"
+                },
+                "16:9"
+              ]
+            },
+            "reference_images": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.images"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$ref": "media.value"
+                  }
+                }
+              }
+            },
+            "videos": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.videos"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$ref": "media.value"
+                  }
+                }
+              }
+            },
+            "audios": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.audios"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$ref": "media.value"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/v1/videos/{{taskId}}"
+        },
+        "result": {
+          "method": "GET",
+          "path": "/v1/videos/{{taskId}}/content",
+          "headers": {
+            "Accept": "video/mp4"
+          }
+        },
+        "response": {
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          },
+          "status": {
+            "$coalesce": [
+              {
+                "$ref": "response.status"
+              },
+              "queued"
+            ]
+          },
+          "message": {
+            "$ref": "response.error.message"
+          },
+          "errorPaths": [
+            "error.code"
+          ],
+          "videos": {
+            "$coalesce": [
+              {
+                "$ref": "response.video_url"
+              },
+              {
+                "$ref": "response.download_url"
+              }
+            ]
+          },
+          "resultEphemeral": true
+        }
+      },
+      {
+        "id": "yuxibox-sd25-per-request",
+        "label": "YuxiBox Seedance 2.5（按次）",
+        "description": "seedance-2.5（YX）-按次 专属协议；POST /v1/videos，GET /v1/videos/{id}，GET /v1/videos/{id}/content。",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://yuxibox.cn",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model",
+            "description": "当前协议对应的官方模型 ID，保留全角括号。"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt",
+            "description": "1–16000 字符。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "required": false,
+            "mapping": "seconds",
+            "description": "2.0 支持 5/10/15 秒，默认 15；2.5 支持 4–30 秒，默认 30。"
+          },
+          {
+            "name": "aspectRatio",
+            "type": "string",
+            "required": false,
+            "mapping": "ratio",
+            "description": "默认 16:9；使用 ratio 时不发送 size。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "required": false,
+            "mapping": "fixed 720P",
+            "description": "固定 720P，只校验，不发送未公开的分辨率字段。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "required": false,
+            "mapping": "reference_images[]",
+            "description": "按素材顺序发送图片 URL，不发送未经声明的 role。"
+          },
+          {
+            "name": "videos",
+            "type": "media[]",
+            "required": false,
+            "mapping": "videos[]",
+            "description": "按素材顺序发送参考视频 URL。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "required": false,
+            "mapping": "audios[]",
+            "description": "按素材顺序发送参考音频 URL。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.model"
+                },
+                "seedance-2.5（YX）-按次"
+              ]
+            },
+            "message": "当前 YuxiBox 协议只适用于 seedance-2.5（YX）-按次"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$len": {
+                        "$ref": "request.prompt"
+                      }
+                    },
+                    1
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$len": {
+                        "$ref": "request.prompt"
+                      }
+                    },
+                    16000
+                  ]
+                }
+              ]
+            },
+            "message": "YuxiBox 视频提示词须为 1–16000 字符"
+          },
+          {
+            "assert": {
+              "$gte": [
+                {
+                  "$ref": "request.duration"
+                },
+                0
+              ]
+            },
+            "message": "YuxiBox 视频时长不能为负数"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 30
+                      }
+                    },
+                    4
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$if": {
+                        "condition": {
+                          "$gt": [
+                            {
+                              "$ref": "request.duration"
+                            },
+                            0
+                          ]
+                        },
+                        "then": {
+                          "$ref": "request.duration"
+                        },
+                        "else": 30
+                      }
+                    },
+                    30
+                  ]
+                }
+              ]
+            },
+            "message": "YuxiBox seedance-2.5（YX）-按次 视频时长超出支持范围"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$lower": {
+                    "$coalesce": [
+                      {
+                        "$ref": "request.resolution"
+                      },
+                      "720p"
+                    ]
+                  }
+                },
+                [
+                  "720p"
+                ]
+              ]
+            },
+            "message": "YuxiBox 输出固定为 720P"
+          },
+          {
+            "assert": {
+              "$in": [
+                {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.aspectRatio"
+                    },
+                    "16:9"
+                  ]
+                },
+                [
+                  "adaptive",
+                  "16:9",
+                  "9:16",
+                  "1:1",
+                  "4:3",
+                  "3:4",
+                  "21:9"
+                ]
+              ]
+            },
+            "message": "YuxiBox 不支持当前画面比例"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                30
+              ]
+            },
+            "message": "YuxiBox seedance-2.5（YX）-按次 参考图片超出上限"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
+                  }
+                },
+                10
+              ]
+            },
+            "message": "YuxiBox seedance-2.5（YX）-按次 参考视频超出上限"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                10
+              ]
+            },
+            "message": "YuxiBox seedance-2.5（YX）-按次 参考音频超出上限"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.generateAudio"
+                },
+                false
+              ]
+            },
+            "message": "YuxiBox 未公开生成音频开关"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.watermark"
+                },
+                false
+              ]
+            },
+            "message": "YuxiBox 未公开水印开关"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v1/videos",
+          "contentType": "application/json",
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "prompt": {
+              "$ref": "request.prompt"
+            },
+            "seconds": {
+              "$toString": {
+                "$if": {
+                  "condition": {
+                    "$gt": [
+                      {
+                        "$ref": "request.duration"
+                      },
+                      0
+                    ]
+                  },
+                  "then": {
+                    "$ref": "request.duration"
+                  },
+                  "else": 30
+                }
+              }
+            },
+            "ratio": {
+              "$coalesce": [
+                {
+                  "$ref": "request.aspectRatio"
+                },
+                "16:9"
+              ]
+            },
+            "reference_images": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.images"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$ref": "media.value"
+                  }
+                }
+              }
+            },
+            "videos": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.videos"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$ref": "media.value"
+                  }
+                }
+              }
+            },
+            "audios": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.audios"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$ref": "media.value"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/v1/videos/{{taskId}}"
+        },
+        "result": {
+          "method": "GET",
+          "path": "/v1/videos/{{taskId}}/content",
+          "headers": {
+            "Accept": "video/mp4"
+          }
+        },
+        "response": {
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          },
+          "status": {
+            "$coalesce": [
+              {
+                "$ref": "response.status"
+              },
+              "queued"
+            ]
+          },
+          "message": {
+            "$ref": "response.error.message"
+          },
+          "errorPaths": [
+            "error.code"
+          ],
+          "videos": {
+            "$coalesce": [
+              {
+                "$ref": "response.video_url"
+              },
+              {
+                "$ref": "response.download_url"
+              }
+            ]
+          },
+          "resultEphemeral": true
+        }
+      }
+    ]
+  },
+  "documentation": "# YuxiBox SD 视频\n\n通过三个独立协议接入 YuxiBox 的 Seedance 2.0、Seedance 2.5 按秒及按次模型。选择协议后，管理端「能力与参数」自动填入官方支持的时长、比例、720P 分辨率和参考素材数量。\n\nBase URL：`https://yuxibox.cn`。使用该站 default 或 seedance 分组的 API Key，密钥只由宿主渠道保存与使用，不进入插件包。\n\n一手依据：[YuxiBox 模型广场](https://yuxibox.cn/pricing) 中对应模型的「API」标签页。完整请求、查询、结果下载与默认值见 [docs/interface.md](docs/interface.md)。\n\n---\n\n# YuxiBox SD 视频接口\n\n## 协议和默认能力\n\n| 协议 | 官方模型 ID | 时长 / 默认 | 参考图片 / 视频 / 音频 |\n| --- | --- | --- | --- |\n| yuxibox-sd20 | seedance-2.0（YX） | 5、10、15秒 / 15秒 | 9 / 3 / 3 |\n| yuxibox-sd25 | seedance-2.5（YX） | 4–30秒，步长1 / 30秒 | 30 / 10 / 10 |\n| yuxibox-sd25-per-request | seedance-2.5（YX）-按次 | 4–30秒，步长1 / 30秒 | 30 / 10 / 10 |\n\n模型 ID 保留全角括号，不自行转成其他模型别名。提示词 1–16000 字符；比例支持 `adaptive,16:9,9:16,1:1,4:3,3:4,21:9`，默认 `16:9`；分辨率固定 `720p`。支持文生、图生、混合参考及音频参考输入。生成音频和水印开关未公开，不显示也不发送；音轨有无由上游决定。\n\n官方仅公布 multipart 单图上传 20 MiB；本插件使用 JSON URL 数组，因此不把该上传限制套到所有参考 URL。未公布的 URL 素材字节和时长限制配置为 0（不增加供应商限制），宿主上传和出站校验仍执行。参考数量是网关上限，具体类型仍受模型权限限制。\n\n## 请求映射\n\nBearer 鉴权。`POST /v1/videos` 发送 JSON 顶层字段：`model`、`prompt`、`seconds`（由统一 duration 转字符串）、`ratio`（由 aspectRatio 映射）。使用 ratio 时省略 size，不发送未公开的 resolution、face_split、videoGenerateAudio、任意 extra JSON 或宿主元数据。\n\n图片映射为 `reference_images:[url]`，视频为 `videos:[url]`，音频为 `audios:[url]`，各自按宿主引用顺序发送；空数组省略。宿主转换已授权素材为公网签名 URL，插件仅做声明式转换。全部图片作为顺序参考图，不宣称首尾帧角色。\n\n无 duration 时采用协议默认值，显式负值拒绝；协议运行时在提交前校验模型匹配、提示词长度、时长、比例、分辨率和素材数量。能力默认配置由前后端共同填入，价格和启用状态由管理员明确配置，不从协议自动推导积分售价。\n\n## 任务与结果\n\n创建响应读取 `id`；`GET /v1/videos/{id}` 查询状态 `queued/in_progress/completed/failed`。错误读取 `error.message`、`error.code`；完成结果读取 `video_url` 或 `download_url`。声明鉴权下载 `GET /v1/videos/{id}/content`，宿主下载转存后再将媒体返回画布。结果标记为 ephemeral，避免依赖上游永久保留。\n\n没有公开取消接口，不声明 DELETE。轮询失败或超时时保存任务 ID 并继续 GET 查询，不重复 POST 付费生成；恢复、转存、SSRF、并发和权限沿用宿主运行时。\n\n## 构建\n\n`node plugin-packages/generate-yuxibox-sd-video.mjs` 生成清单；`node plugin-packages/embed-documentation.mjs yuxibox-sd-video` 嵌入完整文档；使用项目 package-selected.ps1 或 build-packages.sh 生成根目录含 manifest.json 的 `.yingce-plugin` ZIP 包。插件不带可执行代码，权限仅为 generation.run 与 media.read。\n\n<!-- YINGCE_MANIFEST_CONTRACT_START -->\n## Manifest 完整接口定义\n\n以下 JSON 与插件包内实际 `manifest.json` 逐字段一致，覆盖插件身份、权限、配置、鉴权、参数、校验、创建、Agent、查询、取消、结果下载、响应和 Agent 响应映射。`documentation` 字段的值就是当前完整文档；为避免文档在自身内部无限递归，JSON 中仅用等义占位文本表示正文。\n\n```json\n{\n  \"apiVersion\": \"yingce.plugin/v2\",\n  \"id\": \"yuxibox-sd-video\",\n  \"name\": \"YuxiBox SD 视频\",\n  \"version\": \"1.0.0\",\n  \"author\": \"YuxiBox / 影策\",\n  \"description\": \"YuxiBox Seedance 2.0、2.5 按秒及按次的声明式视频协议。\",\n  \"permissions\": [\n    \"generation.run\",\n    \"media.read\"\n  ],\n  \"configuration\": {\n    \"fields\": [\n      {\n        \"name\": \"apiKey\",\n        \"type\": \"secret\",\n        \"label\": \"API Key\",\n        \"required\": true\n      }\n    ]\n  },\n  \"contributes\": {\n    \"providers\": [\n      {\n        \"id\": \"yuxibox-sd20\",\n        \"label\": \"YuxiBox Seedance 2.0（按秒）\",\n        \"description\": \"seedance-2.0（YX） 专属协议；POST /v1/videos，GET /v1/videos/{id}，GET /v1/videos/{id}/content。\",\n        \"capabilities\": [\n          \"video\"\n        ],\n        \"scopes\": [\n          \"admin.system-channel\",\n          \"user.custom-channel\",\n          \"canvas\",\n          \"creation\",\n          \"agent\"\n        ],\n        \"baseUrl\": \"https://yuxibox.cn\",\n        \"requiresPublicMediaUrls\": true,\n        \"auth\": {\n          \"type\": \"bearer\",\n          \"field\": \"apiKey\"\n        },\n        \"parameters\": [\n          {\n            \"name\": \"model\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"model\",\n            \"description\": \"当前协议对应的官方模型 ID，保留全角括号。\"\n          },\n          {\n            \"name\": \"prompt\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"prompt\",\n            \"description\": \"1–16000 字符。\"\n          },\n          {\n            \"name\": \"duration\",\n            \"type\": \"integer\",\n            \"required\": false,\n            \"mapping\": \"seconds\",\n            \"description\": \"2.0 支持 5/10/15 秒，默认 15；2.5 支持 4–30 秒，默认 30。\"\n          },\n          {\n            \"name\": \"aspectRatio\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"ratio\",\n            \"description\": \"默认 16:9；使用 ratio 时不发送 size。\"\n          },\n          {\n            \"name\": \"resolution\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"fixed 720P\",\n            \"description\": \"固定 720P，只校验，不发送未公开的分辨率字段。\"\n          },\n          {\n            \"name\": \"images\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"reference_images[]\",\n            \"description\": \"按素材顺序发送图片 URL，不发送未经声明的 role。\"\n          },\n          {\n            \"name\": \"videos\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"videos[]\",\n            \"description\": \"按素材顺序发送参考视频 URL。\"\n          },\n          {\n            \"name\": \"audios\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"audios[]\",\n            \"description\": \"按素材顺序发送参考音频 URL。\"\n          }\n        ],\n        \"validations\": [\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.model\"\n                },\n                \"seedance-2.0（YX）\"\n              ]\n            },\n            \"message\": \"当前 YuxiBox 协议只适用于 seedance-2.0（YX）\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$len\": {\n                        \"$ref\": \"request.prompt\"\n                      }\n                    },\n                    1\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$len\": {\n                        \"$ref\": \"request.prompt\"\n                      }\n                    },\n                    16000\n                  ]\n                }\n              ]\n            },\n            \"message\": \"YuxiBox 视频提示词须为 1–16000 字符\"\n          },\n          {\n            \"assert\": {\n              \"$gte\": [\n                {\n                  \"$ref\": \"request.duration\"\n                },\n                0\n              ]\n            },\n            \"message\": \"YuxiBox 视频时长不能为负数\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$if\": {\n                    \"condition\": {\n                      \"$gt\": [\n                        {\n                          \"$ref\": \"request.duration\"\n                        },\n                        0\n                      ]\n                    },\n                    \"then\": {\n                      \"$ref\": \"request.duration\"\n                    },\n                    \"else\": 15\n                  }\n                },\n                [\n                  5,\n                  10,\n                  15\n                ]\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.0（YX） 视频时长超出支持范围\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$lower\": {\n                    \"$coalesce\": [\n                      {\n                        \"$ref\": \"request.resolution\"\n                      },\n                      \"720p\"\n                    ]\n                  }\n                },\n                [\n                  \"720p\"\n                ]\n              ]\n            },\n            \"message\": \"YuxiBox 输出固定为 720P\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$coalesce\": [\n                    {\n                      \"$ref\": \"request.aspectRatio\"\n                    },\n                    \"16:9\"\n                  ]\n                },\n                [\n                  \"adaptive\",\n                  \"16:9\",\n                  \"9:16\",\n                  \"1:1\",\n                  \"4:3\",\n                  \"3:4\",\n                  \"21:9\"\n                ]\n              ]\n            },\n            \"message\": \"YuxiBox 不支持当前画面比例\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.images\"\n                  }\n                },\n                9\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.0（YX） 参考图片超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.videos\"\n                  }\n                },\n                3\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.0（YX） 参考视频超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                3\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.0（YX） 参考音频超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.generateAudio\"\n                },\n                false\n              ]\n            },\n            \"message\": \"YuxiBox 未公开生成音频开关\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.watermark\"\n                },\n                false\n              ]\n            },\n            \"message\": \"YuxiBox 未公开水印开关\"\n          }\n        ],\n        \"create\": {\n          \"method\": \"POST\",\n          \"path\": \"/v1/videos\",\n          \"contentType\": \"application/json\",\n          \"body\": {\n            \"model\": {\n              \"$ref\": \"request.model\"\n            },\n            \"prompt\": {\n              \"$ref\": \"request.prompt\"\n            },\n            \"seconds\": {\n              \"$toString\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$gt\": [\n                      {\n                        \"$ref\": \"request.duration\"\n                      },\n                      0\n                    ]\n                  },\n                  \"then\": {\n                    \"$ref\": \"request.duration\"\n                  },\n                  \"else\": 15\n                }\n              }\n            },\n            \"ratio\": {\n              \"$coalesce\": [\n                {\n                  \"$ref\": \"request.aspectRatio\"\n                },\n                \"16:9\"\n              ]\n            },\n            \"reference_images\": {\n              \"$omitEmpty\": {\n                \"$map\": {\n                  \"from\": {\n                    \"$sortByOrder\": {\n                      \"$ref\": \"request.images\"\n                    }\n                  },\n                  \"as\": \"media\",\n                  \"in\": {\n                    \"$ref\": \"media.value\"\n                  }\n                }\n              }\n            },\n            \"videos\": {\n              \"$omitEmpty\": {\n                \"$map\": {\n                  \"from\": {\n                    \"$sortByOrder\": {\n                      \"$ref\": \"request.videos\"\n                    }\n                  },\n                  \"as\": \"media\",\n                  \"in\": {\n                    \"$ref\": \"media.value\"\n                  }\n                }\n              }\n            },\n            \"audios\": {\n              \"$omitEmpty\": {\n                \"$map\": {\n                  \"from\": {\n                    \"$sortByOrder\": {\n                      \"$ref\": \"request.audios\"\n                    }\n                  },\n                  \"as\": \"media\",\n                  \"in\": {\n                    \"$ref\": \"media.value\"\n                  }\n                }\n              }\n            }\n          }\n        },\n        \"poll\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/{{taskId}}\"\n        },\n        \"result\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/{{taskId}}/content\",\n          \"headers\": {\n            \"Accept\": \"video/mp4\"\n          }\n        },\n        \"response\": {\n          \"taskId\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.id\"\n              },\n              {\n                \"$ref\": \"taskId\"\n              }\n            ]\n          },\n          \"status\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.status\"\n              },\n              \"queued\"\n            ]\n          },\n          \"message\": {\n            \"$ref\": \"response.error.message\"\n          },\n          \"errorPaths\": [\n            \"error.code\"\n          ],\n          \"videos\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.video_url\"\n              },\n              {\n                \"$ref\": \"response.download_url\"\n              }\n            ]\n          },\n          \"resultEphemeral\": true\n        }\n      },\n      {\n        \"id\": \"yuxibox-sd25\",\n        \"label\": \"YuxiBox Seedance 2.5（按秒）\",\n        \"description\": \"seedance-2.5（YX） 专属协议；POST /v1/videos，GET /v1/videos/{id}，GET /v1/videos/{id}/content。\",\n        \"capabilities\": [\n          \"video\"\n        ],\n        \"scopes\": [\n          \"admin.system-channel\",\n          \"user.custom-channel\",\n          \"canvas\",\n          \"creation\",\n          \"agent\"\n        ],\n        \"baseUrl\": \"https://yuxibox.cn\",\n        \"requiresPublicMediaUrls\": true,\n        \"auth\": {\n          \"type\": \"bearer\",\n          \"field\": \"apiKey\"\n        },\n        \"parameters\": [\n          {\n            \"name\": \"model\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"model\",\n            \"description\": \"当前协议对应的官方模型 ID，保留全角括号。\"\n          },\n          {\n            \"name\": \"prompt\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"prompt\",\n            \"description\": \"1–16000 字符。\"\n          },\n          {\n            \"name\": \"duration\",\n            \"type\": \"integer\",\n            \"required\": false,\n            \"mapping\": \"seconds\",\n            \"description\": \"2.0 支持 5/10/15 秒，默认 15；2.5 支持 4–30 秒，默认 30。\"\n          },\n          {\n            \"name\": \"aspectRatio\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"ratio\",\n            \"description\": \"默认 16:9；使用 ratio 时不发送 size。\"\n          },\n          {\n            \"name\": \"resolution\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"fixed 720P\",\n            \"description\": \"固定 720P，只校验，不发送未公开的分辨率字段。\"\n          },\n          {\n            \"name\": \"images\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"reference_images[]\",\n            \"description\": \"按素材顺序发送图片 URL，不发送未经声明的 role。\"\n          },\n          {\n            \"name\": \"videos\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"videos[]\",\n            \"description\": \"按素材顺序发送参考视频 URL。\"\n          },\n          {\n            \"name\": \"audios\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"audios[]\",\n            \"description\": \"按素材顺序发送参考音频 URL。\"\n          }\n        ],\n        \"validations\": [\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.model\"\n                },\n                \"seedance-2.5（YX）\"\n              ]\n            },\n            \"message\": \"当前 YuxiBox 协议只适用于 seedance-2.5（YX）\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$len\": {\n                        \"$ref\": \"request.prompt\"\n                      }\n                    },\n                    1\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$len\": {\n                        \"$ref\": \"request.prompt\"\n                      }\n                    },\n                    16000\n                  ]\n                }\n              ]\n            },\n            \"message\": \"YuxiBox 视频提示词须为 1–16000 字符\"\n          },\n          {\n            \"assert\": {\n              \"$gte\": [\n                {\n                  \"$ref\": \"request.duration\"\n                },\n                0\n              ]\n            },\n            \"message\": \"YuxiBox 视频时长不能为负数\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 30\n                      }\n                    },\n                    4\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 30\n                      }\n                    },\n                    30\n                  ]\n                }\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.5（YX） 视频时长超出支持范围\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$lower\": {\n                    \"$coalesce\": [\n                      {\n                        \"$ref\": \"request.resolution\"\n                      },\n                      \"720p\"\n                    ]\n                  }\n                },\n                [\n                  \"720p\"\n                ]\n              ]\n            },\n            \"message\": \"YuxiBox 输出固定为 720P\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$coalesce\": [\n                    {\n                      \"$ref\": \"request.aspectRatio\"\n                    },\n                    \"16:9\"\n                  ]\n                },\n                [\n                  \"adaptive\",\n                  \"16:9\",\n                  \"9:16\",\n                  \"1:1\",\n                  \"4:3\",\n                  \"3:4\",\n                  \"21:9\"\n                ]\n              ]\n            },\n            \"message\": \"YuxiBox 不支持当前画面比例\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.images\"\n                  }\n                },\n                30\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.5（YX） 参考图片超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.videos\"\n                  }\n                },\n                10\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.5（YX） 参考视频超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                10\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.5（YX） 参考音频超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.generateAudio\"\n                },\n                false\n              ]\n            },\n            \"message\": \"YuxiBox 未公开生成音频开关\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.watermark\"\n                },\n                false\n              ]\n            },\n            \"message\": \"YuxiBox 未公开水印开关\"\n          }\n        ],\n        \"create\": {\n          \"method\": \"POST\",\n          \"path\": \"/v1/videos\",\n          \"contentType\": \"application/json\",\n          \"body\": {\n            \"model\": {\n              \"$ref\": \"request.model\"\n            },\n            \"prompt\": {\n              \"$ref\": \"request.prompt\"\n            },\n            \"seconds\": {\n              \"$toString\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$gt\": [\n                      {\n                        \"$ref\": \"request.duration\"\n                      },\n                      0\n                    ]\n                  },\n                  \"then\": {\n                    \"$ref\": \"request.duration\"\n                  },\n                  \"else\": 30\n                }\n              }\n            },\n            \"ratio\": {\n              \"$coalesce\": [\n                {\n                  \"$ref\": \"request.aspectRatio\"\n                },\n                \"16:9\"\n              ]\n            },\n            \"reference_images\": {\n              \"$omitEmpty\": {\n                \"$map\": {\n                  \"from\": {\n                    \"$sortByOrder\": {\n                      \"$ref\": \"request.images\"\n                    }\n                  },\n                  \"as\": \"media\",\n                  \"in\": {\n                    \"$ref\": \"media.value\"\n                  }\n                }\n              }\n            },\n            \"videos\": {\n              \"$omitEmpty\": {\n                \"$map\": {\n                  \"from\": {\n                    \"$sortByOrder\": {\n                      \"$ref\": \"request.videos\"\n                    }\n                  },\n                  \"as\": \"media\",\n                  \"in\": {\n                    \"$ref\": \"media.value\"\n                  }\n                }\n              }\n            },\n            \"audios\": {\n              \"$omitEmpty\": {\n                \"$map\": {\n                  \"from\": {\n                    \"$sortByOrder\": {\n                      \"$ref\": \"request.audios\"\n                    }\n                  },\n                  \"as\": \"media\",\n                  \"in\": {\n                    \"$ref\": \"media.value\"\n                  }\n                }\n              }\n            }\n          }\n        },\n        \"poll\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/{{taskId}}\"\n        },\n        \"result\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/{{taskId}}/content\",\n          \"headers\": {\n            \"Accept\": \"video/mp4\"\n          }\n        },\n        \"response\": {\n          \"taskId\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.id\"\n              },\n              {\n                \"$ref\": \"taskId\"\n              }\n            ]\n          },\n          \"status\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.status\"\n              },\n              \"queued\"\n            ]\n          },\n          \"message\": {\n            \"$ref\": \"response.error.message\"\n          },\n          \"errorPaths\": [\n            \"error.code\"\n          ],\n          \"videos\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.video_url\"\n              },\n              {\n                \"$ref\": \"response.download_url\"\n              }\n            ]\n          },\n          \"resultEphemeral\": true\n        }\n      },\n      {\n        \"id\": \"yuxibox-sd25-per-request\",\n        \"label\": \"YuxiBox Seedance 2.5（按次）\",\n        \"description\": \"seedance-2.5（YX）-按次 专属协议；POST /v1/videos，GET /v1/videos/{id}，GET /v1/videos/{id}/content。\",\n        \"capabilities\": [\n          \"video\"\n        ],\n        \"scopes\": [\n          \"admin.system-channel\",\n          \"user.custom-channel\",\n          \"canvas\",\n          \"creation\",\n          \"agent\"\n        ],\n        \"baseUrl\": \"https://yuxibox.cn\",\n        \"requiresPublicMediaUrls\": true,\n        \"auth\": {\n          \"type\": \"bearer\",\n          \"field\": \"apiKey\"\n        },\n        \"parameters\": [\n          {\n            \"name\": \"model\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"model\",\n            \"description\": \"当前协议对应的官方模型 ID，保留全角括号。\"\n          },\n          {\n            \"name\": \"prompt\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"prompt\",\n            \"description\": \"1–16000 字符。\"\n          },\n          {\n            \"name\": \"duration\",\n            \"type\": \"integer\",\n            \"required\": false,\n            \"mapping\": \"seconds\",\n            \"description\": \"2.0 支持 5/10/15 秒，默认 15；2.5 支持 4–30 秒，默认 30。\"\n          },\n          {\n            \"name\": \"aspectRatio\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"ratio\",\n            \"description\": \"默认 16:9；使用 ratio 时不发送 size。\"\n          },\n          {\n            \"name\": \"resolution\",\n            \"type\": \"string\",\n            \"required\": false,\n            \"mapping\": \"fixed 720P\",\n            \"description\": \"固定 720P，只校验，不发送未公开的分辨率字段。\"\n          },\n          {\n            \"name\": \"images\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"reference_images[]\",\n            \"description\": \"按素材顺序发送图片 URL，不发送未经声明的 role。\"\n          },\n          {\n            \"name\": \"videos\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"videos[]\",\n            \"description\": \"按素材顺序发送参考视频 URL。\"\n          },\n          {\n            \"name\": \"audios\",\n            \"type\": \"media[]\",\n            \"required\": false,\n            \"mapping\": \"audios[]\",\n            \"description\": \"按素材顺序发送参考音频 URL。\"\n          }\n        ],\n        \"validations\": [\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.model\"\n                },\n                \"seedance-2.5（YX）-按次\"\n              ]\n            },\n            \"message\": \"当前 YuxiBox 协议只适用于 seedance-2.5（YX）-按次\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$len\": {\n                        \"$ref\": \"request.prompt\"\n                      }\n                    },\n                    1\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$len\": {\n                        \"$ref\": \"request.prompt\"\n                      }\n                    },\n                    16000\n                  ]\n                }\n              ]\n            },\n            \"message\": \"YuxiBox 视频提示词须为 1–16000 字符\"\n          },\n          {\n            \"assert\": {\n              \"$gte\": [\n                {\n                  \"$ref\": \"request.duration\"\n                },\n                0\n              ]\n            },\n            \"message\": \"YuxiBox 视频时长不能为负数\"\n          },\n          {\n            \"assert\": {\n              \"$and\": [\n                {\n                  \"$gte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 30\n                      }\n                    },\n                    4\n                  ]\n                },\n                {\n                  \"$lte\": [\n                    {\n                      \"$if\": {\n                        \"condition\": {\n                          \"$gt\": [\n                            {\n                              \"$ref\": \"request.duration\"\n                            },\n                            0\n                          ]\n                        },\n                        \"then\": {\n                          \"$ref\": \"request.duration\"\n                        },\n                        \"else\": 30\n                      }\n                    },\n                    30\n                  ]\n                }\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.5（YX）-按次 视频时长超出支持范围\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$lower\": {\n                    \"$coalesce\": [\n                      {\n                        \"$ref\": \"request.resolution\"\n                      },\n                      \"720p\"\n                    ]\n                  }\n                },\n                [\n                  \"720p\"\n                ]\n              ]\n            },\n            \"message\": \"YuxiBox 输出固定为 720P\"\n          },\n          {\n            \"assert\": {\n              \"$in\": [\n                {\n                  \"$coalesce\": [\n                    {\n                      \"$ref\": \"request.aspectRatio\"\n                    },\n                    \"16:9\"\n                  ]\n                },\n                [\n                  \"adaptive\",\n                  \"16:9\",\n                  \"9:16\",\n                  \"1:1\",\n                  \"4:3\",\n                  \"3:4\",\n                  \"21:9\"\n                ]\n              ]\n            },\n            \"message\": \"YuxiBox 不支持当前画面比例\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.images\"\n                  }\n                },\n                30\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.5（YX）-按次 参考图片超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.videos\"\n                  }\n                },\n                10\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.5（YX）-按次 参考视频超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$lte\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                10\n              ]\n            },\n            \"message\": \"YuxiBox seedance-2.5（YX）-按次 参考音频超出上限\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.generateAudio\"\n                },\n                false\n              ]\n            },\n            \"message\": \"YuxiBox 未公开生成音频开关\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.watermark\"\n                },\n                false\n              ]\n            },\n            \"message\": \"YuxiBox 未公开水印开关\"\n          }\n        ],\n        \"create\": {\n          \"method\": \"POST\",\n          \"path\": \"/v1/videos\",\n          \"contentType\": \"application/json\",\n          \"body\": {\n            \"model\": {\n              \"$ref\": \"request.model\"\n            },\n            \"prompt\": {\n              \"$ref\": \"request.prompt\"\n            },\n            \"seconds\": {\n              \"$toString\": {\n                \"$if\": {\n                  \"condition\": {\n                    \"$gt\": [\n                      {\n                        \"$ref\": \"request.duration\"\n                      },\n                      0\n                    ]\n                  },\n                  \"then\": {\n                    \"$ref\": \"request.duration\"\n                  },\n                  \"else\": 30\n                }\n              }\n            },\n            \"ratio\": {\n              \"$coalesce\": [\n                {\n                  \"$ref\": \"request.aspectRatio\"\n                },\n                \"16:9\"\n              ]\n            },\n            \"reference_images\": {\n              \"$omitEmpty\": {\n                \"$map\": {\n                  \"from\": {\n                    \"$sortByOrder\": {\n                      \"$ref\": \"request.images\"\n                    }\n                  },\n                  \"as\": \"media\",\n                  \"in\": {\n                    \"$ref\": \"media.value\"\n                  }\n                }\n              }\n            },\n            \"videos\": {\n              \"$omitEmpty\": {\n                \"$map\": {\n                  \"from\": {\n                    \"$sortByOrder\": {\n                      \"$ref\": \"request.videos\"\n                    }\n                  },\n                  \"as\": \"media\",\n                  \"in\": {\n                    \"$ref\": \"media.value\"\n                  }\n                }\n              }\n            },\n            \"audios\": {\n              \"$omitEmpty\": {\n                \"$map\": {\n                  \"from\": {\n                    \"$sortByOrder\": {\n                      \"$ref\": \"request.audios\"\n                    }\n                  },\n                  \"as\": \"media\",\n                  \"in\": {\n                    \"$ref\": \"media.value\"\n                  }\n                }\n              }\n            }\n          }\n        },\n        \"poll\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/{{taskId}}\"\n        },\n        \"result\": {\n          \"method\": \"GET\",\n          \"path\": \"/v1/videos/{{taskId}}/content\",\n          \"headers\": {\n            \"Accept\": \"video/mp4\"\n          }\n        },\n        \"response\": {\n          \"taskId\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.id\"\n              },\n              {\n                \"$ref\": \"taskId\"\n              }\n            ]\n          },\n          \"status\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.status\"\n              },\n              \"queued\"\n            ]\n          },\n          \"message\": {\n            \"$ref\": \"response.error.message\"\n          },\n          \"errorPaths\": [\n            \"error.code\"\n          ],\n          \"videos\": {\n            \"$coalesce\": [\n              {\n                \"$ref\": \"response.video_url\"\n              },\n              {\n                \"$ref\": \"response.download_url\"\n              }\n            ]\n          },\n          \"resultEphemeral\": true\n        }\n      }\n    ]\n  },\n  \"documentation\": \"<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>\"\n}\n```\n<!-- YINGCE_MANIFEST_CONTRACT_END -->\n"
+}
