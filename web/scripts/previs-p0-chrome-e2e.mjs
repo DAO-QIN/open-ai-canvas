@@ -309,10 +309,9 @@ async function connectCdp(cdpPort) {
             console.log(`      (click target not interactable: ${label})`);
             return false;
         }
-        const point = { x: box.x, y: box.y, button: "left", pointerType: "mouse" };
+        const point = { x: box.x, y: box.y, button: "left" };
         await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point, buttons: 0 });
         await send("Input.dispatchMouseEvent", { type: "mousePressed", ...point, buttons: 1, clickCount: 1 });
-        await sleep(50);
         await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, buttons: 0, clickCount: 1 });
         return true;
     };
@@ -728,17 +727,40 @@ async function saveFailureCloseGuard(cdp, baseUrl) {
     const modalShown = await cdp.poll(`!!document.querySelector('.ant-modal-confirm') && (document.body.innerText || "").includes('留在预演台')`, "close confirm modal", 40000);
     assert(modalShown, "F5 close is guarded by a confirm dialog, not silent exit");
 
-    const modalDismissedExpression = `![...document.querySelectorAll('.ant-modal-confirm')].some((modal) => {
+    // 坐标点击成功派发不代表按钮收到了点击：CI 的动画/渲染调度可能让坐标落到遮罩。
+    // 只对未送达的点击有限重试；一旦按钮收到真实点击，就保留原关闭断言，不重试业务操作。
+    await cdp.evaluate(`(() => {
+        const probe = { count: 0 };
+        probe.listener = (event) => {
+            const button = event.target instanceof Element ? event.target.closest('button') : null;
+            if (event.isTrusted && button?.closest('.ant-modal-confirm') && (button.textContent || '').trim() === '留在预演台') probe.count++;
+        };
+        window.__previsStayClickProbe = probe;
+        document.addEventListener('click', probe.listener, true);
+    })()`);
+    let stayClicked = false;
+    try {
+        for (let attempt = 0; attempt < 3 && !stayClicked; attempt++) {
+            const dispatched = await cdp.clickText("留在预演台", ".ant-modal-confirm button");
+            if (!dispatched) throw new Error("F: 留在预演台 button not clickable");
+            stayClicked = await cdp.poll(`window.__previsStayClickProbe.count > 0`, "stay button received trusted click", 1500);
+        }
+        if (!stayClicked) throw new Error("F: 留在预演台 button did not receive a trusted click");
+    } finally {
+        await cdp.evaluate(`(() => {
+            document.removeEventListener('click', window.__previsStayClickProbe.listener, true);
+            delete window.__previsStayClickProbe;
+        })()`);
+    }
+    const modalGone = await cdp.poll(
+        `![...document.querySelectorAll('.ant-modal-confirm')].some((modal) => {
             const rect = modal.getBoundingClientRect();
             const style = getComputedStyle(modal);
             return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0;
-        })`;
-    let modalGone = false;
-    for (let attempt = 0; attempt < 3 && !modalGone; attempt += 1) {
-        const stayClicked = await cdp.clickText("留在预演台");
-        if (!stayClicked) throw new Error("F: 留在预演台 button not clickable");
-        modalGone = await cdp.poll(modalDismissedExpression, "modal dismissed", attempt === 2 ? 8000 : 2500);
-    }
+        })`,
+        "modal dismissed",
+        20000,
+    );
     assert(modalGone, "F6 confirm dialog dismissed after choosing 留在预演台");
 
     await sleep(1000);
