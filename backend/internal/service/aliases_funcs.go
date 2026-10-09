@@ -47,6 +47,7 @@ var (
 	NormalizeOutboundHeaders                   = app.NormalizeOutboundHeaders
 	NotFound                                   = app.NotFound
 	OutboundHTTPClient                         = app.OutboundHTTPClient
+	OutboundHTTPClientWithProxy                = app.OutboundHTTPClientWithProxy
 	ParseOutboundHeadersJSON                   = app.ParseOutboundHeadersJSON
 	PaymentNotificationResponseFor             = app.PaymentNotificationResponseFor
 	PaymentNotificationResponseForWithRegistry = app.PaymentNotificationResponseForWithRegistry
