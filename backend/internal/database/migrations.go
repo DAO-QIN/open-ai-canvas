@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 48
+const CurrentSchemaVersion int64 = 49
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -154,6 +154,12 @@ var schemaMigrations = []migration{
 	{version: 48, name: "channel_proxy_url", checksum: "sha256:channel-proxy-url-v48-20261009", apply: func(tx *gorm.DB) error {
 		if !tx.Migrator().HasColumn(&model.ModelChannel{}, "ProxyURL") {
 			return tx.Migrator().AddColumn(&model.ModelChannel{}, "ProxyURL")
+		}
+		return nil
+	}},
+	{version: 49, name: "banner_sort_order", checksum: "sha256:banner-sort-order-v49-20261010", apply: func(tx *gorm.DB) error {
+		if !tx.Migrator().HasColumn(&model.BannerAnnouncement{}, "SortOrder") {
+			return tx.Migrator().AddColumn(&model.BannerAnnouncement{}, "SortOrder")
 		}
 		return nil
 	}},

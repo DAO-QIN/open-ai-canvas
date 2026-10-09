@@ -63,6 +63,12 @@ func (r *Repository) Users() ([]model.User, error) {
 	return users, err
 }
 
+func (r *Repository) TotalCreditBalance() (int64, error) {
+	var total int64
+	err := r.db.Model(&model.CreditAccount{}).Select("COALESCE(SUM(available_microcredits), 0)").Scan(&total).Error
+	return total, err
+}
+
 func (r *Repository) AdminUsers(keyword string, role model.UserRole, status model.UserStatus, limit int, offset int) ([]model.User, int64, error) {
 	var users []model.User
 	var total int64
