@@ -663,11 +663,12 @@ func (s *Service) advanceCloudAgentTool(run *model.CloudAgentExecution, state *c
 			return s.failCloudAgent(run, state, cloudAgentImageInspectionBudgetMessage)
 		}
 	}
-	// Skill reads use the domain repository and filesystem, not the checkpoint
-	// transaction's connection. Read first to avoid nesting DB reads on SQLite.
+	// Service-backed reads may open resources or use domain repositories.
+	// Read before the checkpoint transaction to avoid nested DB reads on SQLite
+	// and holding the write transaction open during storage IO.
 	var skillResult any
 	var skillErr error
-	if allowed && (call.Function.Name == "skill_read_file" || call.Function.Name == "model_list" || call.Function.Name == "image_annotation_render") {
+	if allowed && (call.Function.Name == "skill_read_file" || call.Function.Name == "model_list" || call.Function.Name == "image_annotation_render" || call.Function.Name == "canvas_read_text") {
 		state.RuntimeRunID = run.ID
 		if call.Function.Name == "image_annotation_render" {
 			skillResult, skillErr = cloudAgentReadTool(s.repo, run.UserID, state, call, s)
@@ -717,7 +718,7 @@ func (s *Service) advanceCloudAgentTool(run *model.CloudAgentExecution, state *c
 					}
 				}
 			}
-		case call.Function.Name == "skill_read_file", call.Function.Name == "model_list", call.Function.Name == "image_annotation_render":
+		case call.Function.Name == "skill_read_file", call.Function.Name == "model_list", call.Function.Name == "image_annotation_render", call.Function.Name == "canvas_read_text":
 			result, toolErr = skillResult, skillErr
 		default:
 			result, toolErr = cloudAgentReadToolCached(repo, run.UserID, state, call)
