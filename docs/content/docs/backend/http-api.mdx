@@ -5,6 +5,12 @@ description: 信封、错误码与 OpenAPI
 
 # HTTP API 合同
 
+## Agent 画布权限与大事件
+
+自由画布和项目关联画布均使用 `canvas_projects`。Agent 运行时按登录账号和画布 ID 查询归属，不能把所属项目 ID 当作画布 ID；画布不存在、属于其他账号或数据库读取失败时，不声明读写及导出权限。
+
+`canvas_updated` 的画布增量超过单事件 128 KiB 上限时，复用 `requiresRefresh: true` 通知客户端重新读取完整画布，优先保留操作摘要；摘要仍超限则仅发送刷新通知。画布正文、历史和操作回执仍完整保存，普通大小事件继续携带 `canvasPatch`。不提高事件上限、不截断正文、不修改审批暂停或模型调度判断。
+
 ## 注册邮箱等价检查
 
 公开注册与邮箱绑定的唯一性检查将 `gmail.com` 和 `googlemail.com` 视为同一域，移除本地部分的点及 `+` 后缀。例如 `a.b+x@googlemail.com` 与 `ab@gmail.com` 不允许创建两个账号。其他域保留点和 `+`；现有域名白名单规则保持不变。
