@@ -2,6 +2,7 @@ import { App, Button, Form, Input, InputNumber, Modal, Spin, Switch } from "antd
 import { ChevronRight, Copy, Pencil, Plus, Power, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import { AdminSearchInput } from "../components/admin-search-input";
 
 import { ChannelHeadersEditor, validateChannelHeaders } from "@/components/channel-headers-editor";
 import { refreshSystemChannels } from "@/lib/user-session";
@@ -255,7 +256,7 @@ export default function ChannelsPage() {
                         <Button block type="primary" icon={<Plus className="size-4" />} onClick={() => openDrawer()}>
                             新增渠道
                         </Button>
-                        <Input
+                        <AdminSearchInput
                             id="admin-channel-search"
                             aria-label="搜索系统渠道"
                             autoComplete="off"
@@ -263,7 +264,7 @@ export default function ChannelsPage() {
                             prefix={<Search className="size-4 text-foreground/40" />}
                             value={keyword}
                             placeholder="搜索渠道名称或地址"
-                            onChange={(event) => updateUrl({ filter: event.target.value }, true)}
+                            onValueChange={(value) => updateUrl({ filter: value }, true)}
                         />
                         <Select
                             aria-label="筛选渠道状态"
