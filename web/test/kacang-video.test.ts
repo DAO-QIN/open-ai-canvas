@@ -8,6 +8,8 @@ describe("Kacang video protocol defaults", () => {
         ["kacang-gemini-omni-video", 3, 10, 3, "720p", 4, 1],
         ["kacang-grok-video-15", 4, 15, 8, "480p", 14, 0],
         ["kacang-kling-video-30", 1, 15, 5, "720p", 1, 0],
+        ["kacang-grok-video-15-fast", 4, 15, 6, "720p", 7, 0],
+        ["kacang-grok-video-15-route8", 4, 15, 6, "720p", 7, 0],
     ] as const) {
         test(`${protocol} replaces stale capability defaults and preserves prices/status`, () => {
             const definition: ModelProtocolDefinition = { value: protocol, capability: "video", enabled: true, label: protocol, create: "POST /v1/videos", contentType: "application/json", media: "url" };
@@ -25,7 +27,9 @@ describe("Kacang video protocol defaults", () => {
                 generateAudio: { supported: false, default: false },
                 watermark: { supported: false, default: false },
             });
-            expect(profile.resolutions).toEqual(protocol === "kacang-grok-video-15" ? ["480p", "720p", "1080p"] : ["720p"]);
+            const variant = protocol === "kacang-grok-video-15-fast" || protocol === "kacang-grok-video-15-route8";
+            expect(profile.resolutions).toEqual(protocol === "kacang-grok-video-15" ? ["480p", "720p", "1080p"] : variant ? ["720p", "1080p"] : ["720p"]);
+            if (variant) expect(profile.ratios).toEqual(["16:9", "9:16", "1:1", "4:3", "3:4"]);
             expect(selected.priceTiers[0].unitPrice).toBe(6);
             expect(selected.priceTiers[0].billingMode).toBe("fixed_request");
             expect(selected.enabled).toBe(false);

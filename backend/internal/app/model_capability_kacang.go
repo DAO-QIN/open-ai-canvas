@@ -21,6 +21,12 @@ func kacangVideoCapability(profile *VideoCapabilityConfig, protocol string) *Vid
 	case "kacang-kling-video-30":
 		value.References.MaxImages = 1
 		value.Duration = VideoDurationConfig{Selection: "range", Min: 1, Max: 15, Step: 1, Default: 5}
+	case "kacang-grok-video-15-fast", "kacang-grok-video-15-route8":
+		value.References.MaxImages = 7
+		value.Duration = VideoDurationConfig{Selection: "range", Min: 4, Max: 15, Step: 1, Default: 6}
+		value.Ratios = []string{"16:9", "9:16", "1:1", "4:3", "3:4"}
+		value.Resolutions = []string{"720p", "1080p"}
+		value.Operations = append(value.Operations, "reference_to_video")
 	default:
 		return profile
 	}

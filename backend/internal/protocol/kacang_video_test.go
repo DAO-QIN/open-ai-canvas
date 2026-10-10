@@ -15,6 +15,8 @@ func TestKacangVideoDefaultRequestsAndLimits(t *testing.T) {
 		{"kacang-gemini-omni-video", "gemini-omni-flash-1.1", "720p", 3, 10, 3, 4, 1},
 		{"kacang-grok-video-15", "grok-imagine-video-1.5", "480p", 4, 15, 8, 14, 0},
 		{"kacang-kling-video-30", "可灵3.0-特惠", "720p", 1, 15, 5, 1, 0},
+		{"kacang-grok-video-15-fast", "grok-imagine-video-1.5-fast", "720p", 4, 15, 6, 7, 0},
+		{"kacang-grok-video-15-route8", "grok-imagine-video-1.5-线路八", "720p", 4, 15, 6, 7, 0},
 	} {
 		t.Run(tc.provider, func(t *testing.T) {
 			adapter := officialPackageAdapter(t, "kacang-video.yingce-plugin", tc.provider)
@@ -24,6 +26,9 @@ func TestKacangVideoDefaultRequestsAndLimits(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := map[string]any{"model": tc.model, "prompt": request.Prompt, "duration_seconds": float64(tc.seconds), "aspect_ratio": "16:9", "resolution": tc.resolution, "n": float64(1)}
+			if tc.provider == "kacang-grok-video-15-fast" || tc.provider == "kacang-grok-video-15-route8" {
+				delete(want, "n")
+			}
 			if spec.Method != "POST" || spec.Path != "/v1/videos" || spec.Auth.Type != "bearer" || spec.ContentType != "application/json" || !reflect.DeepEqual(manifestTestBody(t, spec), want) {
 				t.Fatalf("create=%#v body=%#v", spec, manifestTestBody(t, spec))
 			}
@@ -87,6 +92,66 @@ func TestKacangVideoDefaultRequestsAndLimits(t *testing.T) {
 			}
 			if _, err := adapter.BuildCancel(context.Background(), PollContext{TaskID: "task-1"}); err == nil {
 				t.Fatal("undocumented cancellation available")
+			}
+		})
+	}
+}
+
+func TestKacangGrokVariantsMediaAndDuration(t *testing.T) {
+	for _, tc := range []struct{ protocol, model string }{
+		{"kacang-grok-video-15-fast", "grok-imagine-video-1.5-fast"},
+		{"kacang-grok-video-15-route8", "grok-imagine-video-1.5-线路八"},
+	} {
+		t.Run(tc.protocol, func(t *testing.T) {
+			a := officialPackageAdapter(t, "kacang-video.yingce-plugin", tc.protocol)
+			r := GenerationRequest{Model: tc.model, Prompt: "人像", Duration: 15, Resolution: "1080P", Images: []MediaReference{{URL: "https://example.com/a.png", Role: "first_frame"}}, Extra: map[string]any{"apiKey": "never-forward", "duration_seconds": 99}}
+			spec, err := a.BuildCreate(context.Background(), RequestContext{Request: r})
+			if err != nil {
+				t.Fatal(err)
+			}
+			body := manifestTestBody(t, spec)
+			if body["first_frame_url"] != "https://example.com/a.png" || body["reference_images"] != nil || body["image"] != nil || body["images"] != nil || body["resolution"] != "1080p" || len(body) != 6 {
+				t.Fatalf("frame=%#v", body)
+			}
+			r.Images = []MediaReference{{URL: "https://example.com/b.png", Role: "reference_image", Order: 2}, {URL: "https://example.com/a.png", Role: "reference_image", Order: 1}}
+			_, err = a.BuildCreate(context.Background(), RequestContext{Request: r})
+			if (err != nil) != (tc.protocol == "kacang-grok-video-15-fast") {
+				t.Fatalf("multi-image 15s: %v", err)
+			}
+			r.Duration = 10
+			spec, err = a.BuildCreate(context.Background(), RequestContext{Request: r})
+			if err != nil {
+				t.Fatal(err)
+			}
+			body = manifestTestBody(t, spec)
+			if !reflect.DeepEqual(body["reference_images"], []any{"https://example.com/a.png", "https://example.com/b.png"}) || body["first_frame_url"] != nil || len(body) != 6 {
+				t.Fatalf("references=%#v", body)
+			}
+			r.Images[0].Role = "first_frame"
+			if _, err := a.BuildCreate(context.Background(), RequestContext{Request: r}); err == nil {
+				t.Fatal("mixed frame/reference accepted")
+			}
+			r.Images = []MediaReference{{DataURL: "data:image/png;base64,YQ=="}}
+			if _, err := a.BuildCreate(context.Background(), RequestContext{Request: r}); err == nil {
+				t.Fatal("non-public media accepted")
+			}
+			r.Images = nil
+			for _, change := range []func(*GenerationRequest){
+				func(r *GenerationRequest) { r.Resolution = "480p" },
+				func(r *GenerationRequest) { r.AspectRatio = "3:2" },
+				func(r *GenerationRequest) {
+					r.Images = []MediaReference{{URL: "https://example.com/tail.png", Role: "last_frame"}}
+				},
+			} {
+				invalid := r
+				change(&invalid)
+				if _, err := a.BuildCreate(context.Background(), RequestContext{Request: invalid}); err == nil {
+					t.Fatalf("unsupported variant input accepted: %#v", invalid)
+				}
+			}
+			parsed, err := a.ParsePoll(context.Background(), PollContext{TaskID: "task-variant"}, []byte(`{"status":"completed","outputs":[{"content_url":"https://example.com/final.mp4"}]}`))
+			if err != nil || parsed.Status != StatusSucceeded || parsed.Result == nil || len(parsed.Result.Videos) != 1 || parsed.Result.Videos[0].URL != "https://example.com/final.mp4" {
+				t.Fatalf("result=%#v %v", parsed, err)
 			}
 		})
 	}
