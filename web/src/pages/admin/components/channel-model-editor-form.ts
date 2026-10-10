@@ -1,5 +1,5 @@
 import type { ModelCapabilityChoice } from "@/components/model-protocol-picker";
-import { defaultModelCapabilityConfig, normalizeModelCapabilityConfig, type ModelCapabilityConfig } from "@/lib/model-capabilities";
+import { defaultAudioCapabilityConfig, defaultModelCapabilityConfig, normalizeModelCapabilityConfig, type ModelCapabilityConfig } from "@/lib/model-capabilities";
 import { imagePresetForRatio, imageSizePresets } from "@/lib/image-size-presets";
 import { modelProtocolSupportsTokenBilling, type ModelProtocolDefinition } from "@/lib/model-protocols";
 import type { ChannelModel } from "@/services/api/wallet";
@@ -43,7 +43,7 @@ export function initialChannelModelValues(item: ChannelModel | null, protocols: 
         protocol,
         priceTiers: item ? (item.priceTiers?.length ? item.priceTiers.map(priceTierToForm) : [legacyPriceTierToForm(item)]) : [defaultPriceTier()],
         enabled: item?.enabled ?? true,
-        capabilityConfig: capability === "audio" ? undefined : normalizeModelCapabilityConfig(item?.capabilityConfig || defaultModelCapabilityConfig(protocol, upstreamModel)),
+        capabilityConfig: capability === "audio" ? audioChannelCapabilityConfig(protocol) : normalizeModelCapabilityConfig(item?.capabilityConfig || defaultModelCapabilityConfig(protocol, upstreamModel)),
     };
 }
 
@@ -54,7 +54,7 @@ export function changeChannelModelCapability(values: ChannelModelFormValues, pro
     return {
         ...values,
         protocol,
-        capabilityConfig: capability === "audio" ? undefined : defaultModelCapabilityConfig(protocol, values.providerModelKey?.trim() || values.modelKey.trim()),
+        capabilityConfig: capability === "audio" ? audioChannelCapabilityConfig(protocol) : defaultModelCapabilityConfig(protocol, values.providerModelKey?.trim() || values.modelKey.trim()),
         priceTiers: values.priceTiers.map((tier) => ({
             ...tier,
             operation: "*",
@@ -85,6 +85,11 @@ export function updateChannelModelUpstreamCapabilities(values: ChannelModelFormV
             image: { ...image, size: { ...image.size, presets: ratios.length ? ratios.map((ratio) => imagePresetForRatio(tier, ratio)) : defaults.image!.size.presets } },
         },
     };
+}
+
+export function audioChannelCapabilityConfig(protocol?: string): ModelCapabilityConfig | undefined {
+    const audio = defaultAudioCapabilityConfig(protocol);
+    return audio ? { version: 1, audio } : undefined;
 }
 
 export function validateChannelModelProtocol(capability: string, protocol: string | undefined, protocols: ModelProtocolDefinition[]) {

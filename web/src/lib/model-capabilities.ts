@@ -34,7 +34,14 @@ export type ModelCapabilityConfig = {
     text?: TextCapabilityConfig;
     image?: ImageCapabilityConfig;
     video?: VideoCapabilityConfig;
+    audio?: AudioCapabilityConfig;
 };
+
+export type AudioCapabilityConfig = { generationType: "music"; taskCount: number; outputCount: number; streaming: boolean };
+
+export function defaultAudioCapabilityConfig(protocol?: ModelProtocol): AudioCapabilityConfig | undefined {
+    return protocol === "kacang-suno" ? { generationType: "music", taskCount: 1, outputCount: 2, streaming: false } : undefined;
+}
 
 export type TextCapabilityConfig = {
     /** Whether the upstream text endpoint accepts SSE streaming responses. */
@@ -504,7 +511,7 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.operations = ["text_to_video", "image_to_video", ...(gemini || grok || variant ? ["reference_to_video"] : [])];
         video.defaultOperation = "text_to_video";
     }
-    return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video };
+    return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video, audio: defaultAudioCapabilityConfig(protocol) };
 }
 
 export function pluginWorkflowCapabilityConfig(protocol: ModelProtocol, workflow: ModelProtocolWorkflow): ModelCapabilityConfig | undefined {

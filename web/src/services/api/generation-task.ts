@@ -507,7 +507,7 @@ export function parseBackendGenerationResult(task: GenerationTask): BackendGener
     if (!task.resultJson) throw new Error("后端任务没有返回结果");
     const result = JSON.parse(task.resultJson) as BackendGenerationResult & { text?: unknown };
     if (!result || typeof result !== "object") throw new Error("后端任务结果格式错误");
-    return { ...result, text: normalizeBackendText(result.text) };
+    return { ...result, audio: result.audio || result.audios?.[0], text: normalizeBackendText(result.text) };
 }
 
 function normalizeBackendText(value: unknown): string | undefined {

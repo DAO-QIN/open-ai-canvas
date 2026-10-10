@@ -5,6 +5,16 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+## 卡藏音乐
+
+- `plugin-packages/kacang-audio/`：Suno 请求、错误、临时媒体链接合同；`build.py` 生成完整接口文档与可安装包。
+- `backend/internal/protocol/manifest_adapter.go`：音频 URL 及 Markdown 音乐链接解析，保持顺序并去重。
+- `backend/internal/app/model_capability_audio.go`、`channel_models.go`：音乐能力默认值、固定合同校验与保存。
+- `backend/internal/app/provider_protocol_result.go`、`resource_generated.go`：双音频结果校验、保存及兼容单音频字段，避免重复入库。
+- `web/src/pages/admin/components/channel-model-editor*`：选择协议默认填充“能力与参数”。
+- `web/src/components/audio-settings-panel.tsx`、`web/src/lib/canvas/canvas-generation-task-sync.ts`：音乐参数展示与双音频画布节点同步。
+- `backend/internal/protocol/kacang_audio_test.go`、`backend/internal/app/model_capability_audio_test.go`、`web/test/kacang-audio.test.ts`：请求/响应、能力与入库、重复同步专项回归。
+
 ## 卡藏视频
 
 - `plugin-packages/kacang-video/`：五个专用 JSON 协议、参数/素材校验、鉴权查询与下载、完整文档及确定性构建脚本；Fast 和线路八使用 `first_frame_url/reference_images`，Fast 增加多图十秒上限校验。

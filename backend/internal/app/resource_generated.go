@@ -49,7 +49,12 @@ func (s *Service) persistGeneratedMediaResultMode(userID string, result map[stri
 	if err != nil {
 		return nil, err
 	}
-	return value.(map[string]interface{}), nil
+	stored := value.(map[string]interface{})
+	// Add the primary alias after persistence so the first track is stored once.
+	if items, ok := stored["audios"].([]interface{}); ok && len(items) > 0 && stored["audio"] == nil {
+		stored["audio"] = items[0]
+	}
+	return stored, nil
 }
 
 func (s *Service) persistGeneratedMediaValue(userID string, value interface{}) (interface{}, error) {

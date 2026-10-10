@@ -132,6 +132,7 @@ export function capabilitySpecFromChannelModel(item?: ChannelModel): CapabilityS
             }),
         };
     }
+    if (item.capabilityConfig?.audio?.generationType === "music") return { ...emptyCapabilitySpec("audio"), inputs: { image: { min: 0, max: 0 }, video: { min: 0, max: 0 }, audio: { min: 0, max: 0 } } };
     return emptyCapabilitySpec("audio");
 }
 

@@ -445,6 +445,7 @@ export type CanvasNodeMetadata = {
     taskUpdatedAt?: string;
     generationEffectKeys?: string[];
     generationOutputCount?: number;
+    generationOutputIndex?: number;
     agentGenerationContinuation?: {
         id: string;
         taskId: string;

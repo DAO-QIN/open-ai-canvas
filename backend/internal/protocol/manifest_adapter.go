@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -330,7 +331,11 @@ func (a manifestAdapter) parse(payload map[string]any, c PollContext) CreateResu
 	paths := append([]string{}, a.manifest.Response.ResultURLPaths...)
 	paths = append(paths, a.manifest.Response.ResultPaths...)
 	for _, path := range paths {
-		for _, value := range mediaPathValues(payload, path) {
+		values := mediaPathValues(payload, path)
+		if a.manifest.Response.ResultKind == "audio" {
+			values = audioMediaPathValues(payload, path)
+		}
+		for _, value := range values {
 			item := MediaReference{URL: value, Kind: a.manifest.Response.ResultKind, Ephemeral: a.manifest.Response.ResultEphemeral}
 			switch a.manifest.Response.ResultKind {
 			case "image":
@@ -483,6 +488,34 @@ var (
 	manifestMDImageRegex   = regexp.MustCompile(`!\[[^\]]*\]\(([^)\s]+)\)`)
 	manifestHTMLVideoRegex = regexp.MustCompile(`(?i)<video[^>]+src=['"]([^'"]+)['"]`)
 )
+
+var manifestMDAudioLinkRegex = regexp.MustCompile(`(?:^|[^!])\[[^\]]*\]\((https?://[^\s)]+)\)`)
+
+// Music chat responses use ordinary Markdown links. Other media kinds retain
+// their existing response contracts; audio bytes are verified by the host.
+func audioMediaPathValues(payload map[string]any, path string) []string {
+	text, ok := pathValue(payload, path).(string)
+	if !ok {
+		return mediaPathValues(payload, path)
+	}
+	var values []string
+	seen := map[string]bool{}
+	appendURL := func(value string) {
+		parsed, err := url.Parse(strings.TrimSpace(value))
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || seen[value] {
+			return
+		}
+		seen[value] = true
+		values = append(values, value)
+	}
+	for _, match := range manifestMDAudioLinkRegex.FindAllStringSubmatch(text, -1) {
+		appendURL(match[1])
+	}
+	if len(values) == 0 {
+		appendURL(strings.TrimSpace(text))
+	}
+	return values
+}
 
 func mediaPathValues(payload map[string]any, path string) []string {
 	value := pathValue(payload, path)

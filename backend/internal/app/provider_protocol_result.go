@@ -57,6 +57,9 @@ func finishProtocolResult(ctx context.Context, config providerConfig, mode strin
 	if len(references) == 0 {
 		return nil, errors.New("声明式协议已完成但没有返回媒体地址")
 	}
+	if mode == "audio" && config.InterfaceType == "kacang-suno" && len(references) != 2 {
+		return nil, errors.New("卡藏 Suno 未返回完整的两首音乐，未标记为生成成功")
+	}
 	if output, handled, err := recoverProtocolMedia(ctx, config, mode, references); handled {
 		return output, err
 	}
@@ -75,6 +78,12 @@ func finishProtocolResult(ctx context.Context, config providerConfig, mode strin
 		if err != nil {
 			return nil, err
 		}
+		if mode == "audio" && config.InterfaceType == "kacang-suno" {
+			mimeType, err = validateGeneratedAudio(mimeType, data, "")
+			if err != nil {
+				return nil, err
+			}
+		}
 		item := map[string]interface{}{"dataUrl": dataURL(mimeType, data), "mimeType": mimeType}
 		items = append(items, item)
 	}
@@ -84,6 +93,9 @@ func finishProtocolResult(ctx context.Context, config providerConfig, mode strin
 	case "video":
 		return map[string]interface{}{"mode": "video", "video": items[0]}, nil
 	default:
+		if len(items) > 1 {
+			return map[string]interface{}{"mode": "audio", "audios": items}, nil
+		}
 		return map[string]interface{}{"mode": "audio", "audio": items[0]}, nil
 	}
 }

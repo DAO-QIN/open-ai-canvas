@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Alert, App, AutoComplete, Button, Form, Input, Segmented, Switch, Tabs } from "antd";
+import { Alert, App, AutoComplete, Button, Descriptions, Form, Input, Segmented, Switch, Tabs } from "antd";
 import { useAdminContext } from "../admin-context";
 import { AdminModal } from "@/pages/admin/ui/overlays";
 import { FlaskConical, Plus } from "lucide-react";
@@ -14,6 +14,7 @@ import type { ModelChannel } from "@/stores/use-config-store";
 import { defaultPriceTier, normalizeUpstreamModelKey, priceTierPayloadFromForm } from "./channel-model-price-tier-form";
 import { PriceTierFields } from "./channel-model-price-tier-fields";
 import { ChannelModelTagsEditor } from "./channel-model-tags-editor";
+import { audioChannelCapabilityConfig } from "./channel-model-editor-form";
 import { changeChannelModelCapability, editorSectionForField, initialChannelModelValues, updateChannelModelUpstreamCapabilities, validateChannelModelPrices, validateChannelModelProtocol, type ChannelModelFormValues as FormValues, type EditorSection } from "./channel-model-editor-form";
 
 export function ChannelModelEditor({
@@ -75,7 +76,7 @@ export function ChannelModelEditor({
             form.setFieldsValue(changeChannelModelCapability(form.getFieldsValue(true), protocols));
             setConfigurationChanged(true);
         } else if (changed.protocol) {
-            form.setFieldValue("capabilityConfig", modelCapability === "audio" ? undefined : defaultModelCapabilityConfig(changed.protocol, providerModelKey.trim() || modelKey.trim()));
+            form.setFieldValue("capabilityConfig", modelCapability === "audio" ? audioChannelCapabilityConfig(changed.protocol) : defaultModelCapabilityConfig(changed.protocol, providerModelKey.trim() || modelKey.trim()));
             setConfigurationChanged(true);
         } else if (changed.providerModelKey !== undefined || changed.modelKey !== undefined) {
             const values = form.getFieldsValue(true);
@@ -369,7 +370,17 @@ export function ChannelModelEditor({
                                             </div>
                                         </section>
                                     ) : null}
-                                    {modelCapability === "audio" && <Alert type="info" title="音频模型无需额外配置引用与参数" description="调用协议和积分定价仍需在对应分组中配置。" />}
+                                        {modelCapability === "audio" && (capabilityConfig?.audio ? <>
+                                            <Descriptions title="音乐生成默认参数" bordered size="small" column={2} items={[
+                                                { key: "input", label: "输入", children: "纯文本音乐描述" },
+                                                { key: "tasks", label: "任务数（n）", children: capabilityConfig.audio.taskCount },
+                                                { key: "outputs", label: "每次返回", children: `${capabilityConfig.audio.outputCount} 首音乐` },
+                                                { key: "streaming", label: "流式输出（stream）", children: "关闭" },
+                                                { key: "references", label: "参考素材", children: "不支持" },
+                                                { key: "parameters", label: "音色、语速、时长、格式", children: "由上游生成，不提供独立参数" },
+                                            ]} />
+                                            <Alert type="info" title="按供应商合同自动配置" description="曲风、情绪、乐器及无人声要求请写入提示词。一次任务返回两首音乐，按次计费；结果链接会及时保存。" />
+                                        </> : <Alert type="info" title="音频模型无需额外配置引用与参数" description="调用协议和积分定价仍需在对应分组中配置。" />)}
                                 </div>
                             ),
                         },

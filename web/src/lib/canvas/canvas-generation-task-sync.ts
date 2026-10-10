@@ -233,11 +233,12 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
     }
 
     if (mode === "audio") {
-        if (!result.audio?.dataUrl) throw new Error("后端任务没有返回音频");
-        const audio = result.audio.storageKey
-            ? { url: await resolveMediaUrl(result.audio.storageKey, result.audio.dataUrl), storageKey: result.audio.storageKey, durationMs: result.audio.durationMs, bytes: result.audio.bytes || 0, mimeType: result.audio.mimeType || "audio/mpeg" }
-            : await storeGeneratedAudio(await (await fetch(result.audio.dataUrl)).blob(), result.audio.format || "mp3");
-        return { ...node, type: CanvasNodeType.Audio, metadata: applyGeneratedMediaResultMetadata(node, audioMetadata(audio), { prompt, ...completedTaskMetadata(task) }, task.model) };
+        const item = result.audios?.[outputIndex] || (outputIndex === 0 ? result.audio : undefined);
+        if (!item?.dataUrl && !item?.storageKey) throw new Error("后端任务没有返回音频");
+        const audio = item.storageKey
+            ? { url: await resolveMediaUrl(item.storageKey, item.dataUrl), storageKey: item.storageKey, durationMs: item.durationMs, bytes: item.bytes || 0, mimeType: item.mimeType || "audio/mpeg" }
+            : await storeGeneratedAudio(await (await fetch(item.dataUrl)).blob(), item.format || "mp3");
+        return { ...node, type: CanvasNodeType.Audio, metadata: { ...applyGeneratedMediaResultMetadata(node, audioMetadata(audio), { prompt, ...completedTaskMetadata(task), generationOutputIndex: outputIndex, generationOutputCount: outputIndex === 0 ? result.audios?.length || 1 : 1 }, task.model), assetId: task.outputs?.find((output) => output.outputIndex === outputIndex)?.materializedAssetId } };
     }
 
     if (!result.text) throw new Error("后端任务没有返回文本");
@@ -330,7 +331,14 @@ export async function applyMaterializedGenerationTaskResultToNodes(nodes: Canvas
     } else if (asset.kind === "video") {
         result.video = { dataUrl: asset.data.url, ...asset.data };
     } else if (asset.kind === "audio") {
-        result.audio = { dataUrl: asset.data.url, ...asset.data };
+        const audios = [...(result.audios || (result.audio ? [result.audio] : []))];
+        for (const item of task.outputs?.length ? task.outputs : [output]) {
+            const audioAsset = useAssetStore.getState().assets.find((candidate) => candidate.id === item.materializedAssetId);
+            if (!audioAsset || audioAsset.kind !== "audio") throw new Error("生成任务音频输出素材不存在");
+            audios[item.outputIndex] = { dataUrl: audioAsset.data.url, ...audioAsset.data };
+        }
+        result.audios = audios;
+        result.audio = audios[0];
     } else {
         throw new Error("生成任务输出素材类型不支持画布节点");
     }
@@ -356,6 +364,11 @@ export async function applyMaterializedGenerationTaskResultToNodes(nodes: Canvas
 export function generationTaskOutputsApplied(node: CanvasNodeData, task: GenerationTask) {
     if (node.metadata?.layerExtraction?.extractionTaskId === task.id && node.metadata.content) return true;
     if (node.metadata?.taskId !== task.id || node.metadata.status !== "success" || !node.metadata.content) return false;
+    if (generationTaskMode(task) === "audio") {
+        const count = parseBackendGenerationResult(task).audios?.length || 1;
+        const index = node.metadata.generationOutputIndex || 0;
+        return index > 0 ? index < count : node.metadata.generationOutputCount === count || count === 1;
+    }
     if (generationTaskMode(task) !== "image") return true;
     const count = parseBackendGenerationResult(task).images?.length || 1;
     return node.metadata.generationOutputCount === count || (count > 1 && (node.metadata.batchChildIds?.length || 0) >= count);
@@ -375,6 +388,20 @@ export function shouldRecoverCanvasImageOutputs(node: CanvasNodeData) {
 
 async function buildGenerationTaskNodeResults(node: CanvasNodeData, task: GenerationTask, nodes: CanvasNodeData[]) {
     if (generationTaskInput(task)?.metadata?.layerDecomposition) return buildImageLayerTaskResult(node, task, nodes);
+    if (generationTaskMode(task) === "audio") {
+        const index = node.metadata?.taskId === task.id ? node.metadata.generationOutputIndex || 0 : 0;
+        const resultNode = await buildGenerationTaskNodeResult(node, task, nodes, index);
+        const audios = parseBackendGenerationResult(task).audios || [];
+        const additionalNodes: CanvasNodeData[] = [];
+        if (index === 0) for (let outputIndex = 1; outputIndex < audios.length; outputIndex += 1) {
+            const id = `${node.id}:task:${task.id}:audio:${outputIndex}`;
+            const existing = nodes.find((item) => item.id === id);
+            if (existing) { additionalNodes.push(existing); continue; }
+            const child = await buildGenerationTaskNodeResult({ ...node, id, title: `${node.title} · ${outputIndex + 1}`, parentId: undefined }, task, nodes, outputIndex);
+            additionalNodes.push({ ...child, position: findAvailableGenerationGroupPosition([...nodes, ...additionalNodes], { x: resultNode.position.x + resultNode.width + 36, y: resultNode.position.y }, child), metadata: { ...child.metadata, versionOfNodeId: undefined, versionLabel: undefined, versionPrimary: undefined, agentGenerationContinuation: undefined } });
+        }
+        return { node: resultNode, additionalNodes };
+    }
     const resultNode = await buildGenerationTaskNodeResult(node, task, nodes);
     const images = generationTaskMode(task) === "image" ? parseBackendGenerationResult(task).images || [] : [];
     if (images.length <= 1) return { node: resultNode, additionalNodes: [] as CanvasNodeData[] };
@@ -634,7 +661,7 @@ export async function syncGenerationTaskToCanvasStore(task: GenerationTask) {
 
 function findGenerationTaskNode(nodes: CanvasNodeData[], task: GenerationTask, targetNodeId?: string) {
     const nodeId = targetNodeId || generationTaskNodeId(task);
-    return nodeId ? nodes.find((node) => node.id === nodeId) : nodes.find((node) => node.metadata?.taskId === task.id);
+    return nodeId ? nodes.find((node) => node.id === nodeId) : nodes.find((node) => node.metadata?.taskId === task.id && !node.metadata.generationOutputIndex);
 }
 
 function completedTaskMetadata(task: GenerationTask): CanvasNodeMetadata {

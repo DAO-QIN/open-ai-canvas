@@ -15,6 +15,7 @@ type ModelCapabilityConfig struct {
 	Text    *TextCapabilityConfig  `json:"text,omitempty"`
 	Image   *ImageCapabilityConfig `json:"image,omitempty"`
 	Video   *VideoCapabilityConfig `json:"video,omitempty"`
+	Audio   *AudioCapabilityConfig `json:"audio,omitempty"`
 }
 
 type TextCapabilityConfig struct {
@@ -153,10 +154,10 @@ func normalizedChannelModelCapability(channelModel *model.ChannelModel) (*ModelC
 		return nil, errors.New("渠道模型为空")
 	}
 	capability := normalizeCapability(channelModel.Capability)
-	if capability == "audio" {
+	if capability == "audio" && string(channelModel.Protocol) != "kacang-suno" {
 		return nil, nil
 	}
-	if capability != "text" && capability != "image" && capability != "video" {
+	if capability != "text" && capability != "image" && capability != "video" && capability != "audio" {
 		return nil, fmt.Errorf("不支持的渠道模型能力：%s", channelModel.Capability)
 	}
 	config, err := DecodeModelCapabilityConfig(channelModel.CapabilityConfigJSON)
@@ -175,6 +176,9 @@ func NormalizeModelCapabilityConfig(capability string, protocol string, input *M
 }
 
 func NormalizeModelCapabilityConfigForModel(capability string, protocol string, modelName string, input *ModelCapabilityConfig) (*ModelCapabilityConfig, error) {
+	if capability == "audio" {
+		return normalizeAudioCapabilityConfig(protocol, input)
+	}
 	if capability != "text" && capability != "image" && capability != "video" {
 		return nil, nil
 	}
@@ -270,8 +274,12 @@ func applyModelSpecificVideoCapability(profile *VideoCapabilityConfig, protocol 
 // 渠道模型能力参数是唯一事实来源，前台模型供应线路直接引用该规格。
 func CapabilitySpecFromModelCapabilityConfig(config *ModelCapabilityConfig, capability string) (CapabilitySpec, error) {
 	spec := CapabilitySpec{Version: 1, Capability: capability, Inputs: map[string]InputConstraint{}, Options: map[string]OptionConstraint{}}
-	// 音频模型当前没有可编辑的渠道能力 JSON，使用空能力规格表示“无额外路由约束”。
 	if capability == "audio" {
+		if config != nil && config.Audio != nil && config.Audio.GenerationType == "music" {
+			for _, kind := range []string{"image", "video", "audio"} {
+				spec.Inputs[kind] = InputConstraint{Min: 0, Max: 0}
+			}
+		}
 		return spec, nil
 	}
 	if config == nil {
