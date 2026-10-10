@@ -489,6 +489,20 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.watermark = { supported: false, default: false };
         video.operations = ["text_to_video", "image_to_video", "reference_to_video", ...(maxAudios > 0 ? ["audio_to_video"] : [])];
     }
+    if (["kacang-gemini-omni-video", "kacang-grok-video-15", "kacang-kling-video-30"].includes(protocol || "")) {
+        const gemini = protocol === "kacang-gemini-omni-video";
+        const grok = protocol === "kacang-grok-video-15";
+        video.references = { promptMaxChars: DEFAULT_VIDEO_PROMPT_MAX_CHARS, minImages: 0, maxImages: gemini ? 4 : grok ? 14 : 1, maxImageBytes: 0, maxVideos: gemini ? 1 : 0, maxVideoBytes: 0, maxVideoDurationSeconds: 0, maxAudios: 0, maxAudioBytes: 0, maxAudioDurationSeconds: 0 };
+        video.duration = { selection: "range", min: gemini ? 3 : grok ? 4 : 1, max: gemini ? 10 : 15, step: 1, default: gemini ? 3 : grok ? 8 : 5 };
+        video.ratios = grok ? ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"] : ["16:9", "9:16"];
+        video.defaultRatio = "16:9";
+        video.resolutions = grok ? ["480p", "720p", "1080p"] : ["720p"];
+        video.defaultResolution = grok ? "480p" : "720p";
+        video.generateAudio = { supported: false, default: false };
+        video.watermark = { supported: false, default: false };
+        video.operations = ["text_to_video", "image_to_video", ...(gemini || grok ? ["reference_to_video"] : [])];
+        video.defaultOperation = "text_to_video";
+    }
     return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video };
 }
 
