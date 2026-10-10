@@ -13,7 +13,7 @@
 依据：[Suno 文档](https://console.prompt-hubs.com/docs/model/suno)、[Suno 参数与定价](https://console.prompt-hubs.com/pricing)，核对日期 2026-10-10。
 
 <!-- YINGCE_MANIFEST_CONTRACT_START -->
-## 完整 Manifest 合同
+## Manifest 完整接口定义
 
 ```json
 {
