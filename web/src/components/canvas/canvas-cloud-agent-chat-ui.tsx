@@ -578,15 +578,7 @@ function useTypewriterText(targetText: string, shouldAnimate: boolean) {
             // Normal output remains visibly animated. Once stream chunks start
             // outrunning the renderer, increase the batch instead of queuing
             // every code point behind a fixed 16ms delay.
-            const revealCount = pendingCharacters > 384
-                ? pendingCharacters
-                : pendingCharacters > 192
-                    ? 32
-                    : pendingCharacters > 96
-                        ? 16
-                        : pendingCharacters > 24
-                            ? 8
-                            : 3;
+            const revealCount = pendingCharacters > 384 ? pendingCharacters : pendingCharacters > 192 ? 32 : pendingCharacters > 96 ? 16 : pendingCharacters > 24 ? 8 : 3;
             const nextText = targetCharacters.slice(0, currentCharacters.length + revealCount).join("");
             visibleRef.current = nextText;
             setVisibleText(nextText);
