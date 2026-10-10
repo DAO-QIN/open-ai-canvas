@@ -238,7 +238,14 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
         const audio = item.storageKey
             ? { url: await resolveMediaUrl(item.storageKey, item.dataUrl), storageKey: item.storageKey, durationMs: item.durationMs, bytes: item.bytes || 0, mimeType: item.mimeType || "audio/mpeg" }
             : await storeGeneratedAudio(await (await fetch(item.dataUrl)).blob(), item.format || "mp3");
-        return { ...node, type: CanvasNodeType.Audio, metadata: { ...applyGeneratedMediaResultMetadata(node, audioMetadata(audio), { prompt, ...completedTaskMetadata(task), generationOutputIndex: outputIndex, generationOutputCount: outputIndex === 0 ? result.audios?.length || 1 : 1 }, task.model), assetId: task.outputs?.find((output) => output.outputIndex === outputIndex)?.materializedAssetId } };
+        return {
+            ...node,
+            type: CanvasNodeType.Audio,
+            metadata: {
+                ...applyGeneratedMediaResultMetadata(node, audioMetadata(audio), { prompt, ...completedTaskMetadata(task), generationOutputIndex: outputIndex, generationOutputCount: outputIndex === 0 ? result.audios?.length || 1 : 1 }, task.model),
+                assetId: task.outputs?.find((output) => output.outputIndex === outputIndex)?.materializedAssetId,
+            },
+        };
     }
 
     if (!result.text) throw new Error("后端任务没有返回文本");
@@ -393,13 +400,21 @@ async function buildGenerationTaskNodeResults(node: CanvasNodeData, task: Genera
         const resultNode = await buildGenerationTaskNodeResult(node, task, nodes, index);
         const audios = parseBackendGenerationResult(task).audios || [];
         const additionalNodes: CanvasNodeData[] = [];
-        if (index === 0) for (let outputIndex = 1; outputIndex < audios.length; outputIndex += 1) {
-            const id = `${node.id}:task:${task.id}:audio:${outputIndex}`;
-            const existing = nodes.find((item) => item.id === id);
-            if (existing) { additionalNodes.push(existing); continue; }
-            const child = await buildGenerationTaskNodeResult({ ...node, id, title: `${node.title} · ${outputIndex + 1}`, parentId: undefined }, task, nodes, outputIndex);
-            additionalNodes.push({ ...child, position: findAvailableGenerationGroupPosition([...nodes, ...additionalNodes], { x: resultNode.position.x + resultNode.width + 36, y: resultNode.position.y }, child), metadata: { ...child.metadata, versionOfNodeId: undefined, versionLabel: undefined, versionPrimary: undefined, agentGenerationContinuation: undefined } });
-        }
+        if (index === 0)
+            for (let outputIndex = 1; outputIndex < audios.length; outputIndex += 1) {
+                const id = `${node.id}:task:${task.id}:audio:${outputIndex}`;
+                const existing = nodes.find((item) => item.id === id);
+                if (existing) {
+                    additionalNodes.push(existing);
+                    continue;
+                }
+                const child = await buildGenerationTaskNodeResult({ ...node, id, title: `${node.title} · ${outputIndex + 1}`, parentId: undefined }, task, nodes, outputIndex);
+                additionalNodes.push({
+                    ...child,
+                    position: findAvailableGenerationGroupPosition([...nodes, ...additionalNodes], { x: resultNode.position.x + resultNode.width + 36, y: resultNode.position.y }, child),
+                    metadata: { ...child.metadata, versionOfNodeId: undefined, versionLabel: undefined, versionPrimary: undefined, agentGenerationContinuation: undefined },
+                });
+            }
         return { node: resultNode, additionalNodes };
     }
     const resultNode = await buildGenerationTaskNodeResult(node, task, nodes);

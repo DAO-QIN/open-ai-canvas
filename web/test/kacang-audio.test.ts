@@ -39,7 +39,28 @@ describe("Kacang Suno music", () => {
     });
 
     test("both tracks land once, retain separate resources, and preserve moved/renamed second track", async () => {
-        const task: GenerationTask = { id: "music-task", type: "canvas_audio", status: "succeeded", prompt: "温柔钢琴，无人声", model: "suno", attempts: 1, createdAt: "", updatedAt: "", inputJson: JSON.stringify({ mode: "audio", metadata: { nodeId: "root" } }), resultJson: JSON.stringify({ mode: "audio", audios: [{ dataUrl: "/api/resources/one/file", storageKey: "resource:one", durationMs: 10000 }, { dataUrl: "/api/resources/two/file", storageKey: "resource:two", durationMs: 12000 }] }), outputs: [{ outputIndex: 0, mediaType: "audio", materializedAssetId: "asset-one" }, { outputIndex: 1, mediaType: "audio", materializedAssetId: "asset-two" }] };
+        const task: GenerationTask = {
+            id: "music-task",
+            type: "canvas_audio",
+            status: "succeeded",
+            prompt: "温柔钢琴，无人声",
+            model: "suno",
+            attempts: 1,
+            createdAt: "",
+            updatedAt: "",
+            inputJson: JSON.stringify({ mode: "audio", metadata: { nodeId: "root" } }),
+            resultJson: JSON.stringify({
+                mode: "audio",
+                audios: [
+                    { dataUrl: "/api/resources/one/file", storageKey: "resource:one", durationMs: 10000 },
+                    { dataUrl: "/api/resources/two/file", storageKey: "resource:two", durationMs: 12000 },
+                ],
+            }),
+            outputs: [
+                { outputIndex: 0, mediaType: "audio", materializedAssetId: "asset-one" },
+                { outputIndex: 1, mediaType: "audio", materializedAssetId: "asset-two" },
+            ],
+        };
         const root: CanvasNodeData = { id: "root", title: "配乐", type: CanvasNodeType.Audio, width: 420, height: 180, position: { x: 10, y: 20 }, metadata: { taskId: task.id } };
         const first = await applyGenerationTaskResultToNodes([root], task);
         expect(first.nodes).toHaveLength(2);

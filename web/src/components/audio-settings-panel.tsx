@@ -12,15 +12,18 @@ type AudioSettingsPanelProps = { config: AiConfig; onConfigChange: (key: CanvasA
 
 export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[var(--panel-width-compact)] space-y-4" }: AudioSettingsPanelProps) {
     const listId = useId();
-    if (isMusicAudioConfig(config)) return (
-        <ImageSettingsTheme theme={theme}>
-            <section className={className} style={{ color: theme.node.text }} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} aria-label="音频生成参数">
-                {showTitle ? <h3 className="text-base font-semibold">音乐设置</h3> : null}
-                <p className="text-sm">每次生成 2 首音乐</p>
-                <p className="text-xs leading-5" style={{ color: theme.node.muted }}>在提示词中描述曲风、情绪、乐器和人声要求。仅支持纯文本，音乐时长与格式由模型决定。</p>
-            </section>
-        </ImageSettingsTheme>
-    );
+    if (isMusicAudioConfig(config))
+        return (
+            <ImageSettingsTheme theme={theme}>
+                <section className={className} style={{ color: theme.node.text }} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} aria-label="音频生成参数">
+                    {showTitle ? <h3 className="text-base font-semibold">音乐设置</h3> : null}
+                    <p className="text-sm">每次生成 2 首音乐</p>
+                    <p className="text-xs leading-5" style={{ color: theme.node.muted }}>
+                        在提示词中描述曲风、情绪、乐器和人声要求。仅支持纯文本，音乐时长与格式由模型决定。
+                    </p>
+                </section>
+            </ImageSettingsTheme>
+        );
     const streaming = isDoubaoAudioConfig(config);
     const voice = normalizeAudioVoiceForConfig(config, config.audioVoice);
     const voices = audioVoiceOptionsForConfig(config);
