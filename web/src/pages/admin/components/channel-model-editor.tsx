@@ -7,14 +7,14 @@ import { ModelIconPicker } from "@/components/model-logo";
 import { ModelIcon } from "@/components/model-picker";
 import { ModelProtocolBrowser } from "@/components/model-protocol-browser";
 import { ModelCapabilityEditor } from "@/components/model-capability-editor";
-import { defaultModelCapabilityConfig, normalizeModelCapabilityConfig, type ModelCapabilityConfig } from "@/lib/model-capabilities";
+import { defaultModelCapabilityConfig, type ModelCapabilityConfig } from "@/lib/model-capabilities";
 import type { ModelProtocolDefinition } from "@/lib/model-protocols";
 import { createAdminChannelModel, testAdminChannelModel, updateAdminChannelModel, type ChannelModel } from "@/services/api/wallet";
 import type { ModelChannel } from "@/stores/use-config-store";
 import { defaultPriceTier, normalizeUpstreamModelKey, priceTierPayloadFromForm } from "./channel-model-price-tier-form";
 import { PriceTierFields } from "./channel-model-price-tier-fields";
 import { ChannelModelTagsEditor } from "./channel-model-tags-editor";
-import { audioChannelCapabilityConfig } from "./channel-model-editor-form";
+import { audioChannelCapabilityConfig, channelModelCapabilityConfigForSave } from "./channel-model-editor-form";
 import { changeChannelModelCapability, editorSectionForField, initialChannelModelValues, updateChannelModelUpstreamCapabilities, validateChannelModelPrices, validateChannelModelProtocol, type ChannelModelFormValues as FormValues, type EditorSection } from "./channel-model-editor-form";
 
 export function ChannelModelEditor({
@@ -111,8 +111,7 @@ export function ChannelModelEditor({
         const values = await validateEditor();
         if (!values) return;
         const upstreamModel = values.providerModelKey?.trim() || values.modelKey.trim();
-        const capabilityConfig =
-            values.capability === "text" || values.capability === "image" || values.capability === "video" ? normalizeModelCapabilityConfig(values.capabilityConfig || defaultModelCapabilityConfig(values.protocol, upstreamModel)) : undefined;
+        const capabilityConfig = channelModelCapabilityConfigForSave(values);
         busyRef.current = true;
         setSaving(true);
         try {
@@ -152,8 +151,7 @@ export function ChannelModelEditor({
         const values = await validateEditor(["modelKey", "providerModelKey", "capability", "protocol", "capabilityConfig"]);
         if (!values) return;
         const upstreamModel = values.providerModelKey?.trim() || values.modelKey.trim();
-        const capabilityConfig =
-            values.capability === "text" || values.capability === "image" || values.capability === "video" ? normalizeModelCapabilityConfig(values.capabilityConfig || defaultModelCapabilityConfig(values.protocol, upstreamModel)) : undefined;
+        const capabilityConfig = channelModelCapabilityConfigForSave(values);
         busyRef.current = true;
         setTesting(true);
         try {

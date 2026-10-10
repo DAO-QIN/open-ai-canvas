@@ -92,6 +92,12 @@ export function audioChannelCapabilityConfig(protocol?: string): ModelCapability
     return audio ? { version: 1, audio } : undefined;
 }
 
+export function channelModelCapabilityConfigForSave(values: ChannelModelFormValues): ModelCapabilityConfig | undefined {
+    if (values.capability === "audio") return audioChannelCapabilityConfig(values.protocol);
+    const upstreamModel = values.providerModelKey?.trim() || values.modelKey.trim();
+    return normalizeModelCapabilityConfig(values.capabilityConfig || defaultModelCapabilityConfig(values.protocol, upstreamModel));
+}
+
 export function validateChannelModelProtocol(capability: string, protocol: string | undefined, protocols: ModelProtocolDefinition[]) {
     if (!protocols.some((p) => p.value === protocol && p.capability === capability && p.enabled !== false)) {
         throw new Error("请选择当前能力下已启用的请求协议");

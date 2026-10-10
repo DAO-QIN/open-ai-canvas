@@ -215,7 +215,7 @@ func (s *Service) SaveAdminChannelModel(actor *model.User, channelID string, id 
 	item.Capability = capability
 	item.Protocol = protocol
 	s.applyChannelModelPriceTierSummary(item, tiers)
-	if capability == "text" || capability == "image" || capability == "video" {
+	if capability == "text" || capability == "image" || capability == "video" || (capability == "audio" && string(protocol) == "kacang-suno") {
 		capabilityConfig, normalizeErr := NormalizeModelCapabilityConfigForModel(capability, string(protocol), providerModelKey, req.CapabilityConfig)
 		if normalizeErr != nil {
 			return nil, normalizeErr

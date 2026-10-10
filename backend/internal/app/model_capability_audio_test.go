@@ -3,9 +3,49 @@ package app
 import (
 	"context"
 	"encoding/base64"
+	"reflect"
 	"testing"
+	"yingce/backend/internal/model"
 	"yingce/backend/internal/protocol"
 )
+
+func TestKacangSunoAdminSavePersistsCapabilitiesDisabledUnpriced(t *testing.T) {
+	svc, db := newChannelModelTestService(t)
+	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin}
+	channel := model.ModelChannel{ID: "music", UserID: admin.ID, Scope: model.ChannelScopeSystem, Enabled: true, Name: "Music", BaseURL: "https://example.com/v1", APIKey: "test", ModelsJSON: `[]`}
+	if err := db.Create(&channel).Error; err != nil {
+		t.Fatal(err)
+	}
+	disabled := false
+	profile := DefaultModelCapabilityConfigForModel("kacang-suno", "suno")
+	saved, err := svc.SaveAdminChannelModel(admin, channel.ID, "", ChannelModelRequest{
+		ModelKey: "suno", ProviderModelKey: "suno", Capability: "audio", Protocol: "kacang-suno", CapabilityConfig: profile, Enabled: &disabled,
+		PriceTiers: []ChannelModelPriceTierRequest{{BillingMode: "fixed_request", PriceConfigured: false, Enabled: &disabled}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := svc.repo.ChannelModelByID(channel.ID, saved.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeModelCapabilityConfig(stored.CapabilityConfigJSON)
+	if err != nil || decoded == nil || !reflect.DeepEqual(decoded.Audio, profile.Audio) || stored.CapabilityVersion == 0 {
+		t.Fatalf("saved music capabilities lost: %#v, %v", stored, err)
+	}
+	if stored.Enabled || stored.PriceConfigured {
+		t.Fatal("disabled/unpriced model changed")
+	}
+	for _, tier := range stored.PriceTiers {
+		if tier.Enabled || tier.PriceConfigured {
+			t.Fatal("price tier enabled or priced")
+		}
+	}
+	published, err := svc.AdminChannelModels(admin, channel.ID)
+	if err != nil || len(published) != 1 || published[0].CapabilityConfig == nil {
+		t.Fatalf("music capabilities missing from admin readback: %#v, %v", published, err)
+	}
+}
 
 func TestKacangSunoStoresTwoTracksWithoutDuplicatePrimary(t *testing.T) {
 	s := newResourceTestService(t)

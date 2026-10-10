@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
-import { audioChannelCapabilityConfig, changeChannelModelCapability, initialChannelModelValues } from "@/pages/admin/components/channel-model-editor-form";
+import { audioChannelCapabilityConfig, channelModelCapabilityConfigForSave, changeChannelModelCapability, initialChannelModelValues } from "@/pages/admin/components/channel-model-editor-form";
 import type { ModelProtocolDefinition } from "@/lib/model-protocols";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 import type { GenerationTask } from "@/services/api/task-center";
@@ -21,8 +21,21 @@ describe("Kacang Suno music", () => {
         expect(selected.capabilityConfig).toEqual({ version: 1, audio: { generationType: "music", taskCount: 1, outputCount: 2, streaming: false } });
         expect(selected.enabled).toBe(false);
         expect(selected.priceTiers[0].unitPrice).toBe(23);
+        expect(channelModelCapabilityConfigForSave(selected)).toEqual(selected.capabilityConfig);
+        expect(channelModelCapabilityConfigForSave({ ...selected, protocol: "openai-audio" })).toBeUndefined();
         expect(defaultModelCapabilityConfig("kacang-suno", "suno").audio).toEqual(selected.capabilityConfig?.audio);
         expect(audioChannelCapabilityConfig("openai-audio")).toBeUndefined();
+    });
+
+    test("saving a disabled unpriced music model retains its capability contract", () => {
+        const selected = changeChannelModelCapability({ ...initialChannelModelValues(null, protocols), capability: "audio", protocol: "kacang-suno", modelKey: "suno", enabled: false }, protocols);
+        selected.priceTiers[0].priceConfigured = false;
+        selected.priceTiers[0].enabled = false;
+        const profile = channelModelCapabilityConfigForSave(selected);
+        expect(profile?.audio).toEqual({ generationType: "music", taskCount: 1, outputCount: 2, streaming: false });
+        expect(selected.enabled).toBe(false);
+        expect(selected.priceTiers[0].priceConfigured).toBe(false);
+        expect(selected.priceTiers[0].enabled).toBe(false);
     });
 
     test("both tracks land once, retain separate resources, and preserve moved/renamed second track", async () => {
