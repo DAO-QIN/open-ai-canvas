@@ -330,7 +330,13 @@ export type CanvasNodeMetadata = {
     /** 普通生图模型逐层提取；刷新只恢复已提交任务，不自动提交下一次付费请求。 */
     experimentalLayerPlan?: {
         sourceNodeId: string;
-        requests: Array<{ nodeId: string; target: string; removeFromBackground?: boolean; extraction?: import("@/lib/canvas/canvas-image-layer-strategy").ImageLayerExtraction; generation?: import("@/lib/canvas/canvas-image-layers").ImageLayerGeneration }>;
+        requests: Array<{
+            nodeId: string;
+            target: string;
+            removeFromBackground?: boolean;
+            extraction?: import("@/lib/canvas/canvas-image-layer-strategy").ImageLayerExtraction;
+            generation?: import("@/lib/canvas/canvas-image-layers").ImageLayerGeneration;
+        }>;
         errorSignature?: string;
         composedSignature?: string;
         plannerModel?: string;
@@ -364,7 +370,7 @@ export type CanvasNodeMetadata = {
         incomplete?: { completed: number; total: number; failed: number; missingBackground: boolean };
     };
     imageLayer?: { groupId: string; outputIndex: number; kind?: "base" | "transparent" };
-    /** Cropped materials are separate from the full-size compositing contract. */
+    /** 裁切素材与完整画布尺寸的图层合成分别保存。 */
     imageLayerMaterials?: { auto?: boolean; status?: "loading" | "ready" | "error"; groupId?: string; error?: string };
     imageLayerMaterial?: { sourceLayerId: string; sourceGroupId: string; bounds: { left: number; top: number; width: number; height: number } };
     storageKey?: string;

@@ -10,7 +10,16 @@ type ImageSize = { width: number; height: number };
 
 export type ImageLayerPlan = {
     layout?: "continuous" | "composition" | "mixed";
-    layers: Array<{ name: string; description: string; kind: "background" | "object"; generation: ImageLayerGeneration; editUnit?: "scene" | "object" | "text" | "decoration" | "group"; removeFromBackground?: boolean; bbox?: [number, number, number, number]; extraction?: ImageLayerExtraction }>;
+    layers: Array<{
+        name: string;
+        description: string;
+        kind: "background" | "object";
+        generation: ImageLayerGeneration;
+        editUnit?: "scene" | "object" | "text" | "decoration" | "group";
+        removeFromBackground?: boolean;
+        bbox?: [number, number, number, number];
+        extraction?: ImageLayerExtraction;
+    }>;
     reasoning?: { structure: string; editingGoal: string; strategy: string };
     model?: string;
     taskId?: string;
@@ -33,8 +42,8 @@ export function imageLayerPlanningPrompt(instructions: string, referenceSize?: I
         purpose === "materials"
             ? '当前目的：提取素材。第一层保留完整原图（extraction.method="source"），其他层 removeFromBackground=false；收集素材无需删除原图中的内容，也无需重画底板。'
             : '当前目的：拆分背景与前景，便于美工独立移动、替换或删除。第一层是移除已拆前景后完整、不透明的背景，extraction.method="generate"，保留其他环境、底色与设计结构并修补遮挡；不是原图副本。其余选中的对象、文字或完整场景全部 removeFromBackground=true，保持原位置和比例。只选择必要的独立编辑单元，不额外输出备用副本。',
-        '先声明 layout：continuous=同一连续场景，composition=多个有独立边界的嵌入素材组成的排版，mixed=两者混合。只有实际存在独立外边界的照片、插画、截图或完整设计容器，才是可原像素裁取的素材；保留其内部主体、环境和标签。连续照片中的家具、织物、物件或背景一角不是嵌入面板，不能用矩形裁块冒充独立素材。连续场景优先提取完整主要主体的透明轮廓，背景支撑、被画幅截断的局部和缺少复用价值的小物体留在背景。默认不列举所有可见物，用户要求细分时才增加细节。前景及完整素材只保留原图可见内容；背景只修补被已拆前景遮挡的位置，不扩图或补画其他未展示内容。',
-        '每层声明 editUnit：scene=嵌入的完整照片/场景，group=完整组件，object=独立主体，text=文字，decoration=装饰。extraction 工具：source 仅用于第一层；source-region 复制区域全部原像素，适用于完整规则素材，声明 shape=rect|rounded-rect|ellipse，圆角用 radiusRatio（占短边 0–0.5）；generate 用于需透明轮廓的主体/文字或明确请求的修补。完整 scene 禁止重画或内部去背景。边界不确定时保留 source-region 并省略 bbox，等待用户框选，不能改用 generate。',
+        "先声明 layout：continuous=同一连续场景，composition=多个有独立边界的嵌入素材组成的排版，mixed=两者混合。只有实际存在独立外边界的照片、插画、截图或完整设计容器，才是可原像素裁取的素材；保留其内部主体、环境和标签。连续照片中的家具、织物、物件或背景一角不是嵌入面板，不能用矩形裁块冒充独立素材。连续场景优先提取完整主要主体的透明轮廓，背景支撑、被画幅截断的局部和缺少复用价值的小物体留在背景。默认不列举所有可见物，用户要求细分时才增加细节。前景及完整素材只保留原图可见内容；背景只修补被已拆前景遮挡的位置，不扩图或补画其他未展示内容。",
+        "每层声明 editUnit：scene=嵌入的完整照片/场景，group=完整组件，object=独立主体，text=文字，decoration=装饰。extraction 工具：source 仅用于第一层；source-region 复制区域全部原像素，适用于完整规则素材，声明 shape=rect|rounded-rect|ellipse，圆角用 radiusRatio（占短边 0–0.5）；generate 用于需透明轮廓的主体/文字或明确请求的修补。完整 scene 禁止重画或内部去背景。边界不确定时保留 source-region 并省略 bbox，等待用户框选，不能改用 generate。",
         "按复用价值选择 2–8 层（含底图）。同一素材可保留副本；不是所有可见细节都值得拆出。超过上限按完整语义单元分组，支持之后继续拆分。name 简短唯一，description 仅描述对象外观、组成和位置，不写保留、移除、透明度或其他生成指令。",
         '每张图分别声明 generation={"prompt":"只用于本层的完整执行指令","background":"opaque或transparent"}，执行时只会收到本层 prompt，不会收到其他层描述或用户总体要求，因此必须自行写清本层任务及有关位置。背景层 prompt 仅写应保留的背景、需移除对象的客观名称/外观/位置以及如何修补，不能粘贴前景的保留、透明边缘或输出要求；background 必须为 opaque。对象层 prompt 仅写本层对象及其保留范围，不能包含背景层修补任务或其他图层的输出要求；background 必须为 transparent。完整照片/面板保持内部全部内容，透明仅作用于面板外部。把用户要求分配到相关层，不原样复制混有其他层指令的总体要求。generation 只允许 prompt、background 两个字段，不能更改模型、画布尺寸、质量或张数；prompt 不超过2400字。source/source-region 层也给出各自独立参数，但执行仍使用原图像素，不付费重画。',
         coordinates + " bbox 位于图层对象，与 extraction 同级；坐标须覆盖整个素材的边界，不能只框内部主体。不要虚构精确边界。",
@@ -81,7 +90,13 @@ export function applyImageLayerPlanningPurpose(plan: ImageLayerPlan, purpose: Im
 
 /** 节点标题只保留素材名称；完整描述与坐标继续留在生成计划中。 */
 export function imageLayerTargetName(target: string) {
-    return target.replace(/<bbox>[^<]*<\/bbox>/g, "").split(/[：:\n]/)[0].trim().slice(0, 48) || "图层素材";
+    return (
+        target
+            .replace(/<bbox>[^<]*<\/bbox>/g, "")
+            .split(/[：:\n]/)[0]
+            .trim()
+            .slice(0, 48) || "图层素材"
+    );
 }
 
 /** 语义计划必须有效；可选区域提示不能使已识别的整份计划失效，也不能猜测单位或裁剪坐标。 */
@@ -116,7 +131,7 @@ export function parseImageLayerPlan(text: string, referenceSize?: ImageSize): Im
         let bbox: [number, number, number, number] | undefined;
         const nestedBbox = item.extraction?.bbox;
         const conflictingBbox = item.bbox !== undefined && nestedBbox !== undefined && JSON.stringify(item.bbox) !== JSON.stringify(nestedBbox);
-        const regionBbox = conflictingBbox ? undefined : item.bbox ?? nestedBbox;
+        const regionBbox = conflictingBbox ? undefined : (item.bbox ?? nestedBbox);
         if (conflictingBbox) warnings.push(`“${name}”返回了冲突的区域坐标，请核对原图并重新框选。`);
         if (regionBbox !== undefined) {
             const space = value.coordinateSpace ?? "normalized1000";
@@ -137,7 +152,7 @@ export function parseImageLayerPlan(text: string, referenceSize?: ImageSize): Im
                 const shape = item.extraction.shape;
                 if (!["rect", "rounded-rect", "ellipse"].includes(shape)) throw new Error("识图规划的原图提取形状无效");
                 const radiusRatio = item.extraction.radiusRatio;
-                // Keep a usable semantic plan, but an explicit source-region without geometry blocks submission in the editor.
+                // 保留可用的语义计划；显式选择原图区域却缺少几何坐标时，由编辑器阻止提交。
                 extraction = { method, ...(bbox ? { region: { bbox, shape, ...(shape === "rounded-rect" ? { radiusRatio } : {}) } } : {}) };
                 if (!bbox) warnings.push(`“${name}”使用原图提取，需要先在原图框选有效区域；不会自动改为付费生成。`);
             } else throw new Error("识图规划的提取方式与图层角色不一致");
@@ -148,10 +163,12 @@ export function parseImageLayerPlan(text: string, referenceSize?: ImageSize): Im
         return { name, description, kind, generation, ...(editUnit ? { editUnit } : {}), ...(index ? { removeFromBackground: item.removeFromBackground ?? false } : {}), ...(bbox ? { bbox } : {}), ...(extraction ? { extraction } : {}) };
     });
     const fields = ["structure", "editingGoal", "strategy"] as const;
-    const reasoning = value.reasoning && fields.every((field) => typeof value.reasoning[field] === "string" && value.reasoning[field].trim().length > 0 && value.reasoning[field].length <= 400)
-        ? Object.fromEntries(fields.map((field) => [field, value.reasoning[field].trim()])) as ImageLayerPlan["reasoning"] : undefined;
+    const reasoning =
+        value.reasoning && fields.every((field) => typeof value.reasoning[field] === "string" && value.reasoning[field].trim().length > 0 && value.reasoning[field].length <= 400)
+            ? (Object.fromEntries(fields.map((field) => [field, value.reasoning[field].trim()])) as ImageLayerPlan["reasoning"])
+            : undefined;
     if (value.reasoning && !reasoning) warnings.push("规划依据格式无效，已保留图层计划；请核对图像结构与提取方式。");
-    const layout = ["continuous", "composition", "mixed"].includes(value.layout) ? value.layout as ImageLayerPlan["layout"] : undefined;
+    const layout = ["continuous", "composition", "mixed"].includes(value.layout) ? (value.layout as ImageLayerPlan["layout"]) : undefined;
     if (value.layout !== undefined && !layout) warnings.push("图片结构分类无效，请核对是否为连续场景或嵌入式排版。");
     return { layers, ...(layout ? { layout } : {}), ...(reasoning ? { reasoning } : {}), ...(warnings.length ? { warnings } : {}) };
 }

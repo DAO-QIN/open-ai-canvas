@@ -38,7 +38,7 @@ export function useCanvasImageLayerGroups({
         if (!enabled) return;
         for (const root of nodes) {
             if (root.metadata?.status === "loading" && root.metadata.imageLayerWorkflow?.stage === "planning" && !activeLayerGroupIds?.has(root.id)) {
-                setNodes((current) => current.map((node) => node.id === root.id ? { ...node, metadata: { ...node.metadata, status: "error", errorDetails: "拆解规划等待已中断，未自动提交拆图任务；请重新发起拆分。" } } : node));
+                setNodes((current) => current.map((node) => (node.id === root.id ? { ...node, metadata: { ...node.metadata, status: "error", errorDetails: "拆解规划等待已中断，未自动提交拆图任务；请重新发起拆分。" } } : node)));
                 continue;
             }
             const plan = root.metadata?.experimentalLayerPlan;
@@ -48,9 +48,7 @@ export function useCanvasImageLayerGroups({
             if (ready.length !== children.length && (activeLayerGroupIds?.has(root.id) || runningNodeId === root.id || children.some((node) => node?.metadata?.status === "loading" && node.metadata.taskId))) continue;
             if (!ready.length) {
                 if (root.metadata?.status !== "error") {
-                    setNodes((current) =>
-                        current.map((node) => (node.id === root.id ? { ...node, metadata: { ...node.metadata, status: "error", errorDetails: "拆层未完成：没有已验收图层；不会自动继续扣费。请展开检查并单独重试失败层。" } } : node)),
-                    );
+                    setNodes((current) => current.map((node) => (node.id === root.id ? { ...node, metadata: { ...node.metadata, status: "error", errorDetails: "拆层未完成：没有已验收图层；不会自动继续扣费。请展开检查并单独重试失败层。" } } : node)));
                 }
                 continue;
             }
@@ -65,17 +63,35 @@ export function useCanvasImageLayerGroups({
                     if (scope.current !== epoch) return;
                     setNodes((current) => {
                         const live = current.find((node) => node.id === root.id);
-                        if (!live?.metadata?.experimentalLayerPlan || experimentalLayerSignature(live, current) !== signature || (live.metadata.imageLayerGroup ? imageLayerCompositeSignature(live.metadata.imageLayerGroup, current) : undefined) !== editSignature) return current;
+                        if (
+                            !live?.metadata?.experimentalLayerPlan ||
+                            experimentalLayerSignature(live, current) !== signature ||
+                            (live.metadata.imageLayerGroup ? imageLayerCompositeSignature(live.metadata.imageLayerGroup, current) : undefined) !== editSignature
+                        )
+                            return current;
                         const byId = new Map(result.additionalNodes.map((node) => [node.id, node]));
                         return current.map((node) =>
-                            node.id === root.id ? { ...result.node, title: node.title, position: node.position, ...(node.width !== root.width || node.height !== root.height ? { width: node.width, height: node.height } : {}), metadata: { ...result.node.metadata, imageBatchExpanded: node.metadata?.imageBatchExpanded ?? false } } : byId.has(node.id) ? { ...node, title: byId.get(node.id)!.title, metadata: { ...node.metadata, ...byId.get(node.id)!.metadata, batchRootId: root.id } } : node,
+                            node.id === root.id
+                                ? {
+                                      ...result.node,
+                                      title: node.title,
+                                      position: node.position,
+                                      ...(node.width !== root.width || node.height !== root.height ? { width: node.width, height: node.height } : {}),
+                                      metadata: { ...result.node.metadata, imageBatchExpanded: node.metadata?.imageBatchExpanded ?? false },
+                                  }
+                                : byId.has(node.id)
+                                  ? { ...node, title: byId.get(node.id)!.title, metadata: { ...node.metadata, ...byId.get(node.id)!.metadata, batchRootId: root.id } }
+                                  : node,
                         );
                     });
                 } catch (error) {
                     if (scope.current !== epoch) return;
                     setNodes((current) =>
                         current.map((node) =>
-                            node.id === root.id && experimentalLayerSignature(node, current) === signature && node.metadata?.experimentalLayerPlan && (node.metadata.imageLayerGroup ? imageLayerCompositeSignature(node.metadata.imageLayerGroup, current) : undefined) === editSignature
+                            node.id === root.id &&
+                            experimentalLayerSignature(node, current) === signature &&
+                            node.metadata?.experimentalLayerPlan &&
+                            (node.metadata.imageLayerGroup ? imageLayerCompositeSignature(node.metadata.imageLayerGroup, current) : undefined) === editSignature
                                 ? {
                                       ...node,
                                       metadata: { ...node.metadata, status: "error", errorDetails: error instanceof Error ? error.message : "实验拆层合成失败", experimentalLayerPlan: { ...node.metadata.experimentalLayerPlan, errorSignature: signature } },

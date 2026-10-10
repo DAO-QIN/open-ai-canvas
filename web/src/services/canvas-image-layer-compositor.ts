@@ -50,7 +50,8 @@ export async function normalizeImageLayerCanvas(input: LayerInput, target?: { wi
         const { info } = decoded;
         if (!target) return { image: { ...input, width: info.width, height: info.height }, info };
         if (!Number.isSafeInteger(target.width) || !Number.isSafeInteger(target.height) || target.width <= 0 || target.height <= 0 || target.width * target.height > MAX_LAYER_PIXELS) throw new Error("源图画布尺寸无效或超过处理上限");
-        if (Math.abs(info.width / info.height / (target.width / target.height) - 1) > 0.01) throw new Error(`模型结果比例与原图不一致（原图 ${target.width}×${target.height}，实际 ${info.width}×${info.height}），已拒绝该图层；不会拉伸或裁切来掩盖构图变化`);
+        if (Math.abs(info.width / info.height / (target.width / target.height) - 1) > 0.01)
+            throw new Error(`模型结果比例与原图不一致（原图 ${target.width}×${target.height}，实际 ${info.width}×${info.height}），已拒绝该图层；不会拉伸或裁切来掩盖构图变化`);
         if (info.width === target.width && info.height === target.height) return { image: { ...input, width: info.width, height: info.height }, info };
         const canvas = document.createElement("canvas");
         canvas.width = target.width;
@@ -90,11 +91,13 @@ export async function decodeAndComposeImageLayers(inputs: LayerInput[], roles?: 
             pixels += layer.info.width * layer.info.height;
             if (pixels > MAX_GROUP_PIXELS) throw new Error("图层总像素量超过处理上限");
         }
-        const order = roles ? decoded.map((layer, index) => {
-            validateImageLayerOutput(layer.info);
-            if (layer.info.width !== decoded[0].info.width || layer.info.height !== decoded[0].info.height) throw new Error("图层尺寸不一致，无法确定合成坐标");
-            return index;
-        }) : validateLayerRasters(decoded.map((layer) => layer.info));
+        const order = roles
+            ? decoded.map((layer, index) => {
+                  validateImageLayerOutput(layer.info);
+                  if (layer.info.width !== decoded[0].info.width || layer.info.height !== decoded[0].info.height) throw new Error("图层尺寸不一致，无法确定合成坐标");
+                  return index;
+              })
+            : validateLayerRasters(decoded.map((layer) => layer.info));
         const { width, height } = decoded[0].info;
         const canvas = document.createElement("canvas");
         canvas.width = width;

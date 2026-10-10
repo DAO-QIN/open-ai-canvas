@@ -1,6 +1,6 @@
 import { validateImageLayerRegion, type ImageLayerRegion } from "./canvas-image-layer-strategy";
 
-/** Propose nearby panel edges only where an even exterior and a contrasting interior agree. */
+/** 仅在均匀外侧与对比明显的内侧一致时，建议附近的面板边界。 */
 export function suggestImageLayerRegion(width: number, height: number, pixels: Uint8ClampedArray, region: ImageLayerRegion): ImageLayerRegion | undefined {
     validateImageLayerRegion(region);
     if (pixels.length !== width * height * 4 || width < 32 || height < 32 || region.shape === "ellipse") return;
@@ -53,7 +53,7 @@ export function suggestImageLayerRegion(width: number, height: number, pixels: U
     return validateImageLayerRegion({ ...region, bbox });
 }
 
-/** Tight alpha bounds include soft edges; no opaque background is inferred or removed. */
+/** alpha 有效区域包含柔和边缘，不推断或移除不透明背景。 */
 export function imageLayerAlphaBounds(width: number, height: number, pixels: Uint8ClampedArray) {
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || pixels.length !== width * height * 4) throw new Error("图层像素尺寸无效");
     let left = width,

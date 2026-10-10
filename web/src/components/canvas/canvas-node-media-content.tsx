@@ -532,7 +532,11 @@ export function ImageContent({
                     loading={loading}
                     theme={theme}
                 />
-                {node.metadata?.imageLayerGroup?.incomplete ? <div role="status" className="absolute bottom-2 left-2 right-2 rounded bg-black/75 px-2 py-1 text-xs text-amber-300">部分合成：{node.metadata.imageLayerGroup.incomplete.completed}/{node.metadata.imageLayerGroup.incomplete.total} 层已通过{node.metadata.imageLayerGroup.incomplete.missingBackground ? "，缺少完整背景" : ""}，展开可查看并重试失败层</div> : null}
+                {node.metadata?.imageLayerGroup?.incomplete ? (
+                    <div role="status" className="absolute bottom-2 left-2 right-2 rounded bg-black/75 px-2 py-1 text-xs text-amber-300">
+                        部分合成：{node.metadata.imageLayerGroup.incomplete.completed}/{node.metadata.imageLayerGroup.incomplete.total} 层已通过{node.metadata.imageLayerGroup.incomplete.missingBackground ? "，缺少完整背景" : ""}，展开可查看并重试失败层
+                    </div>
+                ) : null}
                 {node.metadata?.imageLayerGroup?.compositeStatus === "updating" || node.metadata?.imageLayerGroup?.compositeStatus === "error" ? (
                     <div role="status" className="absolute inset-0 grid place-items-center bg-black/60 p-4 text-center text-xs text-white">
                         {node.metadata.imageLayerGroup.compositeStatus === "updating" ? "正在更新合成图…" : node.metadata.imageLayerGroup.compositeError || "合成图更新失败，请在图层管理中重试"}

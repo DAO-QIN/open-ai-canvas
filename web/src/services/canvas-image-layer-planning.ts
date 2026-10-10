@@ -7,7 +7,9 @@ import type { ReferenceImage } from "@/types/image";
 /** 列表只有安全摘要，按源节点筛选后通过已有鉴权详情接口读取计划。 */
 export async function readImageLayerPlanningHistory(projectId: string, sourceNodeId: string, sourceStorageKey: string | undefined, signal: AbortSignal) {
     const tasks = await listGenerationTasks(50, { projectId }, undefined, signal);
-    const candidates = tasks.filter((task) => task.projectId === projectId && task.type === "canvas_text" && task.status === "succeeded" && task.clientContext?.nodeId?.startsWith(`${sourceNodeId}-layer-plan-`)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const candidates = tasks
+        .filter((task) => task.projectId === projectId && task.type === "canvas_text" && task.status === "succeeded" && task.clientContext?.nodeId?.startsWith(`${sourceNodeId}-layer-plan-`))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     for (const summary of candidates) {
         signal.throwIfAborted();
         const task = await queryGenerationTask(summary.id, { signal });
@@ -49,6 +51,10 @@ export async function prepareImageLayerPlanningReference(source: ReferenceImage,
             signal.throwIfAborted();
             const reference: ReferenceImage = { id: source.id, name: `layer-plan-${source.id}.${type === "image/jpeg" ? "jpg" : "png"}`, type, dataUrl, width: canvas.width, height: canvas.height };
             return { reference, sourceSize };
-        } finally { canvas.width = canvas.height = 0; }
-    } finally { bitmap.close(); }
+        } finally {
+            canvas.width = canvas.height = 0;
+        }
+    } finally {
+        bitmap.close();
+    }
 }

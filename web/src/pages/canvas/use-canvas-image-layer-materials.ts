@@ -56,7 +56,7 @@ export function useCanvasImageLayerMaterials({
                 const materials: CanvasNodeData[] = [];
                 const groupId = nanoid();
                 const errors: string[] = [];
-                // Decode one full-size layer at a time to bound browser memory. No model calls.
+                // 每次只解码一个完整图层，限制浏览器内存占用，不调用模型。
                 for (const child of children) {
                     if (!active()) return;
                     try {
@@ -86,7 +86,7 @@ export function useCanvasImageLayerMaterials({
                 }
                 if (!active()) return;
                 if (!materials.length) throw new Error(errors.join("；") || "没有可用的独立素材");
-                // Stale edits/deletions must never be presented as materials for the current layers.
+                // 编辑或删除后的旧异步结果不能作为当前图层的素材显示。
                 const live = nodesRef.current.find((node) => node.id === root.id);
                 if (
                     children.some((child) => !nodesRef.current.some((node) => node.id === child.id && node.metadata?.content === child.metadata?.content && node.metadata?.storageKey === child.metadata?.storageKey)) ||

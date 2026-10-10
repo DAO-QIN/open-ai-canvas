@@ -4,7 +4,12 @@ import { ensureMediaNodeMinimumSize, fitImageMaterialNodeSize } from "../src/lib
 import { CanvasNodeType } from "../src/types/canvas";
 
 test("extreme material ratios use bounded preview frames and remain stable after reload", () => {
-    for (const [width, height] of [[1408, 79], [12, 1400], [701, 626], [10, 8]]) {
+    for (const [width, height] of [
+        [1408, 79],
+        [12, 1400],
+        [701, 626],
+        [10, 8],
+    ]) {
         const size = fitImageMaterialNodeSize(width, height);
         expect(size.width).toBeLessThanOrEqual(720);
         expect(size.height).toBeLessThanOrEqual(520);

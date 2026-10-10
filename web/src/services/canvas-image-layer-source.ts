@@ -29,7 +29,7 @@ async function encode(canvas: HTMLCanvasElement) {
     return { dataUrl, width: canvas.width, height: canvas.height, bytes: blob.size, mimeType: "image/png" };
 }
 
-/** Independent designer material. Original-position layers remain untouched. */
+/** 生成独立设计素材，保持参与原位置合成的图层不变。 */
 export async function cropImageLayerMaterial(source: LayerInput) {
     const decoded = await decodeLayer(source);
     const canvas = document.createElement("canvas");
@@ -82,11 +82,13 @@ export async function calibrateImageLayerPlan(source: LayerInput, plan: ImageLay
     const warnings = [...(plan.warnings || [])];
     indices.forEach((index, n) => {
         const region = proposals[n];
-        // A calibration must not grow into another planned panel.
-        const crossesPanel = region && regions.some((original, j) => {
-            const other = proposals[j] || original;
-            return j !== n && Math.min(region.bbox[2], other.bbox[2]) - Math.max(region.bbox[0], other.bbox[0]) > 2 && Math.min(region.bbox[3], other.bbox[3]) - Math.max(region.bbox[1], other.bbox[1]) > 2;
-        });
+        // 边界校准不能扩展到其他已规划的面板。
+        const crossesPanel =
+            region &&
+            regions.some((original, j) => {
+                const other = proposals[j] || original;
+                return j !== n && Math.min(region.bbox[2], other.bbox[2]) - Math.max(region.bbox[0], other.bbox[0]) > 2 && Math.min(region.bbox[3], other.bbox[3]) - Math.max(region.bbox[1], other.bbox[1]) > 2;
+            });
         if (region && !crossesPanel) {
             layers[index] = { ...layers[index], bbox: region.bbox, extraction: { method: "source-region", region } };
             warnings.push(`“${layers[index].name}”已按规则区域边缘校准，请核对完整场景预览；校准不是精确分割。`);
@@ -95,7 +97,7 @@ export async function calibrateImageLayerPlan(source: LayerInput, plan: ImageLay
     return { ...plan, layers, warnings };
 }
 
-/** Copy source pixels at their original coordinates. Never crop/recenter the output canvas. */
+/** 按原坐标复制源图像素，不裁切或重新居中输出画布。 */
 export async function extractImageLayerFromSource(source: LayerInput, extraction: ImageLayerExtraction, target?: { width: number; height: number }) {
     if (extraction.method === "generate" || (extraction.method === "source-region" && !extraction.region)) throw new Error("原图提取方式或区域缺失");
     if (extraction.region) validateImageLayerRegion(extraction.region);
@@ -123,7 +125,7 @@ export async function extractImageLayerFromSource(source: LayerInput, extraction
     }
 }
 
-/** Keep the original outside selected holes; consume only the generated inpainting inside them. */
+/** 选定区域外保留原图，仅在区域内使用生成的修补结果。 */
 export async function patchImageLayerBackground(generated: LayerInput, patch: ImageLayerBackgroundPatch) {
     if (!patch.regions.length || patch.regions.length > 7) throw new Error("底图修补区域无效");
     patch.regions.forEach(validateImageLayerRegion);

@@ -80,9 +80,7 @@ export async function runImageLayerExtraction({
                     onProgress?.(index, "complete");
                     return;
                 }
-                let result = await inspect(
-                    (await runStage({ index, stage: "extract", prompt: layerGenerations[index].prompt, config: imageLayerGenerationConfig(config, layerGenerations[index], index), reference: source, canvas })).images,
-                );
+                let result = await inspect((await runStage({ index, stage: "extract", prompt: layerGenerations[index].prompt, config: imageLayerGenerationConfig(config, layerGenerations[index], index), reference: source, canvas })).images);
                 check(index);
                 if (index > 0 && !hasUsableLayerTransparency(result.info) && removalConfig) {
                     check(index);

@@ -140,10 +140,15 @@ export async function buildSourceImageLayerNodeResult(node: CanvasNodeData, imag
     if (signal.aborted) throw new DOMException("拆层已停止", "AbortError");
     const uploaded = await uploadImage(image.dataUrl);
     if (signal.aborted) throw new DOMException("拆层已停止", "AbortError");
-    return { ...node, metadata: applyGeneratedMediaResultMetadata({ ...node, metadata: resetGenerationTaskMetadata(node.metadata) }, imageMetadata(uploaded), {
-        model: undefined, producedModelCandidate: undefined, producedModel: undefined,
-        layerExtraction: { ...extraction, phase: "complete", rejectedTaskId: undefined, extractionTaskId: undefined },
-    }) };
+    return {
+        ...node,
+        metadata: applyGeneratedMediaResultMetadata({ ...node, metadata: resetGenerationTaskMetadata(node.metadata) }, imageMetadata(uploaded), {
+            model: undefined,
+            producedModelCandidate: undefined,
+            producedModel: undefined,
+            layerExtraction: { ...extraction, phase: "complete", rejectedTaskId: undefined, extractionTaskId: undefined },
+        }),
+    };
 }
 
 export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: GenerationTask, nodes: CanvasNodeData[] = [node], outputIndex = 0): Promise<CanvasNodeData> {
@@ -199,7 +204,12 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
             width: imageSize.width,
             height: imageSize.height,
             position: { x: node.position.x + node.width / 2 - imageSize.width / 2, y: node.position.y + node.height / 2 - imageSize.height / 2 },
-            metadata: applyGeneratedMediaResultMetadata(node, imageMetadata(normalizedImage), { prompt, ...completedTaskMetadata(task), generationOutputCount: 1, ...(extraction ? { layerExtraction: extraction, status: needsRemoval ? "idle" : "success" } : {}) }, task.model),
+            metadata: applyGeneratedMediaResultMetadata(
+                node,
+                imageMetadata(normalizedImage),
+                { prompt, ...completedTaskMetadata(task), generationOutputCount: 1, ...(extraction ? { layerExtraction: extraction, status: needsRemoval ? "idle" : "success" } : {}) },
+                task.model,
+            ),
         };
     }
 
@@ -326,7 +336,13 @@ export async function applyMaterializedGenerationTaskResultToNodes(nodes: Canvas
     }
     const { node: updatedNode, additionalNodes } = await buildGenerationTaskNodeResults(node, { ...task, resultJson: JSON.stringify(result) }, nodes);
     const stamp = (item: CanvasNodeData) => ({ ...item, metadata: applyGenerationConsumerEffect(item.metadata || {}, effectKey, (metadata) => metadata).value });
-    const durableNode = stamp({ ...updatedNode, metadata: { ...updatedNode.metadata, assetId: updatedNode.metadata?.assetId || (updatedNode.metadata?.imageLayerGroup || (updatedNode.metadata?.layerExtraction && updatedNode.metadata.storageKey !== asset.data.storageKey) ? undefined : asset.id) } });
+    const durableNode = stamp({
+        ...updatedNode,
+        metadata: {
+            ...updatedNode.metadata,
+            assetId: updatedNode.metadata?.assetId || (updatedNode.metadata?.imageLayerGroup || (updatedNode.metadata?.layerExtraction && updatedNode.metadata.storageKey !== asset.data.storageKey) ? undefined : asset.id),
+        },
+    });
     const durableChildren = additionalNodes.map(stamp);
     return {
         nodes: commitCanvasGenerationResult(nodes, node, durableNode, task.id, durableChildren),
@@ -522,7 +538,15 @@ export async function buildExperimentalImageLayerResult(root: CanvasNodeData, no
             validateImageLayerOutput(await inspectImageLayer({ dataUrl: item.node.metadata!.content!, storageKey: item.node.metadata?.storageKey }));
             ready.push(item);
         } catch (error) {
-            rejected.push({ ...item.node, metadata: { ...item.node.metadata, status: "error", errorDetails: error instanceof Error ? error.message : "图层资源验收失败", ...(item.node.metadata?.layerExtraction ? { layerExtraction: { ...item.node.metadata.layerExtraction, rejectedTaskId: item.node.metadata.taskId } } : {}) } });
+            rejected.push({
+                ...item.node,
+                metadata: {
+                    ...item.node.metadata,
+                    status: "error",
+                    errorDetails: error instanceof Error ? error.message : "图层资源验收失败",
+                    ...(item.node.metadata?.layerExtraction ? { layerExtraction: { ...item.node.metadata.layerExtraction, rejectedTaskId: item.node.metadata.taskId } } : {}),
+                },
+            });
         }
     }
     if (!ready.length) throw new Error("没有已验收的图层可生成合成图");
@@ -534,14 +558,31 @@ export async function buildExperimentalImageLayerResult(root: CanvasNodeData, no
         order.splice(before < 0 ? order.length : before, 0, item);
     }
     const sources = order.map((item) => item.node);
-    const decoded = await decodeAndComposeImageLayers(sources.map((node) => ({ dataUrl: node.metadata!.content!, storageKey: node.metadata?.storageKey })), order.map((item) => item.index));
+    const decoded = await decodeAndComposeImageLayers(
+        sources.map((node) => ({ dataUrl: node.metadata!.content!, storageKey: node.metadata?.storageKey })),
+        order.map((item) => item.index),
+    );
     const updatedChildren = sources.map((node, index) => ({
         ...node,
         title: node.metadata?.imageLayer ? node.title : imageLayerTargetName(plan.requests.find((request) => request.nodeId === node.id)!.target),
         metadata: { ...node.metadata, batchRootId: root.id, imageLayer: { groupId: root.id, outputIndex: order[index].index, kind: order[index].index === 0 ? ("base" as const) : ("transparent" as const) } },
     }));
     const completed = sources.length;
-    const group: NonNullable<CanvasNodeMetadata["imageLayerGroup"]> = { width: decoded.width, height: decoded.height, compositeStatus: "ready", layers: decoded.order.map((index) => previous?.layers.find((layer) => layer.nodeId === sources[index].id) || { nodeId: sources[index].id, x: 0, y: 0, visible: !order.some((item) => item.index === 0) || order[index].index === 0 || plan.requests.find((request) => request.nodeId === sources[index].id)?.removeFromBackground !== false }), ...(completed < plan.requests.length ? { incomplete: { completed, total: plan.requests.length, failed: plan.requests.length - completed, missingBackground: !order.some((item) => item.index === 0) } } : {}) };
+    const group: NonNullable<CanvasNodeMetadata["imageLayerGroup"]> = {
+        width: decoded.width,
+        height: decoded.height,
+        compositeStatus: "ready",
+        layers: decoded.order.map(
+            (index) =>
+                previous?.layers.find((layer) => layer.nodeId === sources[index].id) || {
+                    nodeId: sources[index].id,
+                    x: 0,
+                    y: 0,
+                    visible: !order.some((item) => item.index === 0) || order[index].index === 0 || plan.requests.find((request) => request.nodeId === sources[index].id)?.removeFromBackground !== false,
+                },
+        ),
+        ...(completed < plan.requests.length ? { incomplete: { completed, total: plan.requests.length, failed: plan.requests.length - completed, missingBackground: !order.some((item) => item.index === 0) } } : {}),
+    };
     const composite = await uploadImage(previous || group.layers.some((layer) => !layer.visible) ? await composeCanvasImageLayerGroup(group, updatedChildren) : decoded.composite);
     if (composite.pendingRemoteUpload) throw new Error("合成图尚未保存到服务端，请重试本地合成");
     group.compositeSignature = imageLayerCompositeSignature(group, updatedChildren);
@@ -555,7 +596,14 @@ export async function buildExperimentalImageLayerResult(root: CanvasNodeData, no
                 batchChildIds: plan.requests.map((request) => request.nodeId),
                 imageBatchExpanded: root.metadata?.imageBatchExpanded ?? false,
                 primaryImageId: undefined,
-                experimentalLayerPlan: { ...plan, composedSignature: experimentalLayerSignature(root, nodes.map((node) => rejected.find((item) => item.id === node.id) || node)), errorSignature: undefined },
+                experimentalLayerPlan: {
+                    ...plan,
+                    composedSignature: experimentalLayerSignature(
+                        root,
+                        nodes.map((node) => rejected.find((item) => item.id === node.id) || node),
+                    ),
+                    errorSignature: undefined,
+                },
                 status: "success",
                 errorDetails: undefined,
                 batchFailedCount: plan.requests.length - completed,

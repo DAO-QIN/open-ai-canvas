@@ -35,7 +35,15 @@ test("按规划的本层透明度生成，保持模型、源图尺寸及默认�
 });
 
 test("缺失、空白、过长、角色冲突或额外参数的规划在图像调用前停止", () => {
-    for (const generation of [undefined, {}, { prompt: " ", background: "opaque" }, { prompt: "x".repeat(2401), background: "opaque" }, { prompt: "错误背景", background: "transparent" }, { prompt: "合法提示", background: "opaque", model: "other" }, { prompt: "合法提示", background: "opaque", size: "1:1" }]) {
+    for (const generation of [
+        undefined,
+        {},
+        { prompt: " ", background: "opaque" },
+        { prompt: "x".repeat(2401), background: "opaque" },
+        { prompt: "错误背景", background: "transparent" },
+        { prompt: "合法提示", background: "opaque", model: "other" },
+        { prompt: "合法提示", background: "opaque", size: "1:1" },
+    ]) {
         const value = { ...plan, layers: [{ ...plan.layers[0], generation }, plan.layers[1]] };
         expect(() => parseImageLayerPlan(JSON.stringify(value))).toThrow("未提交拆图任务");
     }

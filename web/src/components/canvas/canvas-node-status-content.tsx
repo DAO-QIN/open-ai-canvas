@@ -23,13 +23,18 @@ export function LoadingContent({ node, theme, onOpenTaskDetails }: Pick<CanvasNo
     const progress = showsProgress && typeof node.metadata?.taskProgress === "number" ? Math.max(0, Math.min(100, Math.round(node.metadata.taskProgress))) : null;
     const statusLabel = taskId ? generationTaskStatusLabel(displayTask) : "等待任务状态";
     const workflow = node.metadata?.imageLayerWorkflow;
-    const stageLabel = workflow ? workflow.stage === "planning" ? "拆解规划中" : `拆解中，共 ${workflow.total} 张图` : node.metadata?.experimentalLayerPlan?.progress || (taskId ? generationTaskStageLabel(displayTask) : "正在创建任务");
+    const stageLabel = workflow ? (workflow.stage === "planning" ? "拆解规划中" : `拆解中，共 ${workflow.total} 张图`) : node.metadata?.experimentalLayerPlan?.progress || (taskId ? generationTaskStageLabel(displayTask) : "正在创建任务");
     const elapsed = useTaskElapsed(workflow?.startedAt || node.metadata?.taskCreatedAt);
     return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2.5 px-5 text-center" style={{ color: theme.node.activeStroke }}>
             {submissionUncertain ? <AlertCircle className="size-10" /> : <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />}
             <span className="text-[var(--fs-tiny)] font-semibold">{stageLabel}</span>
-            {workflow ? <span className="text-[var(--fs-tiny)] tabular-nums" style={{ color: theme.node.muted }}><Clock3 className="mr-1 inline size-3" />{elapsed}</span> : null}
+            {workflow ? (
+                <span className="text-[var(--fs-tiny)] tabular-nums" style={{ color: theme.node.muted }}>
+                    <Clock3 className="mr-1 inline size-3" />
+                    {elapsed}
+                </span>
+            ) : null}
             {taskId ? (
                 <div className="flex w-full max-w-[210px] flex-col items-center gap-1.5">
                     <div className="max-w-full truncate text-[var(--fs-label)] font-medium" style={{ color: theme.node.text }}>

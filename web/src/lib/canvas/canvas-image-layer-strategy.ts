@@ -1,7 +1,7 @@
 export type ImageLayerRegion = {
     bbox: [number, number, number, number];
     shape: "rect" | "rounded-rect" | "ellipse";
-    /** Radius relative to the shorter side, independent of planning-preview size. */
+    /** 圆角半径相对于短边，与规划预览尺寸无关。 */
     radiusRatio?: number;
 };
 
@@ -21,7 +21,7 @@ export function validateImageLayerRegion(value: ImageLayerRegion): ImageLayerReg
     return { bbox: [...box], shape: value.shape, ...(value.shape === "rounded-rect" ? { radiusRatio: value.radiusRatio } : {}) };
 }
 
-/** Missing strategies keep the existing model path; invalid explicit strategies never fall back to a paid call. */
+/** 未指定策略时沿用模型路径；无效的显式策略不能回退为付费调用。 */
 export function resolveImageLayerExtractions(count: number, input?: ImageLayerExtraction[], removals?: boolean[]) {
     if (!Number.isInteger(count) || count < 2 || count > 8 || (input && input.length !== count) || (removals && removals.length !== count)) throw new Error("拆层方式与目标数量不一致");
     return Array.from({ length: count }, (_, index): ImageLayerExtraction => {
@@ -38,15 +38,15 @@ export function resolveImageLayerExtractions(count: number, input?: ImageLayerEx
 }
 
 export function imageLayerExtractionTargets(targets: string[], extractions: ImageLayerExtraction[]) {
-    return targets.map((target, index) => extractions[index]?.method === "source-region" && extractions[index].region
-        ? `${target.replace(/，?区域\s*<bbox>[^<]*<\/bbox>/g, "").trim()}，区域 <bbox>${extractions[index].region!.bbox.join(" ")}</bbox>`
-        : target);
+    return targets.map((target, index) =>
+        extractions[index]?.method === "source-region" && extractions[index].region ? `${target.replace(/，?区域\s*<bbox>[^<]*<\/bbox>/g, "").trim()}，区域 <bbox>${extractions[index].region!.bbox.join(" ")}</bbox>` : target,
+    );
 }
 
-/** Restrict generated background changes only when every requested removal has explicit geometry. */
+/** 只有所有待移除对象均有明确几何区域时，才限制生成底图的改动范围。 */
 export function imageLayerBackgroundPatch(source: ImageLayerSource, extractions: ImageLayerExtraction[], removals: boolean[]): ImageLayerBackgroundPatch | undefined {
     if (extractions[0]?.method !== "generate") return;
-    const indices = removals.flatMap((remove, i) => i > 0 && remove ? [i] : []);
+    const indices = removals.flatMap((remove, i) => (i > 0 && remove ? [i] : []));
     if (!indices.length || indices.some((i) => extractions[i]?.method !== "source-region" || !extractions[i].region)) return;
     return { source, regions: indices.map((i) => validateImageLayerRegion(extractions[i].region!)) };
 }
