@@ -7,7 +7,7 @@ description: 信封、错误码与 OpenAPI
 
 ## 商品套图
 
-商品配置使用单一 `planner` 创作模型（策划、细化与标题）和 `imageModel` 生图模型；`qualityCheck` 是默认 false 的可选成图质检，不再提供独立 `titleModel`。选项返回 `reviewAvailable`，管理员配置的 `reviewModel` 至少支持两图输入。普通用户不能指定质检模型，报价 `prices` 中 quality 项保存服务端选择的模型快照，计入文本调用与预算；审核模式在生成阶段授权。
+商品配置使用单一 `planner` 创作模型（策划、细化与标题）和 `imageModel` 生图模型；`qualityCheck` 是默认 false 的可选成图质检，不再提供独立 `titleModel`。可选 `reviewModel` 允许用户选择支持两图输入的审查模型，未提供时使用后台默认模型；选项的 defaults.reviewModel 返回默认选择。服务端校验互斥模型身份、有效能力及价格，报价 `prices` 中 quality 项冻结已选模型，计入文本调用与预算；更换需重新报价，审核模式在生成阶段授权。
 
 轮次槽位 `qualityChecks` 返回 `stepId`、`versionId`、步骤 `status` 和成功时的 `report`（`verdict`: pass/attention/undetermined，`summary`，`issues` 的 category/evidence/suggestion）。结果对应具体图片版本，轮次新增 checking 状态。已有 retry-step/recover 合同用于检查失败与不确定结果，不自动重生成图片。ZIP manifest 的所选图片附带对应 qualityCheck。后台设置增加 reviewAvailable/reviewModel，默认关闭质检能力和新商品自动质检；检查模型变化仅影响后续授权。
 

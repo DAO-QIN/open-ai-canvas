@@ -7,7 +7,7 @@ description: 影策后端核心持久化表与状态边界
 
 ## 商品套图
 
-可选智能质检沿用 Schema 51，无新增表或列。用户配置 JSON 增加 qualityCheck，移除独立 titleModel，标题与策划统一使用 planner。后台 ecommerce_studio 设置 JSON 增加 reviewAvailable/reviewModel。quality 执行步骤保存在 ecommerce_steps：RequestJSON 固定原图、成图资源、图片版本与模型，ResultJSON 保存版本 ID 及检查报告；报价/授权 PricesJSON 保存质检模型与价格快照。阶段唯一键、步骤任务关联及账务原子性继续使用已有约束，历史版本不覆盖。轮次 checking 表示正在检查，和生成一样可暂停、恢复与租约协调。
+可选智能质检沿用 Schema 51，无新增表或列。用户配置 JSON 增加 qualityCheck 和可选 reviewModel，未指定审查模型时采用后台默认；移除独立 titleModel，标题与策划统一使用 planner。后台 ecommerce_studio 设置 JSON 增加 reviewAvailable/reviewModel。quality 执行步骤保存在 ecommerce_steps：RequestJSON 固定原图、成图资源、图片版本与模型，ResultJSON 保存版本 ID 及检查报告；报价/授权 PricesJSON 保存用户选择或默认的质检模型与价格快照。阶段唯一键、步骤任务关联及账务原子性继续使用已有约束，历史版本不覆盖。轮次 checking 表示正在检查，和生成一样可暂停、恢复与租约协调。
 
 Schema 51 接续 50，新增 ecommerce_batches、ecommerce_products、ecommerce_runs、ecommerce_branches、ecommerce_slots、ecommerce_image_versions、ecommerce_steps、ecommerce_quotes、ecommerce_authorizations、ecommerce_presets、ecommerce_operations。全部业务对象保存 user_id；步骤按 run_id/stage_key 唯一，操作按 user_id/operation_id 唯一。ecommerce_steps.price_signature 使用 TEXT 保存宿主模型、价格档和计费设置的完整快照。
 

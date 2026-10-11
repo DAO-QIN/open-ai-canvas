@@ -2475,7 +2475,8 @@ components:
         "properties":
           {
             "planner": { "$ref": "#/components/schemas/EcommerceSelection" },
-            "qualityCheck": { "type": "boolean", "default": false, "description": "可选成图智能质检，模型由后台配置，费用另计入生成报价" },
+            "qualityCheck": { "type": "boolean", "default": false, "description": "可选成图智能质检，费用计入生成报价" },
+            "reviewModel": { "$ref": "#/components/schemas/EcommerceSelection", "description": "用户选择的审查模型，至少支持两张图片；未提供时使用后台默认模型，更换需重新报价" },
             "imageModel": { "$ref": "#/components/schemas/EcommerceSelection" },
             "hero": { "$ref": "#/components/schemas/EcommerceOutput" },
             "detail": { "$ref": "#/components/schemas/EcommerceOutput" },

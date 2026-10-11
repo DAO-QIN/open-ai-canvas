@@ -58,6 +58,19 @@ describe("product model and version choices", () => {
         expect(slot.versions).toHaveLength(2);
         expect(currentVersion({ ...slot, selectedVersionId: "missing" })).toBeUndefined();
     });
+    test("review choices require two images and preserve the selected model identity", () => {
+        const catalog = {
+            channels: [{ id: "review", models: [
+                { modelKey: "single", capability: "text", available: true, capabilityConfig: { text: { references: { maxImages: 1 } } } },
+                { modelKey: "dual", capability: "text", available: true, capabilityConfig: { text: { references: { maxImages: 2 } } } },
+                { modelKey: "disabled", capability: "text", available: false, capabilityConfig: { text: { references: { maxImages: 2 } } } },
+            ] }],
+        } as ModelCatalogResponse;
+        const choices = modelChoices(catalog, "text", 2);
+        expect(choices.map((choice) => choice.value)).toEqual(["review:dual"]);
+        expect(choices[0].selection).toEqual({ channelId: "review", channelModelKey: "dual" });
+        expect(selectedModelKey(choices[0].selection)).toBe("review:dual");
+    });
     test("quality verdict follows the selected version and ignores superseded checks", () => {
         const slot = {
             selectedVersionId: "old",

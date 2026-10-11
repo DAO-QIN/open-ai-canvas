@@ -29,20 +29,21 @@ type Output struct {
 	CopyMode string `json:"copyMode"`
 }
 type Config struct {
-	Planner                Selection `json:"planner"`
-	ImageModel             Selection `json:"imageModel"`
-	QualityCheck           bool      `json:"qualityCheck"`
-	Hero                   Output    `json:"hero"`
-	Detail                 Output    `json:"detail"`
-	TitleCount             int       `json:"titleCount"`
-	TitleMaxLength         int       `json:"titleMaxLength"`
-	Style                  string    `json:"style"`
-	Platform               string    `json:"platform"`
-	Market                 string    `json:"market"`
-	Language               string    `json:"language"`
-	PlanningInstructions   string    `json:"planningInstructions,omitempty"`
-	RefinementInstructions string    `json:"refinementInstructions,omitempty"`
-	GenerationInstructions string    `json:"generationInstructions,omitempty"`
+	Planner                Selection  `json:"planner"`
+	ImageModel             Selection  `json:"imageModel"`
+	ReviewModel            *Selection `json:"reviewModel,omitempty"`
+	QualityCheck           bool       `json:"qualityCheck"`
+	Hero                   Output     `json:"hero"`
+	Detail                 Output     `json:"detail"`
+	TitleCount             int        `json:"titleCount"`
+	TitleMaxLength         int        `json:"titleMaxLength"`
+	Style                  string     `json:"style"`
+	Platform               string     `json:"platform"`
+	Market                 string     `json:"market"`
+	Language               string     `json:"language"`
+	PlanningInstructions   string     `json:"planningInstructions,omitempty"`
+	RefinementInstructions string     `json:"refinementInstructions,omitempty"`
+	GenerationInstructions string     `json:"generationInstructions,omitempty"`
 }
 type Settings struct {
 	ReviewAvailable         bool      `json:"reviewAvailable"`

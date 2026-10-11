@@ -100,6 +100,65 @@ func TestEcommerceQualityAutoBillingSnapshotAndVersion(t *testing.T) {
 	}
 }
 
+func TestEcommerceQualityUserSelectedModelIsQuotedAndFrozen(t *testing.T) {
+	f := newWorkflow(t)
+	enableQuality(t, f)
+	selected := Selection{ChannelID: "user-review", ChannelModelKey: "selected-vision"}
+	f.config.ReviewModel = &selected
+	p := f.productView(t)
+	if _, err := f.svc.UpdateProduct("owner", p.ID, ProductRequest{Guard: Guard{Revision: p.Revision, OperationID: "select-reviewer"}, Name: p.Name, SellingPoints: p.SellingPoints, Config: &f.config}); err != nil {
+		t.Fatal(err)
+	}
+	p = f.productView(t)
+	q, err := f.svc.Quote("owner", p.ID, QuoteRequest{Revision: p.Revision, Scope: Scope{Action: "auto"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, price := range q.Prices {
+		if price.Key == "quality" && (price.ReviewModel == nil || *price.ReviewModel != selected) {
+			t.Fatal("quote replaced the user's review model")
+		}
+	}
+	if _, err = f.svc.Command("owner", p.ID, Command{Guard: Guard{Revision: p.Revision, OperationID: "user-review-auto"}, Action: "auto", QuoteID: q.ID, BudgetMicrocredits: q.BudgetMicrocredits}); err != nil {
+		t.Fatal(err)
+	}
+	settings, _ := f.svc.Settings()
+	settings.ReviewModel = Selection{ChannelID: "future", ChannelModelKey: "future-default"}
+	if err = f.repo.SaveSystemSetting(&model.SystemSetting{Key: SettingsKey, ValueJSON: encode(settings)}); err != nil {
+		t.Fatal(err)
+	}
+	p = f.finish(t)
+	if p.Run.Status != "completed" || f.taskCount(t) != 27 {
+		t.Fatal("user-selected review workflow failed")
+	}
+	for _, step := range p.Run.Steps {
+		if step.Kind == "quality" {
+			var intent Intent
+			if err = json.Unmarshal([]byte(step.RequestJSON), &intent); err != nil || intent.ReviewModel != selected {
+				t.Fatal("dispatch lost the authorized user-selected reviewer")
+			}
+		}
+	}
+}
+
+func TestEcommerceQualitySelectionUsesExclusiveModelContract(t *testing.T) {
+	f := newWorkflow(t)
+	for _, choice := range []Selection{{}, {ChannelID: "partial"}, {ChannelModelKey: "partial"}, {LogicalModelID: "logical", ChannelID: "channel", ChannelModelKey: "vision"}} {
+		config := f.config
+		config.ReviewModel = &choice
+		if err := ValidateConfig(config); err == nil {
+			t.Fatalf("invalid review selection accepted: %+v", choice)
+		}
+	}
+	for _, choice := range []Selection{{LogicalModelID: "logical"}, {ChannelID: "channel", ChannelModelKey: "vision"}} {
+		config := f.config
+		config.ReviewModel = &choice
+		if err := ValidateConfig(config); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestEcommerceQualityReviewModeRequiresSeparateApproval(t *testing.T) {
 	f := newWorkflow(t)
 	enableQuality(t, f)

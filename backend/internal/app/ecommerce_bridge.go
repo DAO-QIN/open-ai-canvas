@@ -55,6 +55,11 @@ func (h ecommerceHost) ValidateConfig(userID string, config ecommerce.Config) er
 	if err := ecommerce.ValidateConfig(config); err != nil {
 		return err
 	}
+	if config.QualityCheck && config.ReviewModel != nil {
+		if err := h.ValidateReviewModel(userID, *config.ReviewModel); err != nil {
+			return err
+		}
+	}
 	frontend, err := h.svc.FeatureEnabled(FeatureFrontendModels)
 	if err != nil {
 		return err
@@ -311,7 +316,11 @@ func (s *Service) EcommerceOptions(actor *model.User) (map[string]any, error) {
 	if e != nil {
 		return nil, e
 	}
-	return map[string]any{"defaults": settings.Defaults, "reviewAvailable": settings.ReviewAvailable, "batchLimit": settings.BatchLimit, "state": state, "catalog": catalog, "presets": presets}, nil
+	defaults := settings.Defaults
+	if defaults.ReviewModel == nil && settings.ReviewModel != (ecommerce.Selection{}) {
+		defaults.ReviewModel = &settings.ReviewModel
+	}
+	return map[string]any{"defaults": defaults, "reviewAvailable": settings.ReviewAvailable, "batchLimit": settings.BatchLimit, "state": state, "catalog": catalog, "presets": presets}, nil
 }
 func (s *Service) EcommerceSettings(actor *model.User) (ecommerce.Settings, error) {
 	if e := s.RequireAdmin(actor); e != nil {

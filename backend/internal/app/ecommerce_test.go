@@ -119,6 +119,15 @@ func TestEcommerceQualityHostTwoImagesAndOwnership(t *testing.T) {
 	if err := host.ValidateReviewModel(user.ID, config.Planner); err == nil {
 		t.Fatal("one-image model accepted as reviewer")
 	}
+	config.ReviewModel = &config.Planner
+	config.QualityCheck = true
+	if err := host.ValidateConfig(user.ID, config); err == nil {
+		t.Fatal("user-selected one-image reviewer accepted in product config")
+	}
+	config.QualityCheck = false
+	if err := host.ValidateConfig(user.ID, config); err != nil {
+		t.Fatalf("inactive review model blocked ordinary creation: %v", err)
+	}
 }
 func TestEcommerceHostAdmissionWithPluginCenterClosed(t *testing.T) {
 	s, db, user, config := ecommerceTestService(t)

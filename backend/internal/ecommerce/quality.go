@@ -82,7 +82,7 @@ func qualityCheckViews(steps []model.EcommerceStep, versions []model.EcommerceIm
 	return out
 }
 
-func (s *Service) reviewSelection(userID string) (Selection, error) {
+func (s *Service) reviewSelection(userID string, config Config) (Selection, error) {
 	settings, err := s.Settings()
 	if err != nil {
 		return Selection{}, err
@@ -90,8 +90,12 @@ func (s *Service) reviewSelection(userID string) (Selection, error) {
 	if !settings.ReviewAvailable {
 		return Selection{}, invalid("智能质检暂未开放，请关闭质检选项或稍后再试")
 	}
-	if err := s.host.ValidateReviewModel(userID, settings.ReviewModel); err != nil {
+	selection := settings.ReviewModel
+	if config.ReviewModel != nil {
+		selection = *config.ReviewModel
+	}
+	if err := s.host.ValidateReviewModel(userID, selection); err != nil {
 		return Selection{}, err
 	}
-	return settings.ReviewModel, nil
+	return selection, nil
 }

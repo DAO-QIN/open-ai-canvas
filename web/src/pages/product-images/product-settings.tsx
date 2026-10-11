@@ -1,14 +1,16 @@
 import { Input, InputNumber } from "antd";
 import { Select } from "@/components/ui/base/select";
 import { Switch } from "@/components/ui/base/switch/switch";
-import type { ProductConfig } from "@/lib/ecommerce/contracts";
+import type { ModelSelection, ProductConfig } from "@/lib/ecommerce/contracts";
 import type { ModelCatalogResponse } from "@/services/api/logical-models";
 import { modelChoices, selectedModelKey as selectedKey } from "@/lib/ecommerce/models";
 
-type Props = { value: ProductConfig; catalog: ModelCatalogResponse; onChange: (value: ProductConfig) => void; disabled?: boolean; advancedOnly?: boolean; reviewAvailable?: boolean };
-export function ProductSettings({ value, catalog, onChange, disabled, advancedOnly = false, reviewAvailable = false }: Props) {
+type Props = { value: ProductConfig; catalog: ModelCatalogResponse; onChange: (value: ProductConfig) => void; disabled?: boolean; advancedOnly?: boolean; reviewAvailable?: boolean; defaultReviewModel?: ModelSelection };
+export function ProductSettings({ value, catalog, onChange, disabled, advancedOnly = false, reviewAvailable = false, defaultReviewModel }: Props) {
     const texts = modelChoices(catalog, "text");
+    const reviews = modelChoices(catalog, "text", 2);
     const images = modelChoices(catalog, "image");
+    const review = value.reviewModel ?? defaultReviewModel;
     const set = <K extends keyof ProductConfig>(key: K, next: ProductConfig[K]) => onChange({ ...value, [key]: next });
     const image = images.find((choice) => choice.value === selectedKey(value.imageModel))?.model;
     const profile = image?.capabilityConfig as { image?: { size?: { values?: string[]; presets?: { size: string }[] }; quality?: { values?: string[] } } } | undefined;
@@ -49,6 +51,7 @@ export function ProductSettings({ value, catalog, onChange, disabled, advancedOn
                     {(
                         [
                             ["planner", "创作模型", texts],
+                            ["reviewModel", "审查模型", reviews],
                             ["imageModel", "生图模型", images],
                         ] as const
                     ).map(([key, label, choices]) => (
@@ -57,16 +60,18 @@ export function ProductSettings({ value, catalog, onChange, disabled, advancedOn
                             <Select
                                 className="w-full"
                                 ariaLabel={label}
-                                disabled={disabled}
+                                disabled={disabled || (key === "reviewModel" && (!value.qualityCheck || !reviewAvailable))}
                                 showSearch
                                 optionFilterProp="label"
-                                value={selectedKey(value[key])}
+                                placeholder={key === "reviewModel" ? "选择审查模型" : undefined}
+                                value={key === "reviewModel" ? (review ? selectedKey(review) : undefined) : selectedKey(value[key])}
                                 options={choices.map(({ value, label }) => ({ value, label }))}
                                 onChange={(id) => {
                                     const choice = choices.find((item) => item.value === id);
                                     if (choice) set(key, choice.selection);
                                 }}
                             />
+                            {key === "reviewModel" && <p className="text-xs leading-5 text-foreground/60">开启智能质检后使用；换模型需重新确认费用。</p>}
                         </label>
                     ))}
                     {(

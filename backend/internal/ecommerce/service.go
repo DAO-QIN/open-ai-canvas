@@ -27,7 +27,11 @@ func (s *Service) Settings() (Settings, error) {
 	return value, nil
 }
 func ValidateConfig(config Config) error {
-	for _, choice := range []Selection{config.Planner, config.ImageModel} {
+	choices := []Selection{config.Planner, config.ImageModel}
+	if config.ReviewModel != nil {
+		choices = append(choices, *config.ReviewModel)
+	}
+	for _, choice := range choices {
 		logical := choice.LogicalModelID != ""
 		channel := choice.ChannelID != "" && choice.ChannelModelKey != ""
 		if logical == channel || (logical && (choice.ChannelID != "" || choice.ChannelModelKey != "")) {

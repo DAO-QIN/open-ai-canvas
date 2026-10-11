@@ -490,6 +490,7 @@ function ProductImport({ options, disabled, onImported, onDisable }: { options: 
                 value={config}
                 catalog={options.catalog}
                 reviewAvailable={options.reviewAvailable}
+                defaultReviewModel={options.defaults.reviewModel}
                 disabled={disabled || submitting}
                 onChange={(next) => {
                     setConfig(next);
@@ -1008,7 +1009,7 @@ function ProductInfo({ product, options, onClose, onSaved, onApply }: { product:
                     真实卖点
                     <Input.TextArea aria-label="商品真实卖点" maxLength={8000} autoSize={{ minRows: 3, maxRows: 8 }} value={points} onChange={(e) => setPoints(e.target.value)} />
                 </label>
-                <ProductSettings value={config} catalog={options.catalog} reviewAvailable={options.reviewAvailable} onChange={setConfig} disabled={busy} />
+                <ProductSettings value={config} catalog={options.catalog} reviewAvailable={options.reviewAvailable} defaultReviewModel={options.defaults.reviewModel} onChange={setConfig} disabled={busy} />
             </div>
         </AppDrawer>
     );

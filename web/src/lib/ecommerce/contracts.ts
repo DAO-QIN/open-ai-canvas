@@ -5,6 +5,7 @@ export type ProductOutput = { count: number; size: string; quality?: string; cop
 export type ProductConfig = {
     planner: ModelSelection;
     imageModel: ModelSelection;
+    reviewModel?: ModelSelection;
     qualityCheck?: boolean;
     hero: ProductOutput;
     detail: ProductOutput;

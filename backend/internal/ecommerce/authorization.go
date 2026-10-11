@@ -342,7 +342,7 @@ func (s *Service) Quote(userID, productID string, req QuoteRequest) (*QuoteView,
 			var reviewModel Selection
 			if (config.QualityCheck && isNewRun(req.Action)) || keys["quality"] > 0 {
 				var e error
-				reviewModel, e = s.reviewSelection(userID)
+				reviewModel, e = s.reviewSelection(userID, config)
 				if e != nil {
 					return e
 				}

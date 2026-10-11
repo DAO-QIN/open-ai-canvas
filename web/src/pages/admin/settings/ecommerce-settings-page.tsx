@@ -79,6 +79,7 @@ export default function EcommerceSettingsPage() {
     const setDefault = <K extends keyof ProductConfig>(field: K, next: ProductConfig[K]) => value && setDraft({ ...value, defaults: { ...value.defaults, [field]: next } });
     const state = query.data?.options.state;
     const texts = query.data ? modelChoices(query.data.options.catalog, "text") : [];
+    const reviews = query.data ? modelChoices(query.data.options.catalog, "text", 2) : [];
     const images = query.data ? modelChoices(query.data.options.catalog, "image") : [];
     const reviewKey = value?.reviewModel && (value.reviewModel.logicalModelId || (value.reviewModel.channelId && value.reviewModel.channelModelKey)) ? selectedModelKey(value.reviewModel) : undefined;
     const selected = value && images.find((choice) => choice.value === selectedModelKey(value.defaults.imageModel));
@@ -219,7 +220,7 @@ export default function EcommerceSettingsPage() {
                                 ))}
                             </div>
                         </SettingsSectionCard>
-                        <SettingsSectionCard title="智能质检" description="生成后对照原图与成图检查。模型只在后台配置，用户自主选择是否质检；费用计入生成阶段报价，不自动重生成。">
+                        <SettingsSectionCard title="智能质检" description="生成后对照原图与成图检查。后台配置默认审查模型，用户可在高级设置选择；费用计入生成阶段报价，不自动重生成。">
                             <div className="space-y-4 p-4">
                                 <div className="flex items-center justify-between gap-4">
                                     <span className="text-sm">开放智能质检</span>
@@ -238,9 +239,9 @@ export default function EcommerceSettingsPage() {
                                         disabled={busy}
                                         placeholder="选择质检模型"
                                         value={reviewKey}
-                                        options={texts.map(({ value, label }) => ({ value, label }))}
+                                        options={reviews.map(({ value, label }) => ({ value, label }))}
                                         onChange={(id) => {
-                                            const choice = texts.find((item) => item.value === id);
+                                            const choice = reviews.find((item) => item.value === id);
                                             if (choice) setDraft({ ...value, reviewModel: choice.selection });
                                         }}
                                     />
