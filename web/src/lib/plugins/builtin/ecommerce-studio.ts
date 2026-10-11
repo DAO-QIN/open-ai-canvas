@@ -11,7 +11,7 @@ export const ecommerceStudioPlugin: RegisteredPlugin = {
         version: "1.0.0",
         author: "影策团队",
         description: "从商品原图生成主图、详情图和标题，支持方案确认、单图调整与成套导出。",
-        documentation: "# 商品套图\n\n从创作首页直接打开。每张原图对应一个商品，默认先生成方案与标题，再确认套图费用。平台开放后默认可用；你可以在插件中心个人停用。关闭后历史作品仍可查看和下载。",
+        documentation: "# 商品套图\n\n从侧栏短剧 Agent 下方或创作首页直接打开。每张原图对应一个商品，默认先生成方案与标题，再确认套图费用。平台开放后默认可用；个人启停位于商品套图工作区。关闭后历史作品仍可查看和下载。",
         surfaces: ["fullscreen"],
         permissions: ["asset.read", "asset.upload", "generation.run", "ai.text", "media.read", "canvas.write"],
         trusted: true,

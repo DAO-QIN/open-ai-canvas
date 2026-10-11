@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"encoding/json"
 	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -181,7 +180,7 @@ func (r *Repository) DeleteEcommercePreset(userID, id string) error {
 	return r.db.Delete(&model.EcommercePreset{}, "user_id = ? AND id = ?", userID, id).Error
 }
 
-// SHARE locks fence a toggle or feature-settings update against atomic admission.
+// SHARE locks fence platform and personal toggles against atomic admission.
 func (r *Repository) EcommerceEnabled(userID string) (bool, string, error) {
 	var user model.User
 	if err := r.db.Clauses(clause.Locking{Strength: "SHARE"}).First(&user, "id = ?", userID).Error; err != nil {
@@ -189,21 +188,6 @@ func (r *Repository) EcommerceEnabled(userID string) (bool, string, error) {
 	}
 	if user.Status != model.UserStatusActive {
 		return false, "账号不可用，已暂停后续派发", nil
-	}
-	var setting model.SystemSetting
-	err := r.db.Clauses(clause.Locking{Strength: "SHARE"}).First(&setting, "key = ?", "feature_availability").Error
-	if err == nil {
-		flags := struct {
-			PluginCenterEnabled *bool `json:"pluginCenterEnabled"`
-		}{}
-		if e := json.Unmarshal([]byte(setting.ValueJSON), &flags); e != nil {
-			return false, "", e
-		}
-		if flags.PluginCenterEnabled != nil && !*flags.PluginCenterEnabled {
-			return false, "插件能力暂未开放", nil
-		}
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, "", err
 	}
 	var state model.PluginPlatformState
 	if err := r.db.Clauses(clause.Locking{Strength: "SHARE"}).First(&state, "plugin_id = ?", model.EcommercePluginID).Error; err != nil {
@@ -223,7 +207,7 @@ func (r *Repository) EcommerceEnabled(userID string) (bool, string, error) {
 		return false, "", err
 	}
 	if !personal.Enabled {
-		return false, "你已停用商品套图，请先在插件中心启用", nil
+		return false, "你已停用商品套图，请先在商品套图工作区启用", nil
 	}
 	return true, "", nil
 }

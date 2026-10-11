@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useQueryClient } from "@tanstack/react-query";
 import { App, Button, Skeleton } from "antd";
 import { Switch } from "@/pages/admin/ui/controls";
-import { AlertTriangle, Clapperboard, Coins, Gift, ListChecks, MonitorCog, PlugZap, RadioTower, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, Clapperboard, Coins, Gift, ListChecks, MonitorCog, Package, PlugZap, RadioTower, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { getAdminFeatureAvailability, updateAdminFeatureAvailability } from "@/services/api/auth";
@@ -27,6 +27,12 @@ const editableFeatureKeys: EditableFeatureKey[] = ["shortDramaEnabled", "taskCen
 
 const workspaceFeatureRows: FeatureRow[] = [
     {
+        key: "shortDramaEnabled",
+        title: "短剧创作",
+        description: "开放短剧入口、项目列表与项目详情。关闭不删除已有项目。",
+        icon: <Clapperboard className="size-4" aria-hidden="true" />,
+    },
+    {
         key: "ecommerceEnabled",
         title: "商品套图",
         description: (
@@ -37,14 +43,7 @@ const workspaceFeatureRows: FeatureRow[] = [
                 </Link>
             </>
         ),
-        icon: <Sparkles className="size-4" aria-hidden="true" />,
-        dependsOn: "pluginCenterEnabled",
-    },
-    {
-        key: "shortDramaEnabled",
-        title: "短剧创作",
-        description: "开放短剧入口、项目列表与项目详情。关闭不删除已有项目。",
-        icon: <Clapperboard className="size-4" aria-hidden="true" />,
+        icon: <Package className="size-4" aria-hidden="true" />,
     },
     {
         key: "taskCenterEnabled",
@@ -423,7 +422,6 @@ function FeatureSourceRow({ row, saved, draft, saving, onChange }: { row: Featur
 }
 
 function effectiveFeatureValue(features: FeatureAvailability, key: FeatureKey) {
-    if (key === "ecommerceEnabled") return features.pluginCenterEnabled && features.ecommerceEnabled;
     if (key === "systemPluginsVisibleToUsers") return features.pluginCenterEnabled && features.systemPluginsVisibleToUsers;
     return features[key];
 }

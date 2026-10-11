@@ -13,6 +13,7 @@ import { EAGLE_PLUGIN_ID } from "@/lib/plugins/builtin/eagle";
 import { PROMPT_OPTIMIZER_PLUGIN_ID } from "@/lib/plugins/builtin/prompt-optimizer";
 import { RUNNINGHUB_PLUGIN_ID } from "@/lib/plugins/builtin/workflows";
 import { isOfficialApplicationPluginId } from "@/lib/plugins/official-applications";
+import { ECOMMERCE_PLUGIN_ID } from "@/lib/ecommerce/contracts";
 import type { PluginManifest, PluginManifestV2, RegisteredPlugin } from "@/lib/plugins/plugin-types";
 import { getEagleLibrary, type EagleFolder } from "@/services/api/eagle";
 import { fetchPlugins, setUserPluginEnabled, type BackendPlugin, type PluginState } from "@/services/api/plugins";
@@ -123,7 +124,7 @@ export default function PluginsPage() {
     const registeredPlugins = useMemo(() => {
         const byId = new Map(builtinPlugins.map((plugin) => [plugin.manifest.id, plugin]));
         for (const plugin of remotePlugins) byId.set(plugin.manifest.id, plugin);
-        return [...byId.values()];
+        return [...byId.values()].filter((plugin) => plugin.manifest.id !== ECOMMERCE_PLUGIN_ID);
     }, [builtinPlugins, remotePlugins]);
     const backendPluginById = useMemo(() => new Map(backendPlugins.map((plugin) => [plugin.manifest.id, plugin])), [backendPlugins]);
 

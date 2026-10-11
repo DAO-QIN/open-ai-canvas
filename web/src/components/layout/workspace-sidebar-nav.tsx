@@ -11,6 +11,7 @@ import { useWorkspaceLogout } from "@/hooks/use-workspace-logout";
 import { SystemAnnouncementCenter } from "@/components/layout/system-announcement-center";
 import { aceternityMotion } from "@/lib/aceternity-motion";
 import { cn } from "@/lib/utils";
+import { PRODUCT_IMAGES_ROUTE } from "@/lib/ecommerce/contracts";
 import { preloadWorkspaceRoute } from "@/lib/workspace-route-modules";
 import { useUserStore, type FeatureAvailability } from "@/stores/use-user-store";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
@@ -47,6 +48,7 @@ function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[];
                 { ...toolItem("create", "/"), id: "home", title: "创作" },
                 { ...toolItem("inspirations", "/inspirations"), title: "灵感" },
                 { ...toolItem("projects", "/projects"), title: "短剧 Agent" },
+                ...(features.ecommerceEnabled ? [toolItem("product-images", PRODUCT_IMAGES_ROUTE)] : []),
                 { ...toolItem("canvas", "/canvas"), title: "自由画布" },
             ],
         },
@@ -296,7 +298,7 @@ export function WorkspaceSidebarNav({ collapsed, onNavigate, onOpenSearch, onExp
 
     const slug = pathname.split("/").filter(Boolean)[0] || "home";
     const section = searchParams.get("section");
-    const activeId = slug === "settings" && section ? `settings:${section}` : slug;
+    const activeId = pathname === PRODUCT_IMAGES_ROUTE || pathname.startsWith(PRODUCT_IMAGES_ROUTE + "/") ? "product-images" : slug === "settings" && section ? `settings:${section}` : slug;
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const [scrollState, setScrollState] = useState({ hasTopFade: false, hasBottomFade: false });

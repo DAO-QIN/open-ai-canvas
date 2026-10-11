@@ -383,7 +383,7 @@ func TestEcommerceReviewRequiresSeparateBranchAuthorization(t *testing.T) {
 	}
 }
 func TestEcommerceClosingFinishesSubmittedTasksAndNeedsExplicitResume(t *testing.T) {
-	for _, gate := range []string{"platform", "personal", "global"} {
+	for _, gate := range []string{"platform", "personal", "account"} {
 		t.Run(gate, func(t *testing.T) {
 			f := newWorkflow(t)
 			f.action(t, Scope{Action: "auto"})
@@ -396,7 +396,11 @@ func TestEcommerceClosingFinishesSubmittedTasksAndNeedsExplicitResume(t *testing
 				case "personal":
 					err = f.repo.SaveUserPluginState(&model.UserPluginState{UserID: "owner", PluginID: PluginID, Enabled: enabled})
 				default:
-					err = f.repo.SaveSystemSetting(&model.SystemSetting{Key: "feature_availability", ValueJSON: encode(map[string]bool{"pluginCenterEnabled": enabled})})
+					status := model.UserStatusDisabled
+					if enabled {
+						status = model.UserStatusActive
+					}
+					err = f.db.Model(&model.User{}).Where("id = ?", "owner").Update("status", status).Error
 				}
 				if err != nil {
 					t.Fatal(err)
@@ -430,6 +434,24 @@ func TestEcommerceClosingFinishesSubmittedTasksAndNeedsExplicitResume(t *testing
 				t.Fatal("manual resume duplicated/missed tasks")
 			}
 		})
+	}
+}
+func TestEcommercePluginCenterDoesNotGateOfficialCreation(t *testing.T) {
+	f := newWorkflow(t)
+	setCenter := func(enabled bool) {
+		if err := f.repo.SaveSystemSetting(&model.SystemSetting{Key: "feature_availability", ValueJSON: encode(map[string]bool{"pluginCenterEnabled": enabled})}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setCenter(false)
+	f.action(t, Scope{Action: "auto"})
+	f.tick(t)
+	setCenter(true)
+	f.complete(t, true)
+	f.tick(t)
+	setCenter(false)
+	if p := f.finish(t); p.Run.Status != "completed" || f.taskCount(t) != 19 {
+		t.Fatal("plugin center interrupted independent product creation")
 	}
 }
 func TestEcommerceAtomicAdmissionRollsBackOnFailureAndInsufficientCredits(t *testing.T) {

@@ -5,6 +5,10 @@ import type { EcommerceSettings, Product, ProductBatch, ProductBatchResult, Prod
 
 export type EcommerceOptions = { defaults: ProductConfig; batchLimit: number; state: PluginState; catalog: ModelCatalogResponse; presets: ProductPreset[] };
 export const fetchEcommerceOptions = (signal?: AbortSignal) => http.get<EcommerceOptions>("/ecommerce/options", { signal });
+export async function setProductImagesEnabled(enabled: boolean) {
+    const result = await http.put<{ state: PluginState }>("/ecommerce/activation", { enabled });
+    return result.state;
+}
 export const fetchProducts = (page = 1, archived = false, signal?: AbortSignal) => http.get<ProductPage>("/ecommerce/products", { params: { page, pageSize: 20, archived: String(archived) }, signal });
 export const fetchProduct = (id: string, signal?: AbortSignal) => http.get<Product>(`/ecommerce/products/${encodeURIComponent(id)}`, { signal });
 export const fetchProductRun = (id: string, runId: string, signal?: AbortSignal) => http.get<ProductRun>(`/ecommerce/products/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}`, { signal });

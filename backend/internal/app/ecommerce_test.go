@@ -54,6 +54,13 @@ func TestEcommerceHostAdmissionReusesBillingAndKeepsProjectIDEmpty(t *testing.T)
 	s, db, user, config := ecommerceTestService(t)
 	assertEcommerceHostAdmission(t, s, db, user, config)
 }
+func TestEcommerceHostAdmissionWithPluginCenterClosed(t *testing.T) {
+	s, db, user, config := ecommerceTestService(t)
+	if err := s.repo.SaveSystemSetting(&model.SystemSetting{Key: "feature_availability", ValueJSON: `{"frontendModelsEnabled":true,"creditsEnabled":true,"pluginCenterEnabled":false}`}); err != nil {
+		t.Fatal(err)
+	}
+	assertEcommerceHostAdmission(t, s, db, user, config)
+}
 func TestEcommerceHostAdmissionWithRealCatalogPostgres(t *testing.T) {
 	_, db := newProjectNameConflictPostgresService(t)
 	s, db, user, config := ecommerceTestServiceOnDB(t, db)
@@ -150,13 +157,33 @@ func TestEcommercePlatformCannotOpenBeforeValidatedConfiguration(t *testing.T) {
 	if err != nil || !flags.EcommerceEnabled {
 		t.Fatalf("canonical projection: %+v %v", flags, err)
 	}
+	if err := s.repo.SaveSystemSetting(&model.SystemSetting{Key: "feature_availability", ValueJSON: `{"pluginCenterEnabled":false}`}); err != nil {
+		t.Fatal(err)
+	}
+	user.Role = model.UserRoleUser
+	state, err = s.pluginStateForUser(user, ecommerce.PluginID, nil)
+	if err != nil || !state.EffectiveEnabled || !state.CanToggle {
+		t.Fatalf("ordinary user blocked by unrelated plugin switch: %+v %v", state, err)
+	}
 	if _, err = s.SetUserPluginEnabled(user, ecommerce.PluginID, false); err != nil {
 		t.Fatal(err)
+	}
+	state, err = s.pluginStateForUser(user, ecommerce.PluginID, nil)
+	if err != nil || state.EffectiveEnabled || state.BlockedReason != "你已停用商品套图" {
+		t.Fatalf("personal opt-out ignored: %+v %v", state, err)
+	}
+	if _, err = s.SetUserPluginEnabled(user, ecommerce.PluginID, true); err != nil {
+		t.Fatal(err)
+	}
+	state, err = s.pluginStateForUser(user, ecommerce.PluginID, nil)
+	if err != nil || !state.EffectiveEnabled {
+		t.Fatalf("personal opt-in blocked by plugin switch: %+v %v", state, err)
 	}
 	flags, err = s.FeatureAvailability()
 	if err != nil || !flags.EcommerceEnabled {
 		t.Fatal("personal choice overwrote platform record")
 	}
+	user.Role = model.UserRoleAdmin
 	if _, err = s.SetPluginPlatformAvailability(user, ecommerce.PluginID, false); err != nil {
 		t.Fatal(err)
 	}

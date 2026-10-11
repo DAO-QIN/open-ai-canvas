@@ -13,11 +13,12 @@ import { AppDrawer } from "@/components/ui/product/app-drawer";
 import { Select } from "@/components/ui/base/select";
 import { useUserStore } from "@/stores/use-user-store";
 import { uploadResourceFile, resourceIdFromStorageKey } from "@/services/api/resources";
-import { batchCommandProducts, commandProduct, exportProducts, fetchProduct, importProducts, quoteProduct, saveProductPreset, updateProduct, deleteProductDraft } from "@/services/api/ecommerce";
+import { batchCommandProducts, commandProduct, exportProducts, fetchProduct, importProducts, quoteProduct, saveProductPreset, updateProduct, deleteProductDraft, setProductImagesEnabled } from "@/services/api/ecommerce";
 import type { EcommerceOptions } from "@/services/api/ecommerce";
 import { exportProductRun, recoverProductStep } from "@/services/api/ecommerce";
 import { sendProductToCanvas } from "@/services/ecommerce-canvas";
-import { completedImages, credits, currentVersion, productStatus, PRODUCT_IMAGES_ROUTE, type Product, type ProductBranch, type ProductCommand, type ProductConfig, type ProductSlot, type QuoteScope } from "@/lib/ecommerce/contracts";
+import { completedImages, credits, currentVersion, productStatus, ECOMMERCE_PLUGIN_ID, PRODUCT_IMAGES_ROUTE, type Product, type ProductBranch, type ProductCommand, type ProductConfig, type ProductSlot, type QuoteScope } from "@/lib/ecommerce/contracts";
+import { usePluginStore } from "@/stores/use-plugin-store";
 import { useProduct, useProductOptions, useProducts, useProductRun } from "./use-products";
 import { ProductSettings } from "./product-settings";
 import { ProductQuoteModal, type QuotedProduct } from "./quote-modal";
@@ -44,9 +45,28 @@ function ProductImagesWorkspace({ userID }: { userID: string }) {
     const [busy, setBusy] = useState(false);
     const [quoteError, setQuoteError] = useState("");
     const [resultNote, setResultNote] = useState("");
+    const [activationBusy, setActivationBusy] = useState(false);
     const current = () => useUserStore.getState().user?.id === userID;
     const refresh = () => client.invalidateQueries({ queryKey: ["ecommerce", userID] });
     const enabled = options.data?.state.effectiveEnabled === true;
+    const setEnabled = async (nextEnabled: boolean) => {
+        if (activationBusy || busy) return;
+        setActivationBusy(true);
+        try {
+            const state = await setProductImagesEnabled(nextEnabled);
+            if (!current()) return;
+            if (state.pluginId !== ECOMMERCE_PLUGIN_ID || state.userEnabled !== nextEnabled) throw new Error("启用状态尚未确认，请刷新核对");
+            usePluginStore.getState().setPluginStates({ ...usePluginStore.getState().pluginStates, [state.pluginId]: state });
+            message.success(nextEnabled ? "商品套图已启用" : "已暂停你的商品创作，历史作品仍可查看");
+        } catch (error) {
+            if (current()) message.error(error instanceof Error ? error.message : "状态保存未确认，请刷新核对");
+        } finally {
+            if (current()) {
+                await refresh();
+                setActivationBusy(false);
+            }
+        }
+    };
     const prepare = async (items: Product[], scope: (product: Product) => QuoteScope) => {
         if (!enabled || busy || !items.length) return;
         setBusy(true);
@@ -156,7 +176,13 @@ function ProductImagesWorkspace({ userID }: { userID: string }) {
                         showIcon
                         title={options.data.state.blockedReason || "商品套图暂未开放"}
                         description="已提交任务继续收尾；历史作品可以查看和下载。开放后请手动继续未完成的步骤。"
-                        action={!options.data.state.userEnabled && options.data.state.platformAvailable ? <Link to="/plugins">前往插件中心</Link> : undefined}
+                        action={
+                            !options.data.state.userEnabled && options.data.state.platformAvailable ? (
+                                <Button loading={activationBusy} disabled={busy} onClick={() => void setEnabled(true)}>
+                                    启用商品套图
+                                </Button>
+                            ) : undefined
+                        }
                     />
                 )}
                 {resultNote && <Alert type="info" showIcon title={resultNote} closable onClose={() => setResultNote("")} />}
@@ -165,7 +191,8 @@ function ProductImagesWorkspace({ userID }: { userID: string }) {
                 ) : tab === "start" && options.data ? (
                     <ProductImport
                         options={options.data}
-                        disabled={!enabled || busy}
+                        disabled={!enabled || busy || activationBusy}
+                        onDisable={() => void setEnabled(false)}
                         onImported={async (items, auto) => {
                             if (!current()) return;
                             setSelected(items.map((item) => item.id));
@@ -312,7 +339,7 @@ function ProductImagesWorkspace({ userID }: { userID: string }) {
 }
 
 type UploadItem = { id: string; resourceId: string; name: string; sellingPoints: string };
-function ProductImport({ options, disabled, onImported }: { options: EcommerceOptions; disabled: boolean; onImported: (items: Product[], auto: boolean) => Promise<void> }) {
+function ProductImport({ options, disabled, onImported, onDisable }: { options: EcommerceOptions; disabled: boolean; onImported: (items: Product[], auto: boolean) => Promise<void>; onDisable: () => void }) {
     const { message } = App.useApp();
     const userID = useUserStore((state) => state.user?.id);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -507,6 +534,14 @@ function ProductImport({ options, disabled, onImported }: { options: EcommerceOp
                             设为我的默认
                         </Button>
                     </div>
+                    {options.state.effectiveEnabled && (
+                        <div className="flex flex-wrap items-center gap-2 text-foreground/60">
+                            <Button type="text" disabled={disabled || submitting || uploading} onClick={onDisable}>
+                                停用我的商品创作
+                            </Button>
+                            <span>只影响你的后续创作，历史作品保留。</span>
+                        </div>
+                    )}
                 </div>
             </details>
             <div className="flex flex-wrap items-center justify-between gap-3">

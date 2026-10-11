@@ -44,6 +44,16 @@ func ecommerceBind(c *gin.Context, value any) bool {
 func RegisterEcommerceRoutes(r *gin.RouterGroup, svc *service.Service) {
 	group := r.Group("/ecommerce")
 	group.GET("/options", ecommerceActor(svc, false, func(c *gin.Context, u *model.User) { v, e := svc.EcommerceOptions(u); ecommerceReply(c, v, e) }))
+	group.PUT("/activation", ecommerceActor(svc, true, func(c *gin.Context, u *model.User) {
+		var req struct {
+			Enabled *bool `json:"enabled" binding:"required"`
+		}
+		if !ecommerceBind(c, &req) {
+			return
+		}
+		state, err := svc.SetUserPluginEnabled(u, model.EcommercePluginID, *req.Enabled)
+		ecommerceReply(c, gin.H{"state": state}, err)
+	}))
 	group.GET("/preferences", ecommerceActor(svc, false, func(c *gin.Context, u *model.User) { v, e := svc.EcommercePreferences(u.ID); ecommerceReply(c, v, e) }))
 	group.PUT("/preferences", ecommerceActor(svc, true, func(c *gin.Context, u *model.User) {
 		var req service.EcommercePresetRequest

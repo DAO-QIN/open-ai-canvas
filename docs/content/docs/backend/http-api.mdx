@@ -12,6 +12,7 @@ description: 信封、错误码与 OpenAPI
 | 方法               | /api 后路径                                   | 合同                                                            |
 | ------------------ | --------------------------------------------- | --------------------------------------------------------------- |
 | GET                | /ecommerce/options                            | 当前有效目录、平台默认设置、开关状态及本人预设                  |
+| PUT                | /ecommerce/activation                         | enabled 必填布尔值；只修改本人启用状态，平台关闭时拒绝启用；不受插件中心开关影响 |
 | GET / PUT          | /ecommerce/preferences                        | 当前用户默认设置，复用版本化 default 预设                       |
 | GET / PUT / DELETE | /ecommerce/presets 及 /:id                    | 预设保存和删除；修订号、操作标识及归属校验                      |
 | POST / GET         | /ecommerce/batches                            | 批量导入或读取本人批次；每张原图一个商品                        |

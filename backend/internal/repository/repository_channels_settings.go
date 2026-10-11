@@ -3,7 +3,6 @@
 package repository
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
 
@@ -127,23 +126,6 @@ func (r *Repository) SystemSettingOptional(key string) (*model.SystemSetting, er
 }
 
 func (r *Repository) SaveSystemSetting(setting *model.SystemSetting) error {
-	if setting.Key == "feature_availability" && r.db.Migrator().HasTable(&model.EcommerceRun{}) {
-		return r.db.Transaction(func(tx *gorm.DB) error {
-			if e := tx.Save(setting).Error; e != nil {
-				return e
-			}
-			var flags struct {
-				PluginCenterEnabled *bool `json:"pluginCenterEnabled"`
-			}
-			if e := json.Unmarshal([]byte(setting.ValueJSON), &flags); e != nil {
-				return e
-			}
-			if flags.PluginCenterEnabled != nil && !*flags.PluginCenterEnabled {
-				return New(tx).PauseEcommerce("", "插件能力已关闭；重新开放后请手动继续")
-			}
-			return nil
-		})
-	}
 	return r.db.Save(setting).Error
 }
 

@@ -255,15 +255,9 @@ func (s *Service) pluginStateForUser(actor *model.User, pluginID string, items [
 		state.BlockedReason = "系统插件由管理员统一管理"
 	}
 	if pluginID == PluginEcommerceStudio {
-		center, err := s.FeatureEnabled(FeaturePluginCenter)
-		if err != nil {
-			return PluginStateView{}, err
-		}
-		if !center {
-			state.EffectiveEnabled = false
-			state.CanToggle = false
-			state.BlockedReason = "插件能力总开关已关闭"
-		} else if platformAvailable && !userEnabled {
+		if !platformAvailable {
+			state.BlockedReason = "商品套图暂未开放"
+		} else if !userEnabled {
 			state.BlockedReason = "你已停用商品套图"
 		}
 	}

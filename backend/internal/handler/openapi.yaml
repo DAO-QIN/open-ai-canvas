@@ -1724,6 +1724,31 @@ paths:
             },
         },
     }
+  /ecommerce/activation:
+    put:
+      tags: [ecommerce]
+      summary: 当前用户启停商品套图，独立于插件中心
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
   /ecommerce/preferences:
     {
       "get":
