@@ -422,7 +422,6 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                         <li>返利按好友在线充值实际到账的积分计算，包含套餐赠送积分。签到、注册赠送、兑换码和积分调整不产生返利。</li>
                         <li>{data.policy.freezeDays ? `当前新订单的返利等待期为 ${data.policy.freezeDays} 天，从充值积分到账时起计算。` : "当前新订单的返利到账即可使用。"} 已有返利的具体解锁时间，以返利明细为准。</li>
                         <li>返利比例和等待期在好友下单时确定，之后调整不影响该笔订单。</li>
-                        <li>可用返利按 1:1 手动转为站内积分，无手续费，仅用于站内创作，不支持现金提现。</li>
                     </ul>
                 </details>
             </div>

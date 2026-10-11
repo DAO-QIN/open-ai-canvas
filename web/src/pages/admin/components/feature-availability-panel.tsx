@@ -1,24 +1,27 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { App, Button, Skeleton } from "antd";
 import { Switch } from "@/pages/admin/ui/controls";
-import { AlertTriangle, Clapperboard, Coins, ListChecks, MonitorCog, PlugZap, RadioTower, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, Clapperboard, Coins, Gift, ListChecks, MonitorCog, PlugZap, RadioTower, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { getAdminFeatureAvailability, updateAdminFeatureAvailability } from "@/services/api/auth";
+import { getAdminPromotionPolicy, updatePromotionPolicy, type PromotionPolicy } from "@/services/api/promotion";
 import { useUserStore, type FeatureAvailability } from "@/stores/use-user-store";
 import { AdminStatusBadge } from "./admin-ui";
 import { Link } from "react-router";
 
-type FeatureKey = "shortDramaEnabled" | "taskCenterEnabled" | "creditsEnabled" | "customChannelsEnabled" | "inspirationSourcesVisible" | "frontendModelsEnabled" | "pluginCenterEnabled" | "systemPluginsVisibleToUsers";
+type EditableFeatureKey = "shortDramaEnabled" | "taskCenterEnabled" | "creditsEnabled" | "customChannelsEnabled" | "inspirationSourcesVisible" | "frontendModelsEnabled" | "pluginCenterEnabled" | "systemPluginsVisibleToUsers";
+type FeatureKey = EditableFeatureKey | "promotionEnabled";
 type FeatureRow = {
     key: FeatureKey;
     title: string;
-    description: string;
+    description: ReactNode;
     icon: ReactNode;
     dependsOn?: FeatureKey;
 };
 
-const editableFeatureKeys: FeatureKey[] = ["shortDramaEnabled", "taskCenterEnabled", "creditsEnabled", "customChannelsEnabled", "inspirationSourcesVisible", "frontendModelsEnabled", "pluginCenterEnabled", "systemPluginsVisibleToUsers"];
+const editableFeatureKeys: EditableFeatureKey[] = ["shortDramaEnabled", "taskCenterEnabled", "creditsEnabled", "customChannelsEnabled", "inspirationSourcesVisible", "frontendModelsEnabled", "pluginCenterEnabled", "systemPluginsVisibleToUsers"];
 
 const workspaceFeatureRows: FeatureRow[] = [
     {
@@ -51,6 +54,19 @@ const workspaceFeatureRows: FeatureRow[] = [
         description: "显示创作首页的素材来源说明；关闭后隐藏该面板。",
         icon: <Sparkles className="size-4" aria-hidden="true" />,
     },
+    {
+        key: "promotionEnabled",
+        title: "邀请有礼",
+        description: (
+            <>
+                开放侧栏邀请入口、新邀请绑定与新订单返利。关闭后已有订单、历史记录和返利转入继续保留。
+                <Link className="underline underline-offset-4" to="/admin/promotion">
+                    设置返利比例与冻结期
+                </Link>
+            </>
+        ),
+        icon: <Gift className="size-4" aria-hidden="true" />,
+    },
 ];
 
 const pluginFeatureRows: FeatureRow[] = [
@@ -82,8 +98,15 @@ const allFeatureRows = [...workspaceFeatureRows, ...pluginFeatureRows, ...modelF
 const featureByKey = new Map(allFeatureRows.map((item) => [item.key, item]));
 
 export default function FeatureAvailabilityPanel() {
+    const userID = useUserStore((state) => state.user?.id);
+    return userID ? <FeatureAvailabilitySettings key={userID} userID={userID} /> : null;
+}
+
+function FeatureAvailabilitySettings({ userID }: { userID: string }) {
     const { message, modal } = App.useApp();
+    const client = useQueryClient();
     const setGlobalFeatures = useUserStore((state) => state.setFeatures);
+    const [promotionPolicy, setPromotionPolicy] = useState<PromotionPolicy | null>(null);
     const [savedFeatures, setSavedFeatures] = useState<FeatureAvailability | null>(null);
     const [draftFeatures, setDraftFeatures] = useState<FeatureAvailability | null>(null);
     const [loading, setLoading] = useState(true);
@@ -92,71 +115,100 @@ export default function FeatureAvailabilityPanel() {
     const [loadError, setLoadError] = useState("");
     const [saveError, setSaveError] = useState("");
     const requestVersionRef = useRef(0);
+    const activeRef = useRef(false);
+    const savingRef = useRef(false);
+    const controllerRef = useRef<AbortController | null>(null);
+    const current = useCallback(() => activeRef.current && useUserStore.getState().user?.id === userID, [userID]);
 
     const load = useCallback(
-        async (initial = false, announce = false) => {
+        async (initial = false, announce = false, clearSaveError = true) => {
             const requestVersion = ++requestVersionRef.current;
+            controllerRef.current?.abort();
+            const controller = new AbortController();
+            controllerRef.current = controller;
             if (initial) setLoading(true);
             else setRefreshing(true);
             setLoadError("");
             try {
-                const result = await getAdminFeatureAvailability();
-                const value = parseFeatureAvailability(result.features);
-                if (requestVersion !== requestVersionRef.current) return;
+                const [result, policy] = await Promise.all([getAdminFeatureAvailability(controller.signal), getAdminPromotionPolicy(controller.signal)]);
+                const value = { ...parseFeatureAvailability(result.features), promotionEnabled: policy.enabled };
+                if (!current() || requestVersion !== requestVersionRef.current) return;
+                setPromotionPolicy(policy);
+                client.setQueryData(["admin", userID, "promotion", "policy"], policy);
                 setSavedFeatures(value);
                 setDraftFeatures(value);
                 setGlobalFeatures(value);
-                setSaveError("");
+                if (clearSaveError) setSaveError("");
                 if (announce) message.success("已重新读取当前功能状态");
             } catch (error) {
-                if (requestVersion !== requestVersionRef.current) return;
+                if (!current() || requestVersion !== requestVersionRef.current) return;
                 const errorMessage = error instanceof Error ? error.message : "读取功能开放配置失败";
                 setLoadError(errorMessage);
                 if (!initial) message.error(errorMessage);
             } finally {
-                if (requestVersion === requestVersionRef.current) {
+                if (current() && requestVersion === requestVersionRef.current) {
                     setLoading(false);
                     setRefreshing(false);
                 }
             }
         },
-        [message, setGlobalFeatures],
+        [client, current, message, setGlobalFeatures, userID],
     );
 
     useEffect(() => {
+        activeRef.current = true;
         void load(true);
         return () => {
+            activeRef.current = false;
             requestVersionRef.current += 1;
+            controllerRef.current?.abort();
         };
     }, [load]);
 
     const setFeature = async (key: FeatureKey, enabled: boolean) => {
-        if (!savedFeatures || saving || savedFeatures[key] === enabled) return;
+        if (!current() || !savedFeatures || !promotionPolicy || savingRef.current || refreshing || loadError || savedFeatures[key] === enabled) return;
         const previous = savedFeatures;
         const expected = { ...savedFeatures, [key]: enabled };
         setDraftFeatures(expected);
+        savingRef.current = true;
         setSaving(true);
         setSaveError("");
         try {
-            const result = await updateAdminFeatureAvailability(toEditablePayload(expected));
-            const value = parseFeatureAvailability(result.features);
-            if (!sameEditableFeatures(value, expected)) throw new Error("服务端返回的功能状态与本次保存内容不一致，请重新读取后核对");
+            let value: FeatureAvailability;
+            if (key === "promotionEnabled") {
+                // The versioned policy owns this switch; preserve its rate and freeze period.
+                const policy = await updatePromotionPolicy({ ...promotionPolicy, enabled });
+                if (!current()) return;
+                if (policy.enabled !== enabled) throw new Error("服务端返回的邀请状态与本次保存内容不一致");
+                setPromotionPolicy(policy);
+                client.setQueryData(["admin", userID, "promotion", "policy"], policy);
+                void client.invalidateQueries({ queryKey: ["promotion", userID] });
+                value = { ...expected, promotionEnabled: policy.enabled };
+            } else {
+                const result = await updateAdminFeatureAvailability(toEditablePayload(expected));
+                if (!current()) return;
+                value = parseFeatureAvailability(result.features);
+                if (!sameEditableFeatures(value, expected)) throw new Error("服务端返回的功能状态与本次保存内容不一致，请重新读取后核对");
+            }
             setSavedFeatures(value);
             setDraftFeatures(value);
             setGlobalFeatures(value);
             message.success(`${featureByKey.get(key)?.title || "功能"}已${enabled ? "开启" : "关闭"}`);
         } catch (error) {
+            if (!current()) return;
             const errorMessage = error instanceof Error ? error.message : "保存功能开放配置失败";
             setDraftFeatures(previous);
-            setSaveError(`${errorMessage}。已恢复修改前状态。`);
+            setSaveError(`${errorMessage}。本次修改未确认，请以重新读取的服务端状态为准。`);
             message.error(errorMessage);
+            await load(false, false, false);
         } finally {
-            setSaving(false);
+            savingRef.current = false;
+            if (current()) setSaving(false);
         }
     };
 
     const requestFeatureChange = (key: FeatureKey, enabled: boolean) => {
-        if (!savedFeatures || saving || savedFeatures[key] === enabled) return;
+        if (!savedFeatures || savingRef.current || refreshing || loadError || savedFeatures[key] === enabled) return;
         if (key === "creditsEnabled" && !enabled) {
             modal.confirm({
                 title: "关闭用户积分功能？",
@@ -223,18 +275,15 @@ export default function FeatureAvailabilityPanel() {
 
     const enabledWorkspaceFeatures = workspaceFeatureRows.filter((row) => effectiveFeatureValue(draftFeatures, row.key)).length;
     const enabledPluginFeatures = pluginFeatureRows.filter((row) => effectiveFeatureValue(draftFeatures, row.key)).length;
+    const controlsDisabled = saving || refreshing || Boolean(loadError) || !promotionPolicy;
 
     return (
         <div className="admin-settings-stack admin-feature-availability">
             <div className="admin-feature-command-bar">
-                <span>邀请返利：{savedFeatures.promotionEnabled ? "已开放" : "未开放"}。开关、比例和冻结期在邀请返利中统一配置。</span>
-                <Link to="/admin/promotion">管理邀请返利</Link>
-            </div>
-            <div className="admin-feature-command-bar">
                 <div className="admin-feature-command-copy" aria-live="polite">
                     <div className="flex flex-wrap items-center gap-2">
                         <strong>{saving ? "正在保存更改" : "开关切换后立即生效"}</strong>
-                        <AdminStatusBadge label={saving ? "提交中" : savedFeatures.configured ? "服务端配置" : "系统默认"} tone={saving ? "warning" : "neutral"} />
+                        <AdminStatusBadge label={saving ? "提交中" : savedFeatures.configured || (promotionPolicy && promotionPolicy.version > 0) ? "服务端配置" : "系统默认"} tone={saving ? "warning" : "neutral"} />
                     </div>
                 </div>
                 <div className="admin-feature-command-actions">
@@ -247,7 +296,7 @@ export default function FeatureAvailabilityPanel() {
             {loadError || saveError ? (
                 <div className="admin-feature-inline-alert" role="alert">
                     <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
-                    <span>{saveError || `${loadError}。页面仍显示上一次成功读取的状态。`}</span>
+                    <span>{[saveError, loadError ? `${loadError}。页面显示上次确认的状态，请刷新成功后再修改。` : ""].filter(Boolean).join(" ")}</span>
                 </div>
             ) : null}
 
@@ -256,10 +305,10 @@ export default function FeatureAvailabilityPanel() {
                     title="1. 用户工作台入口"
                     description="先决定普通用户能进入哪些核心工作区"
                     icon={<MonitorCog className="size-4" aria-hidden="true" />}
-                    status={<AdminStatusBadge label={`${enabledWorkspaceFeatures}/5 开放`} tone={enabledWorkspaceFeatures === 5 ? "success" : "neutral"} />}
+                    status={<AdminStatusBadge label={`${enabledWorkspaceFeatures}/${workspaceFeatureRows.length} 开放`} tone={enabledWorkspaceFeatures === workspaceFeatureRows.length ? "success" : "neutral"} />}
                 >
                     {workspaceFeatureRows.map((row) => (
-                        <FeatureSettingRow key={row.key} row={row} saved={savedFeatures} draft={draftFeatures} saving={saving} onChange={requestFeatureChange} />
+                        <FeatureSettingRow key={row.key} row={row} saved={savedFeatures} draft={draftFeatures} saving={controlsDisabled} onChange={requestFeatureChange} />
                     ))}
                 </FeatureDomainPanel>
 
@@ -267,10 +316,10 @@ export default function FeatureAvailabilityPanel() {
                     title="2. 插件开放范围"
                     description="先开放插件中心，再决定系统插件是否可见"
                     icon={<PlugZap className="size-4" aria-hidden="true" />}
-                    status={<AdminStatusBadge label={`${enabledPluginFeatures}/2 生效`} tone={enabledPluginFeatures === 2 ? "success" : "neutral"} />}
+                    status={<AdminStatusBadge label={`${enabledPluginFeatures}/${pluginFeatureRows.length} 生效`} tone={enabledPluginFeatures === pluginFeatureRows.length ? "success" : "neutral"} />}
                 >
-                    <FeatureSettingRow row={pluginFeatureRows[0]} saved={savedFeatures} draft={draftFeatures} saving={saving} onChange={requestFeatureChange} step={1} />
-                    {draftFeatures.pluginCenterEnabled ? <FeatureSettingRow row={pluginFeatureRows[1]} saved={savedFeatures} draft={draftFeatures} saving={saving} onChange={requestFeatureChange} step={2} /> : null}
+                    <FeatureSettingRow row={pluginFeatureRows[0]} saved={savedFeatures} draft={draftFeatures} saving={controlsDisabled} onChange={requestFeatureChange} step={1} />
+                    {draftFeatures.pluginCenterEnabled ? <FeatureSettingRow row={pluginFeatureRows[1]} saved={savedFeatures} draft={draftFeatures} saving={controlsDisabled} onChange={requestFeatureChange} step={2} /> : null}
                 </FeatureDomainPanel>
 
                 <FeatureDomainPanel
@@ -279,7 +328,7 @@ export default function FeatureAvailabilityPanel() {
                     icon={<Sparkles className="size-4" aria-hidden="true" />}
                     status={<AdminStatusBadge label={draftFeatures.frontendModelsEnabled ? "前台模型目录" : "系统渠道"} tone="info" />}
                 >
-                    <FeatureSourceRow row={modelFeatureRows[0]} saved={savedFeatures} draft={draftFeatures} saving={saving} onChange={requestFeatureChange} />
+                    <FeatureSourceRow row={modelFeatureRows[0]} saved={savedFeatures} draft={draftFeatures} saving={controlsDisabled} onChange={requestFeatureChange} />
                 </FeatureDomainPanel>
             </div>
         </div>

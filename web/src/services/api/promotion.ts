@@ -1,6 +1,7 @@
 import { compactApiParams, http } from "./request";
+import { parsePromotionPolicy } from "@/lib/promotion-policy";
 
-export type PromotionPolicy = { enabled: boolean; ratioBps: number; freezeDays: number; version: number };
+export type PromotionPolicy = ReturnType<typeof parsePromotionPolicy>;
 export type PromotionProfile = { userId: string; inviteCode: string | null; paused: boolean; ratioOverrideBps: number | null; version: number };
 export type PromotionOverview = {
     policy: PromotionPolicy;
@@ -61,11 +62,11 @@ export function transferPromotion(request: TransferRequest) {
 export function getPromotionTransferResult(requestID: string, signal?: AbortSignal) {
     return http.get<PromotionTransfer>(`/promotion/transfers/${encodeURIComponent(requestID)}`, { signal });
 }
-export function getAdminPromotionPolicy(signal?: AbortSignal) {
-    return http.get<PromotionPolicy>("/admin/promotion/policy", { signal });
+export async function getAdminPromotionPolicy(signal?: AbortSignal) {
+    return parsePromotionPolicy(await http.get<unknown>("/admin/promotion/policy", { signal }));
 }
-export function updatePromotionPolicy(policy: PromotionPolicy) {
-    return http.put<PromotionPolicy>("/admin/promotion/policy", policy);
+export async function updatePromotionPolicy(policy: PromotionPolicy) {
+    return parsePromotionPolicy(await http.put<unknown>("/admin/promotion/policy", parsePromotionPolicy(policy)));
 }
 export function getAdminPromotionProfiles(keyword: string, page: number, signal?: AbortSignal) {
     return http.get<PromotionPage<AdminPromotionProfile>>("/admin/promotion/profiles", { params: compactApiParams({ keyword, page, pageSize: 20 }), signal });

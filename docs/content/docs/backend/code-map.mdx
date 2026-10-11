@@ -12,6 +12,7 @@ description: 从产品功能快速定位主要代码入口
 - `internal/app/promotion_bridge.go` 和 `internal/handler/promotion.go`：组合根与公开接口；认证 Host 在账号创建事务内调用推广域。
 - `internal/database/migrations.go` 的 v50、`database.Models()` 与 `cmd/migrate-sqlite-postgres`：正式迁移及跨数据库复制清单，覆盖五张邀请返利表。
 - `web/src/pages/promotion`、`web/src/pages/admin/promotion`、`web/src/services/api/promotion.ts`：真实用户及后台页面与 API；`web/src/lib/promotion-credits.ts` 处理精确金额和账号隔离的未确认请求。
+- `web/src/pages/admin/components/feature-availability-panel.tsx` 的「邀请有礼」开关复用版本化返利规则；`web/src/lib/promotion-policy.ts` 严格校验配置，避免缺失或异常值变成可保存的默认配置。
 
 ## 卡藏音乐
 

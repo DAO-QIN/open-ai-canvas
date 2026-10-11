@@ -437,8 +437,8 @@ export function getFeatureAvailability() {
     return http.get<{ features: FeatureAvailability }>("/features");
 }
 
-export function getAdminFeatureAvailability() {
-    return http.get<{ features: FeatureAvailability }>("/admin/settings/features");
+export function getAdminFeatureAvailability(signal?: AbortSignal) {
+    return http.get<{ features: FeatureAvailability }>("/admin/settings/features", { signal });
 }
 
 export function updateAdminFeatureAvailability(
