@@ -179,9 +179,6 @@ func (h ecommerceHost) Prepare(userID string, intent ecommerce.Intent, cap *int6
 		}
 		prompt += "\n服务端资源库的实际像素尺寸：" + string(dimensions) + "。画幅只按这些尺寸判断；宽高为0表示未知，不能从模型预览猜测。预览可能缩放或拼排，不能把预览形状当作实际画幅，也不能仅凭两图显示大小不同认定商品比例改变。商品外形问题须有独立的可见结构依据。"
 	}
-	if utf8.RuneCountInString(prompt) > 16000 {
-		return nil, BadAuthRequest("本步骤提示词过长，请简化方案后重新确认")
-	}
 	input := map[string]any{"mode": mode, "prompt": prompt, "config": config, "referenceImages": references}
 	if mode == "text" {
 		config["maxOutputTokens"] = 8192

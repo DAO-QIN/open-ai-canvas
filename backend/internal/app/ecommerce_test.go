@@ -88,6 +88,18 @@ func TestEcommerceQualityHostTwoImagesAndOwnership(t *testing.T) {
 	if !strings.Contains(prompt, `"result":{"height":4096,"width":4096}`) || !strings.Contains(prompt, `"source":{"height":0,"width":0}`) || !strings.Contains(prompt, "不能从模型预览猜测") || prepared.Task.Prompt != prompt {
 		t.Fatal("review must use trusted resource dimensions and preserve unknown sizes")
 	}
+	// Token billing quotes use the maximum admitted prompt to reserve a safe
+	// upper bound. Trusted host metadata must be included without rejecting it.
+	quoteIntent := intent
+	quoteIntent.StageID, quoteIntent.VersionID, quoteIntent.ResultResourceID = "", "", ""
+	quoteIntent.Prompt = strings.Repeat("商", 16000)
+	if _, err := host.Prepare(user.ID, quoteIntent, nil); err != nil {
+		t.Fatalf("maximum quote prompt plus trusted dimensions: %v", err)
+	}
+	quoteIntent.Prompt += "商"
+	if _, err := host.Prepare(user.ID, quoteIntent, nil); err == nil {
+		t.Fatal("oversized original review prompt accepted")
+	}
 	intent.ResultResourceID = "foreign-result"
 	if _, err := host.Prepare(user.ID, intent, nil); err == nil {
 		t.Fatal("cross-user review resource accepted")
