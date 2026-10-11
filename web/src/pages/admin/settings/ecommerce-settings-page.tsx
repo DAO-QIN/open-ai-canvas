@@ -80,6 +80,7 @@ export default function EcommerceSettingsPage() {
     const state = query.data?.options.state;
     const texts = query.data ? modelChoices(query.data.options.catalog, "text") : [];
     const images = query.data ? modelChoices(query.data.options.catalog, "image") : [];
+    const reviewKey = value?.reviewModel && (value.reviewModel.logicalModelId || (value.reviewModel.channelId && value.reviewModel.channelModelKey)) ? selectedModelKey(value.reviewModel) : undefined;
     const selected = value && images.find((choice) => choice.value === selectedModelKey(value.defaults.imageModel));
     const profile = selected?.model.capabilityConfig as { image?: { size?: { values?: string[]; presets?: { size: string }[] }; quality?: { values?: string[] } } } | undefined;
     const sizes = [...new Set([...(profile?.image?.size?.values ?? []), ...(profile?.image?.size?.presets ?? []).map((item) => item.size)])];
@@ -107,7 +108,7 @@ export default function EcommerceSettingsPage() {
                 </div>
             ) : (
                 value && (
-                    <>
+                    <div className="admin-settings-stack shrink-0">
                         <SettingsSectionCard
                             title="平台开放"
                             icon={<Image className="size-4" />}
@@ -235,7 +236,8 @@ export default function EcommerceSettingsPage() {
                                         className="w-full"
                                         ariaLabel="质检模型"
                                         disabled={busy}
-                                        value={selectedModelKey(value.reviewModel ?? {})}
+                                        placeholder="选择质检模型"
+                                        value={reviewKey}
                                         options={texts.map(({ value, label }) => ({ value, label }))}
                                         onChange={(id) => {
                                             const choice = texts.find((item) => item.value === id);
@@ -268,7 +270,7 @@ export default function EcommerceSettingsPage() {
                                 ))}
                             </div>
                         </SettingsSectionCard>
-                    </>
+                    </div>
                 )
             )}
         </AdminPageFrame>
