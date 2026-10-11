@@ -156,6 +156,7 @@ func (h ecommerceHost) Prepare(userID string, intent ecommerce.Intent, cap *int6
 		return map[string]any{"id": r.ID, "storageKey": "resource:" + r.ID, "mimeType": r.MimeType, "bytes": r.Size, "width": r.Width, "height": r.Height}
 	}
 	references := []any{reference(resource)}
+	prompt := intent.Prompt
 	if intent.Kind == "quality" {
 		// Before generation, quote the same two-image input shape using the
 		// source as a placeholder. Admission requires the actual stored result.
@@ -169,8 +170,19 @@ func (h ecommerceHost) Prepare(userID string, intent ecommerce.Intent, cap *int6
 			return nil, BadAuthRequest("质检必须关联已经保存的成图版本")
 		}
 		references = append(references, reference(result))
+		dimensions, err := json.Marshal(map[string]any{
+			"source": map[string]int{"width": resource.Width, "height": resource.Height},
+			"result": map[string]int{"width": result.Width, "height": result.Height},
+		})
+		if err != nil {
+			return nil, err
+		}
+		prompt += "\n服务端资源库的实际像素尺寸：" + string(dimensions) + "。画幅只按这些尺寸判断；宽高为0表示未知，不能从模型预览猜测。预览可能缩放或拼排，不能把预览形状当作实际画幅，也不能仅凭两图显示大小不同认定商品比例改变。商品外形问题须有独立的可见结构依据。"
 	}
-	input := map[string]any{"mode": mode, "prompt": intent.Prompt, "config": config, "referenceImages": references}
+	if utf8.RuneCountInString(prompt) > 16000 {
+		return nil, BadAuthRequest("本步骤提示词过长，请简化方案后重新确认")
+	}
+	input := map[string]any{"mode": mode, "prompt": prompt, "config": config, "referenceImages": references}
 	if mode == "text" {
 		config["maxOutputTokens"] = 8192
 		input["maxOutputTokens"] = 8192
@@ -180,7 +192,7 @@ func (h ecommerceHost) Prepare(userID string, intent ecommerce.Intent, cap *int6
 	if cap != nil {
 		maxCharge = *cap
 	}
-	req := CreateTaskRequest{Type: "canvas_" + mode, Operation: "ecommerce_" + strings.ReplaceAll(intent.Kind, ":", "_"), Prompt: intent.Prompt, LogicalModelID: selection.LogicalModelID, Input: input, admission: &taskAdmission{ID: newID(), MaxCharge: maxCharge}, callerHoldsStorageMu: true}
+	req := CreateTaskRequest{Type: "canvas_" + mode, Operation: "ecommerce_" + strings.ReplaceAll(intent.Kind, ":", "_"), Prompt: prompt, LogicalModelID: selection.LogicalModelID, Input: input, admission: &taskAdmission{ID: newID(), MaxCharge: maxCharge}, callerHoldsStorageMu: true}
 	task, order, signature, err := h.svc.prepareTaskAdmission(userID, req)
 	if err != nil {
 		return nil, err

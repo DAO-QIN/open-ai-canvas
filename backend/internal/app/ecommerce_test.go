@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"path/filepath"
+	"strings"
 	"testing"
 	"yingce/backend/internal/database"
 	"yingce/backend/internal/ecommerce"
@@ -60,7 +61,7 @@ func TestEcommerceQualityHostTwoImagesAndOwnership(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, resource := range []*model.Resource{
-		{ID: "commerce-result", UserID: user.ID, Kind: "image", Status: "ready", MimeType: "image/png", Size: 120},
+		{ID: "commerce-result", UserID: user.ID, Kind: "image", Status: "ready", MimeType: "image/png", Size: 120, Width: 4096, Height: 4096},
 		{ID: "foreign-result", UserID: "other", Kind: "image", Status: "ready", MimeType: "image/png", Size: 120},
 	} {
 		if err := db.Create(resource).Error; err != nil {
@@ -82,6 +83,10 @@ func TestEcommerceQualityHostTwoImagesAndOwnership(t *testing.T) {
 	}
 	if stringValue(refs[0].(map[string]any)["storageKey"]) != "resource:commerce-source" || stringValue(refs[1].(map[string]any)["storageKey"]) != "resource:commerce-result" {
 		t.Fatal("review source/result order changed")
+	}
+	prompt := stringValue(input["prompt"])
+	if !strings.Contains(prompt, `"result":{"height":4096,"width":4096}`) || !strings.Contains(prompt, `"source":{"height":0,"width":0}`) || !strings.Contains(prompt, "不能从模型预览猜测") || prepared.Task.Prompt != prompt {
+		t.Fatal("review must use trusted resource dimensions and preserve unknown sizes")
 	}
 	intent.ResultResourceID = "foreign-result"
 	if _, err := host.Prepare(user.ID, intent, nil); err == nil {
