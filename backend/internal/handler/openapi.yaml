@@ -2462,7 +2462,6 @@ components:
         "required":
           [
             "planner",
-            "titleModel",
             "imageModel",
             "hero",
             "detail",
@@ -2476,7 +2475,7 @@ components:
         "properties":
           {
             "planner": { "$ref": "#/components/schemas/EcommerceSelection" },
-            "titleModel": { "$ref": "#/components/schemas/EcommerceSelection" },
+            "qualityCheck": { "type": "boolean", "default": false, "description": "可选成图智能质检，模型由后台配置，费用另计入生成报价" },
             "imageModel": { "$ref": "#/components/schemas/EcommerceSelection" },
             "hero": { "$ref": "#/components/schemas/EcommerceOutput" },
             "detail": { "$ref": "#/components/schemas/EcommerceOutput" },
@@ -2515,6 +2514,8 @@ components:
           {
             "revision": { "type": "integer", "format": "int64", "minimum": 1 },
             "defaults": { "$ref": "#/components/schemas/EcommerceConfig" },
+            "reviewAvailable": { "type": "boolean", "default": false },
+            "reviewModel": { "$ref": "#/components/schemas/EcommerceSelection" },
             "batchLimit":
               {
                 "type": "integer",

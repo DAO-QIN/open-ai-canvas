@@ -1,11 +1,12 @@
 import { Input, InputNumber } from "antd";
 import { Select } from "@/components/ui/base/select";
+import { Switch } from "@/components/ui/base/switch/switch";
 import type { ProductConfig } from "@/lib/ecommerce/contracts";
 import type { ModelCatalogResponse } from "@/services/api/logical-models";
 import { modelChoices, selectedModelKey as selectedKey } from "@/lib/ecommerce/models";
 
-type Props = { value: ProductConfig; catalog: ModelCatalogResponse; onChange: (value: ProductConfig) => void; disabled?: boolean; advancedOnly?: boolean };
-export function ProductSettings({ value, catalog, onChange, disabled, advancedOnly = false }: Props) {
+type Props = { value: ProductConfig; catalog: ModelCatalogResponse; onChange: (value: ProductConfig) => void; disabled?: boolean; advancedOnly?: boolean; reviewAvailable?: boolean };
+export function ProductSettings({ value, catalog, onChange, disabled, advancedOnly = false, reviewAvailable = false }: Props) {
     const texts = modelChoices(catalog, "text");
     const images = modelChoices(catalog, "image");
     const set = <K extends keyof ProductConfig>(key: K, next: ProductConfig[K]) => onChange({ ...value, [key]: next });
@@ -31,13 +32,23 @@ export function ProductSettings({ value, catalog, onChange, disabled, advancedOn
                     </label>
                 </div>
             )}
+            <div className="flex items-start justify-between gap-4 rounded-xl bg-surface-hover p-4">
+                <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                        智能质检 <span className="text-xs font-normal text-foreground/60">可选</span>
+                    </p>
+                    <p id="product-quality-description" className="text-xs leading-5 text-foreground/60">
+                        {reviewAvailable ? "生成后检查商品一致性和图片文案，会增加积分与等待时间，费用在生成前确认。" : "智能质检暂未开放，仍可正常生成套图。"}
+                    </p>
+                </div>
+                <Switch aria-label="智能质检" aria-describedby="product-quality-description" checked={Boolean(value.qualityCheck)} disabled={disabled || (!reviewAvailable && !value.qualityCheck)} onChange={(enabled) => set("qualityCheck", enabled)} />
+            </div>
             <details className="rounded-xl bg-surface-hover p-4" open={advancedOnly || undefined}>
                 <summary className="cursor-pointer text-sm font-medium focus-visible:outline focus-visible:outline-2">高级设置</summary>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     {(
                         [
-                            ["planner", "方案与细化模型", texts],
-                            ["titleModel", "标题模型", texts],
+                            ["planner", "创作模型", texts],
                             ["imageModel", "生图模型", images],
                         ] as const
                     ).map(([key, label, choices]) => (

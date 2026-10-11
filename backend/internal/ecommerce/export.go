@@ -11,13 +11,14 @@ import (
 )
 
 type ExportSlot struct {
-	SlotID  string `json:"slotId"`
-	Kind    string `json:"kind"`
-	Index   int    `json:"index"`
-	Version int    `json:"version,omitempty"`
-	File    string `json:"file,omitempty"`
-	Status  string `json:"status"`
-	Missing bool   `json:"missing"`
+	QualityCheck *QualityCheckView `json:"qualityCheck,omitempty"`
+	SlotID       string            `json:"slotId"`
+	Kind         string            `json:"kind"`
+	Index        int               `json:"index"`
+	Version      int               `json:"version,omitempty"`
+	File         string            `json:"file,omitempty"`
+	Status       string            `json:"status"`
+	Missing      bool              `json:"missing"`
 }
 type ExportManifest struct {
 	ProductID     string       `json:"productId"`
@@ -116,6 +117,13 @@ func (s *Service) export(ctx context.Context, userID string, productIDs []string
 					}
 				}
 				if selected != nil {
+					for i := range slot.QualityChecks {
+						if slot.QualityChecks[i].VersionID == selected.ID {
+							check := slot.QualityChecks[i]
+							entry.QualityCheck = &check
+							break
+						}
+					}
 					resource, reader, e := s.host.OpenResource(userID, selected.ResourceID)
 					if e != nil {
 						return e

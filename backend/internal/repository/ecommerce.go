@@ -212,7 +212,7 @@ func (r *Repository) EcommerceEnabled(userID string) (bool, string, error) {
 	return true, "", nil
 }
 func (r *Repository) PauseEcommerce(userID, reason string) error {
-	q := r.db.Model(&model.EcommerceRun{}).Where("status IN ?", []string{"queued", "planning", "generating", "review", "blocked"})
+	q := r.db.Model(&model.EcommerceRun{}).Where("status IN ?", []string{"queued", "planning", "generating", "checking", "review", "blocked"})
 	if userID != "" {
 		q = q.Where("user_id = ?", userID)
 	}

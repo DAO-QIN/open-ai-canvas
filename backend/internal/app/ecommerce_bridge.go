@@ -63,7 +63,7 @@ func (h ecommerceHost) ValidateConfig(userID string, config ecommerce.Config) er
 		Selection ecommerce.Selection
 		Cap       string
 		Out       *ecommerce.Output
-	}{{config.Planner, "text", nil}, {config.TitleModel, "text", nil}, {config.ImageModel, "image", &config.Hero}, {config.ImageModel, "image", &config.Detail}} {
+	}{{config.Planner, "text", nil}, {config.ImageModel, "image", &config.Hero}, {config.ImageModel, "image", &config.Detail}} {
 		input := map[string]any{"mode": role.Cap, "prompt": "商品套图能力校验", "config": ecommerceConfig(role.Selection, role.Out), "referenceImages": []any{map[string]any{"storageKey": "resource:capability-check", "bytes": 1}}}
 		_, resolved, e := h.svc.resolveTaskModelSelection(input, role.Selection.LogicalModelID, "canvas_"+role.Cap, "ecommerce_validate", frontend)
 		if e != nil {
@@ -79,7 +79,7 @@ func (h ecommerceHost) ValidateConfig(userID string, config ecommerce.Config) er
 			return BadAuthRequest("模型尚未配置有效能力")
 		}
 		if role.Cap == "text" && (profile.Text == nil || profile.Text.References.MaxImages < 1) {
-			return BadAuthRequest("策划与标题模型必须支持原图理解")
+			return BadAuthRequest("创作模型必须支持原图理解")
 		}
 		if role.Cap == "image" && (profile.Image == nil || profile.Image.References.MaxImages < 1) {
 			return BadAuthRequest("生图模型必须支持商品参考图")
@@ -92,6 +92,32 @@ func (h ecommerceHost) ValidateConfig(userID string, config ecommerce.Config) er
 		}
 	}
 	return nil
+}
+func (h ecommerceHost) ValidateReviewModel(_ string, selection ecommerce.Selection) error {
+	logical := selection.LogicalModelID != ""
+	channel := selection.ChannelID != "" && selection.ChannelModelKey != ""
+	if logical == channel || (logical && (selection.ChannelID != "" || selection.ChannelModelKey != "")) {
+		return BadAuthRequest("请选择一个质检模型")
+	}
+	frontend, err := h.svc.FeatureEnabled(FeatureFrontendModels)
+	if err != nil {
+		return err
+	}
+	input := map[string]any{"mode": "text", "prompt": "商品成图质检能力校验", "config": ecommerceConfig(selection, nil), "referenceImages": []any{map[string]any{"storageKey": "resource:quality-source", "bytes": 1}, map[string]any{"storageKey": "resource:quality-result", "bytes": 1}}}
+	_, resolved, err := h.svc.resolveTaskModelSelection(input, selection.LogicalModelID, "canvas_text", "ecommerce_quality_validate", frontend)
+	if err != nil {
+		return err
+	}
+	cfg, _ := resolved["config"].(map[string]any)
+	cm, err := h.svc.repo.ChannelModelByKey(stringValue(cfg["channelId"]), stringValue(cfg["model"]))
+	if err != nil {
+		return err
+	}
+	profile, err := DecodeModelCapabilityConfig(cm.CapabilityConfigJSON)
+	if err != nil || profile == nil || profile.Text == nil || profile.Text.References.MaxImages < 2 {
+		return BadAuthRequest("质检模型必须支持同时理解原图与成图（至少两张图片）")
+	}
+	return h.svc.ValidateTaskCapability(resolved)
 }
 func (h ecommerceHost) Prepare(userID string, intent ecommerce.Intent, cap *int64) (*ecommerce.Prepared, error) {
 	if !utf8.ValidString(intent.Prompt) || utf8.RuneCountInString(intent.Prompt) > 16000 {
@@ -107,8 +133,14 @@ func (h ecommerceHost) Prepare(userID string, intent ecommerce.Intent, cap *int6
 	mode := "text"
 	selection := intent.Config.Planner
 	var out *ecommerce.Output
-	if intent.Kind == "title" {
-		selection = intent.Config.TitleModel
+	if intent.Kind == "quality" {
+		selection = intent.ReviewModel
+		if intent.StageID != "" && intent.VersionID == "" {
+			return nil, BadAuthRequest("质检必须关联已经保存的成图版本")
+		}
+		if err := h.ValidateReviewModel(userID, selection); err != nil {
+			return nil, err
+		}
 	}
 	if strings.HasPrefix(intent.Kind, "image:") {
 		mode = "image"
@@ -120,7 +152,25 @@ func (h ecommerceHost) Prepare(userID string, intent ecommerce.Intent, cap *int6
 		}
 	}
 	config := ecommerceConfig(selection, out)
-	input := map[string]any{"mode": mode, "prompt": intent.Prompt, "config": config, "referenceImages": []any{map[string]any{"id": resource.ID, "storageKey": "resource:" + resource.ID, "mimeType": resource.MimeType, "bytes": resource.Size, "width": resource.Width, "height": resource.Height}}}
+	reference := func(r *model.Resource) any {
+		return map[string]any{"id": r.ID, "storageKey": "resource:" + r.ID, "mimeType": r.MimeType, "bytes": r.Size, "width": r.Width, "height": r.Height}
+	}
+	references := []any{reference(resource)}
+	if intent.Kind == "quality" {
+		// Before generation, quote the same two-image input shape using the
+		// source as a placeholder. Admission requires the actual stored result.
+		result := resource
+		if intent.ResultResourceID != "" {
+			result, err = h.svc.repo.ResourceForUser(userID, intent.ResultResourceID)
+			if err != nil || result.Kind != "image" || result.Status != "ready" {
+				return nil, BadAuthRequest("待质检成图不存在或不属于当前账号")
+			}
+		} else if intent.StageID != "" {
+			return nil, BadAuthRequest("质检必须关联已经保存的成图版本")
+		}
+		references = append(references, reference(result))
+	}
+	input := map[string]any{"mode": mode, "prompt": intent.Prompt, "config": config, "referenceImages": references}
 	if mode == "text" {
 		config["maxOutputTokens"] = 8192
 		input["maxOutputTokens"] = 8192
@@ -252,7 +302,7 @@ func (s *Service) EcommerceOptions(actor *model.User) (map[string]any, error) {
 	if e != nil {
 		return nil, e
 	}
-	return map[string]any{"defaults": settings.Defaults, "batchLimit": settings.BatchLimit, "state": state, "catalog": catalog, "presets": presets}, nil
+	return map[string]any{"defaults": settings.Defaults, "reviewAvailable": settings.ReviewAvailable, "batchLimit": settings.BatchLimit, "state": state, "catalog": catalog, "presets": presets}, nil
 }
 func (s *Service) EcommerceSettings(actor *model.User) (ecommerce.Settings, error) {
 	if e := s.RequireAdmin(actor); e != nil {

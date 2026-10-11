@@ -31,7 +31,7 @@ type Output struct {
 type Config struct {
 	Planner                Selection `json:"planner"`
 	ImageModel             Selection `json:"imageModel"`
-	TitleModel             Selection `json:"titleModel"`
+	QualityCheck           bool      `json:"qualityCheck"`
 	Hero                   Output    `json:"hero"`
 	Detail                 Output    `json:"detail"`
 	TitleCount             int       `json:"titleCount"`
@@ -45,13 +45,15 @@ type Config struct {
 	GenerationInstructions string    `json:"generationInstructions,omitempty"`
 }
 type Settings struct {
-	Revision                int64  `json:"revision"`
-	Defaults                Config `json:"defaults"`
-	BatchLimit              int    `json:"batchLimit"`
-	ProductConcurrency      int    `json:"productConcurrency"`
-	TextConcurrency         int    `json:"textConcurrency"`
-	ImageConcurrency        int    `json:"imageConcurrency"`
-	ProductImageConcurrency int    `json:"productImageConcurrency"`
+	ReviewAvailable         bool      `json:"reviewAvailable"`
+	ReviewModel             Selection `json:"reviewModel"`
+	Revision                int64     `json:"revision"`
+	Defaults                Config    `json:"defaults"`
+	BatchLimit              int       `json:"batchLimit"`
+	ProductConcurrency      int       `json:"productConcurrency"`
+	TextConcurrency         int       `json:"textConcurrency"`
+	ImageConcurrency        int       `json:"imageConcurrency"`
+	ProductImageConcurrency int       `json:"productImageConcurrency"`
 }
 
 func DefaultSettings() Settings {
@@ -108,12 +110,13 @@ type Command struct {
 	VersionID          string      `json:"versionId,omitempty"`
 }
 type Price struct {
-	Key                   string `json:"key"`
-	Signature             string `json:"signature"`
-	EstimatedMicrocredits int64  `json:"estimatedMicrocredits"`
-	CapMicrocredits       int64  `json:"capMicrocredits"`
-	Calls                 int    `json:"calls"`
-	Estimated             bool   `json:"estimated"`
+	ReviewModel           *Selection `json:"reviewModel,omitempty"`
+	Key                   string     `json:"key"`
+	Signature             string     `json:"signature"`
+	EstimatedMicrocredits int64      `json:"estimatedMicrocredits"`
+	CapMicrocredits       int64      `json:"capMicrocredits"`
+	Calls                 int        `json:"calls"`
+	Estimated             bool       `json:"estimated"`
 }
 type QuoteView struct {
 	model.EcommerceQuote
@@ -122,9 +125,10 @@ type QuoteView struct {
 }
 type SlotView struct {
 	model.EcommerceSlot
-	Refinement *Refinement                   `json:"refinement,omitempty"`
-	Draft      *Refinement                   `json:"draft,omitempty"`
-	Versions   []model.EcommerceImageVersion `json:"versions"`
+	QualityChecks []QualityCheckView            `json:"qualityChecks"`
+	Refinement    *Refinement                   `json:"refinement,omitempty"`
+	Draft         *Refinement                   `json:"draft,omitempty"`
+	Versions      []model.EcommerceImageVersion `json:"versions"`
 }
 type BranchView struct {
 	model.EcommerceBranch
@@ -181,12 +185,15 @@ type PresetRequest struct {
 	Config Config `json:"config"`
 }
 type Intent struct {
-	Kind       string
-	Config     Config
-	ResourceID string
-	Prompt     string
-	StageID    string
-	Copy       string
+	ReviewModel      Selection
+	ResultResourceID string
+	VersionID        string
+	Kind             string
+	Config           Config
+	ResourceID       string
+	Prompt           string
+	StageID          string
+	Copy             string
 }
 type Prepared struct {
 	Task      *model.Task
@@ -206,6 +213,7 @@ type Host interface {
 	WithStorageLock(func() error) error
 	Require(*repository.Repository, string) error
 	ValidateConfig(string, Config) error
+	ValidateReviewModel(string, Selection) error
 	Prepare(string, Intent, *int64) (*Prepared, error)
 	Admit(*repository.Repository, *Prepared) error
 	StorageQuota(*repository.Repository, string, int64) error

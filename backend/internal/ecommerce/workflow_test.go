@@ -24,11 +24,12 @@ import (
 // The fake supplies model responses only. Admission and settlement use the real
 // task, credit-account, billing-order, transaction and orchestration code.
 type workflowHost struct {
-	db            *gorm.DB
-	repo          *repository.Repository
-	mu            sync.Mutex
-	signature     string
-	failAdmission bool
+	db              *gorm.DB
+	repo            *repository.Repository
+	mu              sync.Mutex
+	signature       string
+	failAdmission   bool
+	qualityResponse string
 }
 
 func (h *workflowHost) WithStorageLock(fn func() error) error {
@@ -47,6 +48,12 @@ func (h *workflowHost) Require(repo *repository.Repository, user string) error {
 	return nil
 }
 func (h *workflowHost) ValidateConfig(_ string, config Config) error { return ValidateConfig(config) }
+func (h *workflowHost) ValidateReviewModel(_ string, selection Selection) error {
+	if selection.ChannelID == "" || selection.ChannelModelKey == "" {
+		return invalid("review model required")
+	}
+	return nil
+}
 func (h *workflowHost) Prepare(user string, intent Intent, cap *int64) (*Prepared, error) {
 	amount, taskType := int64(1000), "canvas_text"
 	if strings.HasPrefix(intent.Kind, "image:") {
@@ -157,7 +164,6 @@ func workflowOnDB(t *testing.T, db *gorm.DB) *workflowFixture {
 	}
 	config := DefaultSettings().Defaults
 	config.Planner = Selection{ChannelID: "vision", ChannelModelKey: "vision-model"}
-	config.TitleModel = config.Planner
 	config.ImageModel = Selection{ChannelID: "image", ChannelModelKey: "image-model"}
 	host := &workflowHost{db: db, repo: repo, signature: "price-v1"}
 	svc := New(repo, host, "worker-one")
@@ -249,6 +255,11 @@ func (f *workflowFixture) complete(t *testing.T, settle bool) {
 			t.Fatal(err)
 		}
 		switch step.Kind {
+		case "quality":
+			result.Text = encode(QualityReport{Verdict: "pass", Summary: "商品一致，未发现明显问题", Issues: []QualityIssue{}})
+			if f.host.qualityResponse != "" {
+				result.Text = f.host.qualityResponse
+			}
 		case "title":
 			result.Text = encode(map[string]any{"titles": []string{"手柄杯", "日常杯", "简洁杯"}})
 		case "plan":

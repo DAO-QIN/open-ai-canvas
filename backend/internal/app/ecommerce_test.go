@@ -41,7 +41,6 @@ func ecommerceTestServiceOnDB(t *testing.T, db *gorm.DB) (*Service, *gorm.DB, *m
 	image.Image.Size.Default = "1024x1024"
 	config := ecommerce.DefaultSettings().Defaults
 	config.Planner = ecommerce.Selection{ChannelID: "commerce-channel", ChannelModelKey: "vision-test"}
-	config.TitleModel = config.Planner
 	config.ImageModel = ecommerce.Selection{ChannelID: "commerce-channel", ChannelModelKey: "image-test"}
 	for _, item := range []any{user, &model.ModelChannel{ID: "commerce-channel", Scope: model.ChannelScopeSystem, Enabled: true, Name: "commerce-test"}, &model.ChannelModel{ID: "commerce-vision", ChannelID: "commerce-channel", ModelKey: "vision-test", Capability: "text", Protocol: model.ChannelInterfaceChatCompletion, CapabilityConfigJSON: mustEncodeModelCapabilityConfig(t, vision), BillingMode: "fixed_request", UnitPriceMicrocredits: 100, PriceConfigured: true, Enabled: true}, &model.ChannelModel{ID: "commerce-image", ChannelID: "commerce-channel", ModelKey: "image-test", Capability: "image", Protocol: model.ChannelInterfaceOpenAIImage, CapabilityConfigJSON: mustEncodeModelCapabilityConfig(t, image), BillingMode: "fixed_request", UnitPriceMicrocredits: 200, PriceConfigured: true, Enabled: true}, &model.ChannelModelPriceTier{ID: "commerce-text-tier", ChannelModelID: "commerce-vision", SelectorKey: "{}", SelectorJSON: "{}", BillingMode: "fixed_request", UnitPriceMicrocredits: 100, PriceConfigured: true, Enabled: true}, &model.ChannelModelPriceTier{ID: "commerce-image-tier", ChannelModelID: "commerce-image", SelectorKey: "{}", SelectorJSON: "{}", BillingMode: "fixed_request", UnitPriceMicrocredits: 200, PriceConfigured: true, Enabled: true}, &model.CreditAccount{UserID: user.ID, AvailableMicrocredits: 10000}, &model.Resource{ID: "commerce-source", UserID: user.ID, Kind: "image", Status: "ready", MimeType: "image/png", Size: 100}, &model.SystemSetting{Key: "feature_availability", ValueJSON: "{\"frontendModelsEnabled\":true,\"creditsEnabled\":true,\"pluginCenterEnabled\":true}"}} {
 		if err = db.Create(item).Error; err != nil {
@@ -53,6 +52,56 @@ func ecommerceTestServiceOnDB(t *testing.T, db *gorm.DB) (*Service, *gorm.DB, *m
 func TestEcommerceHostAdmissionReusesBillingAndKeepsProjectIDEmpty(t *testing.T) {
 	s, db, user, config := ecommerceTestService(t)
 	assertEcommerceHostAdmission(t, s, db, user, config)
+}
+func TestEcommerceQualityHostTwoImagesAndOwnership(t *testing.T) {
+	s, db, user, config := ecommerceTestService(t)
+	host := ecommerceHost{svc: s}
+	if err := host.ValidateReviewModel(user.ID, config.Planner); err != nil {
+		t.Fatal(err)
+	}
+	for _, resource := range []*model.Resource{
+		{ID: "commerce-result", UserID: user.ID, Kind: "image", Status: "ready", MimeType: "image/png", Size: 120},
+		{ID: "foreign-result", UserID: "other", Kind: "image", Status: "ready", MimeType: "image/png", Size: 120},
+	} {
+		if err := db.Create(resource).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	intent := ecommerce.Intent{Kind: "quality", Config: config, ReviewModel: config.Planner, ResourceID: "commerce-source", ResultResourceID: "commerce-result", VersionID: "version-one", StageID: "quality-step", Prompt: "检查原图与成图"}
+	prepared, err := host.Prepare(user.ID, intent, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var input map[string]any
+	if err := json.Unmarshal([]byte(prepared.Task.InputJSON), &input); err != nil {
+		t.Fatal(err)
+	}
+	refs, ok := input["referenceImages"].([]any)
+	if !ok || len(refs) != 2 || prepared.Task.ProjectID != "" || prepared.Task.Operation != "ecommerce_quality" || prepared.Task.Type != "canvas_text" {
+		t.Fatal("quality did not use the host two-image text task contract")
+	}
+	if stringValue(refs[0].(map[string]any)["storageKey"]) != "resource:commerce-source" || stringValue(refs[1].(map[string]any)["storageKey"]) != "resource:commerce-result" {
+		t.Fatal("review source/result order changed")
+	}
+	intent.ResultResourceID = "foreign-result"
+	if _, err := host.Prepare(user.ID, intent, nil); err == nil {
+		t.Fatal("cross-user review resource accepted")
+	}
+	cm, err := s.repo.ChannelModelByKey(config.Planner.ChannelID, config.Planner.ChannelModelKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := DecodeModelCapabilityConfig(cm.CapabilityConfigJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile.Text.References.MaxImages = 1
+	if err := db.Model(cm).Update("capability_config_json", mustEncodeModelCapabilityConfig(t, profile)).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := host.ValidateReviewModel(user.ID, config.Planner); err == nil {
+		t.Fatal("one-image model accepted as reviewer")
+	}
 }
 func TestEcommerceHostAdmissionWithPluginCenterClosed(t *testing.T) {
 	s, db, user, config := ecommerceTestService(t)

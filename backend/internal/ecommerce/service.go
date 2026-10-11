@@ -27,7 +27,7 @@ func (s *Service) Settings() (Settings, error) {
 	return value, nil
 }
 func ValidateConfig(config Config) error {
-	for _, choice := range []Selection{config.Planner, config.TitleModel, config.ImageModel} {
+	for _, choice := range []Selection{config.Planner, config.ImageModel} {
 		logical := choice.LogicalModelID != ""
 		channel := choice.ChannelID != "" && choice.ChannelModelKey != ""
 		if logical == channel || (logical && (choice.ChannelID != "" || choice.ChannelModelKey != "")) {
@@ -66,6 +66,14 @@ func (s *Service) SaveSettings(actor *model.User, settings Settings) (Settings, 
 	}
 	if err := s.host.ValidateConfig(actor.ID, settings.Defaults); err != nil {
 		return Settings{}, err
+	}
+	if settings.Defaults.QualityCheck && !settings.ReviewAvailable {
+		return Settings{}, invalid("默认开启智能质检前，请先开放质检能力")
+	}
+	if settings.ReviewAvailable {
+		if err := s.host.ValidateReviewModel(actor.ID, settings.ReviewModel); err != nil {
+			return Settings{}, err
+		}
 	}
 	err := s.repo.MutateEcommerceSettings(func(current *model.SystemSetting, repo *repository.Repository) error {
 		before := DefaultSettings()
@@ -286,8 +294,12 @@ func (s *Service) Run(userID, productID, runID string) (*RunView, error) {
 	if err != nil {
 		return nil, err
 	}
+	v.Steps, err = s.repo.EcommerceSteps(userID, run.ID)
+	if err != nil {
+		return nil, err
+	}
 	for _, slot := range slots {
-		out := SlotView{EcommerceSlot: slot, Versions: []model.EcommerceImageVersion{}}
+		out := SlotView{EcommerceSlot: slot, Versions: []model.EcommerceImageVersion{}, QualityChecks: []QualityCheckView{}}
 		if slot.RefinementJSON != "" {
 			if err = json.Unmarshal([]byte(slot.RefinementJSON), &out.Refinement); err != nil {
 				return nil, err
@@ -303,6 +315,7 @@ func (s *Service) Run(userID, productID, runID string) (*RunView, error) {
 				out.Versions = append(out.Versions, version)
 			}
 		}
+		out.QualityChecks = qualityCheckViews(v.Steps, out.Versions)
 		v.Slots = append(v.Slots, out)
 	}
 	v.Steps, err = s.repo.EcommerceSteps(userID, run.ID)

@@ -3,7 +3,7 @@ import type { ModelCatalogResponse } from "./logical-models";
 import type { PluginState } from "./plugins";
 import type { EcommerceSettings, Product, ProductBatch, ProductBatchResult, ProductCommand, ProductConfig, ProductPage, ProductPreset, ProductQuote, ProductRun, QuoteScope } from "@/lib/ecommerce/contracts";
 
-export type EcommerceOptions = { defaults: ProductConfig; batchLimit: number; state: PluginState; catalog: ModelCatalogResponse; presets: ProductPreset[] };
+export type EcommerceOptions = { defaults: ProductConfig; reviewAvailable: boolean; batchLimit: number; state: PluginState; catalog: ModelCatalogResponse; presets: ProductPreset[] };
 export const fetchEcommerceOptions = (signal?: AbortSignal) => http.get<EcommerceOptions>("/ecommerce/options", { signal });
 export async function setProductImagesEnabled(enabled: boolean) {
     const result = await http.put<{ state: PluginState }>("/ecommerce/activation", { enabled });

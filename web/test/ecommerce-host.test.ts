@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createOfficialApplicationHostServices, officialApplicationRoute } from "@/services/plugin-applications";
 import { modelChoices, selectedModelKey } from "@/lib/ecommerce/models";
-import { currentVersion, type ProductSlot } from "@/lib/ecommerce/contracts";
+import { currentVersion, versionQualityCheck, type ProductSlot } from "@/lib/ecommerce/contracts";
 import type { PluginManifest } from "@/lib/plugins/plugin-types";
 import type { ModelCatalogResponse } from "@/services/api/logical-models";
 
@@ -57,5 +57,18 @@ describe("product model and version choices", () => {
         expect(currentVersion(slot)?.resourceId).toBe("old-resource");
         expect(slot.versions).toHaveLength(2);
         expect(currentVersion({ ...slot, selectedVersionId: "missing" })).toBeUndefined();
+    });
+    test("quality verdict follows the selected version and ignores superseded checks", () => {
+        const slot = {
+            selectedVersionId: "old",
+            qualityChecks: [
+                { stepId: "old-failed", versionId: "old", status: "superseded" },
+                { stepId: "new-check", versionId: "new", status: "succeeded", report: { verdict: "pass", summary: "正常", issues: [] } },
+                { stepId: "old-check", versionId: "old", status: "succeeded", report: { verdict: "attention", summary: "文字错误", issues: [] } },
+            ],
+        } as unknown as ProductSlot;
+        expect(versionQualityCheck(slot, slot.selectedVersionId)?.report?.verdict).toBe("attention");
+        expect(versionQualityCheck(slot, "new")?.report?.verdict).toBe("pass");
+        expect(versionQualityCheck(slot, "missing")).toBeUndefined();
     });
 });

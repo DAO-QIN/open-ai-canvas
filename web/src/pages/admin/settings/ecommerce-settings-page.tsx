@@ -124,12 +124,11 @@ export default function EcommerceSettingsPage() {
                                 <AdminSwitch size="sm" aria-label="商品套图平台开放" checked={state?.platformAvailable ?? false} loading={busy} disabled={dirty || busy} onChange={(enabled) => void toggle(enabled)} />
                             </div>
                         </SettingsSectionCard>
-                        <SettingsSectionCard title="默认模型与交付" description="策划、标题模型必须理解原图；生图模型必须支持参考图。保存时由服务端校验能力、规格及价格。">
+                        <SettingsSectionCard title="默认模型与交付" description="创作模型统一负责策划、细化与标题，必须理解原图；生图模型必须支持参考图。保存时由服务端校验能力、规格及价格。">
                             <div className="grid gap-4 p-4 md:grid-cols-2">
                                 {(
                                     [
-                                        ["planner", "策划与细化模型", texts],
-                                        ["titleModel", "标题模型", texts],
+                                        ["planner", "创作模型", texts],
                                         ["imageModel", "生图模型", images],
                                     ] as const
                                 ).map(([field, label, choices]) => (
@@ -217,6 +216,38 @@ export default function EcommerceSettingsPage() {
                                         <Input aria-label={label} disabled={busy} value={value.defaults[field]} maxLength={1200} onChange={(event) => setDefault(field, event.target.value)} />
                                     </label>
                                 ))}
+                            </div>
+                        </SettingsSectionCard>
+                        <SettingsSectionCard title="智能质检" description="生成后对照原图与成图检查。模型只在后台配置，用户自主选择是否质检；费用计入生成阶段报价，不自动重生成。">
+                            <div className="space-y-4 p-4">
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="text-sm">开放智能质检</span>
+                                    <AdminSwitch
+                                        aria-label="开放智能质检"
+                                        checked={value.reviewAvailable ?? false}
+                                        disabled={busy}
+                                        onChange={(enabled) => setDraft({ ...value, reviewAvailable: enabled, defaults: { ...value.defaults, qualityCheck: enabled && Boolean(value.defaults.qualityCheck) } })}
+                                    />
+                                </div>
+                                <label className="block space-y-2 text-sm">
+                                    质检模型
+                                    <AdminSelect
+                                        className="w-full"
+                                        ariaLabel="质检模型"
+                                        disabled={busy}
+                                        value={selectedModelKey(value.reviewModel ?? {})}
+                                        options={texts.map(({ value, label }) => ({ value, label }))}
+                                        onChange={(id) => {
+                                            const choice = texts.find((item) => item.value === id);
+                                            if (choice) setDraft({ ...value, reviewModel: choice.selection });
+                                        }}
+                                    />
+                                </label>
+                                <p className="text-xs text-[var(--admin-text-secondary)]">至少支持同时理解两张图片。保存时校验能力；每次授权固定模型与价格。</p>
+                                <div className="flex items-center justify-between gap-4">
+                                    <span className="text-sm">新商品默认开启质检</span>
+                                    <AdminSwitch aria-label="新商品默认开启质检" checked={Boolean(value.defaults.qualityCheck)} disabled={busy || !value.reviewAvailable} onChange={(enabled) => setDefault("qualityCheck", enabled)} />
+                                </div>
                             </div>
                         </SettingsSectionCard>
                         <SettingsSectionCard title="批次与并发" description="这些是商品模块上限，实际执行仍受平台账号活动任务与 Worker、渠道并发限制。等待异步结果的任务持续占用容量。">

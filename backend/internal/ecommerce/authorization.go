@@ -46,6 +46,9 @@ func addImageSteps(run *model.EcommerceRun, slot model.EcommerceSlot, refine boo
 		steps = append(steps, newStep(run, "refine", slot.Kind, slot.ID, slot.Generation))
 	}
 	steps = append(steps, newStep(run, "image", slot.Kind, slot.ID, slot.Generation))
+	if config, err := runConfig(run); err == nil && config.QualityCheck {
+		steps = append(steps, newStep(run, "quality", slot.Kind, slot.ID, slot.Generation))
+	}
 	return steps
 }
 func (s *Service) newRun(repo *repository.Repository, p *model.EcommerceProduct, config Config, action string) (*model.EcommerceRun, []model.EcommerceStep, error) {
@@ -100,6 +103,9 @@ func prospectiveKeys(config Config, scope Scope) (map[string]int, error) {
 			keys["refine"] = config.Hero.Count + config.Detail.Count
 			keys["image:hero"] = config.Hero.Count
 			keys["image:detail"] = config.Detail.Count
+			if config.QualityCheck {
+				keys["quality"] = config.Hero.Count + config.Detail.Count
+			}
 		}
 		return keys, nil
 	}
@@ -135,7 +141,7 @@ func (s *Service) quotedSteps(repo *repository.Repository, p *model.EcommercePro
 			}
 		}
 		for _, step := range steps {
-			if step.TaskID == nil && step.Status == "pending" && (step.Kind == "refine" || step.Kind == "image") && slices.Contains(scope.Branches, step.BranchKind) {
+			if step.TaskID == nil && step.Status == "pending" && (step.Kind == "refine" || step.Kind == "image" || step.Kind == "quality") && slices.Contains(scope.Branches, step.BranchKind) {
 				out = append(out, step)
 			}
 		}
@@ -246,8 +252,20 @@ func (s *Service) quotedSteps(repo *repository.Repository, p *model.EcommercePro
 				}
 				retry := newStep(run, step.Kind, step.BranchKind, step.SlotID, generation)
 				out = append(out, retry)
+				if retry.Kind == "quality" {
+					out[len(out)-1].StageKey = "quality:retry:" + step.ID
+					out[len(out)-1].RequestJSON = step.RequestJSON
+				}
 				if retry.Kind == "refine" {
-					out = append(out, newStep(run, "image", retry.BranchKind, retry.SlotID, generation))
+					out = append(out, addImageSteps(run, model.EcommerceSlot{ID: retry.SlotID, Kind: retry.BranchKind, Generation: generation}, false)...)
+				} else if retry.Kind == "image" {
+					config, e := runConfig(run)
+					if e != nil {
+						return nil, e
+					}
+					if config.QualityCheck {
+						out = append(out, newStep(run, "quality", retry.BranchKind, retry.SlotID, generation))
+					}
 				}
 			}
 		}
@@ -321,9 +339,17 @@ func (s *Service) Quote(userID, productID string, req QuoteRequest) (*QuoteView,
 				}
 			}
 			prices := []Price{}
+			var reviewModel Selection
+			if (config.QualityCheck && isNewRun(req.Action)) || keys["quality"] > 0 {
+				var e error
+				reviewModel, e = s.reviewSelection(userID)
+				if e != nil {
+					return e
+				}
+			}
 			estimated, budget := int64(0), int64(0)
 			textCalls, imageCalls := 0, 0
-			for _, key := range []string{"plan:hero", "plan:detail", "title", "refine", "image:hero", "image:detail"} {
+			for _, key := range []string{"plan:hero", "plan:detail", "title", "refine", "image:hero", "image:detail", "quality"} {
 				calls := keys[key]
 				if calls == 0 {
 					continue
@@ -336,19 +362,22 @@ func (s *Service) Quote(userID, productID string, req QuoteRequest) (*QuoteView,
 				if key == "refine" {
 					prompt = "根据已确认商品方案逐图细化；" + encode(productSnapshot(p))
 				}
+				if key == "quality" {
+					prompt = "对照原商品图与生成图，检查商品一致性、文案、真实性与已确认方案；" + encode(productSnapshot(p))
+				}
 				if strings.HasPrefix(key, "image:") {
 					prompt = "根据商品原图和已经确认的方案生成单张商品图片。"
 					imageCalls += calls
 				} else {
 					textCalls += calls
 				}
-				prepared, e := s.host.Prepare(userID, Intent{Kind: kind, Config: config, ResourceID: p.SourceResourceID, Prompt: prompt}, nil)
+				prepared, e := s.host.Prepare(userID, Intent{Kind: kind, Config: config, ResourceID: p.SourceResourceID, Prompt: prompt, ReviewModel: reviewModel}, nil)
 				if e != nil {
 					return e
 				}
 				capAmount := prepared.Amount
 				if prepared.Estimated {
-					upper, e := s.host.Prepare(userID, Intent{Kind: kind, Config: config, ResourceID: p.SourceResourceID, Prompt: strings.Repeat("商", 16000)}, nil)
+					upper, e := s.host.Prepare(userID, Intent{Kind: kind, Config: config, ResourceID: p.SourceResourceID, Prompt: strings.Repeat("商", 16000), ReviewModel: reviewModel}, nil)
 					if e != nil {
 						return e
 					}
@@ -358,6 +387,10 @@ func (s *Service) Quote(userID, productID string, req QuoteRequest) (*QuoteView,
 					return invalid("报价超出支持范围")
 				}
 				prices = append(prices, Price{Key: key, Signature: prepared.Signature, EstimatedMicrocredits: prepared.Amount, CapMicrocredits: capAmount, Calls: calls, Estimated: prepared.Estimated})
+				if key == "quality" {
+					selected := reviewModel
+					prices[len(prices)-1].ReviewModel = &selected
+				}
 				estimated += prepared.Amount * int64(calls)
 				budget += capAmount * int64(calls)
 			}
@@ -513,6 +546,18 @@ func (s *Service) Command(userID, productID string, req Command) (*ProductView, 
 						}
 					}
 					if req.Action == "redo-image" {
+						previous, e := repo.EcommerceSteps(userID, run.ID)
+						if e != nil {
+							return e
+						}
+						for _, old := range previous {
+							if old.SlotID == scope.SlotID && old.TaskID == nil && old.Status == "pending" {
+								old.Status = "superseded"
+								if e := repo.SaveEcommerceStep(&old); e != nil {
+									return e
+								}
+							}
+						}
 						slots, e := repo.EcommerceSlots(userID, run.ID)
 						if e != nil {
 							return e
@@ -782,6 +827,9 @@ func (s *Service) applyConfig(repo *repository.Repository, p *model.EcommercePro
 	if old.Hero.Count != config.Hero.Count || old.Detail.Count != config.Detail.Count {
 		return invalid("追加图片请使用补充策划；减少数量请新建轮次")
 	}
+	if old.QualityCheck != config.QualityCheck {
+		return invalid("智能质检设置仅影响新轮次；请在整套重做前调整")
+	}
 	if old.Style != config.Style || old.Language != config.Language || old.Platform != config.Platform || old.Market != config.Market || old.Hero.CopyMode != config.Hero.CopyMode || old.Detail.CopyMode != config.Detail.CopyMode || old.PlanningInstructions != config.PlanningInstructions || old.RefinementInstructions != config.RefinementInstructions || old.GenerationInstructions != config.GenerationInstructions {
 		return invalid("已经确认的视觉规则需通过新轮次重新策划；此操作只调整未派发步骤的模型和规格")
 	}
@@ -793,7 +841,9 @@ func (s *Service) applyConfig(repo *repository.Repository, p *model.EcommercePro
 		if step.TaskID != nil {
 			continue
 		}
-		step.RequestJSON = ""
+		if step.Kind != "quality" {
+			step.RequestJSON = ""
+		}
 		if e := repo.SaveEcommerceStep(&step); e != nil {
 			return e
 		}

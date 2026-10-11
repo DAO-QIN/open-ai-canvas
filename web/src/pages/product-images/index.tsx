@@ -21,6 +21,7 @@ import { completedImages, credits, currentVersion, productStatus, ECOMMERCE_PLUG
 import { usePluginStore } from "@/stores/use-plugin-store";
 import { useProduct, useProductOptions, useProducts, useProductRun } from "./use-products";
 import { ProductSettings } from "./product-settings";
+import { ProductQualityResult } from "./quality-result";
 import { ProductQuoteModal, type QuotedProduct } from "./quote-modal";
 import { ImageDrawer, PlanDrawer, useUnsavedDraft } from "./product-drawers";
 
@@ -488,6 +489,7 @@ function ProductImport({ options, disabled, onImported, onDisable }: { options: 
             <ProductSettings
                 value={config}
                 catalog={options.catalog}
+                reviewAvailable={options.reviewAvailable}
                 disabled={disabled || submitting}
                 onChange={(next) => {
                     setConfig(next);
@@ -801,6 +803,7 @@ function ProductDetail({
                                             <Button size="small" disabled={!item.refinement && !item.versions.length} onClick={() => setSlot(item)}>
                                                 调整与版本
                                             </Button>
+                                            <ProductQualityResult slot={item} versionId={item.selectedVersionId} />
                                         </div>
                                     </article>
                                 ))}
@@ -815,7 +818,7 @@ function ProductDetail({
                             <p className="min-w-0 flex-1 text-sm text-foreground/60">{step.error || productStatus(step.status)}</p>
                             {step.status === "failed" ? (
                                 <Button disabled={!canCreate || busy} onClick={() => onQuote({ action: "retry-step", stepId: step.id })}>
-                                    重新报价并重试
+                                    {step.kind === "quality" ? "重新报价并检查" : "重新报价并重试"}
                                 </Button>
                             ) : step.taskId ? (
                                 <Button
@@ -1005,7 +1008,7 @@ function ProductInfo({ product, options, onClose, onSaved, onApply }: { product:
                     真实卖点
                     <Input.TextArea aria-label="商品真实卖点" maxLength={8000} autoSize={{ minRows: 3, maxRows: 8 }} value={points} onChange={(e) => setPoints(e.target.value)} />
                 </label>
-                <ProductSettings value={config} catalog={options.catalog} onChange={setConfig} disabled={busy} />
+                <ProductSettings value={config} catalog={options.catalog} reviewAvailable={options.reviewAvailable} onChange={setConfig} disabled={busy} />
             </div>
         </AppDrawer>
     );

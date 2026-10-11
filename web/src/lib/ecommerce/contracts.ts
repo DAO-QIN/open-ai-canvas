@@ -5,7 +5,7 @@ export type ProductOutput = { count: number; size: string; quality?: string; cop
 export type ProductConfig = {
     planner: ModelSelection;
     imageModel: ModelSelection;
-    titleModel: ModelSelection;
+    qualityCheck?: boolean;
     hero: ProductOutput;
     detail: ProductOutput;
     titleCount: number;
@@ -18,7 +18,19 @@ export type ProductConfig = {
     refinementInstructions?: string;
     generationInstructions?: string;
 };
-export type EcommerceSettings = { revision: number; defaults: ProductConfig; batchLimit: number; productConcurrency: number; textConcurrency: number; imageConcurrency: number; productImageConcurrency: number };
+export type EcommerceSettings = {
+    revision: number;
+    defaults: ProductConfig;
+    reviewAvailable: boolean;
+    reviewModel: ModelSelection;
+    batchLimit: number;
+    productConcurrency: number;
+    textConcurrency: number;
+    imageConcurrency: number;
+    productImageConcurrency: number;
+};
+export type ProductQualityReport = { verdict: "pass" | "attention" | "undetermined"; summary: string; issues: { category: "product" | "text" | "claims" | "plan" | "uncertainty"; evidence: string; suggestion: string }[] };
+export type ProductQualityCheck = { stepId: string; versionId: string; status: string; report?: ProductQualityReport };
 export type ProductAnalysis = { identity: string; visibleFeatures: string[]; confirmedSellingPoints: string[]; unknowns: string[] };
 export type ProductDesign = { evidence: string; viewpoint: string; framing: string; pose: string; layout: string; focus: string; crop: string; textBlocks: { role: string; text: string; placement: string }[] };
 export type ProductScreen = { slotId: string; kind: "hero" | "detail"; title: string; copy: string; brief: string; design: ProductDesign };
@@ -39,6 +51,7 @@ export type ProductSlot = {
     refinement?: ProductRefinement;
     draft?: ProductRefinement;
     versions: ProductImageVersion[];
+    qualityChecks?: ProductQualityCheck[];
 };
 export type ProductBranch = {
     id: string;
@@ -140,6 +153,7 @@ export function productStatus(status?: string) {
                 queued: "排队中",
                 planning: "策划中",
                 generating: "生成中",
+                checking: "智能质检中",
                 settling: "结算中",
                 review: "待确认方案",
                 completed: "已完成",
@@ -166,6 +180,9 @@ export function completedImages(product: Product) {
 }
 export function currentVersion(slot: ProductSlot) {
     return slot.versions.find((version) => version.id === slot.selectedVersionId);
+}
+export function versionQualityCheck(slot: ProductSlot, versionId?: string) {
+    return slot.qualityChecks?.find((check) => check.versionId === versionId && check.status !== "superseded");
 }
 export function shouldPoll(status?: string) {
     return Boolean(status && !["completed", "completed_with_warnings", "archived"].includes(status));

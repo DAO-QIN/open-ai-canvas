@@ -94,6 +94,9 @@ func (s *Service) advance(claimed model.EcommerceRun) error {
 						step.Status = "failed"
 						step.ErrorCode = "invalid_result"
 						step.Error = "结果未通过结构校验，已保留原始响应；请调整后明确重试"
+						if step.Kind == "quality" {
+							step.Error = "智能质检未完成，成图与原始响应已保留；重新检查前请确认费用"
+						}
 						if step.RawResponse == "" {
 							step.RawResponse = completion.Text
 						}
@@ -120,6 +123,9 @@ func (s *Service) advance(claimed model.EcommerceRun) error {
 						step.Status = "failed"
 						step.ErrorCode = "model_failed"
 						step.Error = "模型任务已失败，成品已保留；重试前需要重新确认费用"
+						if step.Kind == "quality" {
+							step.Error = "智能质检任务失败，成图已保留；可重新确认费用后只重试检查"
+						}
 					}
 					if e := s.markFailedOutput(repo, p, run, *step); e != nil {
 						return e
@@ -317,6 +323,12 @@ func (s *Service) admitStepTransaction(repo *repository.Repository, p *model.Eco
 	if price == nil {
 		return blocked("ecommerce_scope", "该步骤没有获批报价")
 	}
+	if step.Kind == "quality" {
+		if price.ReviewModel == nil {
+			return blocked("ecommerce_scope", "质检模型未获授权，请重新报价")
+		}
+		intent.ReviewModel = *price.ReviewModel
+	}
 	intent.StageID = step.ID
 	prepared, e := s.host.Prepare(p.UserID, intent, &price.CapMicrocredits)
 	if e != nil {
@@ -355,7 +367,7 @@ func (s *Service) admitStepTransaction(repo *repository.Repository, p *model.Eco
 	if e := repo.SaveEcommerceStep(step); e != nil {
 		return e
 	}
-	if step.SlotID != "" {
+	if step.SlotID != "" && step.Kind != "quality" {
 		slots, e := repo.EcommerceSlots(p.UserID, run.ID)
 		if e != nil {
 			return e
@@ -383,6 +395,50 @@ func (s *Service) stepIntent(repo *repository.Repository, p *model.EcommerceProd
 		return Intent{}, false, e
 	}
 	intent := Intent{Kind: priceKey(step), Config: config, ResourceID: p.SourceResourceID}
+	if step.Kind == "quality" {
+		if step.RequestJSON != "" {
+			if e := json.Unmarshal([]byte(step.RequestJSON), &intent); e != nil {
+				return intent, false, e
+			}
+			if intent.VersionID == "" || intent.ResultResourceID == "" {
+				return intent, false, invalid("原质检目标缺失")
+			}
+			return intent, true, nil
+		}
+		branch, e := findBranch(repo, p.UserID, run.ID, step.BranchKind)
+		if e != nil {
+			return intent, false, e
+		}
+		if branch.AcceptedPlanJSON == "" {
+			return intent, false, nil
+		}
+		var plan Plan
+		if e := json.Unmarshal([]byte(branch.AcceptedPlanJSON), &plan); e != nil {
+			return intent, false, e
+		}
+		versions, e := repo.EcommerceVersions(p.UserID, run.ID)
+		if e != nil {
+			return intent, false, e
+		}
+		slots, e := repo.EcommerceSlots(p.UserID, run.ID)
+		if e != nil {
+			return intent, false, e
+		}
+		for _, version := range versions {
+			if version.SlotID != step.SlotID || version.Number != step.Generation {
+				continue
+			}
+			for _, slot := range slots {
+				if slot.ID == step.SlotID {
+					intent.VersionID = version.ID
+					intent.ResultResourceID = version.ResourceID
+					intent.Prompt = QualityPrompt(product, config, plan, slot, version)
+					return intent, true, nil
+				}
+			}
+		}
+		return intent, false, nil
+	}
 	if step.Kind == "title" {
 		intent.Prompt = TitlePrompt(product, config)
 		return intent, true, nil
@@ -464,6 +520,22 @@ func (s *Service) acceptResult(repo *repository.Repository, p *model.EcommercePr
 	config = submitted.Config
 	step.RawResponse = result.Text
 	switch step.Kind {
+	case "quality":
+		report, e := CompileQuality(result.Text)
+		if e != nil {
+			return e
+		}
+		versions, e := repo.EcommerceVersions(p.UserID, run.ID)
+		if e != nil {
+			return e
+		}
+		for _, version := range versions {
+			if version.ID == submitted.VersionID && version.ResourceID == submitted.ResultResourceID && version.SlotID == step.SlotID {
+				step.ResultJSON = encode(qualityResult{VersionID: version.ID, Report: *report})
+				return nil
+			}
+		}
+		return invalid("质检图片版本关联无效")
 	case "title":
 		titles, e := CompileTitles(result.Text, config)
 		if e != nil {
@@ -590,6 +662,20 @@ func (s *Service) acceptResult(repo *repository.Repository, p *model.EcommercePr
 	return nil
 }
 func (s *Service) markFailedOutput(repo *repository.Repository, p *model.EcommerceProduct, run *model.EcommerceRun, step model.EcommerceStep) error {
+	if step.Kind == "image" && step.Status == "failed" {
+		steps, e := repo.EcommerceSteps(p.UserID, run.ID)
+		if e != nil {
+			return e
+		}
+		for _, dependent := range steps {
+			if dependent.Kind == "quality" && dependent.SlotID == step.SlotID && dependent.Generation == step.Generation && dependent.TaskID == nil {
+				dependent.Status = "superseded"
+				if e := repo.SaveEcommerceStep(&dependent); e != nil {
+					return e
+				}
+			}
+		}
+	}
 	if step.Kind == "plan" {
 		b, e := findBranch(repo, p.UserID, run.ID, step.BranchKind)
 		if e != nil {
@@ -627,10 +713,14 @@ func (s *Service) deriveStatus(repo *repository.Repository, p *model.EcommercePr
 		return "", e
 	}
 	active, failed, uncertain, pending, settling := false, false, false, false, false
+	qualityOnly := true
 	for _, step := range steps {
 		switch step.Status {
 		case "submitted":
 			active = true
+			if step.Kind != "quality" {
+				qualityOnly = false
+			}
 		case "uncertain":
 			uncertain = true
 		case "failed":
@@ -643,6 +733,9 @@ func (s *Service) deriveStatus(repo *repository.Repository, p *model.EcommercePr
 		}
 	}
 	if active {
+		if qualityOnly {
+			return "checking", nil
+		}
 		return "generating", nil
 	}
 	if uncertain {
@@ -662,7 +755,18 @@ func (s *Service) deriveStatus(repo *repository.Repository, p *model.EcommercePr
 		}
 	}
 	if allImages {
-		if failed {
+		versions, e := repo.EcommerceVersions(p.UserID, run.ID)
+		if e != nil {
+			return "", e
+		}
+		for _, check := range qualityCheckViews(steps, versions) {
+			for _, slot := range slots {
+				if check.VersionID == slot.SelectedVersionID && check.Report != nil && check.Report.Verdict != "pass" {
+					failed = true
+				}
+			}
+		}
+		if failed && !pending {
 			return "completed_with_warnings", nil
 		}
 		if !pending {

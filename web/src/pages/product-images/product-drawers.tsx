@@ -4,6 +4,7 @@ import { useBlocker } from "react-router";
 import { AppDrawer } from "@/components/ui/product/app-drawer";
 import { CachedResourceImage } from "@/components/cached-resource-image";
 import { Select } from "@/components/ui/base/select";
+import { ProductQualityResult } from "./quality-result";
 import { currentVersion, type ProductBranch, type ProductCommand, type ProductPlan, type ProductRefinement, type ProductSlot } from "@/lib/ecommerce/contracts";
 
 export function useUnsavedDraft(dirty: boolean) {
@@ -266,6 +267,11 @@ export function ImageDrawer({
                                 {index ? "对比版本" : "当前版本"}
                                 {version ? " · " + version.number : ""}
                             </p>
+                            {version && (
+                                <div className="px-3 pb-3">
+                                    <ProductQualityResult slot={slot} versionId={version.id} detailed />
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
