@@ -36,6 +36,7 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
             ...(features.taskCenterEnabled ? [toolEntry("tasks", "/tasks")] : []),
             toolEntry("assets", "/assets"),
             toolEntry("skills", "/skills"),
+            ...(features.promotionEnabled ? [toolEntry("promotion", "/promotion")] : []),
             ...(features.creditsEnabled ? [{ ...toolEntry("wallet"), run: () => openWorkspaceWallet() }] : []),
             toolEntry("settings", "/settings"),
         ];

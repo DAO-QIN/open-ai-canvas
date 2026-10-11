@@ -1,26 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, App, Button, Input, Spin, Table, Tabs } from "antd";
-import { ArrowRight, Copy, RefreshCw, UsersRound } from "lucide-react";
+import { Alert, App, Button, Input, Spin } from "antd";
+import { ArrowRight, ChevronDown, Coins, Copy, Gift, Link2, LockKeyhole, RefreshCw, UsersRound, Wallet } from "lucide-react";
 import { AppModal } from "@/components/ui/product/app-modal/app-modal";
+import { EmptyState } from "@/components/ui/product/empty-state/empty-state";
+import { StatusBadge } from "@/components/ui/base/badges/status-badge";
+import { SegmentedControl } from "@/components/ui/base/segmented-control";
+import { PaginationBar } from "@/components/layout/workspace-page";
 import { useUserStore } from "@/stores/use-user-store";
 import { ApiError } from "@/services/api/request";
-import {
-    createPromotionCode,
-    getPromotionInvitations,
-    getPromotionOverview,
-    getPromotionRecords,
-    getPromotionTransferResult,
-    getPromotionTransfers,
-    transferPromotion,
-    type CommissionRecord,
-    type PromotionTransfer,
-    type TransferRequest,
-} from "@/services/api/promotion";
-import { clearPendingPromotionTransfer, commissionRemaining, formatPromotionCredits as credits, MAX_PROMOTION_TRANSFER, parsePromotionCredits, readPendingPromotionTransfer, savePendingPromotionTransfer } from "@/lib/promotion-credits";
+import { createPromotionCode, getPromotionInvitations, getPromotionOverview, getPromotionRecords, getPromotionTransferResult, getPromotionTransfers, transferPromotion, type PromotionTransfer, type TransferRequest } from "@/services/api/promotion";
+import { clearPendingPromotionTransfer, formatPromotionCredits as credits, MAX_PROMOTION_TRANSFER, parsePromotionCredits, readPendingPromotionTransfer, savePendingPromotionTransfer } from "@/lib/promotion-credits";
+import { CommissionItem, InvitationItem, TransferItem } from "./record-items";
 import "./promotion.css";
 
-const date = (value: string) => new Date(value).toLocaleString("zh-CN");
+type RecordTab = "invites" | "records" | "transfers";
+const recordTabs = [
+    { value: "invites" as const, label: "已邀请" },
+    { value: "records" as const, label: "返利明细" },
+    { value: "transfers" as const, label: "转入记录" },
+];
 
 export default function PromotionPage() {
     const userID = useUserStore((state) => state.user?.id);
@@ -33,7 +32,7 @@ function PromotionWorkspace({ userID }: { userID: string }) {
     const [recordPage, setRecordPage] = useState(1);
     const [invitePage, setInvitePage] = useState(1);
     const [transferPage, setTransferPage] = useState(1);
-    const [tab, setTab] = useState("records");
+    const [tab, setTab] = useState<RecordTab>("invites");
     const [open, setOpen] = useState(false);
     const [input, setInput] = useState("");
     const [busy, setBusy] = useState(false);
@@ -145,7 +144,7 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                 setPending(null);
                 void refresh();
             }
-            message.error(error instanceof Error ? error.message : "转入结果未确认，请核对原请求");
+            message.error(request && !definitive ? "暂时无法确认转入结果，请稍后继续核对，避免重复转入。" : error instanceof Error ? error.message : "转入结果未确认，请继续核对");
         } finally {
             submitting.current = false;
             if (current()) setBusy(false);
@@ -164,24 +163,10 @@ function PromotionWorkspace({ userID }: { userID: string }) {
         }
     };
 
-    const recordColumns = [
-        { title: "产生时间", dataIndex: "createdAt", render: date },
-        { title: "充值到账积分", dataIndex: "baseMicrocredits", render: credits },
-        { title: "比例", dataIndex: "ratioBps", render: (value: number) => `${value / 100}%` },
-        { title: "返利积分", dataIndex: "amountMicrocredits", render: credits },
-        { title: "已转入", dataIndex: "transferredMicrocredits", render: credits },
-        { title: "已作废", dataIndex: "voidedMicrocredits", render: (value: string, record: CommissionRecord) => <span title={record.voidReason}>{credits(value)}</span> },
-        {
-            title: "可用时间",
-            dataIndex: "availableAt",
-            render: (value: string, record: CommissionRecord) => (commissionRemaining(record) <= BigInt(0) ? "已处理" : `${new Date(value).getTime() > clock + serverOffset ? "冻结至 " : "已可用 · "}${date(value)}`),
-        },
-    ];
-
     if (overview.isPending)
         return (
             <div className="promotion-page">
-                <Spin tip="正在读取邀请返利">
+                <Spin tip="正在读取邀请奖励">
                     <div className="h-32" />
                 </Spin>
             </div>
@@ -189,174 +174,297 @@ function PromotionWorkspace({ userID }: { userID: string }) {
     if (!overview.data)
         return (
             <div className="promotion-page">
-                <Alert type="error" title="读取邀请返利失败" description={overview.error?.message} action={<Button onClick={() => void overview.refetch()}>重试</Button>} />
+                <Alert type="error" title="暂时无法读取邀请奖励" description={overview.error?.message} action={<Button onClick={() => void overview.refetch()}>重试</Button>} />
             </div>
         );
     const data = overview.data;
     const code = data.profile.inviteCode;
     const invitationURL = new URL("/register", window.location.origin);
     if (code) invitationURL.searchParams.set("inviteCode", code);
-    const pageError = overview.error || (tab === "records" ? records.error : tab === "invites" ? invites.error : transfers.error);
+    const selectedRecords = tab === "records" ? records : tab === "invites" ? invites : transfers;
+    const currentPage = tab === "records" ? recordPage : tab === "invites" ? invitePage : transferPage;
+    const setPage = tab === "records" ? setRecordPage : tab === "invites" ? setInvitePage : setTransferPage;
+    const available = BigInt(data.availableMicrocredits);
+    const maximumTransfer = credits((available > MAX_PROMOTION_TRANSFER ? MAX_PROMOTION_TRANSFER : available).toString()).replaceAll(",", "");
+    let inputError = "";
+    if (!pending && input.trim()) {
+        try {
+            if (BigInt(parsePromotionCredits(input)) > available) inputError = "金额超过可转入返利，请调整后再试。";
+        } catch (error) {
+            inputError = error instanceof Error ? error.message : "请输入有效积分";
+        }
+    }
+    const copy = async (value: string, label: string) => {
+        try {
+            await navigator.clipboard.writeText(value);
+            if (current()) message.success(`${label}已复制，快去分享给好友吧`);
+        } catch {
+            if (current()) message.error("复制失败，可选中内容手动复制");
+        }
+    };
+    const emptyDescription = tab === "invites" ? "好友通过你的邀请码完成注册后，会显示在这里。" : tab === "records" ? "受邀好友在线充值到账后，就能看到你的返利。" : "把可用返利转入积分后，到账记录会显示在这里。";
 
     return (
         <main className="promotion-page">
-            <header className="promotion-heading">
-                <div>
-                    <h1>
-                        <UsersRound className="size-6" />
-                        邀请返利
-                    </h1>
-                    <p>邀请新用户注册，每次充值到账后获得积分返利。</p>
-                </div>
-                <Button icon={<RefreshCw className="size-4" />} onClick={() => void refresh()}>
-                    刷新
-                </Button>
-            </header>
-            {!data.canPromote ? <Alert type="info" showIcon title={data.profile.paused ? "推广资格已暂停" : "邀请活动暂未开放"} description="新邀请和新订单返利已暂停，历史记录和已有返利仍可查看、转入。" /> : null}
-            {pageError ? <Alert type="error" title="部分数据读取失败" description={pageError.message} action={<Button onClick={() => void refresh()}>重试</Button>} /> : null}
-            {storageError ? <Alert type="error" title="暂时无法转入积分" description={storageError} /> : null}
-            {pending ? <Alert type="warning" showIcon title="有一笔转入请求等待核对" description={`${credits(pending.amountMicrocredits)} 积分 · ${pending.requestId}`} action={<Button onClick={() => setOpen(true)}>核对 / 重试</Button>} /> : null}
-            <section className="promotion-card promotion-invite">
-                <div>
-                    <h2>我的推广规则</h2>
-                    <p>
-                        当前有效比例 <strong>{data.effectiveRatioBps / 100}%</strong> · {data.policy.freezeDays ? `冻结 ${data.policy.freezeDays} 天` : "返利立即可用"} · 已邀请 {data.inviteCount} 人
-                    </p>
-                    <p className="promotion-muted">规则调整仅影响之后新建的充值订单。返利包含充值套餐赠送的积分。</p>
-                </div>
-                <div className="promotion-code">
-                    <Input aria-label="我的邀请码" readOnly value={code ?? "尚未生成邀请码"} />
-                    {code ? (
-                        <Button
-                            disabled={!data.canPromote}
-                            icon={<Copy className="size-4" />}
-                            onClick={() =>
-                                void navigator.clipboard
-                                    .writeText(invitationURL.toString())
-                                    .then(() => message.success("邀请链接已复制"))
-                                    .catch(() => message.error("复制失败，请重试"))
-                            }
-                        >
-                            复制邀请链接
-                        </Button>
-                    ) : (
-                        <Button disabled={!data.canPromote} loading={creating} onClick={() => void createCode()}>
-                            生成邀请码
-                        </Button>
-                    )}
-                </div>
-            </section>
-            <section className="promotion-stats" aria-label="返利概览">
-                {(
-                    [
-                        ["累计产生", data.totalMicrocredits],
-                        ["冻结中", data.frozenMicrocredits],
-                        ["可转入", data.availableMicrocredits],
-                        ["已转入", data.transferredMicrocredits],
-                        ["已作废", data.voidedMicrocredits],
-                    ] as const
-                ).map(([label, value]) => (
-                    <div className="promotion-card" key={label}>
-                        <span>{label}</span>
-                        <strong>{credits(value)}</strong>
-                        <small>积分</small>
+            <div className="promotion-content">
+                <header className="promotion-heading">
+                    <div>
+                        <h1>邀请有礼</h1>
+                        <p>把好用的创作工具分享给朋友，收获更多创作积分。</p>
                     </div>
-                ))}
-            </section>
-            <div className="promotion-transfer-bar">
-                <p>可用返利按 1:1 转为站内积分，无手续费。</p>
-                <Button
-                    type="primary"
-                    icon={<ArrowRight className="size-4" />}
-                    disabled={Boolean(storageError) || (!pending && BigInt(data.availableMicrocredits) === BigInt(0))}
-                    onClick={() => {
-                        setInput("");
-                        setOpen(true);
-                    }}
-                >
-                    {pending ? "核对上次转入" : "转入积分钱包"}
-                </Button>
+                    <div className="promotion-heading-actions">
+                        <StatusBadge tone={data.canPromote && data.effectiveRatioBps > 0 ? "success" : "neutral"} label={data.canPromote ? `充值返利 ${data.effectiveRatioBps / 100}%` : "邀请暂未开放"} />
+                        <Button type="text" aria-label="刷新邀请奖励" loading={overview.isFetching} icon={<RefreshCw className="size-4" />} onClick={() => void refresh()}>
+                            刷新
+                        </Button>
+                    </div>
+                </header>
+                {!data.canPromote ? <Alert type="info" showIcon title={data.profile.paused ? "你的邀请功能已暂停" : "邀请活动暂未开放"} description="暂时不能邀请新好友或获得新的充值返利，已有返利仍可查看和转入积分。" /> : null}
+                {overview.error ? <Alert type="error" title="数据更新失败，当前显示上次读取的结果" description={overview.error.message} action={<Button onClick={() => void refresh()}>重试</Button>} /> : null}
+                {storageError ? <Alert type="error" title="暂时无法转入积分" description={storageError} /> : null}
+                {pending ? (
+                    <Alert
+                        type="warning"
+                        showIcon
+                        title="上次转入的结果还未确认"
+                        description={`${credits(pending.amountMicrocredits)} 积分正在等待核对。继续操作会先查询结果，避免重复转入。`}
+                        action={<Button onClick={() => setOpen(true)}>继续核对</Button>}
+                    />
+                ) : null}
+                <section className="promotion-card promotion-invite" aria-labelledby="promotion-invite-title">
+                    <div className="promotion-section-heading">
+                        <div className="promotion-invite-intro">
+                            <span className="promotion-gift-mark">
+                                <Gift aria-hidden />
+                            </span>
+                            <div>
+                                <h2 id="promotion-invite-title">邀请好友，一起创作</h2>
+                                <p>
+                                    好友通过你的邀请注册并在线充值，你可获得充值到账积分的 <strong>{data.effectiveRatioBps / 100}%</strong> 作为返利。
+                                </p>
+                            </div>
+                        </div>
+                        <span className="promotion-invite-count">
+                            <UsersRound aria-hidden />
+                            已邀请 <strong>{data.inviteCount}</strong> 人
+                        </span>
+                    </div>
+                    {data.canPromote && data.effectiveRatioBps === 0 ? <p className="promotion-zero-ratio">当前返利比例为 0%，新充值暂不产生返利。</p> : null}
+                    {code ? (
+                        <div className="promotion-share-fields">
+                            <div className="promotion-share-field">
+                                <label htmlFor="promotion-code">我的邀请码</label>
+                                <div className="promotion-copy-field">
+                                    <Input id="promotion-code" readOnly value={code} />
+                                    <Button disabled={!data.canPromote} aria-label="复制邀请码" icon={<Copy className="size-4" />} onClick={() => void copy(code, "邀请码")}>
+                                        复制
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="promotion-share-field">
+                                <label htmlFor="promotion-link">专属邀请链接</label>
+                                <div className="promotion-copy-field">
+                                    <Link2 aria-hidden />
+                                    <Input id="promotion-link" readOnly value={invitationURL.toString()} />
+                                    <Button disabled={!data.canPromote} aria-label="复制邀请链接" icon={<Copy className="size-4" />} onClick={() => void copy(invitationURL.toString(), "邀请链接")}>
+                                        复制链接
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="promotion-create-code">
+                            <div>
+                                <strong>你的邀请，从一个专属链接开始</strong>
+                                <p>生成后即可复制分享，好友也可以在注册时填写你的邀请码。</p>
+                            </div>
+                            <Button type="primary" disabled={!data.canPromote} loading={creating} icon={<Link2 className="size-4" />} onClick={() => void createCode()}>
+                                生成我的邀请链接
+                            </Button>
+                        </div>
+                    )}
+                    <ol className="promotion-steps" aria-label="如何获得邀请奖励">
+                        <li>
+                            <span>01</span>
+                            <div>
+                                <strong>分享邀请</strong>
+                                <p>把链接或邀请码发给新朋友。</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span>02</span>
+                            <div>
+                                <strong>好友注册并充值</strong>
+                                <p>注册时绑定邀请，在线充值到账后产生返利。</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span>03</span>
+                            <div>
+                                <strong>转为创作积分</strong>
+                                <p>{data.policy.freezeDays ? `新返利等待 ${data.policy.freezeDays} 天解锁后，手动转入积分。` : "返利到账即可手动转入积分。"}</p>
+                            </div>
+                        </li>
+                    </ol>
+                </section>
+                <section className="promotion-card promotion-account" aria-labelledby="promotion-account-title">
+                    <div className="promotion-section-heading">
+                        <h2 id="promotion-account-title">
+                            <Wallet aria-hidden />
+                            我的返利
+                        </h2>
+                        <span className="promotion-muted">1 返利积分 = 1 创作积分 · 无手续费</span>
+                    </div>
+                    <div className="promotion-account-body">
+                        <div className="promotion-available">
+                            <span>可转入积分</span>
+                            <strong>
+                                {credits(data.availableMicrocredits)} <small>积分</small>
+                            </strong>
+                            <Button
+                                type="primary"
+                                icon={<ArrowRight className="size-4" />}
+                                disabled={Boolean(storageError) || (!pending && available === BigInt(0))}
+                                onClick={() => {
+                                    setInput(maximumTransfer);
+                                    setOpen(true);
+                                }}
+                            >
+                                {pending ? "核对上次转入" : "转入积分"}
+                            </Button>
+                            <p>
+                                {pending
+                                    ? "先确认上次转入结果，再开始新的转入。"
+                                    : storageError
+                                      ? "转入暂不可用，请先核对上方提示。"
+                                      : available > BigInt(0)
+                                        ? "转入后即可用于站内创作，支持全部或部分转入。"
+                                        : BigInt(data.frozenMicrocredits) > BigInt(0)
+                                          ? "返利还在等待解锁，解锁后即可转入。"
+                                          : "好友充值后，返利会显示在这里。"}
+                            </p>
+                        </div>
+                        <div className="promotion-stats" aria-label="返利概览">
+                            <div>
+                                <span>
+                                    <LockKeyhole aria-hidden />
+                                    待解锁
+                                </span>
+                                <strong>
+                                    {credits(data.frozenMicrocredits)} <small>积分</small>
+                                </strong>
+                                <p>等待期结束后自动可用</p>
+                            </div>
+                            <div>
+                                <span>
+                                    <Coins aria-hidden />
+                                    累计返利
+                                </span>
+                                <strong>
+                                    {credits(data.totalMicrocredits)} <small>积分</small>
+                                </strong>
+                                <p>邀请好友累计获得的返利</p>
+                            </div>
+                            <div>
+                                <span>
+                                    <Wallet aria-hidden />
+                                    已转入积分
+                                </span>
+                                <strong>
+                                    {credits(data.transferredMicrocredits)} <small>积分</small>
+                                </strong>
+                                <p>已成功存入积分钱包</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section className="promotion-card promotion-records" aria-labelledby="promotion-records-title">
+                    <div className="promotion-section-heading">
+                        <div>
+                            <h2 id="promotion-records-title">邀请与奖励记录</h2>
+                            <p>每一次邀请和每一笔到账，都能在这里查看。</p>
+                        </div>
+                        <SegmentedControl<RecordTab> ariaLabel="选择记录类型" value={tab} onChange={setTab} options={recordTabs} />
+                    </div>
+                    <div className="promotion-record-content" role="region" aria-label={recordTabs.find((item) => item.value === tab)?.label} aria-busy={selectedRecords.isFetching}>
+                        {selectedRecords.error ? (
+                            <Alert type="error" title="暂时无法读取记录" description={selectedRecords.error.message} action={<Button onClick={() => void selectedRecords.refetch()}>重试</Button>} />
+                        ) : selectedRecords.isPending ? (
+                            <div className="promotion-record-loading">
+                                <Spin />
+                            </div>
+                        ) : selectedRecords.data?.items.length ? (
+                            <ul className="promotion-record-list">
+                                {tab === "invites"
+                                    ? invites.data?.items.map((item) => <InvitationItem key={item.id} invitation={item} />)
+                                    : tab === "records"
+                                      ? records.data?.items.map((item) => <CommissionItem key={item.id} record={item} serverNow={clock + serverOffset} />)
+                                      : transfers.data?.items.map((item) => <TransferItem key={item.id} transfer={item} />)}
+                            </ul>
+                        ) : (
+                            <EmptyState
+                                size="compact"
+                                icon={tab === "invites" ? UsersRound : tab === "records" ? Gift : Wallet}
+                                title={tab === "invites" ? "还没有好友加入" : tab === "records" ? "还没有收到返利" : "还没有转入记录"}
+                                description={emptyDescription}
+                            />
+                        )}
+                    </div>
+                    {!selectedRecords.error && selectedRecords.data ? <PaginationBar current={currentPage} pageSize={20} total={selectedRecords.data.total} pageSizeOptions={[20]} onChange={(page) => setPage(page)} /> : null}
+                </section>
+                <details className="promotion-card promotion-rules">
+                    <summary>
+                        <span>活动规则</span>
+                        <ChevronDown aria-hidden />
+                    </summary>
+                    <ul>
+                        <li>仅邀请新用户。好友须在注册时填写你的邀请码，一个账号只能绑定一位邀请人，注册后不能补绑或更换。</li>
+                        <li>返利按好友在线充值实际到账的积分计算，包含套餐赠送积分。签到、注册赠送、兑换码和积分调整不产生返利。</li>
+                        <li>{data.policy.freezeDays ? `当前新订单的返利等待期为 ${data.policy.freezeDays} 天，从充值积分到账时起计算。` : "当前新订单的返利到账即可使用。"} 已有返利的具体解锁时间，以返利明细为准。</li>
+                        <li>返利比例和等待期在好友下单时确定，之后调整不影响该笔订单。</li>
+                        <li>可用返利按 1:1 手动转为站内积分，无手续费，仅用于站内创作，不支持现金提现。</li>
+                    </ul>
+                </details>
             </div>
-            <section className="promotion-card promotion-table">
-                <Tabs
-                    activeKey={tab}
-                    onChange={setTab}
-                    items={[
-                        {
-                            key: "records",
-                            label: "返利明细",
-                            children: (
-                                <Table<CommissionRecord>
-                                    rowKey="id"
-                                    columns={recordColumns}
-                                    dataSource={records.data?.items ?? []}
-                                    loading={records.isFetching}
-                                    scroll={{ x: 1050 }}
-                                    locale={{ emptyText: "暂无返利记录" }}
-                                    pagination={{ current: recordPage, pageSize: 20, total: records.data?.total ?? 0, showSizeChanger: false, onChange: setRecordPage }}
-                                />
-                            ),
-                        },
-                        {
-                            key: "invites",
-                            label: "邀请明细",
-                            children: (
-                                <Table
-                                    rowKey="id"
-                                    columns={[
-                                        { title: "被邀请人", dataIndex: "displayName" },
-                                        { title: "注册时间", dataIndex: "createdAt", render: date },
-                                    ]}
-                                    dataSource={invites.data?.items ?? []}
-                                    loading={invites.isFetching}
-                                    locale={{ emptyText: "暂无邀请记录" }}
-                                    pagination={{ current: invitePage, pageSize: 20, total: invites.data?.total ?? 0, showSizeChanger: false, onChange: setInvitePage }}
-                                />
-                            ),
-                        },
-                        {
-                            key: "transfers",
-                            label: "转入记录",
-                            children: (
-                                <Table
-                                    rowKey="id"
-                                    columns={[
-                                        { title: "转入时间", dataIndex: "createdAt", render: date },
-                                        { title: "积分", dataIndex: "amountMicrocredits", render: credits },
-                                        { title: "请求标识", dataIndex: "requestId" },
-                                    ]}
-                                    dataSource={transfers.data?.items ?? []}
-                                    loading={transfers.isFetching}
-                                    scroll={{ x: 700 }}
-                                    locale={{ emptyText: "暂无转入记录" }}
-                                    pagination={{ current: transferPage, pageSize: 20, total: transfers.data?.total ?? 0, showSizeChanger: false, onChange: setTransferPage }}
-                                />
-                            ),
-                        },
-                    ]}
-                />
-            </section>
             <AppModal
-                title={pending ? "核对并重试原转入请求" : "转入积分钱包"}
+                title={pending ? "核对上次转入" : "返利转入积分"}
                 open={open}
                 onCancel={() => !busy && setOpen(false)}
                 onOk={() => void submit()}
                 confirmLoading={busy}
-                okText={pending ? "核对 / 重试" : "确认转入"}
+                okText={pending ? "查询并重试" : "确认转入"}
+                okButtonProps={{ disabled: Boolean(storageError) || (!pending && (!input.trim() || Boolean(inputError))) }}
                 cancelButtonProps={{ disabled: busy }}
                 closable={!busy}
                 maskClosable={!busy}
             >
-                <div className="space-y-4">
-                    <p>
-                        可转入 {credits(data.availableMicrocredits)} 积分。{pending ? "将复用上次请求，不会重复入账。" : "支持最多六位小数。"}
+                <div className="promotion-transfer-form">
+                    <p>{pending ? "先查询是否已到账；尚未到账时，将使用原请求重试，避免重复转入。" : "把返利存入积分钱包，即可用于下一次创作。1:1 转入，无手续费。"}</p>
+                    <div className="promotion-transfer-label">
+                        <label htmlFor="promotion-transfer-amount">转入积分</label>
+                        <span>可转入 {credits(data.availableMicrocredits)} 积分</span>
+                    </div>
+                    <Input
+                        id="promotion-transfer-amount"
+                        aria-describedby="promotion-transfer-hint"
+                        status={inputError ? "error" : undefined}
+                        inputMode="decimal"
+                        disabled={Boolean(pending) || busy}
+                        value={pending ? credits(pending.amountMicrocredits).replaceAll(",", "") : input}
+                        onChange={(event) => setInput(event.target.value)}
+                        suffix={
+                            !pending ? (
+                                <Button type="text" size="small" disabled={busy} onClick={() => setInput(maximumTransfer)}>
+                                    全部转入
+                                </Button>
+                            ) : (
+                                "积分"
+                            )
+                        }
+                    />
+                    <p id="promotion-transfer-hint" className={inputError ? "promotion-input-error" : "promotion-muted"} role={inputError ? "alert" : undefined}>
+                        {inputError || (pending ? "本次金额已锁定，请先完成核对。" : "可修改金额，支持最多六位小数。")}
                     </p>
-                    <Input aria-label="转入积分" inputMode="decimal" disabled={Boolean(pending) || busy} value={pending ? credits(pending.amountMicrocredits).replaceAll(",", "") : input} onChange={(event) => setInput(event.target.value)} />
-                    {!pending ? (
-                        <Button disabled={busy} onClick={() => setInput(credits((BigInt(data.availableMicrocredits) > MAX_PROMOTION_TRANSFER ? MAX_PROMOTION_TRANSFER : BigInt(data.availableMicrocredits)).toString()).replaceAll(",", ""))}>
-                            全部转入
-                        </Button>
-                    ) : null}
                 </div>
             </AppModal>
         </main>

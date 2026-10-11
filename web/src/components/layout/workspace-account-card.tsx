@@ -1,5 +1,5 @@
 import { Button } from "antd";
-import { ArrowUpRight, Coins, LogOut, RefreshCw, Settings, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowUpRight, Coins, Gift, LogOut, RefreshCw, Settings, ShieldCheck } from "lucide-react";
 import { Link } from "react-router";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { useWorkspaceLogout } from "@/hooks/use-workspace-logout";
@@ -25,7 +25,7 @@ export function WorkspaceAccountCard({ onWallet, onNavigate }: { onWallet: () =>
             {availableMicrocredits === null ? <Button size="small" loading={refreshing} icon={<RefreshCw />} onClick={() => void refresh()}>刷新余额</Button> : <button type="button" onClick={onWallet}>充值 / 兑换<ArrowUpRight /></button>}
         </div> : null}
         <nav className="workspace-account-card-actions" aria-label="账户操作">
-            <Link to="/promotion" onClick={onNavigate}><UsersRound /><span>邀请返利</span><ArrowUpRight /></Link>
+            <Link to="/promotion" onClick={onNavigate}><Gift /><span>邀请有礼</span><ArrowUpRight /></Link>
             <Link to="/settings" onClick={onNavigate}><Settings /><span>账户与设置</span><ArrowUpRight /></Link>
             {user.role === "admin" ? <Link to="/admin" onClick={onNavigate}><ShieldCheck /><span>管理员后台</span><ArrowUpRight /></Link> : null}
             <Button danger type="text" icon={<LogOut />} loading={loggingOut} onClick={() => void handleLogout()}>退出登录</Button>
