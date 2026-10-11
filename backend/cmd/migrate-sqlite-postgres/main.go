@@ -61,7 +61,7 @@ func main() {
 		}
 		copyRows := len(tableNames) == 0
 		if copyRows {
-			if err := database.MigrateSchema(tx); err != nil {
+			if err := createFreshMigrationSchema(tx); err != nil {
 				return fmt.Errorf("创建目标表结构：%w", err)
 			}
 		} else if err := validateTargetTableNames(tableNames); err != nil {
@@ -89,6 +89,18 @@ func main() {
 	}); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// Only called after proving the target has no business tables. Schema seeds
+// must not conflict with the source snapshots, which are copied verbatim.
+func createFreshMigrationSchema(tx *gorm.DB) error {
+	if err := database.MigrateSchema(tx); err != nil {
+		return err
+	}
+	if err := tx.Where("1 = 1").Delete(&model.IDSequence{}).Error; err != nil {
+		return err
+	}
+	return tx.Delete(&model.PluginPlatformState{}, "plugin_id = ?", model.EcommercePluginID).Error
 }
 
 func verifySQLite(db *gorm.DB) error {
@@ -456,6 +468,17 @@ func migrations() []tableMigration {
 		migrateTable[model.BannerAnnouncement]("banner_announcements"),
 		migrateTable[model.CreationRun]("creation_runs"),
 		migrateTable[model.CreationSubmission]("creation_submissions"),
+		migrateTable[model.EcommerceBatch]("ecommerce_batches"),
+		migrateTable[model.EcommerceProduct]("ecommerce_products"),
+		migrateTable[model.EcommerceRun]("ecommerce_runs"),
+		migrateTable[model.EcommerceBranch]("ecommerce_branches"),
+		migrateTable[model.EcommerceSlot]("ecommerce_slots"),
+		migrateTable[model.EcommerceImageVersion]("ecommerce_image_versions"),
+		migrateTable[model.EcommerceStep]("ecommerce_steps"),
+		migrateTable[model.EcommerceQuote]("ecommerce_quotes"),
+		migrateTable[model.EcommerceAuthorization]("ecommerce_authorizations"),
+		migrateTable[model.EcommercePreset]("ecommerce_presets"),
+		migrateTable[model.EcommerceOperation]("ecommerce_operations"),
 		migrateTable[model.Task]("tasks"),
 		migrateTable[model.CloudAgentExecution]("cloud_agent_executions"),
 		migrateTable[model.CloudAgentEventRecord]("cloud_agent_event_records"),

@@ -43,9 +43,10 @@ type FeatureAvailability struct {
 
 type PublicFeatureAvailability struct {
 	FeatureAvailability
-	Configured bool      `json:"configured"`
-	UpdatedBy  string    `json:"updatedBy,omitempty"`
-	UpdatedAt  time.Time `json:"updatedAt,omitempty"`
+	EcommerceEnabled bool      `json:"ecommerceEnabled"`
+	Configured       bool      `json:"configured"`
+	UpdatedBy        string    `json:"updatedBy,omitempty"`
+	UpdatedAt        time.Time `json:"updatedAt,omitempty"`
 }
 
 func DefaultFeatureAvailability() FeatureAvailability {
@@ -73,7 +74,13 @@ func (s *Service) FeatureAvailability() (*PublicFeatureAvailability, error) {
 	if err != nil {
 		return nil, err
 	}
-	return publicFeatureAvailability(setting, value), nil
+	public := publicFeatureAvailability(setting, value)
+	state, err := s.repo.PluginPlatformState(model.EcommercePluginID)
+	if err != nil {
+		return nil, err
+	}
+	public.EcommerceEnabled = state != nil && state.Available
+	return public, nil
 }
 
 func (s *Service) AdminFeatureAvailability(actor *model.User) (*PublicFeatureAvailability, error) {
@@ -111,7 +118,7 @@ func (s *Service) UpdateFeatureAvailability(actor *model.User, value FeatureAvai
 	if err := s.appendAdminAudit(actor, "feature_availability.update", "system_setting", featureAvailabilitySettingKey, "更新功能开放配置", map[string]any{"before": before, "after": value}); err != nil {
 		return nil, err
 	}
-	return publicFeatureAvailability(&setting, value), nil
+	return s.FeatureAvailability()
 }
 
 func (s *Service) FeatureEnabled(feature string) (bool, error) {

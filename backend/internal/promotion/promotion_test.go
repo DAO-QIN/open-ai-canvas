@@ -208,7 +208,7 @@ func runPromotionWorkflow(t *testing.T, driver string) {
 			}
 		}
 		status, err := database.ReadSchemaStatus(db)
-		if err != nil || !status.Ready || status.Current != 50 {
+		if err != nil || !status.Ready || status.Current != database.CurrentSchemaVersion {
 			t.Fatalf("migration status=%+v err=%v", status, err)
 		}
 		var latest struct{ Checksum string }

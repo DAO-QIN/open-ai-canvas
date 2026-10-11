@@ -201,6 +201,7 @@ export default function PluginsPage() {
     const togglePlugin = async (plugin: RegisteredPlugin, enabled: boolean) => {
         try {
             const next = await setUserPluginEnabled(plugin.manifest.id, enabled);
+            if (next.pluginId !== plugin.manifest.id || next.userEnabled !== enabled) throw new Error("插件状态响应未确认，已重新查询当前状态");
             setEnabled(plugin.manifest.id, enabled);
             setPluginStates({ ...usePluginStore.getState().pluginStates, [next.pluginId]: next });
             if (next.pluginId === RUNNINGHUB_PLUGIN_ID) {
@@ -209,6 +210,7 @@ export default function PluginsPage() {
             message.success(`${plugin.manifest.name}${enabled ? "已启用" : "已停用"}`);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "更新插件状态失败");
+            await reloadBackendPlugins();
         }
     };
 
@@ -280,16 +282,21 @@ export default function PluginsPage() {
                         </nav>
                     </aside>
                     <div className="plugins-page-content">
-                        <CollectionToolbar label="插件筛选" trailing={<div className="plugins-toolbar-actions">
-                                <Button icon={<RefreshCw className="size-4" />} loading={backendPluginsLoading} onClick={() => void reloadBackendPlugins()}>
-                                    刷新插件
-                                </Button>
-                                {user?.role === "admin" ? (
-                                    <Button type="primary" onClick={() => navigate("/admin/plugins")}>
-                                        管理员插件管理
+                        <CollectionToolbar
+                            label="插件筛选"
+                            trailing={
+                                <div className="plugins-toolbar-actions">
+                                    <Button icon={<RefreshCw className="size-4" />} loading={backendPluginsLoading} onClick={() => void reloadBackendPlugins()}>
+                                        刷新插件
                                     </Button>
-                                ) : null}
-                            </div>}>
+                                    {user?.role === "admin" ? (
+                                        <Button type="primary" onClick={() => navigate("/admin/plugins")}>
+                                            管理员插件管理
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            }
+                        >
                             <Input
                                 className="plugins-search"
                                 prefix={<Search className="size-4 text-foreground/38" aria-hidden="true" />}

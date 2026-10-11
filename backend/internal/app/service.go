@@ -13,6 +13,7 @@ import (
 
 	"yingce/backend/internal/auth"
 	"yingce/backend/internal/canvas"
+	"yingce/backend/internal/ecommerce"
 	"yingce/backend/internal/kernel"
 	"yingce/backend/internal/model"
 	"yingce/backend/internal/payment"
@@ -25,6 +26,7 @@ import (
 )
 
 type Service struct {
+	ecommerce                *ecommerce.Service
 	repo                     *repository.Repository
 	dataDir                  string
 	cancelMu                 sync.Mutex
@@ -170,6 +172,7 @@ func (s *Service) StartWorker() {
 	s.startResourceDeletionWorker(ctx)
 	s.startSkillSyncWorker(ctx)
 	s.startPaymentWorker(ctx)
+	s.runWorkerLoop(s.ecommerceDomain().RunWorker)
 	go s.syncAgentSessionLimit()
 	s.runWorkerLoop(func(ctx context.Context) {
 		ticker := time.NewTicker(3 * time.Second)

@@ -27,6 +27,7 @@ tags:
   - name: admin
   - name: skills
   - name: promotion
+  - name: ecommerce
 paths:
   /auth/register:
     post:
@@ -42,20 +43,20 @@ paths:
               type: object
               required: [username, password, acceptedTerms]
               properties:
-                username: {type: string}
-                password: {type: string, format: password}
-                acceptedTerms: {type: boolean}
-                displayName: {type: string}
-                email: {type: string}
-                emailCode: {type: string}
-                phone: {type: string}
-                smsCode: {type: string}
-                ticket: {type: string}
-                inviteCode: {type: string, maxLength: 16}
+                username: { type: string }
+                password: { type: string, format: password }
+                acceptedTerms: { type: boolean }
+                displayName: { type: string }
+                email: { type: string }
+                emailCode: { type: string }
+                phone: { type: string }
+                smsCode: { type: string }
+                ticket: { type: string }
+                inviteCode: { type: string, maxLength: 16 }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "400": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /auth/linuxdo/start:
     get:
       tags: [auth]
@@ -63,13 +64,17 @@ paths:
       summary: 发起 Linux.do 登录或注册
       description: 邀请码保存在服务端 OAuth state，仅新建账号时使用；已有账号登录不重新绑定。
       parameters:
-        - {in: query, name: next, schema: {type: string}}
-        - {in: query, name: acceptedTerms, schema: {type: boolean}}
-        - {in: query, name: inviteCode, schema: {type: string, maxLength: 16}}
+        - { in: query, name: next, schema: { type: string } }
+        - { in: query, name: acceptedTerms, schema: { type: boolean } }
+        - {
+            in: query,
+            name: inviteCode,
+            schema: { type: string, maxLength: 16 },
+          }
       responses:
-        "302": {description: 跳转到身份提供方}
-        "400": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "302": { description: 跳转到身份提供方 }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /public/invite-code/{code}:
     get:
       tags: [promotion]
@@ -77,10 +82,10 @@ paths:
       summary: 匿名验证邀请码，不公开邀请人身份
       description: 每 IP 每分钟最多 30 次；成功信封 data 为 {valid:boolean}，活动或推广暂停时返回 false。
       parameters:
-        - {in: path, name: code, required: true, schema: {type: string}}
+        - { in: path, name: code, required: true, schema: { type: string } }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "429": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "429": { $ref: "#/components/responses/Error" }
   /promotion/overview:
     get:
       tags: [promotion]
@@ -93,45 +98,45 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - {$ref: "#/components/schemas/Envelope"}
+                  - { $ref: "#/components/schemas/Envelope" }
                   - type: object
                     properties:
-                      data: {$ref: "#/components/schemas/PromotionOverview"}
+                      data: { $ref: "#/components/schemas/PromotionOverview" }
   /promotion/code:
     post:
       tags: [promotion]
       summary: 主动生成邀请码，已存在时返回原邀请码
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "403": { $ref: "#/components/responses/Error" }
   /promotion/invitations:
     get:
       tags: [promotion]
       summary: 当前用户的邀请分页，用户名已在后端脱敏
       parameters:
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
   /promotion/records:
     get:
       tags: [promotion]
       summary: 当前用户的返利分页
       description: data 为 {items,total,page,pageSize}；items 为 CommissionRecord。冻结可用性以服务端 availableAt 为准。
       parameters:
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
   /promotion/transfers:
     get:
       tags: [promotion]
       summary: 当前用户的转入凭据分页
       parameters:
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
     post:
       tags: [promotion]
       summary: 手动将可用返利按 1:1 转入钱包
@@ -144,27 +149,37 @@ paths:
               type: object
               required: [requestId, amountMicrocredits]
               properties:
-                requestId: {type: string, pattern: "^[a-zA-Z0-9_-]{8,80}$"}
-                amountMicrocredits: {type: string, pattern: "^[1-9][0-9]{0,15}$", description: "1～9007199254740991 微积分的十进制字符串；入账后还须满足钱包余额上限"}
+                requestId: { type: string, pattern: "^[a-zA-Z0-9_-]{8,80}$" }
+                amountMicrocredits:
+                  {
+                    type: string,
+                    pattern: "^[1-9][0-9]{0,15}$",
+                    description: "1～9007199254740991 微积分的十进制字符串；入账后还须满足钱包余额上限",
+                  }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "409": {$ref: "#/components/responses/Error"}
-        "429": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /promotion/transfers/{requestId}:
     get:
       tags: [promotion]
       summary: 核对当前用户原请求的转入结果
       parameters:
-        - {in: path, name: requestId, required: true, schema: {type: string}}
+        - {
+            in: path,
+            name: requestId,
+            required: true,
+            schema: { type: string },
+          }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "404": {description: 尚无已提交凭据，可使用同一请求 ID 重试}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "404": { description: 尚无已提交凭据，可使用同一请求 ID 重试 }
   /admin/promotion/policy:
     get:
       tags: [admin, promotion]
       summary: 管理员读取全局推广规则
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
     put:
       tags: [admin, promotion]
       summary: 按版本保存完整推广规则并原子记录审计
@@ -173,26 +188,26 @@ paths:
         required: true
         content:
           application/json:
-            schema: {$ref: "#/components/schemas/PromotionPolicy"}
+            schema: { $ref: "#/components/schemas/PromotionPolicy" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "409": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "409": { $ref: "#/components/responses/Error" }
   /admin/promotion/profiles:
     get:
       tags: [admin, promotion]
       summary: 管理员按用户名或用户 ID 查询推广档案
       parameters:
-        - {in: query, name: keyword, schema: {type: string, maxLength: 120}}
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { in: query, name: keyword, schema: { type: string, maxLength: 120 } }
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
   /admin/promotion/profiles/{userId}:
     put:
       tags: [admin, promotion]
       summary: 按版本配置个人比例和暂停状态
       parameters:
-        - {in: path, name: userId, required: true, schema: {type: string}}
+        - { in: path, name: userId, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
@@ -201,28 +216,35 @@ paths:
               type: object
               required: [version, paused, ratioOverrideBps]
               properties:
-                version: {type: integer, format: int64, minimum: 0}
-                paused: {type: boolean}
-                ratioOverrideBps: {type: integer, minimum: 0, maximum: 10000, nullable: true, description: "null 继承全局；0 明确不返利"}
+                version: { type: integer, format: int64, minimum: 0 }
+                paused: { type: boolean }
+                ratioOverrideBps:
+                  {
+                    type: integer,
+                    minimum: 0,
+                    maximum: 10000,
+                    nullable: true,
+                    description: "null 继承全局；0 明确不返利",
+                  }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "409": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "409": { $ref: "#/components/responses/Error" }
   /admin/promotion/records:
     get:
       tags: [admin, promotion]
       summary: 管理员查询返利分页
       parameters:
-        - {in: query, name: userId, schema: {type: string}}
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { in: query, name: userId, schema: { type: string } }
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
   /admin/promotion/records/{id}/void:
     post:
       tags: [admin, promotion]
       summary: 作废该记录剩余未转入的返利，与审计原子提交
       parameters:
-        - {in: path, name: id, required: true, schema: {type: string}}
+        - { in: path, name: id, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
@@ -231,10 +253,10 @@ paths:
               type: object
               required: [reason]
               properties:
-                reason: {type: string, minLength: 1, maxLength: 500}
+                reason: { type: string, minLength: 1, maxLength: 500 }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "409": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "409": { $ref: "#/components/responses/Error" }
   /admin/settings/appearance/live2d:
     post:
       tags: [admin]
@@ -248,7 +270,7 @@ paths:
               type: object
               required: [file]
               properties:
-                file: {type: string, format: binary}
+                file: { type: string, format: binary }
       responses:
         "200":
           description: 成功信封 data.model 包含 resourceId 和服务端确认的 entry
@@ -257,8 +279,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  code: {type: integer, enum: [0]}
-                  msg: {type: string}
+                  code: { type: integer, enum: [0] }
+                  msg: { type: string }
                   data:
                     type: object
                     properties:
@@ -266,51 +288,90 @@ paths:
                         type: object
                         required: [resourceId, entry]
                         properties:
-                          resourceId: {type: string}
-                          entry: {type: string}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
-        "429": {$ref: "#/components/responses/Error"}
+                          resourceId: { type: string }
+                          entry: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /admin/settings/appearance/live2d/{id}/{file}:
     get:
       tags: [admin]
       summary: 读取模型草稿文件（管理员所有者或当前配置引用）
       parameters:
-        - {in: path, name: id, required: true, schema: {type: string}}
-        - {in: path, name: file, required: true, description: ZIP 内相对路径，可包含多级目录, schema: {type: string}}
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - {
+            in: path,
+            name: file,
+            required: true,
+            description: ZIP 内相对路径，可包含多级目录,
+            schema: { type: string },
+          }
       responses:
-        "200": {description: JSON、PNG 或 MOC3 文件，非 JSON 信封}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200": { description: JSON、PNG 或 MOC3 文件，非 JSON 信封 }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /public/appearance/live2d/{id}/{file}:
     get:
       tags: [meta]
       security: []
       summary: 读取当前启用的 Live2D 模型文件
       parameters:
-        - {in: path, name: id, required: true, schema: {type: string}}
-        - {in: path, name: file, required: true, description: ZIP 内相对路径，可包含多级目录, schema: {type: string}}
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - {
+            in: path,
+            name: file,
+            required: true,
+            description: ZIP 内相对路径，可包含多级目录,
+            schema: { type: string },
+          }
       responses:
-        "200": {description: JSON、PNG 或 MOC3 文件，非 JSON 信封；停用后拒绝公开读取}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200":
+          {
+            description: JSON、PNG 或 MOC3 文件，非 JSON 信封；停用后拒绝公开读取,
+          }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /tools:
     get:
       tags: [canvas]
       summary: 列出可见且启用的生成工具
       parameters:
-        - {in: query, name: scope, schema: {type: string, enum: [public, favorites, custom], default: public}}
-        - {in: query, name: type, schema: {type: string, enum: [style, motion, nine_grid, effect]}}
-        - {in: query, name: tag, schema: {type: string}}
-        - {in: query, name: search, schema: {type: string}}
-        - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
-        - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 80, default: 20}}
+        - {
+            in: query,
+            name: scope,
+            schema:
+              {
+                type: string,
+                enum: [public, favorites, custom],
+                default: public,
+              },
+          }
+        - {
+            in: query,
+            name: type,
+            schema: { type: string, enum: [style, motion, nine_grid, effect] },
+          }
+        - { in: query, name: tag, schema: { type: string } }
+        - { in: query, name: search, schema: { type: string } }
+        - {
+            in: query,
+            name: page,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            in: query,
+            name: pageSize,
+            schema: { type: integer, minimum: 1, maximum: 80, default: 20 },
+          }
       responses:
-        "200": {description: "标准信封 data 为 tools（摘要不含 prompt/extraInfo）、totalCount、page、pageSize、hasMore"}
-        "401": {description: 未登录}
+        "200":
+          {
+            description: "标准信封 data 为 tools（摘要不含 prompt/extraInfo）、totalCount、page、pageSize、hasMore",
+          }
+        "401": { description: 未登录 }
     post:
       tags: [canvas]
       summary: 创建当前用户的工具
@@ -318,11 +379,11 @@ paths:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/ToolMutation'}
+            schema: { $ref: "#/components/schemas/ToolMutation" }
       responses:
-        "200": {description: 标准信封 data 为完整工具}
-        "400": {description: 参数无效或预览资源不符合要求}
-        "401": {description: 未登录}
+        "200": { description: 标准信封 data 为完整工具 }
+        "400": { description: 参数无效或预览资源不符合要求 }
+        "401": { description: 未登录 }
   /skills/presets:
     get:
       tags: [canvas]
@@ -331,30 +392,59 @@ paths:
       responses:
         "200":
           description: 标准信封 data 为 presets 数组；预设只引用公开且启用的种子技能
-        "500": {$ref: "#/components/responses/Error"}
+        "500": { $ref: "#/components/responses/Error" }
   /skills:
     get:
       tags: [skills]
       summary: 列出技能；在个人技能视图按技能库分类筛选
       parameters:
-        - {in: query, name: scope, schema: {type: string, enum: [public, mine, created, favorites], default: public}}
-        - {in: query, name: libraryCategoryId, description: 用户技能库分类 ID，仅支持 mine 或 created 视图；与 libraryUncategorized 互斥, schema: {type: string}}
-        - {in: query, name: libraryUncategorized, description: 仅列出未归类技能，仅支持 mine 或 created 视图；与 libraryCategoryId 互斥, schema: {type: boolean}}
+        - {
+            in: query,
+            name: scope,
+            schema:
+              {
+                type: string,
+                enum: [public, mine, created, favorites],
+                default: public,
+              },
+          }
+        - {
+            in: query,
+            name: libraryCategoryId,
+            description: 用户技能库分类 ID，仅支持 mine 或 created 视图；与 libraryUncategorized 互斥,
+            schema: { type: string },
+          }
+        - {
+            in: query,
+            name: libraryUncategorized,
+            description: 仅列出未归类技能，仅支持 mine 或 created 视图；与 libraryCategoryId 互斥,
+            schema: { type: boolean },
+          }
       responses:
-        "200": {description: 标准信封 data 为技能列表及分页信息；categories 含共享分类 value、label 和技能广场公开技能 count}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
-        "404": {$ref: "#/components/responses/Error"}
+        "200":
+          {
+            description: 标准信封 data 为技能列表及分页信息；categories 含共享分类 value、label 和技能广场公开技能 count,
+          }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /skills/library-categories:
     get:
       tags: [skills]
       summary: 获取当前用户可见的技能库分类和数量
       parameters:
-        - {in: query, name: scope, schema: {type: string, enum: [mine, created], default: mine}}
+        - {
+            in: query,
+            name: scope,
+            schema: { type: string, enum: [mine, created], default: mine },
+          }
       responses:
-        "200": {description: 标准信封 data 为 categories、totalCount、uncategorizedCount；分类含 id、name、scope、count}
-        "401": {$ref: "#/components/responses/Error"}
+        "200":
+          {
+            description: 标准信封 data 为 categories、totalCount、uncategorizedCount；分类含 id、name、scope、count,
+          }
+        "401": { $ref: "#/components/responses/Error" }
     post:
       tags: [skills]
       summary: 创建个人或平台技能库分类
@@ -366,27 +456,38 @@ paths:
               type: object
               required: [name]
               properties:
-                name: {type: string, minLength: 1, maxLength: 64}
-                scope: {type: string, enum: [personal, platform], default: personal}
+                name: { type: string, minLength: 1, maxLength: 64 }
+                scope:
+                  {
+                    type: string,
+                    enum: [personal, platform],
+                    default: personal,
+                  }
       responses:
-        "200": {description: 标准信封 data.category 为新分类}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200": { description: 标准信封 data.category 为新分类 }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /skills/library-categories/{id}:
     parameters:
-      - {in: path, name: id, required: true, schema: {type: string}}
+      - { in: path, name: id, required: true, schema: { type: string } }
     delete:
       tags: [skills]
       summary: 删除技能库分类并解除相关技能归类，不删除技能
       responses:
-        "200": {description: "标准信封 data 为 {deleted: true}"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
-        "404": {$ref: "#/components/responses/Error"}
+        "200": { description: "标准信封 data 为 {deleted: true}" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /skills/{id}/library-category:
     parameters:
-      - {in: path, name: id, required: true, description: 技能 ID, schema: {type: string}}
+      - {
+          in: path,
+          name: id,
+          required: true,
+          description: 技能 ID,
+          schema: { type: string },
+        }
     patch:
       tags: [skills]
       summary: 为当前用户已加入或自建的技能设置/清除技能库分类
@@ -398,43 +499,58 @@ paths:
               type: object
               required: [categoryId]
               properties:
-                categoryId: {type: string, description: 个人分类或可见平台分类 ID；空字符串表示取消归类}
+                categoryId:
+                  {
+                    type: string,
+                    description: 个人分类或可见平台分类 ID；空字符串表示取消归类,
+                  }
       responses:
-        "200": {description: 标准信封 data.skill 为更新后的技能}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
-        "404": {$ref: "#/components/responses/Error"}
+        "200": { description: 标准信封 data.skill 为更新后的技能 }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /tools/{id}:
     parameters:
-      - {in: path, name: id, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      - {
+          in: path,
+          name: id,
+          required: true,
+          schema: { type: integer, format: int64, minimum: 1 },
+        }
     get:
       tags: [canvas]
       summary: 查询可见且启用工具的完整详情
       responses:
-        "200": {description: 标准信封 data 为完整工具，包含 prompt 和 extraInfo}
-        "404": {description: 工具不存在或不可见}
+        "200":
+          { description: 标准信封 data 为完整工具，包含 prompt 和 extraInfo }
+        "404": { description: 工具不存在或不可见 }
     delete:
       tags: [canvas]
       summary: 删除自己的用户工具及关联收藏，不删除预览文件
       responses:
-        "200": {description: "标准信封 data 为 {deleted: true}"}
-        "404": {description: 工具不存在或不能删除}
+        "200": { description: "标准信封 data 为 {deleted: true}" }
+        "404": { description: 工具不存在或不能删除 }
   /tools/{id}/favorite:
     parameters:
-      - {in: path, name: id, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      - {
+          in: path,
+          name: id,
+          required: true,
+          schema: { type: integer, format: int64, minimum: 1 },
+        }
     post:
       tags: [canvas]
       summary: 幂等收藏可见工具
       responses:
-        "200": {description: 标准信封 data 为完整工具和收藏状态}
-        "404": {description: 工具不存在或不可见}
+        "200": { description: 标准信封 data 为完整工具和收藏状态 }
+        "404": { description: 工具不存在或不可见 }
     delete:
       tags: [canvas]
       summary: 幂等取消收藏可见工具
       responses:
-        "200": {description: 标准信封 data 为完整工具和收藏状态}
-        "404": {description: 工具不存在或不可见}
+        "200": { description: 标准信封 data 为完整工具和收藏状态 }
+        "404": { description: 工具不存在或不可见 }
   /model-catalog:
     get:
       tags: [models]
@@ -508,7 +624,15 @@ paths:
                                           maxLength: 12
                                         color:
                                           type: string
-                                          enum: [purple, blue, green, gold, orange, pink]
+                                          enum:
+                                            [
+                                              purple,
+                                              blue,
+                                              green,
+                                              gold,
+                                              orange,
+                                              pink,
+                                            ]
                                   description:
                                     type: string
                                     maxLength: 500
@@ -1056,7 +1180,7 @@ paths:
                   type: string
                   minLength: 64
                   maxLength: 64
-                  pattern: '^[0-9a-fA-F]{64}$'
+                  pattern: "^[0-9a-fA-F]{64}$"
                 reason:
                   type: string
                   maxLength: 2000
@@ -1209,17 +1333,59 @@ paths:
                           required: [id, priceVersion, prices]
                           properties:
                             id: { type: string, minLength: 1 }
-                            priceVersion: { type: integer, format: int64, minimum: 1 }
+                            priceVersion:
+                              { type: integer, format: int64, minimum: 1 }
                             prices:
                               type: object
                               additionalProperties: false
                               description: 按次/秒仅unit字段；文本Token为输入、输出、缓存；视频Token仅输出。必须完整提交对应字段。
                               properties:
-                                unitPriceMicrocredits: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
-                                inputTokenPriceMicrocredits: { type: integer, format: int64, minimum: 0, maximum: 1000000000000 }
-                                outputTokenPriceMicrocredits: { type: integer, format: int64, minimum: 0, maximum: 1000000000000 }
-                                cachedTokenPriceMicrocredits: { type: integer, format: int64, minimum: 0, maximum: 1000000000000 }
-            example: { models: [{ modelId: MODEL001, priceVersion: 4, priceTiers: [{ id: TIER001, priceVersion: 8, prices: { unitPriceMicrocredits: 1370000 } }] }] }
+                                unitPriceMicrocredits:
+                                  {
+                                    type: integer,
+                                    format: int64,
+                                    minimum: 0,
+                                    maximum: 9007199254740991,
+                                  }
+                                inputTokenPriceMicrocredits:
+                                  {
+                                    type: integer,
+                                    format: int64,
+                                    minimum: 0,
+                                    maximum: 1000000000000,
+                                  }
+                                outputTokenPriceMicrocredits:
+                                  {
+                                    type: integer,
+                                    format: int64,
+                                    minimum: 0,
+                                    maximum: 1000000000000,
+                                  }
+                                cachedTokenPriceMicrocredits:
+                                  {
+                                    type: integer,
+                                    format: int64,
+                                    minimum: 0,
+                                    maximum: 1000000000000,
+                                  }
+            example:
+              {
+                models:
+                  [
+                    {
+                      modelId: MODEL001,
+                      priceVersion: 4,
+                      priceTiers:
+                        [
+                          {
+                            id: TIER001,
+                            priceVersion: 8,
+                            prices: { unitPriceMicrocredits: 1370000 },
+                          },
+                        ],
+                    },
+                  ],
+              }
       responses:
         "200":
           description: 更新成功，data.updated 为更新的模型数量
@@ -1373,9 +1539,26 @@ paths:
                 type: object
                 required: [resourceId]
                 properties:
-                  resourceId: {type: string}
-                  purpose: {type: string, enum: [display, copy, download, browser-process, provider-input], default: display}
-                  variant: {type: string, enum: [original, playback], default: original}
+                  resourceId: { type: string }
+                  purpose:
+                    {
+                      type: string,
+                      enum:
+                        [
+                          display,
+                          copy,
+                          download,
+                          browser-process,
+                          provider-input,
+                        ],
+                      default: display,
+                    }
+                  variant:
+                    {
+                      type: string,
+                      enum: [original, playback],
+                      default: original,
+                    }
       responses:
         "200":
           $ref: "#/components/responses/Envelope"
@@ -1398,10 +1581,16 @@ paths:
           description: 仅返回统一访问描述，不返回文件正文。
         - in: query
           name: variant
-          schema: { type: string, enum: [original, playback], default: original }
+          schema:
+            { type: string, enum: [original, playback], default: original }
         - in: query
           name: purpose
-          schema: { type: string, enum: [display, download, browser-process], default: display }
+          schema:
+            {
+              type: string,
+              enum: [display, download, browser-process],
+              default: display,
+            }
       responses:
         "200":
           description: 文件流
@@ -1519,10 +1708,683 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /ecommerce/options:
+    {
+      "get":
+        {
+          "tags": ["ecommerce"],
+          "summary": "有效模型、默认配置、平台和个人启用状态与预设",
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/preferences:
+    {
+      "get":
+        {
+          "tags": ["ecommerce"],
+          "summary": "当前用户的默认创作设置",
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+      "put":
+        {
+          "tags": ["ecommerce"],
+          "summary": "CAS 保存个人默认设置，仅影响后续导入",
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        { "$ref": "#/components/schemas/EcommercePresetWrite" },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/presets:
+    {
+      "get":
+        {
+          "tags": ["ecommerce"],
+          "summary": "当前用户个人预设",
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+      "put":
+        {
+          "tags": ["ecommerce"],
+          "summary": "按名称和修订号保存预设，operationId 防重",
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        { "$ref": "#/components/schemas/EcommercePresetWrite" },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/presets/{id}:
+    {
+      "delete":
+        {
+          "tags": ["ecommerce"],
+          "summary": "删除本人预设；重复同一操作返回原结果",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+              {
+                "in": "query",
+                "name": "revision",
+                "schema": { "type": "integer" },
+              },
+              {
+                "in": "query",
+                "name": "operationId",
+                "schema": { "type": "string" },
+              },
+            ],
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/batches:
+    {
+      "post":
+        {
+          "tags": ["ecommerce"],
+          "summary": "每张原图导入为一个商品；按 operationId 防重",
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        { "$ref": "#/components/schemas/EcommerceImport" },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+      "get":
+        {
+          "tags": ["ecommerce"],
+          "summary": "本人商品批次",
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/batches/{id}:
+    {
+      "get":
+        {
+          "tags": ["ecommerce"],
+          "summary": "本人批次及商品",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+            ],
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/products:
+    {
+      "get":
+        {
+          "tags": ["ecommerce"],
+          "summary": "本人商品分页，可筛选批次及归档",
+          "parameters":
+            [
+              {
+                "in": "query",
+                "name": "page",
+                "schema": { "type": "integer" },
+              },
+              {
+                "in": "query",
+                "name": "pageSize",
+                "schema": { "type": "integer" },
+              },
+              {
+                "in": "query",
+                "name": "batchId",
+                "schema": { "type": "string" },
+              },
+              {
+                "in": "query",
+                "name": "archived",
+                "schema": { "type": "boolean" },
+              },
+            ],
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/products/{id}:
+    {
+      "get":
+        {
+          "tags": ["ecommerce"],
+          "summary": "本人商品及当前轮次、历史索引；关闭后仍可读",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+            ],
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+      "put":
+        {
+          "tags": ["ecommerce"],
+          "summary": "CAS 更新资料、后续设置或归档，原轮次快照保留",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+            ],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "$ref": "#/components/schemas/EcommerceProductWrite",
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+      "delete":
+        {
+          "tags": ["ecommerce"],
+          "summary": "仅删除无生成记录草稿；归属、修订号和操作标识校验",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+              {
+                "in": "query",
+                "name": "revision",
+                "schema": { "type": "integer" },
+              },
+              {
+                "in": "query",
+                "name": "operationId",
+                "schema": { "type": "string" },
+              },
+            ],
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/products/{id}/runs/{runId}:
+    {
+      "get":
+        {
+          "tags": ["ecommerce"],
+          "summary": "读取本人历史轮次及图片版本",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+              {
+                "in": "path",
+                "name": "runId",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+            ],
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/products/{id}/quote:
+    {
+      "post":
+        {
+          "tags": ["ecommerce"],
+          "summary": "当前目录报价，有效期15分钟，文本和图片全部计费",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+            ],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "$ref": "#/components/schemas/EcommerceQuoteRequest",
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/products/{id}/commands:
+    {
+      "post":
+        {
+          "tags": ["ecommerce"],
+          "summary": "确认报价或编辑；付费操作仅消费服务器报价的授权范围",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+            ],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        { "$ref": "#/components/schemas/EcommerceCommand" },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/batch-commands:
+    {
+      "post":
+        {
+          "tags": ["ecommerce"],
+          "summary": "逐商品返回 success、skipped 或 failed，不回滚其它商品",
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "required": ["items"],
+                          "properties":
+                            {
+                              "items":
+                                {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "maxItems": 100,
+                                  "items":
+                                    {
+                                      "type": "object",
+                                      "required": ["productId", "command"],
+                                      "properties":
+                                        {
+                                          "productId": { "type": "string" },
+                                          "command":
+                                            {
+                                              "$ref": "#/components/schemas/EcommerceCommand",
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/products/{id}/steps/{stepId}/recover:
+    {
+      "post":
+        {
+          "tags": ["ecommerce"],
+          "summary": "查询原上游任务或恢复原媒体保存，不重复生成",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+              {
+                "in": "path",
+                "name": "stepId",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+            ],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                { "application/json": { "schema": { "type": "object" } } },
+            },
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/export:
+    {
+      "post":
+        {
+          "tags": ["ecommerce"],
+          "summary": "导出本人商品选中成功版本、标题和缺失清单",
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        {
+                          "type": "object",
+                          "required": ["productIds"],
+                          "properties":
+                            {
+                              "productIds":
+                                {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "maxItems": 100,
+                                  "items": { "type": "string" },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "完成校验后下载 ZIP，清单说明部分缺失",
+                  "content":
+                    {
+                      "application/zip":
+                        { "schema": { "type": "string", "format": "binary" } },
+                    },
+                },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /ecommerce/products/{id}/runs/{runId}/export:
+    {
+      "post":
+        {
+          "tags": ["ecommerce"],
+          "summary": "关闭后仍可导出本人历史轮次",
+          "parameters":
+            [
+              {
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+              {
+                "in": "path",
+                "name": "runId",
+                "required": true,
+                "schema": { "type": "string" },
+              },
+            ],
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                { "application/json": { "schema": { "type": "object" } } },
+            },
+          "responses":
+            {
+              "200":
+                {
+                  "description": "完成校验后下载 ZIP，清单说明部分缺失",
+                  "content":
+                    {
+                      "application/zip":
+                        { "schema": { "type": "string", "format": "binary" } },
+                    },
+                },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
+  /admin/ecommerce/settings:
+    {
+      "get":
+        {
+          "tags": ["admin"],
+          "summary": "管理员读取商品模块配置，默认关闭",
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+      "put":
+        {
+          "tags": ["admin"],
+          "summary": "CAS 保存并验证模型能力、规格及编排限制；不自动开放",
+          "requestBody":
+            {
+              "required": true,
+              "content":
+                {
+                  "application/json":
+                    {
+                      "schema":
+                        { "$ref": "#/components/schemas/EcommerceSettings" },
+                    },
+                },
+            },
+          "responses":
+            {
+              "200": { "$ref": "#/components/responses/Envelope" },
+              "401": { "$ref": "#/components/responses/Error" },
+              "403": { "$ref": "#/components/responses/Error" },
+              "404": { "$ref": "#/components/responses/Error" },
+              "409": { "$ref": "#/components/responses/Error" },
+            },
+        },
+    }
 components:
   parameters:
-    PromotionPage: {in: query, name: page, schema: {type: integer, minimum: 1, maximum: 1000000, default: 1}}
-    PromotionPageSize: {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+    PromotionPage:
+      {
+        in: query,
+        name: page,
+        schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 },
+      }
+    PromotionPageSize:
+      {
+        in: query,
+        name: pageSize,
+        schema: { type: integer, minimum: 1, maximum: 100, default: 20 },
+      }
     AgentRunID:
       name: id
       in: path
@@ -1535,6 +2397,332 @@ components:
       in: cookie
       name: open_ai_canvas_session
   schemas:
+    EcommerceGuard:
+      {
+        "type": "object",
+        "required": ["revision", "operationId"],
+        "properties":
+          {
+            "revision": { "type": "integer", "format": "int64", "minimum": 0 },
+            "operationId":
+              { "type": "string", "minLength": 1, "maxLength": 120 },
+          },
+      }
+    EcommerceSelection:
+      {
+        "type": "object",
+        "description": "logicalModelId 与 channelId/channelModelKey 两种选择互斥，最终能力由服务端有效目录校验",
+        "properties":
+          {
+            "logicalModelId": { "type": "string" },
+            "channelId": { "type": "string" },
+            "channelModelKey": { "type": "string" },
+          },
+      }
+    EcommerceOutput:
+      {
+        "type": "object",
+        "required": ["count", "size", "copyMode"],
+        "properties":
+          {
+            "count": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "size": { "type": "string" },
+            "quality": { "type": "string" },
+            "copyMode": { "type": "string", "enum": ["none", "typeset"] },
+          },
+      }
+    EcommerceConfig:
+      {
+        "type": "object",
+        "required":
+          [
+            "planner",
+            "titleModel",
+            "imageModel",
+            "hero",
+            "detail",
+            "titleCount",
+            "titleMaxLength",
+            "style",
+            "platform",
+            "market",
+            "language",
+          ],
+        "properties":
+          {
+            "planner": { "$ref": "#/components/schemas/EcommerceSelection" },
+            "titleModel": { "$ref": "#/components/schemas/EcommerceSelection" },
+            "imageModel": { "$ref": "#/components/schemas/EcommerceSelection" },
+            "hero": { "$ref": "#/components/schemas/EcommerceOutput" },
+            "detail": { "$ref": "#/components/schemas/EcommerceOutput" },
+            "titleCount":
+              { "type": "integer", "minimum": 1, "maximum": 10, "default": 3 },
+            "titleMaxLength":
+              {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 300,
+                "default": 80,
+              },
+            "style": { "type": "string" },
+            "platform": { "type": "string" },
+            "market": { "type": "string" },
+            "language": { "type": "string" },
+            "planningInstructions": { "type": "string", "maxLength": 4000 },
+            "refinementInstructions": { "type": "string", "maxLength": 4000 },
+            "generationInstructions": { "type": "string", "maxLength": 4000 },
+          },
+      }
+    EcommerceSettings:
+      {
+        "type": "object",
+        "required":
+          [
+            "revision",
+            "defaults",
+            "batchLimit",
+            "productConcurrency",
+            "textConcurrency",
+            "imageConcurrency",
+            "productImageConcurrency",
+          ],
+        "properties":
+          {
+            "revision": { "type": "integer", "format": "int64", "minimum": 1 },
+            "defaults": { "$ref": "#/components/schemas/EcommerceConfig" },
+            "batchLimit":
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 20,
+              },
+            "productConcurrency":
+              { "type": "integer", "minimum": 1, "default": 3 },
+            "textConcurrency":
+              { "type": "integer", "minimum": 1, "default": 2 },
+            "imageConcurrency":
+              { "type": "integer", "minimum": 1, "default": 4 },
+            "productImageConcurrency":
+              { "type": "integer", "minimum": 1, "default": 2 },
+          },
+      }
+    EcommercePresetWrite:
+      {
+        "allOf":
+          [
+            { "$ref": "#/components/schemas/EcommerceGuard" },
+            {
+              "type": "object",
+              "required": ["config"],
+              "properties":
+                {
+                  "name": { "type": "string", "maxLength": 120 },
+                  "config": { "$ref": "#/components/schemas/EcommerceConfig" },
+                },
+            },
+          ],
+      }
+    EcommerceImport:
+      {
+        "type": "object",
+        "required": ["operationId", "items"],
+        "properties":
+          {
+            "operationId":
+              { "type": "string", "minLength": 1, "maxLength": 120 },
+            "name": { "type": "string" },
+            "config": { "$ref": "#/components/schemas/EcommerceConfig" },
+            "items":
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 100,
+                "items":
+                  {
+                    "type": "object",
+                    "required": ["resourceId", "name"],
+                    "properties":
+                      {
+                        "resourceId": { "type": "string" },
+                        "name": { "type": "string", "maxLength": 200 },
+                        "sellingPoints":
+                          { "type": "string", "maxLength": 8000 },
+                      },
+                  },
+              },
+          },
+      }
+    EcommerceProductWrite:
+      {
+        "allOf":
+          [
+            { "$ref": "#/components/schemas/EcommerceGuard" },
+            {
+              "type": "object",
+              "properties":
+                {
+                  "name": { "type": "string", "maxLength": 200 },
+                  "sellingPoints": { "type": "string", "maxLength": 8000 },
+                  "archived": { "type": "boolean" },
+                  "config": { "$ref": "#/components/schemas/EcommerceConfig" },
+                },
+            },
+          ],
+      }
+    EcommerceQuoteScope:
+      {
+        "type": "object",
+        "required": ["action"],
+        "properties":
+          {
+            "action":
+              {
+                "type": "string",
+                "enum":
+                  [
+                    "planning",
+                    "auto",
+                    "generate",
+                    "continue",
+                    "redo-review",
+                    "redo-auto",
+                    "redo-image",
+                    "redo-titles",
+                    "retry-step",
+                    "append",
+                    "apply-config",
+                  ],
+              },
+            "branches":
+              {
+                "type": "array",
+                "items": { "type": "string", "enum": ["hero", "detail"] },
+              },
+            "slotId": { "type": "string" },
+            "stepId": { "type": "string" },
+            "additionalHero": { "type": "integer", "minimum": 0 },
+            "additionalDetail": { "type": "integer", "minimum": 0 },
+            "config": { "$ref": "#/components/schemas/EcommerceConfig" },
+          },
+      }
+    EcommerceQuoteRequest:
+      {
+        "allOf":
+          [
+            { "$ref": "#/components/schemas/EcommerceQuoteScope" },
+            {
+              "type": "object",
+              "required": ["revision"],
+              "properties":
+                {
+                  "revision":
+                    { "type": "integer", "format": "int64", "minimum": 1 },
+                },
+            },
+          ],
+      }
+    EcommerceCommand:
+      {
+        "allOf":
+          [
+            { "$ref": "#/components/schemas/EcommerceGuard" },
+            {
+              "type": "object",
+              "required": ["action"],
+              "properties":
+                {
+                  "action":
+                    {
+                      "type": "string",
+                      "enum":
+                        [
+                          "planning",
+                          "auto",
+                          "generate",
+                          "continue",
+                          "redo-review",
+                          "redo-auto",
+                          "redo-image",
+                          "redo-titles",
+                          "retry-step",
+                          "append",
+                          "apply-config",
+                          "pause",
+                          "save-plan",
+                          "restore-plan",
+                          "save-draft",
+                          "select-version",
+                        ],
+                    },
+                  "quoteId": { "type": "string" },
+                  "budgetMicrocredits":
+                    {
+                      "type": "integer",
+                      "format": "int64",
+                      "minimum": 0,
+                      "maximum": 1000000000000,
+                    },
+                  "branch": { "type": "string", "enum": ["hero", "detail"] },
+                  "branchRevision": { "type": "integer", "format": "int64" },
+                  "plan":
+                    {
+                      "type": "object",
+                      "description": "严格槽位合同的完整策划快照",
+                    },
+                  "slotId": { "type": "string" },
+                  "slotRevision": { "type": "integer", "format": "int64" },
+                  "draft":
+                    {
+                      "type": "object",
+                      "description": "只接受准确文案和提示词调整，保留服务端内部细化元数据",
+                    },
+                  "versionId": { "type": "string" },
+                },
+            },
+          ],
+      }
+    EcommerceQuote:
+      {
+        "type": "object",
+        "required":
+          [
+            "id",
+            "productId",
+            "productRevision",
+            "scope",
+            "estimatedMicrocredits",
+            "budgetMicrocredits",
+            "textCalls",
+            "imageCalls",
+            "expiresAt",
+          ],
+        "properties":
+          {
+            "id": { "type": "string" },
+            "productId": { "type": "string" },
+            "productRevision": { "type": "integer", "format": "int64" },
+            "runRevision": { "type": "integer", "format": "int64" },
+            "scope": { "$ref": "#/components/schemas/EcommerceQuoteScope" },
+            "estimatedMicrocredits":
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0,
+                "maximum": 1000000000000,
+              },
+            "budgetMicrocredits":
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0,
+                "maximum": 1000000000000,
+              },
+            "textCalls": { "type": "integer", "minimum": 0 },
+            "imageCalls": { "type": "integer", "minimum": 0 },
+            "expiresAt": { "type": "string", "format": "date-time" },
+          },
+      }
     PromotionMicrocredits:
       type: string
       pattern: "^[0-9]+$"
@@ -1543,64 +2731,75 @@ components:
       type: object
       required: [enabled, ratioBps, freezeDays, version]
       properties:
-        enabled: {type: boolean, default: false}
-        ratioBps: {type: integer, minimum: 0, maximum: 10000, default: 0}
-        freezeDays: {type: integer, minimum: 0, maximum: 365, default: 0}
-        version: {type: integer, format: int64, minimum: 0}
+        enabled: { type: boolean, default: false }
+        ratioBps: { type: integer, minimum: 0, maximum: 10000, default: 0 }
+        freezeDays: { type: integer, minimum: 0, maximum: 365, default: 0 }
+        version: { type: integer, format: int64, minimum: 0 }
     PromotionOverview:
       type: object
       properties:
-        policy: {$ref: "#/components/schemas/PromotionPolicy"}
+        policy: { $ref: "#/components/schemas/PromotionPolicy" }
         profile:
           type: object
           properties:
-            userId: {type: string}
-            inviteCode: {type: string, nullable: true}
-            paused: {type: boolean}
-            ratioOverrideBps: {type: integer, nullable: true}
-            version: {type: integer, format: int64}
-        effectiveRatioBps: {type: integer}
-        canPromote: {type: boolean}
-        inviteCount: {type: integer}
-        totalMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        frozenMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        availableMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        transferredMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        voidedMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        serverTime: {type: string, format: date-time}
+            userId: { type: string }
+            inviteCode: { type: string, nullable: true }
+            paused: { type: boolean }
+            ratioOverrideBps: { type: integer, nullable: true }
+            version: { type: integer, format: int64 }
+        effectiveRatioBps: { type: integer }
+        canPromote: { type: boolean }
+        inviteCount: { type: integer }
+        totalMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        frozenMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        availableMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        transferredMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        voidedMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        serverTime: { type: string, format: date-time }
     CommissionRecord:
       type: object
       properties:
-        id: {type: string}
-        paymentOrderId: {type: string}
-        inviterId: {type: string}
-        baseMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        amountMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        transferredMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        voidedMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        ratioBps: {type: integer}
-        policyVersion: {type: integer, format: int64}
-        profileVersion: {type: integer, format: int64}
-        freezeDays: {type: integer}
-        availableAt: {type: string, format: date-time}
-        createdAt: {type: string, format: date-time}
-        updatedAt: {type: string, format: date-time}
-        voidReason: {type: string}
-        voidedBy: {type: string}
+        id: { type: string }
+        paymentOrderId: { type: string }
+        inviterId: { type: string }
+        baseMicrocredits: { $ref: "#/components/schemas/PromotionMicrocredits" }
+        amountMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        transferredMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        voidedMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        ratioBps: { type: integer }
+        policyVersion: { type: integer, format: int64 }
+        profileVersion: { type: integer, format: int64 }
+        freezeDays: { type: integer }
+        availableAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        voidReason: { type: string }
+        voidedBy: { type: string }
     ToolMutation:
       type: object
       required: [type, label, prompt]
       properties:
-        type: {type: string, enum: [style, motion, nine_grid, effect]}
-        label: {type: string, description: 名称最多 120 字节}
-        prompt: {type: string, description: 最多 8000 字节，不允许嵌套工具标签}
-        visibility: {type: string, enum: [private, public], default: private}
-        desc: {type: string}
-        tag: {type: string}
-        cover: {type: string, description: 本人已上传完成的资源 URL，仅限私有工具}
-        mediaUrl: {type: string, description: 本人已上传完成的资源 URL，仅限私有工具}
-        extraInfo: {type: array, items: {type: string}}
-        ratio: {type: string}
+        type: { type: string, enum: [style, motion, nine_grid, effect] }
+        label: { type: string, description: 名称最多 120 字节 }
+        prompt:
+          { type: string, description: 最多 8000 字节，不允许嵌套工具标签 }
+        visibility: { type: string, enum: [private, public], default: private }
+        desc: { type: string }
+        tag: { type: string }
+        cover:
+          { type: string, description: 本人已上传完成的资源 URL，仅限私有工具 }
+        mediaUrl:
+          { type: string, description: 本人已上传完成的资源 URL，仅限私有工具 }
+        extraInfo: { type: array, items: { type: string } }
+        ratio: { type: string }
     ModelRequestIntent:
       type: object
       required: [capability]
@@ -1629,7 +2828,8 @@ components:
             videoGenerateAudio: true
     LogicalModelQuote:
       type: object
-      required: [logicalModelId, billingMode, quantity, amountMicrocredits, estimated]
+      required:
+        [logicalModelId, billingMode, quantity, amountMicrocredits, estimated]
       properties:
         logicalModelId:
           type: string
@@ -1655,7 +2855,19 @@ components:
     VideoTokenEstimate:
       type: object
       description: 仅视频 Token 报价返回；将火山公式用量和平台预留余量分开披露
-      required: [formulaTokens, reservedTokens, outputWidth, outputHeight, framesPerSecond, outputSeconds, referenceSeconds, referenceDurationEstimated, dimensionsEstimated, reservationMarginPercent]
+      required:
+        [
+          formulaTokens,
+          reservedTokens,
+          outputWidth,
+          outputHeight,
+          framesPerSecond,
+          outputSeconds,
+          referenceSeconds,
+          referenceDurationEstimated,
+          dimensionsEstimated,
+          reservationMarginPercent,
+        ]
       properties:
         formulaTokens:
           type: integer
@@ -1736,7 +2948,8 @@ components:
     CloudAgentRequest:
       type: object
       additionalProperties: false
-      required: [canvasId, prompt, permissionMode, contextScope, budget, idempotencyKey]
+      required:
+        [canvasId, prompt, permissionMode, contextScope, budget, idempotencyKey]
       properties:
         canvasId:
           type: string
@@ -1815,7 +3028,22 @@ components:
           properties:
             code:
               type: integer
-              enum: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504, 40301, 40901, 42901]
+              enum:
+                [
+                  400,
+                  401,
+                  403,
+                  404,
+                  409,
+                  429,
+                  500,
+                  502,
+                  503,
+                  504,
+                  40301,
+                  40901,
+                  42901,
+                ]
             data:
               nullable: true
             reason:

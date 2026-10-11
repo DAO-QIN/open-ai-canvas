@@ -63,3 +63,45 @@ func TestCanvasHistoryCompositeKeyMigration(t *testing.T) {
 		t.Fatalf("history refs not copied/verified: %d %v", count, err)
 	}
 }
+
+func TestFreshMigrationPreservesSourceSequencesAndOfficialAvailability(t *testing.T) {
+	source, err := database.Open(database.Config{Driver: "sqlite", DSN: "file:" + t.Name() + "-source?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := database.Open(database.Config{Driver: "sqlite", DSN: "file:" + t.Name() + "-target?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.MigrateSchema(source); err != nil {
+		t.Fatal(err)
+	}
+	if err := source.Model(&model.IDSequence{}).Where("name = ?", "id:MODEL").Update("value", 41).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := source.Model(&model.PluginPlatformState{}).Where("plugin_id = ?", model.EcommercePluginID).Update("available", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := target.Transaction(func(tx *gorm.DB) error {
+		if err := createFreshMigrationSchema(tx); err != nil {
+			return err
+		}
+		for _, migration := range migrations() {
+			if _, err := migration.run(source, tx, true); err != nil {
+				return err
+			}
+		}
+		return database.ReconcilePrefixedIDSequences(tx)
+	}); err != nil {
+		t.Fatalf("fresh migration must copy populated sequence and official state snapshots: %v", err)
+	}
+	for _, migration := range migrations() {
+		if _, err := migration.run(source, target, false); err != nil {
+			t.Fatalf("repeat verification changed %s: %v", migration.name, err)
+		}
+	}
+	id, err := database.AllocatePrefixedID(target, "MODEL")
+	if err != nil || id != "MODEL_000042" {
+		t.Fatalf("source sequence was not preserved: %s %v", id, err)
+	}
+}

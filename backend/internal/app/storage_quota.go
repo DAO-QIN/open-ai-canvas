@@ -29,7 +29,7 @@ func (s *Service) AccountFileStorageUsage(userID string) (*AccountFileStorageUsa
 }
 
 func structuredBytes(usage repository.UserStorageUsage) int64 {
-	return usage.AssetBytes + usage.CanvasBytes
+	return usage.AssetBytes + usage.CanvasBytes + usage.EcommerceBytes
 }
 
 func validateStructuredStorageQuotaWithPolicy(usage repository.UserStorageUsage, kind string, creating bool, deltaBytes int64, policy RuntimeResourcePolicy) error {

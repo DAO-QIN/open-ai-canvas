@@ -25,6 +25,7 @@ export type RuntimeLimits = {
 };
 
 export type FeatureAvailability = {
+    ecommerceEnabled?: boolean;
     promotionEnabled?: boolean;
     welcomeEnabled: boolean;
     shortDramaEnabled: boolean;
@@ -41,6 +42,7 @@ export type FeatureAvailability = {
 };
 
 export const defaultFeatureAvailability: FeatureAvailability = {
+    ecommerceEnabled: false,
     promotionEnabled: false,
     welcomeEnabled: true,
     shortDramaEnabled: true,

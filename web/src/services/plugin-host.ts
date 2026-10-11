@@ -1,5 +1,6 @@
 import { requestToolResponse, type ResponseFunctionTool, type ResponseInputMessage, type ToolChoice } from "@/services/api/image";
 import { pluginStorageFor } from "@/lib/plugins/plugin-storage";
+import { createOfficialApplicationHostServices } from "@/services/plugin-applications";
 import type { AiConfig } from "@/stores/use-config-store";
 import type { PluginHostContext, PluginInstallation, PluginTextRequest, RegisteredPlugin } from "@/lib/plugins/plugin-types";
 
@@ -11,6 +12,7 @@ export function createPluginHostContext(plugin: RegisteredPlugin, installation: 
         storage: pluginStorageFor(plugin.manifest.id),
         config: installation.config,
         services: {
+            applications: createOfficialApplicationHostServices({ manifest: plugin.manifest, permissions, source: plugin.source }),
             ai: {
                 text: {
                     requestToolResponse: async (request: PluginTextRequest) => {

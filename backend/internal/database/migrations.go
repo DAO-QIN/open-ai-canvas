@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 50
+const CurrentSchemaVersion int64 = 51
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -179,6 +179,7 @@ var schemaMigrations = []migration{
 		}
 		return nil
 	}},
+	{version: 51, name: "official_ecommerce_studio", checksum: "sha256:official-ecommerce-studio-v51-20261011", apply: migrateEcommerce},
 }
 
 func migratePrefixedIDSequenceReconcile(tx *gorm.DB) error {

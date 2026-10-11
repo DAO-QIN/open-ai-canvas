@@ -97,6 +97,7 @@ const adminNavigation: Array<{ label: string; items: AdminNavigationItem[] }> = 
         label: "平台配置",
         items: [
             { path: "/admin/plugins", label: "插件管理", description: "平台可用性、上传与卸载", icon: <PlugZap className="size-4" /> },
+            { path: "/admin/ecommerce", label: "商品套图", description: "官方创作模块、默认模型与限制", icon: <PlugZap className="size-4" /> },
             { path: "/admin/skill-curation", label: "技能分类", description: "平台策展与分类维护", icon: <PlugZap className="size-4" /> },
             { path: "/admin/settings/appearance", label: "站点及外观", description: "品牌、SEO、备案与皮肤", icon: <Palette className="size-4" /> },
             { path: "/admin/settings/features", label: "功能开放", description: "工作台、插件与模型能力", icon: <ToggleLeft className="size-4" /> },
