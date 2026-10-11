@@ -95,7 +95,7 @@ func consumeVerification(tx *gorm.DB, id string, now time.Time) error {
 	}
 	return nil
 }
-func (r *Repository) CreateUserWithVerification(user *model.User, id string) error {
+func (r *Repository) CreateUserWithVerification(user *model.User, id string, hooks ...RegistrationHook) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := lockRegistrationEmail(tx, user.Email); err != nil {
 			return err
@@ -106,7 +106,7 @@ func (r *Repository) CreateUserWithVerification(user *model.User, id string) err
 		if err := consumeVerification(tx, id, time.Now()); err != nil {
 			return err
 		}
-		return tx.Create(user).Error
+		return createRegistrationUser(tx, user, hooks)
 	})
 }
 func (r *Repository) CompleteAuthVerification(v *model.AuthVerification, bind bool) (*model.User, error) {

@@ -62,6 +62,7 @@ export type PaymentOrder = {
     providerPaidAt?: string;
     creditedAt?: string;
     closedAt?: string;
+    lastError?: string;
     createdAt: string;
     updatedAt: string;
 };

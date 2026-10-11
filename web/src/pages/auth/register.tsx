@@ -9,6 +9,7 @@ import { ApiError } from "@/services/api/request";
 import { VerificationFields } from "@/components/auth/verification-fields";
 import { emptyVerification, methodLabels, verificationMethods, type VerificationMethod } from "@/services/api/verification";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
+import { validateInviteCode } from "@/services/api/promotion";
 
 type AuthSettings = Awaited<ReturnType<typeof getAuthSettings>>;
 
@@ -19,6 +20,7 @@ export default function RegisterPage() {
     const brandName = useAppearanceStore((state) => state.appearance.brandName) || "平台";
     const [settings, setSettings] = useState<AuthSettings | null>(null);
     const [username, setUsername] = useState("");
+    const [inviteCode, setInviteCode] = useState(() => (params.get("inviteCode") ?? "").trim().toUpperCase());
     const [email, setEmail] = useState("");
     const [verification, setVerification] = useState({ ...emptyVerification });
     const [method, setMethod] = useState<VerificationMethod>("email");
@@ -74,7 +76,9 @@ export default function RegisterPage() {
         setSubmitting(true);
         try {
             if (!settings?.firstUser && !verification.ticket) throw new Error("请先获取本次注册验证码");
-            await register({ username, ...(settings?.firstUser ? { email } : verification), displayName, password, acceptedTerms: agreementAccepted });
+            const code = settings?.firstUser ? "" : inviteCode.trim().toUpperCase();
+            if (code && !(await validateInviteCode(code)).valid) throw new Error("邀请码无效或推广已暂停，请清除或更换邀请码后重试");
+            await register({ username, ...(settings?.firstUser ? { email } : verification), displayName, password, acceptedTerms: agreementAccepted, inviteCode: code || undefined });
             const { applyUserSession } = await import("@/lib/user-session");
             await applyUserSession(await getAuthSession());
             if (!settings?.firstUser) window.sessionStorage.setItem("infinite-canvas:model-setup-guide", "1");
@@ -170,6 +174,8 @@ export default function RegisterPage() {
                 </AuthField>
             </div>
 
+            {!settings?.firstUser ? <AuthField label="邀请码（选填）"><Input value={inviteCode} maxLength={16} disabled={submitting} onChange={(event) => setInviteCode(event.target.value.toUpperCase())} placeholder="由邀请链接自动填写，也可手动输入" allowClear /><span className="auth-scene-label text-xs">仅注册时绑定，绑定后不能更换邀请人。</span></AuthField> : null}
+
             {settingsFailed ? (
                 <Notice icon={<TriangleAlert className="size-3.5" />} tone="amber">
                     <span>
@@ -200,7 +206,7 @@ export default function RegisterPage() {
                     <Divider plain className="auth-scene-divider">
                         或
                     </Divider>
-                    <Button size="large" block disabled={!agreementAccepted} icon={<LinuxDOIcon />} href={agreementAccepted ? linuxDOLoginURL(next, true) : undefined}>
+                    <Button size="large" block disabled={!agreementAccepted} icon={<LinuxDOIcon />} href={agreementAccepted ? linuxDOLoginURL(next, true, inviteCode) : undefined}>
                         使用 Linux.do 注册 / 登录
                     </Button>
                 </>

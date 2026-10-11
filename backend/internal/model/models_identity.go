@@ -39,6 +39,7 @@ type UserIdentity struct {
 }
 
 type OAuthState struct {
+	InviteCode    string     `json:"-" gorm:"size:16"`
 	ID            string     `json:"id" gorm:"primaryKey;size:36"`
 	Provider      string     `json:"provider" gorm:"index;size:32"`
 	StateHash     string     `json:"-" gorm:"uniqueIndex;size:64"`

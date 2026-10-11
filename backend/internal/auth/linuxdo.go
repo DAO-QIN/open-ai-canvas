@@ -17,6 +17,7 @@ import (
 
 	"yingce/backend/internal/model"
 	"yingce/backend/internal/outbound"
+	"yingce/backend/internal/repository"
 
 	"gorm.io/gorm"
 )
@@ -140,7 +141,14 @@ func (s *Service) LinuxDOEnabled() bool {
 	return err == nil && setting.Enabled
 }
 
-func (s *Service) BeginLinuxDOLogin(nextPath string, acceptedTerms bool) (string, error) {
+func (s *Service) BeginLinuxDOLogin(nextPath string, acceptedTerms bool, inviteCodes ...string) (string, error) {
+	inviteCode := ""
+	if len(inviteCodes) > 0 {
+		inviteCode = strings.ToUpper(strings.TrimSpace(inviteCodes[0]))
+	}
+	if len(inviteCode) > 16 {
+		return "", kernel.BadAuthRequest("邀请码过长，请清除或更换后重试")
+	}
 	count, err := s.repo.UserCount()
 	if err != nil {
 		return "", err
@@ -161,7 +169,7 @@ func (s *Service) BeginLinuxDOLogin(nextPath string, acceptedTerms bool) (string
 	challenge := base64.RawURLEncoding.EncodeToString(challengeBytes[:])
 	if err := s.repo.CreateOAuthState(&model.OAuthState{
 		ID: kernel.NewID(), Provider: "linuxdo", StateHash: HashToken(state), CodeVerifier: verifier,
-		NextPath: safeOAuthNext(nextPath), AcceptedTerms: acceptedTerms, ExpiresAt: time.Now().Add(10 * time.Minute),
+		NextPath: safeOAuthNext(nextPath), AcceptedTerms: acceptedTerms, InviteCode: inviteCode, ExpiresAt: time.Now().Add(10 * time.Minute),
 	}); err != nil {
 		return "", err
 	}
@@ -248,7 +256,9 @@ func (s *Service) CompleteLinuxDOLogin(stateValue string, code string) (*LinuxDO
 		if err != nil {
 			return nil, err
 		}
-		if err := s.repo.CreateOAuthUser(user, identity); err != nil {
+		if err := s.repo.CreateOAuthUser(user, identity, func(repo *repository.Repository) error {
+			return s.host.BindInvitation(repo, user, state.InviteCode)
+		}); err != nil {
 			return nil, err
 		}
 	} else {

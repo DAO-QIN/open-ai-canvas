@@ -6,6 +6,8 @@ import (
 
 	"yingce/backend/internal/auth"
 	"yingce/backend/internal/model"
+	"yingce/backend/internal/promotion"
+	"yingce/backend/internal/repository"
 )
 
 const SessionCookieName = auth.SessionCookieName
@@ -87,6 +89,10 @@ func (h authHost) EnsureSignupBonus(userID string) error {
 		return nil
 	}
 	return h.svc.ensureSignupBonus(userID)
+}
+
+func (h authHost) BindInvitation(repo *repository.Repository, user *model.User, code string) error {
+	return promotion.New(repo).BindInvitation(user, code)
 }
 
 func (h authHost) RecordActivity(userID string, event string, count int) {
@@ -202,8 +208,8 @@ func (s *Service) LinuxDOEnabled() bool {
 	return s.authDomain().LinuxDOEnabled()
 }
 
-func (s *Service) BeginLinuxDOLogin(nextPath string, acceptedTerms bool) (string, error) {
-	return s.authDomain().BeginLinuxDOLogin(nextPath, acceptedTerms)
+func (s *Service) BeginLinuxDOLogin(nextPath string, acceptedTerms bool, inviteCodes ...string) (string, error) {
+	return s.authDomain().BeginLinuxDOLogin(nextPath, acceptedTerms, inviteCodes...)
 }
 
 func (s *Service) CompleteLinuxDOLogin(stateValue string, code string) (*LinuxDOCallbackResult, error) {

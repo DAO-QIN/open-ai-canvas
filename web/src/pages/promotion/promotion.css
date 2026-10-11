@@ -1,0 +1,81 @@
+.promotion-page {
+    height: 100%;
+    overflow: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    color: var(--foreground);
+}
+.promotion-heading,
+.promotion-invite,
+.promotion-transfer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.promotion-heading h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--fs-heading, 22px);
+    font-weight: 600;
+}
+.promotion-page p {
+    margin: 6px 0;
+    color: var(--muted-foreground);
+}
+.promotion-card {
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+}
+.promotion-card h2 {
+    font-size: var(--fs-body, 14px);
+    font-weight: 600;
+}
+.promotion-code {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.promotion-code .ant-input {
+    width: 180px;
+}
+.promotion-muted {
+    font-size: var(--fs-label, 12px);
+}
+.promotion-stats {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+}
+.promotion-stats .promotion-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-wrap: anywhere;
+}
+.promotion-stats span,
+.promotion-stats small {
+    color: var(--muted-foreground);
+    font-size: var(--fs-label, 12px);
+}
+.promotion-stats strong {
+    font-size: var(--fs-heading, 22px);
+    font-variant-numeric: tabular-nums;
+}
+.promotion-table {
+    padding-top: 8px;
+}
+@media (max-width: 800px) {
+    .promotion-page {
+        padding: 16px;
+    }
+    .promotion-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

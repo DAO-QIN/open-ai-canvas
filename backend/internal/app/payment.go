@@ -14,6 +14,7 @@ import (
 	"gorm.io/gorm"
 	"yingce/backend/internal/model"
 	"yingce/backend/internal/payment"
+	"yingce/backend/internal/promotion"
 	"yingce/backend/internal/protocol"
 	"yingce/backend/internal/repository"
 )
@@ -98,6 +99,7 @@ type PaymentOrderView struct {
 	ProviderPaidAt      *time.Time               `json:"providerPaidAt,omitempty"`
 	CreditedAt          *time.Time               `json:"creditedAt,omitempty"`
 	ClosedAt            *time.Time               `json:"closedAt,omitempty"`
+	LastError           string                   `json:"lastError,omitempty"`
 	CreatedAt           time.Time                `json:"createdAt"`
 	UpdatedAt           time.Time                `json:"updatedAt"`
 }
@@ -177,7 +179,9 @@ func (s *Service) CreatePaymentOrder(ctx context.Context, actor *model.User, req
 		Status: model.PaymentOrderCreated, CheckoutMode: provider.Descriptor().CheckoutMode,
 		ExpiresAt: now.Add(time.Duration(config.CloseAfterMinutes) * time.Minute),
 	}
-	order, created, err := s.repo.CreatePaymentOrderWithProductReservation(order)
+	order, created, err := s.repo.CreatePaymentOrderWithProductReservation(order, func(repo *repository.Repository) (*model.PaymentPromotionSnapshot, error) {
+		return promotion.New(repo).Snapshot(actor.ID, order.CreditsMicrocredits)
+	})
 	if errors.Is(err, repository.ErrTopupUnavailable) {
 		return nil, NewAppError(http.StatusConflict, "充值商品当前不可购买")
 	}
@@ -554,6 +558,7 @@ func paymentOrderView(order model.PaymentOrder) PaymentOrderView {
 		CreditsMicrocredits: order.CreditsMicrocredits, Status: order.Status, ProviderStatus: order.ProviderStatus,
 		ProviderTradeNo: providerTradeNo, Checkout: checkout, ExpiresAt: order.ExpiresAt,
 		ProviderPaidAt: order.ProviderPaidAt, CreditedAt: order.CreditedAt, ClosedAt: order.ClosedAt,
+		LastError: order.LastError,
 		CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt,
 	}
 }
@@ -598,7 +603,7 @@ func (s *Service) AdminQueryPaymentOrder(ctx context.Context, actor *model.User,
 	if err != nil {
 		return nil, err
 	}
-	if order.Status == model.PaymentOrderCredited || order.Status == model.PaymentOrderClosed {
+	if order.Status == model.PaymentOrderCredited || (order.Status == model.PaymentOrderClosed && order.LastError == "") {
 		view := paymentOrderView(*order)
 		return &view, nil
 	}

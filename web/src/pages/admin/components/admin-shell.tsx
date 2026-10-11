@@ -88,6 +88,7 @@ const adminNavigation: Array<{ label: string; items: AdminNavigationItem[] }> = 
             { path: "/admin/banner-announcements", label: "常驻通知", description: "首页顶部常驻滚动通知", icon: <Megaphone className="size-4" /> },
             { path: "/admin/agent-lessons", label: "Agent 记忆", description: "按用户查看个人记忆", icon: <Sparkles className="size-4" /> },
             { path: "/admin/payments", label: "支付充值", description: "支付渠道、订单与对账", icon: <CreditCard className="size-4" /> },
+            { path: "/admin/promotion", label: "邀请返利", description: "推广规则、个人比例与返利核对", icon: <UsersRound className="size-4" /> },
             { path: "/admin/credit-operations", label: "积分运营", description: "人工调账与异常计费", icon: <Coins className="size-4" /> },
             { path: "/admin/redemption-codes", label: "兑换码", description: "生成与查看兑换码批次", icon: <TicketCheck className="size-4" /> },
         ],

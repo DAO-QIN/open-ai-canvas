@@ -45,7 +45,7 @@ func lockRegistrationEmail(tx *gorm.DB, email string) error {
 	return gorm.ErrInvalidData
 }
 
-func (r *Repository) CreateRegisteredUser(user *model.User) error {
+func (r *Repository) CreateRegisteredUser(user *model.User, hooks ...RegistrationHook) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := lockRegistrationEmail(tx, user.Email); err != nil {
 			return err
@@ -53,6 +53,6 @@ func (r *Repository) CreateRegisteredUser(user *model.User) error {
 		if err := New(tx).CheckEmailAvailable(user.Email, ""); err != nil {
 			return err
 		}
-		return tx.Create(user).Error
+		return createRegistrationUser(tx, user, hooks)
 	})
 }

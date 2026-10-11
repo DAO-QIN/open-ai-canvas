@@ -26,7 +26,215 @@ tags:
   - name: agent
   - name: admin
   - name: skills
+  - name: promotion
 paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      security: []
+      summary: 创建账号，可选绑定直接邀请人
+      description: 保留协议、注册开关和验证要求。首个管理员不绑定邀请；无效邀请码使账号创建与验证码消费整体回滚。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, acceptedTerms]
+              properties:
+                username: {type: string}
+                password: {type: string, format: password}
+                acceptedTerms: {type: boolean}
+                displayName: {type: string}
+                email: {type: string}
+                emailCode: {type: string}
+                phone: {type: string}
+                smsCode: {type: string}
+                ticket: {type: string}
+                inviteCode: {type: string, maxLength: 16}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+  /auth/linuxdo/start:
+    get:
+      tags: [auth]
+      security: []
+      summary: 发起 Linux.do 登录或注册
+      description: 邀请码保存在服务端 OAuth state，仅新建账号时使用；已有账号登录不重新绑定。
+      parameters:
+        - {in: query, name: next, schema: {type: string}}
+        - {in: query, name: acceptedTerms, schema: {type: boolean}}
+        - {in: query, name: inviteCode, schema: {type: string, maxLength: 16}}
+      responses:
+        "302": {description: 跳转到身份提供方}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+  /public/invite-code/{code}:
+    get:
+      tags: [promotion]
+      security: []
+      summary: 匿名验证邀请码，不公开邀请人身份
+      description: 每 IP 每分钟最多 30 次；成功信封 data 为 {valid:boolean}，活动或推广暂停时返回 false。
+      parameters:
+        - {in: path, name: code, required: true, schema: {type: string}}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+        "429": {$ref: "#/components/responses/Error"}
+  /promotion/overview:
+    get:
+      tags: [promotion]
+      summary: 当前用户的返利概览与有效规则
+      description: 金额均为十进制微积分字符串。关闭活动后仍可读取。不会隐式创建邀请码或更新冻结状态。
+      responses:
+        "200":
+          description: 业务信封 data 为 PromotionOverview
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: "#/components/schemas/Envelope"}
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/PromotionOverview"}
+  /promotion/code:
+    post:
+      tags: [promotion]
+      summary: 主动生成邀请码，已存在时返回原邀请码
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+        "403": {$ref: "#/components/responses/Error"}
+  /promotion/invitations:
+    get:
+      tags: [promotion]
+      summary: 当前用户的邀请分页，用户名已在后端脱敏
+      parameters:
+        - {$ref: "#/components/parameters/PromotionPage"}
+        - {$ref: "#/components/parameters/PromotionPageSize"}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+  /promotion/records:
+    get:
+      tags: [promotion]
+      summary: 当前用户的返利分页
+      description: data 为 {items,total,page,pageSize}；items 为 CommissionRecord。冻结可用性以服务端 availableAt 为准。
+      parameters:
+        - {$ref: "#/components/parameters/PromotionPage"}
+        - {$ref: "#/components/parameters/PromotionPageSize"}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+  /promotion/transfers:
+    get:
+      tags: [promotion]
+      summary: 当前用户的转入凭据分页
+      parameters:
+        - {$ref: "#/components/parameters/PromotionPage"}
+        - {$ref: "#/components/parameters/PromotionPageSize"}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+    post:
+      tags: [promotion]
+      summary: 手动将可用返利按 1:1 转入钱包
+      description: 同一用户和请求 ID 幂等。相同请求不同金额返回 40901。关闭活动后仍允许转入已有返利；每用户每分钟最多 20 次。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, amountMicrocredits]
+              properties:
+                requestId: {type: string, pattern: "^[a-zA-Z0-9_-]{8,80}$"}
+                amountMicrocredits: {type: string, pattern: "^[1-9][0-9]{0,15}$", description: "1～9007199254740991 微积分的十进制字符串；入账后还须满足钱包余额上限"}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+        "409": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+  /promotion/transfers/{requestId}:
+    get:
+      tags: [promotion]
+      summary: 核对当前用户原请求的转入结果
+      parameters:
+        - {in: path, name: requestId, required: true, schema: {type: string}}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+        "404": {description: 尚无已提交凭据，可使用同一请求 ID 重试}
+  /admin/promotion/policy:
+    get:
+      tags: [admin, promotion]
+      summary: 管理员读取全局推广规则
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+    put:
+      tags: [admin, promotion]
+      summary: 按版本保存完整推广规则并原子记录审计
+      description: 默认关闭、比例 0、冻结 0。只影响之后新建的订单；旧版本返回 409。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PromotionPolicy"}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+        "409": {$ref: "#/components/responses/Error"}
+  /admin/promotion/profiles:
+    get:
+      tags: [admin, promotion]
+      summary: 管理员按用户名或用户 ID 查询推广档案
+      parameters:
+        - {in: query, name: keyword, schema: {type: string, maxLength: 120}}
+        - {$ref: "#/components/parameters/PromotionPage"}
+        - {$ref: "#/components/parameters/PromotionPageSize"}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+  /admin/promotion/profiles/{userId}:
+    put:
+      tags: [admin, promotion]
+      summary: 按版本配置个人比例和暂停状态
+      parameters:
+        - {in: path, name: userId, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, paused, ratioOverrideBps]
+              properties:
+                version: {type: integer, format: int64, minimum: 0}
+                paused: {type: boolean}
+                ratioOverrideBps: {type: integer, minimum: 0, maximum: 10000, nullable: true, description: "null 继承全局；0 明确不返利"}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+        "409": {$ref: "#/components/responses/Error"}
+  /admin/promotion/records:
+    get:
+      tags: [admin, promotion]
+      summary: 管理员查询返利分页
+      parameters:
+        - {in: query, name: userId, schema: {type: string}}
+        - {$ref: "#/components/parameters/PromotionPage"}
+        - {$ref: "#/components/parameters/PromotionPageSize"}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+  /admin/promotion/records/{id}/void:
+    post:
+      tags: [admin, promotion]
+      summary: 作废该记录剩余未转入的返利，与审计原子提交
+      parameters:
+        - {in: path, name: id, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 1, maxLength: 500}
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+        "409": {$ref: "#/components/responses/Error"}
   /admin/settings/appearance/live2d:
     post:
       tags: [admin]
@@ -1313,6 +1521,8 @@ paths:
           $ref: "#/components/responses/Error"
 components:
   parameters:
+    PromotionPage: {in: query, name: page, schema: {type: integer, minimum: 1, maximum: 1000000, default: 1}}
+    PromotionPageSize: {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
     AgentRunID:
       name: id
       in: path
@@ -1325,6 +1535,58 @@ components:
       in: cookie
       name: open_ai_canvas_session
   schemas:
+    PromotionMicrocredits:
+      type: string
+      pattern: "^[0-9]+$"
+      description: 整数微积分的十进制字符串；1000000 微积分等于 1 积分
+    PromotionPolicy:
+      type: object
+      required: [enabled, ratioBps, freezeDays, version]
+      properties:
+        enabled: {type: boolean, default: false}
+        ratioBps: {type: integer, minimum: 0, maximum: 10000, default: 0}
+        freezeDays: {type: integer, minimum: 0, maximum: 365, default: 0}
+        version: {type: integer, format: int64, minimum: 0}
+    PromotionOverview:
+      type: object
+      properties:
+        policy: {$ref: "#/components/schemas/PromotionPolicy"}
+        profile:
+          type: object
+          properties:
+            userId: {type: string}
+            inviteCode: {type: string, nullable: true}
+            paused: {type: boolean}
+            ratioOverrideBps: {type: integer, nullable: true}
+            version: {type: integer, format: int64}
+        effectiveRatioBps: {type: integer}
+        canPromote: {type: boolean}
+        inviteCount: {type: integer}
+        totalMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
+        frozenMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
+        availableMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
+        transferredMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
+        voidedMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
+        serverTime: {type: string, format: date-time}
+    CommissionRecord:
+      type: object
+      properties:
+        id: {type: string}
+        paymentOrderId: {type: string}
+        inviterId: {type: string}
+        baseMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
+        amountMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
+        transferredMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
+        voidedMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
+        ratioBps: {type: integer}
+        policyVersion: {type: integer, format: int64}
+        profileVersion: {type: integer, format: int64}
+        freezeDays: {type: integer}
+        availableAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+        voidReason: {type: string}
+        voidedBy: {type: string}
     ToolMutation:
       type: object
       required: [type, label, prompt]
@@ -1564,6 +1826,10 @@ components:
                 - forbidden
                 - not_found
                 - conflict
+                - invalid_invite_code
+                - idempotency_conflict
+                - insufficient_promotion_balance
+                - credit_balance_overflow
                 - project_name_conflict
                 - failed_precondition
                 - quota_exceeded

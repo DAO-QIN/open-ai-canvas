@@ -5,6 +5,16 @@ description: 信封、错误码与 OpenAPI
 
 # HTTP API 合同
 
+## 邀请返利
+
+注册 JSON 和 Linux.do 发起查询参数增加可选 `inviteCode`，仅新账号绑定；无效邀请码返回 `invalid_invite_code`，注册事务回滚。匿名 `GET /api/public/invite-code/:code` 仅返回 `{valid}`，每 IP 每分钟限 30 次。
+
+登录用户接口：`GET /api/promotion/overview`、`POST /api/promotion/code`、`GET /api/promotion/invitations`、`GET /api/promotion/records`、`GET /api/promotion/transfers`、`GET /api/promotion/transfers/:requestId`、`POST /api/promotion/transfers`。列表接受 `page/pageSize`，返回 `{items,total,page,pageSize}`；转入接受 `{requestId,amountMicrocredits}`，金额为十进制整数字符串。结果查询未找到返回 404，客户端可使用原请求 ID 继续提交。读取不创建邀请码、不更新冻结状态。
+
+管理员接口：`GET/PUT /api/admin/promotion/policy`，`GET /api/admin/promotion/profiles?keyword=...`，`PUT /api/admin/promotion/profiles/:userId`，`GET /api/admin/promotion/records?userId=...`，`POST /api/admin/promotion/records/:id/void`。规则接受完整 `{enabled,ratioBps,freezeDays,version}`，个人配置接受 `{paused,ratioOverrideBps,version}`，个人比例为 null 时继承。作废要求 `{reason}`，只处理剩余未转入金额并原子记录审计。
+
+新接口的所有微积分金额都是字符串；比例为整数基点。转入重复请求金额不同返回 40901 / `idempotency_conflict`，可用余额不足返回 409 / `insufficient_promotion_balance`，钱包超过上限返回 409 / `credit_balance_overflow`，配置版本冲突返回 409 / `conflict`。活动关闭不禁止历史查询或已有返利转入。详细规则见 [邀请返利](./invitation-rebates)。
+
 ## Agent 画布权限与大事件
 
 自由画布和项目关联画布均使用 `canvas_projects`。Agent 运行时按登录账号和画布 ID 查询归属，不能把所属项目 ID 当作画布 ID；画布不存在、属于其他账号或数据库读取失败时，不声明读写及导出权限。

@@ -24,9 +24,11 @@ const (
 	FeatureSystemPlugins         = "systemPluginsVisibleToUsers"
 	FeatureInspirationSources    = "inspirationSourcesVisible"
 	FeatureTimelineTranscription = "timelineTranscription"
+	FeaturePromotion             = "promotion"
 )
 
 type FeatureAvailability struct {
+	PromotionEnabled             bool `json:"promotionEnabled"`
 	WelcomeEnabled               bool `json:"welcomeEnabled"`
 	ShortDramaEnabled            bool `json:"shortDramaEnabled"`
 	TaskCenterEnabled            bool `json:"taskCenterEnabled"`
@@ -67,6 +69,10 @@ func (s *Service) FeatureAvailability() (*PublicFeatureAvailability, error) {
 	if err != nil {
 		return nil, err
 	}
+	value.PromotionEnabled, err = s.promotionEnabled()
+	if err != nil {
+		return nil, err
+	}
 	return publicFeatureAvailability(setting, value), nil
 }
 
@@ -82,6 +88,12 @@ func (s *Service) UpdateFeatureAvailability(actor *model.User, value FeatureAvai
 		return nil, err
 	}
 	current, before, err := s.readFeatureAvailability()
+	if err != nil {
+		return nil, err
+	}
+	// The promotion switch is owned by the versioned promotion policy, not by
+	// this legacy feature settings write path.
+	value.PromotionEnabled, err = s.promotionEnabled()
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +115,9 @@ func (s *Service) UpdateFeatureAvailability(actor *model.User, value FeatureAvai
 }
 
 func (s *Service) FeatureEnabled(feature string) (bool, error) {
+	if feature == FeaturePromotion {
+		return s.promotionEnabled()
+	}
 	_, value, err := s.readFeatureAvailability()
 	if err != nil {
 		return false, err
@@ -129,6 +144,21 @@ func (s *Service) FeatureEnabled(feature string) (bool, error) {
 	default:
 		return false, errors.New("未知功能开放配置")
 	}
+}
+
+func (s *Service) promotionEnabled() (bool, error) {
+	setting, err := s.repo.SystemSetting(model.PromotionPolicySettingKey)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var policy model.PromotionPolicy
+	if err := json.Unmarshal([]byte(setting.ValueJSON), &policy); err != nil {
+		return false, err
+	}
+	return policy.Enabled, nil
 }
 
 func (s *Service) RequireFeature(feature string) error {

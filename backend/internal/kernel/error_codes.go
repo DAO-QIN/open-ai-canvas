@@ -41,6 +41,10 @@ const (
 	ReasonInternal               ErrorReason = "internal"
 	ReasonBadGateway             ErrorReason = "bad_gateway"
 	ReasonUpstreamDNSFailed      ErrorReason = "upstream_dns_failed"
+	ReasonInvalidInviteCode      ErrorReason = "invalid_invite_code"
+	ReasonIdempotencyConflict    ErrorReason = "idempotency_conflict"
+	ReasonPromotionInsufficient  ErrorReason = "insufficient_promotion_balance"
+	ReasonCreditBalanceOverflow  ErrorReason = "credit_balance_overflow"
 )
 
 func ReasonForStatus(status int) ErrorReason {

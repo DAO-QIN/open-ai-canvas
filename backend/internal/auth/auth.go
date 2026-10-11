@@ -29,6 +29,7 @@ var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{3,32}$`)
 type AuthError = kernel.AppError
 
 type RegisterRequest struct {
+	InviteCode    string `json:"inviteCode"`
 	Username      string `json:"username"`
 	Email         string `json:"email"`
 	EmailCode     string `json:"emailCode"`
@@ -223,6 +224,12 @@ func (s *Service) Register(req RegisterRequest) (*AuthSessionResult, error) {
 	if count == 0 {
 		user.Role = model.UserRoleAdmin
 	}
+	bindInvitation := func(repo *repository.Repository) error {
+		if count == 0 {
+			return nil
+		}
+		return s.host.BindInvitation(repo, &user, req.InviteCode)
+	}
 	if verification != nil {
 		if email != "" {
 			user.EmailVerifiedAt = &now
@@ -230,7 +237,7 @@ func (s *Service) Register(req RegisterRequest) (*AuthSessionResult, error) {
 		if phone != "" {
 			user.PhoneVerifiedAt = &now
 		}
-		if err := s.repo.CreateUserWithVerification(&user, verification.ID); err != nil {
+		if err := s.repo.CreateUserWithVerification(&user, verification.ID, bindInvitation); err != nil {
 			if errors.Is(err, repository.ErrVerificationInvalid) {
 				return nil, invalidVerification()
 			}
@@ -238,10 +245,10 @@ func (s *Service) Register(req RegisterRequest) (*AuthSessionResult, error) {
 		}
 	} else if verifiedCode != nil {
 		user.EmailVerifiedAt = &now
-		if err := s.repo.CreateUserWithEmailVerification(&user, verifiedCode.ID, time.Now()); err != nil {
+		if err := s.repo.CreateUserWithEmailVerification(&user, verifiedCode.ID, time.Now(), bindInvitation); err != nil {
 			return nil, err
 		}
-	} else if err := s.repo.CreateRegisteredUser(&user); err != nil {
+	} else if err := s.repo.CreateRegisteredUser(&user, bindInvitation); err != nil {
 		return nil, err
 	}
 	if err := s.host.EnsureSignupBonus(user.ID); err != nil {

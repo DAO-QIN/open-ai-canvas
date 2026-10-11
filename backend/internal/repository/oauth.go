@@ -48,7 +48,7 @@ func (r *Repository) ConsumeOAuthState(provider string, stateHash string) (*mode
 	return &state, err
 }
 
-func (r *Repository) CreateOAuthUser(user *model.User, identity *model.UserIdentity) error {
+func (r *Repository) CreateOAuthUser(user *model.User, identity *model.UserIdentity, hooks ...RegistrationHook) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := lockRegistrationEmail(tx, user.Email); err != nil {
 			return err
@@ -56,7 +56,7 @@ func (r *Repository) CreateOAuthUser(user *model.User, identity *model.UserIdent
 		if err := New(tx).CheckEmailAvailable(user.Email, ""); err != nil {
 			return err
 		}
-		if err := tx.Create(user).Error; err != nil {
+		if err := createRegistrationUser(tx, user, hooks); err != nil {
 			return err
 		}
 		if err := tx.Create(identity).Error; err != nil {

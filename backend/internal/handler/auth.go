@@ -145,7 +145,7 @@ func RegisterAuthRoutes(r *gin.RouterGroup, svc *service.Service) {
 			return
 		}
 		acceptedTerms := c.Query("acceptedTerms") == "true"
-		target, err := svc.BeginLinuxDOLogin(c.Query("next"), acceptedTerms)
+		target, err := svc.BeginLinuxDOLogin(c.Query("next"), acceptedTerms, c.Query("inviteCode"))
 		if err != nil {
 			failService(c, err)
 			return

@@ -5,6 +5,14 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+## 邀请返利
+
+- `internal/promotion`：推广资格、注册绑定、订单快照、返利计算、用户概览及管理员操作。
+- `internal/repository/promotion.go`：注册事务扩展、配置版本检查、转入分摊、钱包入账与作废审计事务；`repository/payment.go` 在统一充值事务中写入返利。
+- `internal/app/promotion_bridge.go` 和 `internal/handler/promotion.go`：组合根与公开接口；认证 Host 在账号创建事务内调用推广域。
+- `internal/database/migrations.go` 的 v50、`database.Models()` 与 `cmd/migrate-sqlite-postgres`：正式迁移及跨数据库复制清单，覆盖五张邀请返利表。
+- `web/src/pages/promotion`、`web/src/pages/admin/promotion`、`web/src/services/api/promotion.ts`：真实用户及后台页面与 API；`web/src/lib/promotion-credits.ts` 处理精确金额和账号隔离的未确认请求。
+
 ## 卡藏音乐
 
 - `plugin-packages/kacang-audio/`：Suno 请求、错误、临时媒体链接合同；`build.py` 生成完整接口文档与可安装包。

@@ -36,6 +36,14 @@ func TestMigrateSchemaRecordsAndValidatesVersion(t *testing.T) {
 	if !status.Ready || status.Current != CurrentSchemaVersion {
 		t.Fatalf("unexpected schema status: %#v", status)
 	}
+	for _, entity := range []any{&model.PromotionProfile{}, &model.Invitation{}, &model.CommissionRecord{}, &model.PromotionTransfer{}, &model.CommissionAllocation{}} {
+		if !db.Migrator().HasTable(entity) {
+			t.Fatalf("promotion table missing: %T", entity)
+		}
+	}
+	if !db.Migrator().HasColumn(&model.PaymentOrder{}, "PromotionSnapshot") || !db.Migrator().HasColumn(&model.OAuthState{}, "InviteCode") {
+		t.Fatal("promotion snapshot or OAuth invite code column missing")
+	}
 	if !db.Migrator().HasTable(&model.UploadReservation{}) {
 		t.Fatal("upload reservation migration missing")
 	}

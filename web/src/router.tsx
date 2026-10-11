@@ -24,6 +24,8 @@ const LogicalModelsPage = lazy(() => import("@/pages/admin/logical-models/logica
 const AdminPluginsPage = lazy(() => import("@/pages/admin/plugins/plugins-page"));
 const SkillCurationPage = lazy(() => import("@/pages/admin/skill-curation-page"));
 const AdminPaymentsPage = lazy(() => import("@/pages/admin/payments/payments-page"));
+const AdminPromotionPage = lazy(() => import("@/pages/admin/promotion"));
+const PromotionPage = lazy(() => import("@/pages/promotion"));
 const LogsPage = lazy(() => import("@/pages/admin/logs/logs-page"));
 const RedemptionCodesPage = lazy(() => import("@/pages/admin/redemption-codes/redemption-codes-page"));
 const RuntimePolicySettingsPage = lazy(() => import("@/pages/admin/settings/runtime-policy-settings-page"));
@@ -140,6 +142,7 @@ export const router = createBrowserRouter([
                 element: <RequireAuth>{null}</RequireAuth>,
             },
             { path: "/settings", element: <RequireAuth>{deferred(<SettingsPage />)}</RequireAuth> },
+            { path: "/promotion", element: <RequireAuth>{deferred(<PromotionPage />)}</RequireAuth> },
             { path: "/test-voice-recording", element: <RequireAuth>{deferred(<TestVoiceRecording />)}</RequireAuth> },
             {
                 path: "/projects",
@@ -194,6 +197,7 @@ export const router = createBrowserRouter([
                     { path: "plugins", element: <AdminPluginsPage /> },
                     { path: "skill-curation", element: <SkillCurationPage /> },
                     { path: "payments", element: <AdminPaymentsPage /> },
+                    { path: "promotion", element: <AdminPromotionPage /> },
                     { path: "prompt-templates", element: <StoryboardPromptsPage /> },
                     { path: "storyboard-prompts", element: <Navigate to="/admin/prompt-templates" replace /> },
                     { path: "announcements", element: <AnnouncementsPage /> },

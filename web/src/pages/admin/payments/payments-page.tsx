@@ -561,7 +561,13 @@ export default function AdminPaymentsPage() {
                 </div>
             ),
         },
-        { title: "状态", dataIndex: "status", width: 110, align: "center", render: (value) => <AdminStatusBadge {...(paymentOrderStatus[value] || { label: value, tone: "neutral" as const })} /> },
+        {
+            title: "状态",
+            dataIndex: "status",
+            width: 110,
+            align: "center",
+            render: (value, order) => <AdminStatusBadge {...(order.lastError ? { label: "处理失败", tone: "error" as const, title: order.lastError } : paymentOrderStatus[value] || { label: value, tone: "neutral" as const })} />,
+        },
         { title: "创建时间", dataIndex: "createdAt", width: 130, render: (value) => <span title={formatDateTime(value)}>{dayjs(value).format("MM-DD HH:mm")}</span> },
         {
             title: "操作",
@@ -574,7 +580,13 @@ export default function AdminPaymentsPage() {
                     primary={{ label: "详情", icon: <Eye className="size-3.5" />, onClick: () => setSelectedOrder(order) }}
                     visibleActionCount={0}
                     actions={[
-                        { key: "sync", label: "同步支付状态", icon: <RefreshCw className="size-3.5" />, disabled: Boolean(orderActionId) || ["credited", "closed"].includes(order.status), onClick: () => queryOrder(order) },
+                        {
+                            key: "sync",
+                            label: order.lastError ? "重新核验入账" : "同步支付状态",
+                            icon: <RefreshCw className="size-3.5" />,
+                            disabled: Boolean(orderActionId) || order.status === "credited" || (order.status === "closed" && !order.lastError),
+                            onClick: () => queryOrder(order),
+                        },
                         {
                             key: "close",
                             label: "关闭订单",
@@ -873,6 +885,7 @@ export default function AdminPaymentsPage() {
                             { key: "channel", label: "支付渠道", children: providerNames[selectedOrder.providerId] || selectedOrder.providerId },
                             { key: "amount", label: "金额 / 积分", children: `¥ ${(selectedOrder.amountFen / 100).toFixed(2)} / ${formatCredits(selectedOrder.creditsMicrocredits)} 积分` },
                             { key: "status", label: "状态", children: paymentOrderStatus[selectedOrder.status]?.label || selectedOrder.status },
+                            ...(selectedOrder.lastError ? [{ key: "lastError", label: "处理失败", children: selectedOrder.lastError }] : []),
                             ...(
                                 [
                                     { key: "createdAt", label: "创建时间" },

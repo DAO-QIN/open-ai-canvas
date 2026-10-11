@@ -101,7 +101,7 @@ func (r *Repository) PaymentProviderConfig(id string) (*model.PaymentProviderCon
 
 // CreatePaymentOrderWithProductReservation claims the user's idempotency key and,
 // for inventory products, reserves one unit in the same transaction.
-func (r *Repository) CreatePaymentOrderWithProductReservation(order *model.PaymentOrder) (*model.PaymentOrder, bool, error) {
+func (r *Repository) CreatePaymentOrderWithProductReservation(order *model.PaymentOrder, snapshots ...func(*Repository) (*model.PaymentPromotionSnapshot, error)) (*model.PaymentOrder, bool, error) {
 	var existing model.PaymentOrder
 	created := false
 	err := r.db.Transaction(func(tx *gorm.DB) error {
@@ -150,6 +150,13 @@ func (r *Repository) CreatePaymentOrderWithProductReservation(order *model.Payme
 				return ErrTopupUnavailable
 			}
 			order.StockReserved = true
+		}
+		if len(snapshots) > 0 {
+			var err error
+			order.PromotionSnapshot, err = snapshots[0](New(tx))
+			if err != nil {
+				return err
+			}
 		}
 		result := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "user_id"}, {Name: "idempotency_key"}}, DoNothing: true}).Create(order)
 		if result.Error != nil {
@@ -290,6 +297,7 @@ func (r *Repository) RetryPaymentNotification(id, message string, next time.Time
 func (r *Repository) CompletePaymentOrder(providerID, merchantOrderNo string, evidence PaymentEvidence) (*model.PaymentOrder, bool, error) {
 	var order model.PaymentOrder
 	granted := false
+	creditAttempted := false
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&order, "provider_id = ? AND merchant_order_no = ?", providerID, merchantOrderNo).Error; err != nil {
 			return err
@@ -313,6 +321,7 @@ func (r *Repository) CompletePaymentOrder(providerID, merchantOrderNo string, ev
 		if duplicate > 0 {
 			return ErrPaymentTradeNoConflict
 		}
+		creditAttempted = true
 		referenceKey := "payment:" + providerID + ":" + merchantOrderNo
 		entry := model.CreditLedgerEntry{
 			ID: newRepositoryID(), UserID: order.UserID, Type: model.CreditLedgerPaymentTopup,
@@ -372,9 +381,34 @@ func (r *Repository) CompletePaymentOrder(providerID, merchantOrderNo string, ev
 		if updated.RowsAffected != 1 {
 			return ErrPaymentOrderStateConflict
 		}
+		if snapshot := order.PromotionSnapshot; snapshot != nil && snapshot.Eligible {
+			if snapshot.Version != 1 || snapshot.InviterID == "" || snapshot.InviterID == order.UserID || snapshot.RatioBPS <= 0 || snapshot.RatioBPS > 10000 || snapshot.AmountMicrocredits <= 0 || snapshot.AmountMicrocredits > order.CreditsMicrocredits || snapshot.BaseMicrocredits != order.CreditsMicrocredits || snapshot.FreezeDays < 0 || snapshot.FreezeDays > 365 {
+				return ErrPaymentOrderStateConflict
+			}
+			expectedAmount := (snapshot.BaseMicrocredits/10000)*snapshot.RatioBPS + (snapshot.BaseMicrocredits%10000)*snapshot.RatioBPS/10000
+			if snapshot.AmountMicrocredits != expectedAmount {
+				return ErrPaymentOrderStateConflict
+			}
+			record := model.CommissionRecord{ID: newRepositoryID(), PaymentOrderID: order.ID, InviterID: snapshot.InviterID, InviteeID: order.UserID,
+				BaseMicrocredits: snapshot.BaseMicrocredits, AmountMicrocredits: snapshot.AmountMicrocredits, RatioBPS: snapshot.RatioBPS,
+				PolicyVersion: snapshot.PolicyVersion, ProfileVersion: snapshot.ProfileVersion, FreezeDays: snapshot.FreezeDays,
+				AvailableAt: now.Add(time.Duration(snapshot.FreezeDays) * 24 * time.Hour), CreatedAt: now, UpdatedAt: now}
+			if err := tx.Create(&record).Error; err != nil {
+				return err
+			}
+		}
 		granted = true
 		return tx.First(&order, "id = ?", order.ID).Error
 	})
+	if err != nil {
+		granted = false
+		if creditAttempted && order.ID != "" {
+			// The accounting transaction has rolled back. Keep a safe diagnostic
+			// outside it without overwriting a concurrent successful completion.
+			_ = r.db.Model(&model.PaymentOrder{}).Where("id = ? AND status <> ?", order.ID, model.PaymentOrderCredited).
+				Updates(map[string]any{"last_error": "充值及返利入账失败，请重新核验", "updated_at": time.Now()}).Error
+		}
+	}
 	if err == nil && !granted && order.ID != "" {
 		if reloadErr := r.db.First(&order, "id = ?", order.ID).Error; reloadErr != nil {
 			return &order, false, reloadErr

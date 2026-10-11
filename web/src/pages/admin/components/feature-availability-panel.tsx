@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { getAdminFeatureAvailability, updateAdminFeatureAvailability } from "@/services/api/auth";
 import { useUserStore, type FeatureAvailability } from "@/stores/use-user-store";
 import { AdminStatusBadge } from "./admin-ui";
+import { Link } from "react-router";
 
 type FeatureKey = "shortDramaEnabled" | "taskCenterEnabled" | "creditsEnabled" | "customChannelsEnabled" | "inspirationSourcesVisible" | "frontendModelsEnabled" | "pluginCenterEnabled" | "systemPluginsVisibleToUsers";
 type FeatureRow = {
@@ -226,6 +227,10 @@ export default function FeatureAvailabilityPanel() {
     return (
         <div className="admin-settings-stack admin-feature-availability">
             <div className="admin-feature-command-bar">
+                <span>邀请返利：{savedFeatures.promotionEnabled ? "已开放" : "未开放"}。开关、比例和冻结期在邀请返利中统一配置。</span>
+                <Link to="/admin/promotion">管理邀请返利</Link>
+            </div>
+            <div className="admin-feature-command-bar">
                 <div className="admin-feature-command-copy" aria-live="polite">
                     <div className="flex flex-wrap items-center gap-2">
                         <strong>{saving ? "正在保存更改" : "开关切换后立即生效"}</strong>
@@ -375,6 +380,7 @@ function parseFeatureAvailability(value: unknown): FeatureAvailability {
         if (typeof record[key] !== "boolean") throw new Error("功能开放配置响应缺少有效开关状态");
     }
     return {
+        promotionEnabled: record.promotionEnabled === true,
         welcomeEnabled: record.welcomeEnabled as boolean,
         shortDramaEnabled: record.shortDramaEnabled as boolean,
         taskCenterEnabled: record.taskCenterEnabled as boolean,

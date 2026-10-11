@@ -24,7 +24,7 @@ describe("注册服务协议", () => {
         const api = readFileSync(resolve(import.meta.dir, "../src/services/api/auth.ts"), "utf8");
 
         expect(page).toContain("acceptedTerms: agreementAccepted");
-        expect(page).toContain("agreementAccepted ? linuxDOLoginURL(next, true) : undefined");
+        expect(page).toContain("agreementAccepted ? linuxDOLoginURL(next, true, inviteCode) : undefined");
         expect(page).toContain("message.warning(`请先同意${agreementTitle}`)");
         expect(login).toContain("linuxDOLoginURL(next)");
         expect(api).toContain("acceptedTerms: boolean");

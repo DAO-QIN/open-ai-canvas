@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 49
+const CurrentSchemaVersion int64 = 50
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -160,6 +160,22 @@ var schemaMigrations = []migration{
 	{version: 49, name: "banner_sort_order", checksum: "sha256:banner-sort-order-v49-20261010", apply: func(tx *gorm.DB) error {
 		if !tx.Migrator().HasColumn(&model.BannerAnnouncement{}, "SortOrder") {
 			return tx.Migrator().AddColumn(&model.BannerAnnouncement{}, "SortOrder")
+		}
+		return nil
+	}},
+	{version: 50, name: "invitation_rebates", checksum: "sha256:invitation-rebates-v50-20261011", apply: func(tx *gorm.DB) error {
+		if err := tx.AutoMigrate(&model.PromotionProfile{}, &model.Invitation{}, &model.CommissionRecord{}, &model.PromotionTransfer{}, &model.CommissionAllocation{}); err != nil {
+			return err
+		}
+		for _, field := range []struct {
+			entity any
+			name   string
+		}{{&model.PaymentOrder{}, "PromotionSnapshot"}, {&model.OAuthState{}, "InviteCode"}} {
+			if !tx.Migrator().HasColumn(field.entity, field.name) {
+				if err := tx.Migrator().AddColumn(field.entity, field.name); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}},

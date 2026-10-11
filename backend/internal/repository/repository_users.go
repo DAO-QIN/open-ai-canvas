@@ -149,7 +149,7 @@ func (r *Repository) DeleteEmailVerificationCode(id string) error {
 	return r.db.Delete(&model.EmailVerificationCode{}, "id = ?", id).Error
 }
 
-func (r *Repository) CreateUserWithEmailVerification(user *model.User, verificationCodeID string, usedAt time.Time) error {
+func (r *Repository) CreateUserWithEmailVerification(user *model.User, verificationCodeID string, usedAt time.Time, hooks ...RegistrationHook) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := lockRegistrationEmail(tx, user.Email); err != nil {
 			return err
@@ -164,7 +164,7 @@ func (r *Repository) CreateUserWithEmailVerification(user *model.User, verificat
 		if result.RowsAffected != 1 {
 			return errors.New("邮箱验证码已失效，请重新获取")
 		}
-		return tx.Create(user).Error
+		return createRegistrationUser(tx, user, hooks)
 	})
 }
 
