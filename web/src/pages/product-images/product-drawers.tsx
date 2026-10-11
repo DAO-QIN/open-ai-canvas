@@ -259,7 +259,9 @@ export function ImageDrawer({
                     {[selected, other].map((version, index) => (
                         <div key={index} className="overflow-hidden rounded-xl bg-surface-hover">
                             {version ? (
-                                <CachedResourceImage storageKey={"resource:" + version.resourceId} alt={"商品图片版本 " + version.number} className="aspect-square w-full object-contain" />
+                                <div className="aspect-square w-full">
+                                    <CachedResourceImage storageKey={"resource:" + version.resourceId} alt={"商品图片版本 " + version.number} className="h-full w-full object-contain" />
+                                </div>
                             ) : (
                                 <div className="flex aspect-square items-center justify-center text-sm text-foreground/60">暂无可比较版本</div>
                             )}
