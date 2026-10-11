@@ -10,6 +10,8 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
+import { usePromotionOverview } from "@/hooks/use-promotion-overview";
+import { promotionDisplay } from "@/lib/promotion-display";
 import { openWorkspaceWallet } from "@/lib/workspace-wallet";
 
 const PAGE_TITLES: Record<string, string> = {
@@ -34,7 +36,8 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar }: { sidebarOpen:
     const { availableMicrocredits } = useWalletBalance(user?.id, creditsEnabled);
     const { pathname } = useLocation();
     const slug = pathname.split("/").filter(Boolean)[0];
-    const pageTitle = slug ? PAGE_TITLES[slug] || brandName : PAGE_TITLES.home;
+    const promotion = usePromotionOverview(user?.id, slug === "promotion");
+    const pageTitle = slug === "promotion" ? promotionDisplay(promotion.data, Boolean(promotion.error)).title : slug ? PAGE_TITLES[slug] || brandName : PAGE_TITLES.home;
     const balance = availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 
     return (

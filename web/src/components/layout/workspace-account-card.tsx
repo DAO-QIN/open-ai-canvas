@@ -1,18 +1,35 @@
 import { Button } from "antd";
 import { ArrowUpRight, Coins, Gift, LogOut, RefreshCw, Settings, ShieldCheck } from "lucide-react";
 import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { usePromotionOverview } from "@/hooks/use-promotion-overview";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { useWorkspaceLogout } from "@/hooks/use-workspace-logout";
+import { readPendingPromotionTransfer } from "@/lib/promotion-credits";
+import { promotionDisplay } from "@/lib/promotion-display";
 import { useUserStore } from "@/stores/use-user-store";
 import { UserAvatar } from "./user-avatar";
 import "./workspace-account-card.css";
 
 /** 同一账户卡片用于顶部和侧栏；余额与退出均复用真实服务。 */
-export function WorkspaceAccountCard({ onWallet, onNavigate }: { onWallet: () => void; onNavigate: () => void }) {
+export function WorkspaceAccountCard({ onWallet, onNavigate, active }: { onWallet: () => void; onNavigate: () => void; active: boolean }) {
     const user = useUserStore((state) => state.user);
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const { availableMicrocredits, refreshing, refresh } = useWalletBalance(user?.id, creditsEnabled);
     const { handleLogout, loggingOut } = useWorkspaceLogout();
+    const overview = usePromotionOverview(user?.id, active);
+    const [pendingScope, setPendingScope] = useState<{ userId: string; unresolved: boolean }>();
+    useEffect(() => {
+        if (!active || !user) return;
+        let unresolved = true;
+        try {
+            unresolved = Boolean(readPendingPromotionTransfer(user.id));
+        } catch {
+            // Keep the recovery route reachable when local transfer state cannot be read.
+        }
+        setPendingScope({ userId: user.id, unresolved });
+    }, [active, user?.id]);
+    const promotion = promotionDisplay(overview.data, Boolean(overview.error), pendingScope?.userId === user?.id && pendingScope?.unresolved);
     if (!user) return null;
     return <section className="workspace-account-card" aria-label="我的账户">
         <header className="workspace-account-card-identity">
@@ -25,7 +42,7 @@ export function WorkspaceAccountCard({ onWallet, onNavigate }: { onWallet: () =>
             {availableMicrocredits === null ? <Button size="small" loading={refreshing} icon={<RefreshCw />} onClick={() => void refresh()}>刷新余额</Button> : <button type="button" onClick={onWallet}>充值 / 兑换<ArrowUpRight /></button>}
         </div> : null}
         <nav className="workspace-account-card-actions" aria-label="账户操作">
-            <Link to="/promotion" onClick={onNavigate}><Gift /><span>邀请有礼</span><ArrowUpRight /></Link>
+            {promotion.showEntry ? <Link to="/promotion" onClick={onNavigate}><Gift /><span>{promotion.title}</span><ArrowUpRight /></Link> : null}
             <Link to="/settings" onClick={onNavigate}><Settings /><span>账户与设置</span><ArrowUpRight /></Link>
             {user.role === "admin" ? <Link to="/admin" onClick={onNavigate}><ShieldCheck /><span>管理员后台</span><ArrowUpRight /></Link> : null}
             <Button danger type="text" icon={<LogOut />} loading={loggingOut} onClick={() => void handleLogout()}>退出登录</Button>

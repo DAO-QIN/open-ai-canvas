@@ -8,8 +8,10 @@ import { StatusBadge } from "@/components/ui/base/badges/status-badge";
 import { SegmentedControl } from "@/components/ui/base/segmented-control";
 import { PaginationBar } from "@/components/layout/workspace-page";
 import { useUserStore } from "@/stores/use-user-store";
+import { usePromotionOverview } from "@/hooks/use-promotion-overview";
+import { promotionDisplay } from "@/lib/promotion-display";
 import { ApiError } from "@/services/api/request";
-import { createPromotionCode, getPromotionInvitations, getPromotionOverview, getPromotionRecords, getPromotionTransferResult, getPromotionTransfers, transferPromotion, type PromotionTransfer, type TransferRequest } from "@/services/api/promotion";
+import { createPromotionCode, getPromotionInvitations, getPromotionRecords, getPromotionTransferResult, getPromotionTransfers, transferPromotion, type PromotionTransfer, type TransferRequest } from "@/services/api/promotion";
 import { clearPendingPromotionTransfer, formatPromotionCredits as credits, MAX_PROMOTION_TRANSFER, parsePromotionCredits, readPendingPromotionTransfer, savePendingPromotionTransfer } from "@/lib/promotion-credits";
 import { CommissionItem, InvitationItem, TransferItem } from "./record-items";
 import "./promotion.css";
@@ -32,7 +34,7 @@ function PromotionWorkspace({ userID }: { userID: string }) {
     const [recordPage, setRecordPage] = useState(1);
     const [invitePage, setInvitePage] = useState(1);
     const [transferPage, setTransferPage] = useState(1);
-    const [tab, setTab] = useState<RecordTab>("invites");
+    const [selectedTab, setTab] = useState<RecordTab | null>(null);
     const [open, setOpen] = useState(false);
     const [input, setInput] = useState("");
     const [busy, setBusy] = useState(false);
@@ -50,10 +52,12 @@ function PromotionWorkspace({ userID }: { userID: string }) {
         };
     }, []);
     const scope = ["promotion", userID];
-    const overview = useQuery({ queryKey: [...scope, "overview"], queryFn: ({ signal }) => getPromotionOverview(signal), refetchOnWindowFocus: true });
-    const records = useQuery({ queryKey: [...scope, "records", recordPage], queryFn: ({ signal }) => getPromotionRecords(recordPage, signal), enabled: tab === "records" });
-    const invites = useQuery({ queryKey: [...scope, "invites", invitePage], queryFn: ({ signal }) => getPromotionInvitations(invitePage, signal), enabled: tab === "invites" });
-    const transfers = useQuery({ queryKey: [...scope, "transfers", transferPage], queryFn: ({ signal }) => getPromotionTransfers(transferPage, signal), enabled: tab === "transfers" });
+    const overview = usePromotionOverview(userID);
+    const { canInvite, title } = promotionDisplay(overview.data, Boolean(overview.error));
+    const tab = selectedTab ?? (canInvite ? "invites" : "records");
+    const records = useQuery({ queryKey: [...scope, "records", recordPage], queryFn: ({ signal }) => getPromotionRecords(recordPage, signal), enabled: Boolean(overview.data) && tab === "records" });
+    const invites = useQuery({ queryKey: [...scope, "invites", invitePage], queryFn: ({ signal }) => getPromotionInvitations(invitePage, signal), enabled: Boolean(overview.data) && tab === "invites" });
+    const transfers = useQuery({ queryKey: [...scope, "transfers", transferPage], queryFn: ({ signal }) => getPromotionTransfers(transferPage, signal), enabled: Boolean(overview.data) && tab === "transfers" });
     const current = () => active.current && useUserStore.getState().user?.id === userID;
     const refresh = () => client.invalidateQueries({ queryKey: ["promotion", userID] });
 
@@ -202,24 +206,24 @@ function PromotionWorkspace({ userID }: { userID: string }) {
             if (current()) message.error("复制失败，可选中内容手动复制");
         }
     };
-    const emptyDescription = tab === "invites" ? "好友通过你的邀请码完成注册后，会显示在这里。" : tab === "records" ? "受邀好友在线充值到账后，就能看到你的返利。" : "把可用返利转入积分后，到账记录会显示在这里。";
+    const emptyDescription = tab === "transfers" ? "把可用返利转入积分后，到账记录会显示在这里。" : !canInvite ? "已有记录会显示在这里。" : tab === "invites" ? "好友通过你的邀请码完成注册后，会显示在这里。" : "受邀好友在线充值到账后，就能看到你的返利。";
 
     return (
         <main className="promotion-page">
             <div className="promotion-content">
                 <header className="promotion-heading">
                     <div>
-                        <h1>邀请有礼</h1>
-                        <p>把好用的创作工具分享给朋友，收获更多创作积分。</p>
+                        <h1>{title}</h1>
+                        <p>{canInvite ? "把好用的创作工具分享给朋友，收获更多创作积分。" : "查看已有返利，转入积分继续创作。"}</p>
                     </div>
                     <div className="promotion-heading-actions">
-                        <StatusBadge tone={data.canPromote && data.effectiveRatioBps > 0 ? "success" : "neutral"} label={data.canPromote ? `充值返利 ${data.effectiveRatioBps / 100}%` : "邀请暂未开放"} />
-                        <Button type="text" aria-label="刷新邀请奖励" loading={overview.isFetching} icon={<RefreshCw className="size-4" />} onClick={() => void refresh()}>
+                        {canInvite ? <StatusBadge tone={data.effectiveRatioBps > 0 ? "success" : "neutral"} label={`充值返利 ${data.effectiveRatioBps / 100}%`} /> : null}
+                        <Button type="text" aria-label="刷新返利" loading={overview.isFetching} icon={<RefreshCw className="size-4" />} onClick={() => void refresh()}>
                             刷新
                         </Button>
                     </div>
                 </header>
-                {!data.canPromote ? <Alert type="info" showIcon title={data.profile.paused ? "你的邀请功能已暂停" : "邀请活动暂未开放"} description="暂时不能邀请新好友或获得新的充值返利，已有返利仍可查看和转入积分。" /> : null}
+                {!overview.error && !canInvite ? <Alert type="info" showIcon title={data.profile.paused ? "你的邀请功能已暂停" : "邀请活动暂未开放"} description="当前暂停新邀请，已有返利仍可查看和转入积分。" /> : null}
                 {overview.error ? <Alert type="error" title="数据更新失败，当前显示上次读取的结果" description={overview.error.message} action={<Button onClick={() => void refresh()}>重试</Button>} /> : null}
                 {storageError ? <Alert type="error" title="暂时无法转入积分" description={storageError} /> : null}
                 {pending ? (
@@ -231,82 +235,84 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                         action={<Button onClick={() => setOpen(true)}>继续核对</Button>}
                     />
                 ) : null}
-                <section className="promotion-card promotion-invite" aria-labelledby="promotion-invite-title">
-                    <div className="promotion-section-heading">
-                        <div className="promotion-invite-intro">
-                            <span className="promotion-gift-mark">
-                                <Gift aria-hidden />
+                {canInvite ? (
+                    <section className="promotion-card promotion-invite" aria-labelledby="promotion-invite-title">
+                        <div className="promotion-section-heading">
+                            <div className="promotion-invite-intro">
+                                <span className="promotion-gift-mark">
+                                    <Gift aria-hidden />
+                                </span>
+                                <div>
+                                    <h2 id="promotion-invite-title">邀请好友，一起创作</h2>
+                                    <p>
+                                        好友通过你的邀请注册并在线充值，你可获得充值到账积分的 <strong>{data.effectiveRatioBps / 100}%</strong> 作为返利。
+                                    </p>
+                                </div>
+                            </div>
+                            <span className="promotion-invite-count">
+                                <UsersRound aria-hidden />
+                                已邀请 <strong>{data.inviteCount}</strong> 人
                             </span>
-                            <div>
-                                <h2 id="promotion-invite-title">邀请好友，一起创作</h2>
-                                <p>
-                                    好友通过你的邀请注册并在线充值，你可获得充值到账积分的 <strong>{data.effectiveRatioBps / 100}%</strong> 作为返利。
-                                </p>
-                            </div>
                         </div>
-                        <span className="promotion-invite-count">
-                            <UsersRound aria-hidden />
-                            已邀请 <strong>{data.inviteCount}</strong> 人
-                        </span>
-                    </div>
-                    {data.canPromote && data.effectiveRatioBps === 0 ? <p className="promotion-zero-ratio">当前返利比例为 0%，新充值暂不产生返利。</p> : null}
-                    {code ? (
-                        <div className="promotion-share-fields">
-                            <div className="promotion-share-field">
-                                <label htmlFor="promotion-code">我的邀请码</label>
-                                <div className="promotion-copy-field">
-                                    <Input id="promotion-code" readOnly value={code} />
-                                    <Button disabled={!data.canPromote} aria-label="复制邀请码" icon={<Copy className="size-4" />} onClick={() => void copy(code, "邀请码")}>
-                                        复制
-                                    </Button>
+                        {data.effectiveRatioBps === 0 ? <p className="promotion-zero-ratio">当前返利比例为 0%，新充值暂不产生返利。</p> : null}
+                        {code ? (
+                            <div className="promotion-share-fields">
+                                <div className="promotion-share-field">
+                                    <label htmlFor="promotion-code">我的邀请码</label>
+                                    <div className="promotion-copy-field">
+                                        <Input id="promotion-code" readOnly value={code} />
+                                        <Button disabled={!data.canPromote} aria-label="复制邀请码" icon={<Copy className="size-4" />} onClick={() => void copy(code, "邀请码")}>
+                                            复制
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="promotion-share-field">
+                                    <label htmlFor="promotion-link">专属邀请链接</label>
+                                    <div className="promotion-copy-field">
+                                        <Link2 aria-hidden />
+                                        <Input id="promotion-link" readOnly value={invitationURL.toString()} />
+                                        <Button disabled={!data.canPromote} aria-label="复制邀请链接" icon={<Copy className="size-4" />} onClick={() => void copy(invitationURL.toString(), "邀请链接")}>
+                                            复制链接
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="promotion-share-field">
-                                <label htmlFor="promotion-link">专属邀请链接</label>
-                                <div className="promotion-copy-field">
-                                    <Link2 aria-hidden />
-                                    <Input id="promotion-link" readOnly value={invitationURL.toString()} />
-                                    <Button disabled={!data.canPromote} aria-label="复制邀请链接" icon={<Copy className="size-4" />} onClick={() => void copy(invitationURL.toString(), "邀请链接")}>
-                                        复制链接
-                                    </Button>
+                        ) : (
+                            <div className="promotion-create-code">
+                                <div>
+                                    <strong>你的邀请，从一个专属链接开始</strong>
+                                    <p>生成后即可复制分享，好友也可以在注册时填写你的邀请码。</p>
                                 </div>
+                                <Button type="primary" disabled={!data.canPromote} loading={creating} icon={<Link2 className="size-4" />} onClick={() => void createCode()}>
+                                    生成我的邀请链接
+                                </Button>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="promotion-create-code">
-                            <div>
-                                <strong>你的邀请，从一个专属链接开始</strong>
-                                <p>生成后即可复制分享，好友也可以在注册时填写你的邀请码。</p>
-                            </div>
-                            <Button type="primary" disabled={!data.canPromote} loading={creating} icon={<Link2 className="size-4" />} onClick={() => void createCode()}>
-                                生成我的邀请链接
-                            </Button>
-                        </div>
-                    )}
-                    <ol className="promotion-steps" aria-label="如何获得邀请奖励">
-                        <li>
-                            <span>01</span>
-                            <div>
-                                <strong>分享邀请</strong>
-                                <p>把链接或邀请码发给新朋友。</p>
-                            </div>
-                        </li>
-                        <li>
-                            <span>02</span>
-                            <div>
-                                <strong>好友注册并充值</strong>
-                                <p>注册时绑定邀请，在线充值到账后产生返利。</p>
-                            </div>
-                        </li>
-                        <li>
-                            <span>03</span>
-                            <div>
-                                <strong>转为创作积分</strong>
-                                <p>{data.policy.freezeDays ? `新返利等待 ${data.policy.freezeDays} 天解锁后，手动转入积分。` : "返利到账即可手动转入积分。"}</p>
-                            </div>
-                        </li>
-                    </ol>
-                </section>
+                        )}
+                        <ol className="promotion-steps" aria-label="如何获得邀请奖励">
+                            <li>
+                                <span>01</span>
+                                <div>
+                                    <strong>分享邀请</strong>
+                                    <p>把链接或邀请码发给新朋友。</p>
+                                </div>
+                            </li>
+                            <li>
+                                <span>02</span>
+                                <div>
+                                    <strong>好友注册并充值</strong>
+                                    <p>注册时绑定邀请，在线充值到账后产生返利。</p>
+                                </div>
+                            </li>
+                            <li>
+                                <span>03</span>
+                                <div>
+                                    <strong>转为创作积分</strong>
+                                    <p>{data.policy.freezeDays ? `新返利等待 ${data.policy.freezeDays} 天解锁后，手动转入积分。` : "返利到账即可手动转入积分。"}</p>
+                                </div>
+                            </li>
+                        </ol>
+                    </section>
+                ) : null}
                 <section className="promotion-card promotion-account" aria-labelledby="promotion-account-title">
                     <div className="promotion-section-heading">
                         <h2 id="promotion-account-title">
@@ -341,7 +347,9 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                                         ? "转入后即可用于站内创作，支持全部或部分转入。"
                                         : BigInt(data.frozenMicrocredits) > BigInt(0)
                                           ? "返利还在等待解锁，解锁后即可转入。"
-                                          : "好友充值后，返利会显示在这里。"}
+                                          : canInvite
+                                            ? "好友充值后，返利会显示在这里。"
+                                            : "暂无可转入的返利。"}
                             </p>
                         </div>
                         <div className="promotion-stats" aria-label="返利概览">
@@ -405,25 +413,27 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                             <EmptyState
                                 size="compact"
                                 icon={tab === "invites" ? UsersRound : tab === "records" ? Gift : Wallet}
-                                title={tab === "invites" ? "还没有好友加入" : tab === "records" ? "还没有收到返利" : "还没有转入记录"}
+                                title={tab === "invites" ? "暂无邀请记录" : tab === "records" ? "暂无返利记录" : "暂无转入记录"}
                                 description={emptyDescription}
                             />
                         )}
                     </div>
                     {!selectedRecords.error && selectedRecords.data ? <PaginationBar current={currentPage} pageSize={20} total={selectedRecords.data.total} pageSizeOptions={[20]} onChange={(page) => setPage(page)} /> : null}
                 </section>
-                <details className="promotion-card promotion-rules">
-                    <summary>
-                        <span>活动规则</span>
-                        <ChevronDown aria-hidden />
-                    </summary>
-                    <ul>
-                        <li>仅邀请新用户。好友须在注册时填写你的邀请码，一个账号只能绑定一位邀请人，注册后不能补绑或更换。</li>
-                        <li>返利按好友在线充值实际到账的积分计算，包含套餐赠送积分。签到、注册赠送、兑换码和积分调整不产生返利。</li>
-                        <li>{data.policy.freezeDays ? `当前新订单的返利等待期为 ${data.policy.freezeDays} 天，从充值积分到账时起计算。` : "当前新订单的返利到账即可使用。"} 已有返利的具体解锁时间，以返利明细为准。</li>
-                        <li>返利比例和等待期在好友下单时确定，之后调整不影响该笔订单。</li>
-                    </ul>
-                </details>
+                {canInvite ? (
+                    <details className="promotion-card promotion-rules">
+                        <summary>
+                            <span>活动规则</span>
+                            <ChevronDown aria-hidden />
+                        </summary>
+                        <ul>
+                            <li>仅邀请新用户。好友须在注册时填写你的邀请码，一个账号只能绑定一位邀请人，注册后不能补绑或更换。</li>
+                            <li>返利按好友在线充值实际到账的积分计算，包含套餐赠送积分。签到、注册赠送、兑换码和积分调整不产生返利。</li>
+                            <li>{data.policy.freezeDays ? `当前新订单的返利等待期为 ${data.policy.freezeDays} 天，从充值积分到账时起计算。` : "当前新订单的返利到账即可使用。"} 已有返利的具体解锁时间，以返利明细为准。</li>
+                            <li>返利比例和等待期在好友下单时确定，之后调整不影响该笔订单。</li>
+                        </ul>
+                    </details>
+                ) : null}
             </div>
             <AppModal
                 title={pending ? "核对上次转入" : "返利转入积分"}

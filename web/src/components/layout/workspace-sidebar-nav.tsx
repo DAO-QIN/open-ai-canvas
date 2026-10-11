@@ -76,7 +76,7 @@ function WorkspaceSidebarProfile({ collapsed, user }: { collapsed: boolean; user
     }
 
     const avatar = avatarUrl && !failed ? <img src={avatarUrl} alt="" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <CircleUserRound aria-hidden />;
-    const content = <WorkspaceAccountCard onNavigate={() => setMenuOpen(false)} onWallet={() => { setMenuOpen(false); openWorkspaceWallet(); }} />;
+    const content = <WorkspaceAccountCard active={menuOpen} onNavigate={() => setMenuOpen(false)} onWallet={() => { setMenuOpen(false); openWorkspaceWallet(); }} />;
 
     return (
         <div className={cn("app-workspace-sidebar-account", collapsed && "is-collapsed")}>
