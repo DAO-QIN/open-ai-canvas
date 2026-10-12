@@ -328,6 +328,7 @@ function ProductImagesWorkspace({ userID }: { userID: string }) {
             </div>
             <ProductQuoteModal
                 items={quotes}
+                catalog={options.data?.catalog}
                 busy={busy}
                 error={quoteError}
                 onClose={() => {

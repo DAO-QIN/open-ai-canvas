@@ -1,9 +1,11 @@
 import { Alert, Button } from "antd";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { credits, type Product, type ProductQuote } from "@/lib/ecommerce/contracts";
+import { modelChoices, selectedModelKey } from "@/lib/ecommerce/models";
+import type { ModelCatalogResponse } from "@/services/api/logical-models";
 
 export type QuotedProduct = { product: Product; quote?: ProductQuote; error?: string };
-export function ProductQuoteModal({ items, busy, error, onClose, onConfirm }: { items: QuotedProduct[] | null; busy: boolean; error?: string; onClose: () => void; onConfirm: () => void }) {
+export function ProductQuoteModal({ items, busy, error, catalog, onClose, onConfirm }: { items: QuotedProduct[] | null; busy: boolean; error?: string; catalog?: ModelCatalogResponse; onClose: () => void; onConfirm: () => void }) {
     const valid = items?.filter((item) => item.quote) ?? [];
     const estimated = valid.reduce((sum, item) => sum + item.quote!.estimatedMicrocredits, 0);
     const budget = valid.reduce((sum, item) => sum + item.quote!.budgetMicrocredits, 0);
@@ -16,6 +18,7 @@ export function ProductQuoteModal({ items, busy, error, onClose, onConfirm }: { 
     const auto = valid.some((item) => ["auto", "redo-auto"].includes(item.quote!.scope.action));
     const titleOnly = valid.length > 0 && valid.every((item) => item.quote!.scope.action === "redo-titles");
     const planning = valid.length > 0 && valid.every((item) => ["planning", "redo-review", "append"].includes(item.quote!.scope.action));
+    const reviewModels = catalog ? modelChoices(catalog, "text", 2) : [];
     return (
         <AppModal
             title={auto ? "确认整套商品与预算" : "确认本阶段费用"}
@@ -70,6 +73,8 @@ export function ProductQuoteModal({ items, busy, error, onClose, onConfirm }: { 
                 <div className="max-h-64 space-y-3 overflow-auto">
                     {items?.map(({ product, quote, error }) => {
                         const config = quote?.scope.config ?? (quote && ["planning", "auto", "redo-review", "redo-auto"].includes(quote.scope.action) ? product.config : (product.run?.config ?? product.config));
+                        const reviewer = quote?.prices.find((price) => price.key === "quality" && price.calls > 0)?.reviewModel;
+                        const reviewLabel = reviewer && (reviewModels.find((choice) => selectedModelKey(choice.selection) === selectedModelKey(reviewer))?.label || catalog?.models?.find((model) => model.id === reviewer.logicalModelId)?.name || reviewer.channelModelKey || "已确认的审查模型");
                         return (
                             <div key={product.id} className="rounded-lg bg-surface-hover p-3 text-sm">
                                 <p className="font-medium">{product.name}</p>
@@ -87,6 +92,7 @@ export function ProductQuoteModal({ items, busy, error, onClose, onConfirm }: { 
                                         <p className="mt-1 text-xs text-foreground/60">
                                             规格：{config.hero.size} / {config.detail.size} · {config.language}
                                         </p>
+                                        {reviewLabel && <p className="mt-1 text-xs text-foreground/60">审查模型：{reviewLabel}</p>}
                                     </>
                                 ) : (
                                     <p className="mt-1 text-xs text-status-error">已跳过：{error}</p>

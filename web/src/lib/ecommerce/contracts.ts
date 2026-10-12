@@ -130,7 +130,7 @@ export type ProductQuote = {
     imageCalls: number;
     expiresAt: string;
     scope: QuoteScope;
-    prices: { key: string; signature: string; estimatedMicrocredits: number; capMicrocredits: number; calls: number; estimated: boolean }[];
+    prices: { key: string; signature: string; estimatedMicrocredits: number; capMicrocredits: number; calls: number; estimated: boolean; reviewModel?: ModelSelection }[];
 };
 export type ProductCommand = {
     revision: number;
