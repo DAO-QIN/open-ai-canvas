@@ -111,8 +111,8 @@ AI 拆图每层的 `generation.prompt/background` 由 `canvas-image-layer-plan.t
 | 页面装配和跨域动作协调 | `web/src/pages/canvas/project.tsx` |
 | 画布领域规则和生成协议 | `web/src/lib/canvas/canvas-project-domain.ts`、`canvas-project-generation.ts`、`produced-model.ts` |
 | 项目恢复、持久化和项目级动作 | `web/src/pages/canvas/use-canvas-project-lifecycle.ts` |
-| 云端版本校验与冲突草稿 | `web/src/services/user-data-sync.ts`、`canvas-sync-drafts.ts`、`web/src/lib/canvas/canvas-content.ts`、`web/src/pages/canvas/canvas-sync-status.tsx` |
-| 历史树与独立只读预览 | `web/src/pages/canvas/canvas-version-history.tsx`、`canvas-version-preview.tsx`；后端 `internal/canvas/canvas_history.go` 与 `repository/canvas_history.go`，Agent 写入桥接在 `app/canvas_bridge.go` |
+| 画布 operations 同步与本地 journal | `web/src/services/user-data-sync.ts`、`web/src/services/api/user-data.ts`、`web/src/lib/canvas/canvas-content.ts`、`web/src/pages/canvas/canvas-sync-status.tsx`、`web/src/stores/use-sync-progress-store.ts` |
+| 内部资源保护与维护快照 | `backend/internal/canvas/canvas_history.go`、`repair_resources.go`、`backend/internal/repository/canvas_history.go`；仅供资源完整性维护和审计，不提供用户历史树、预览或恢复入口 |
 | Patch 历史、生成任务和重试控制 | `web/src/pages/canvas/use-canvas-history.ts`、`use-canvas-generation.ts`、`use-canvas-generation-executor.ts`、`use-canvas-generation-retry.ts` |
 | 文本、图片、视频和音频生成执行 | `web/src/pages/canvas/canvas-*-generation-executor*.ts` |
 | AI 图层规划、原图提取与合成 | `web/src/lib/canvas/canvas-image-layer-plan.ts`、`canvas-image-layer-strategy.ts` 负责结构化计划与强校验；`web/src/services/canvas-image-layer-source.ts` 负责原图区域 PNG 与底图局部修补，`canvas-image-layer-extraction.ts` 负责并发及条件去背景，`canvas-image-layer-compositor.ts` 负责解码/尺寸/alpha/合成；弹窗编辑计划，`use-canvas-media-tools.ts` 编排，`canvas-generation-task-sync.ts` 消费持久任务，`use-canvas-generation-retry.ts` 区分免费原图重提取与模型重试 |
