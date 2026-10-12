@@ -10,8 +10,6 @@ import { AppDrawer } from "@/components/ui/product/app-drawer";
 import { Clapperboard, Download, Image as ImageIcon, MessageSquareText, MoreHorizontal, Pencil, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { conversationTimestamp } from "./creation-conversations";
 import { formatMessageTime } from "./creation-workspace-messages";
-import { Link } from "react-router";
-import { PRODUCT_IMAGES_ROUTE } from "@/lib/ecommerce/contracts";
 
 export function creationConversationBucket(updatedAt: string): "today" | "yesterday" | "week" | "earlier" {
     const at = new Date(updatedAt).getTime();
@@ -124,15 +122,6 @@ export function CreationHistoryDrawer({
             }
         >
             <div className="creation-history-content">
-                <Link to={PRODUCT_IMAGES_ROUTE + "?tab=history"} className="creation-history-new" onClick={onClose}>
-                    <span className="creation-history-new-icon">
-                        <ImageIcon />
-                    </span>
-                    <span className="creation-history-new-copy">
-                        <strong>商品套图作品</strong>
-                        <small>查看方案、套图与历史版本</small>
-                    </span>
-                </Link>
                 <label className="creation-history-search">
                     <Search aria-hidden="true" />
                     <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索对话标题或内容" aria-label="搜索历史对话" />

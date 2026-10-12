@@ -408,7 +408,9 @@ func (s *Service) prepareCreationTask(userID string, req CreateTaskRequest) (*mo
 			}
 		}
 	}
-	task, order, sig, err := s.prepareTaskAdmission(userID, req)
+	prepared := &creationTaskPreparation{}
+	req.creationPrepare = prepared
+	task, err := s.CreateTask(userID, req)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -443,7 +445,8 @@ func (s *Service) prepareCreationTask(userID string, req CreateTaskRequest) (*mo
 			return nil, nil, "", err
 		}
 	}
-	return task, order, sig, nil
+	sig, err := s.repo.CreationPriceSignature(task, stringValue(resolved["channelId"]), stringValue(resolved["model"]))
+	return task, prepared.Order, sig, err
 }
 func creationQuoteFor(task *model.Task, order *model.BillingOrder, signature string, expires time.Time) CreationQuote {
 	quote := CreationQuote{Model: task.Model, BillingMode: "free", Quantity: 1, ExpiresAt: expires}

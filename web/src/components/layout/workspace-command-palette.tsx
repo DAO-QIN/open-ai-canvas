@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState, type ComponentType } from "react"
 import { useNavigate } from "react-router";
 
 import { navigationTools } from "@/constant/navigation-tools";
-import { PRODUCT_IMAGES_ROUTE } from "@/lib/ecommerce/contracts";
 import { Kbd } from "@/components/ui/base/kbd";
 import { cn } from "@/lib/utils";
 import { openWorkspaceWallet } from "@/lib/workspace-wallet";
@@ -33,7 +32,6 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
         return [
             { id: "home", title: "首页", icon: Home, to: "/" },
             toolEntry("projects", "/projects"),
-            ...(features.ecommerceEnabled ? [toolEntry("product-images", PRODUCT_IMAGES_ROUTE)] : []),
             toolEntry("canvas", "/canvas"),
             ...(features.taskCenterEnabled ? [toolEntry("tasks", "/tasks")] : []),
             toolEntry("assets", "/assets"),

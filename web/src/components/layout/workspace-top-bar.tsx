@@ -13,7 +13,6 @@ import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { usePromotionOverview } from "@/hooks/use-promotion-overview";
 import { promotionDisplay } from "@/lib/promotion-display";
 import { openWorkspaceWallet } from "@/lib/workspace-wallet";
-import { PRODUCT_IMAGES_ROUTE } from "@/lib/ecommerce/contracts";
 
 const PAGE_TITLES: Record<string, string> = {
     home: "创作",
@@ -38,7 +37,7 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar }: { sidebarOpen:
     const { pathname } = useLocation();
     const slug = pathname.split("/").filter(Boolean)[0];
     const promotion = usePromotionOverview(user?.id, slug === "promotion");
-    const pageTitle = pathname === PRODUCT_IMAGES_ROUTE || pathname.startsWith(PRODUCT_IMAGES_ROUTE + "/") ? "商品套图" : slug === "promotion" ? promotionDisplay(promotion.data, Boolean(promotion.error)).title : slug ? PAGE_TITLES[slug] || brandName : PAGE_TITLES.home;
+    const pageTitle = slug === "promotion" ? promotionDisplay(promotion.data, Boolean(promotion.error)).title : slug ? PAGE_TITLES[slug] || brandName : PAGE_TITLES.home;
     const balance = availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 
     return (

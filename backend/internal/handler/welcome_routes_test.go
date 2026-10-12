@@ -27,7 +27,7 @@ func TestWelcomeAvailabilityPublicRoute(t *testing.T) {
 	}
 	sqlDB.SetMaxOpenConns(1)
 	t.Cleanup(func() { _ = sqlDB.Close() })
-	if err := db.AutoMigrate(&model.SystemSetting{}, &model.PluginPlatformState{}); err != nil {
+	if err := db.AutoMigrate(&model.SystemSetting{}); err != nil {
 		t.Fatal(err)
 	}
 	router := gin.New()

@@ -4,7 +4,6 @@ import { PROMPT_OPTIMIZER_PLUGIN_ID } from "@/lib/plugins/builtin/prompt-optimiz
 import { RUNNINGHUB_PLUGIN_ID } from "@/lib/plugins/builtin/workflows";
 
 import { EDITOR_SHELL_PLUGIN_ID } from "./builtin/editor/editor-shell";
-import { ECOMMERCE_PLUGIN_ID } from "@/lib/ecommerce/contracts";
 
 /**
  * 官方“应用型”插件清单：这些插件在管理页按用户自主启停处理，而不是系统协议。
@@ -12,7 +11,13 @@ import { ECOMMERCE_PLUGIN_ID } from "@/lib/ecommerce/contracts";
  * 之前管理页、用户插件页和后端各自维护一份清单，管理页漏掉 AI 审美分析和剪辑
  * 工作台，导致二者被误判为系统协议并在管理页显示“已停用”。这里收敛为唯一来源。
  */
-export const OFFICIAL_APPLICATION_PLUGIN_IDS = [ECOMMERCE_PLUGIN_ID, RUNNINGHUB_PLUGIN_ID, EAGLE_PLUGIN_ID, PROMPT_OPTIMIZER_PLUGIN_ID, ART_CRITIQUE_PLUGIN_ID, EDITOR_SHELL_PLUGIN_ID] as const;
+export const OFFICIAL_APPLICATION_PLUGIN_IDS = [
+    RUNNINGHUB_PLUGIN_ID,
+    EAGLE_PLUGIN_ID,
+    PROMPT_OPTIMIZER_PLUGIN_ID,
+    ART_CRITIQUE_PLUGIN_ID,
+    EDITOR_SHELL_PLUGIN_ID,
+] as const;
 
 const officialApplicationIdSet = new Set<string>(OFFICIAL_APPLICATION_PLUGIN_IDS);
 

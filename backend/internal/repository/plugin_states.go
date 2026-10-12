@@ -27,17 +27,6 @@ func (r *Repository) PluginPlatformStates() ([]model.PluginPlatformState, error)
 }
 
 func (r *Repository) SavePluginPlatformState(state *model.PluginPlatformState) error {
-	if state.PluginID == model.EcommercePluginID {
-		return r.db.Transaction(func(tx *gorm.DB) error {
-			if e := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "plugin_id"}}, DoUpdates: clause.AssignmentColumns([]string{"available", "updated_by", "updated_at"})}).Create(state).Error; e != nil {
-				return e
-			}
-			if !state.Available && tx.Migrator().HasTable(&model.EcommerceRun{}) {
-				return New(tx).PauseEcommerce("", "商品套图已关闭；重新开放后请手动继续")
-			}
-			return nil
-		})
-	}
 	return r.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "plugin_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"available", "updated_by", "updated_at"}),
@@ -66,17 +55,6 @@ func (r *Repository) UserPluginStates(userID string) ([]model.UserPluginState, e
 }
 
 func (r *Repository) SaveUserPluginState(state *model.UserPluginState) error {
-	if state.PluginID == model.EcommercePluginID {
-		return r.MutateEcommerce(state.UserID, "", func(_ *model.EcommerceProduct, repo *Repository) error {
-			if e := repo.db.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "user_id"}, {Name: "plugin_id"}}, DoUpdates: clause.AssignmentColumns([]string{"enabled", "updated_at"})}).Create(state).Error; e != nil {
-				return e
-			}
-			if !state.Enabled && repo.db.Migrator().HasTable(&model.EcommerceRun{}) {
-				return repo.PauseEcommerce(state.UserID, "你已停用商品套图；启用后请手动继续")
-			}
-			return nil
-		})
-	}
 	return r.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}, {Name: "plugin_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"enabled", "updated_at"}),

@@ -2,19 +2,17 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useQueryClient } from "@tanstack/react-query";
 import { App, Button, Skeleton } from "antd";
 import { Switch } from "@/pages/admin/ui/controls";
-import { AlertTriangle, Clapperboard, Coins, Gift, ListChecks, MonitorCog, Package, PlugZap, RadioTower, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, Clapperboard, Coins, Gift, ListChecks, MonitorCog, PlugZap, RadioTower, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { getAdminFeatureAvailability, updateAdminFeatureAvailability } from "@/services/api/auth";
 import { getAdminPromotionPolicy, updatePromotionPolicy, type PromotionPolicy } from "@/services/api/promotion";
-import { setPluginPlatformAvailability } from "@/services/api/plugins";
-import { ECOMMERCE_PLUGIN_ID } from "@/lib/ecommerce/contracts";
 import { useUserStore, type FeatureAvailability } from "@/stores/use-user-store";
 import { AdminStatusBadge } from "./admin-ui";
 import { Link } from "react-router";
 
 type EditableFeatureKey = "shortDramaEnabled" | "taskCenterEnabled" | "creditsEnabled" | "customChannelsEnabled" | "inspirationSourcesVisible" | "frontendModelsEnabled" | "pluginCenterEnabled" | "systemPluginsVisibleToUsers";
-type FeatureKey = EditableFeatureKey | "promotionEnabled" | "ecommerceEnabled";
+type FeatureKey = EditableFeatureKey | "promotionEnabled";
 type FeatureRow = {
     key: FeatureKey;
     title: string;
@@ -31,19 +29,6 @@ const workspaceFeatureRows: FeatureRow[] = [
         title: "短剧创作",
         description: "开放短剧入口、项目列表与项目详情。关闭不删除已有项目。",
         icon: <Clapperboard className="size-4" aria-hidden="true" />,
-    },
-    {
-        key: "ecommerceEnabled",
-        title: "商品套图",
-        description: (
-            <>
-                开放官方商品创作入口与后续派发；关闭后在途任务收尾，历史作品保留。
-                <Link className="underline underline-offset-4" to="/admin/ecommerce">
-                    配置模型与批次限制
-                </Link>
-            </>
-        ),
-        icon: <Package className="size-4" aria-hidden="true" />,
     },
     {
         key: "taskCenterEnabled",
@@ -190,13 +175,7 @@ function FeatureAvailabilitySettings({ userID }: { userID: string }) {
         setSaveError("");
         try {
             let value: FeatureAvailability;
-            if (key === "ecommerceEnabled") {
-                const state = await setPluginPlatformAvailability(ECOMMERCE_PLUGIN_ID, enabled);
-                if (!current()) return;
-                if (state.pluginId !== ECOMMERCE_PLUGIN_ID || state.platformAvailable !== enabled) throw new Error("服务端返回的商品套图状态与保存内容不一致");
-                value = { ...expected, ecommerceEnabled: state.platformAvailable };
-                void client.invalidateQueries({ queryKey: ["ecommerce", userID] });
-            } else if (key === "promotionEnabled") {
+            if (key === "promotionEnabled") {
                 // The versioned policy owns this switch; preserve its rate and freeze period.
                 const policy = await updatePromotionPolicy({ ...promotionPolicy, enabled });
                 if (!current()) return;
@@ -451,7 +430,6 @@ function parseFeatureAvailability(value: unknown): FeatureAvailability {
     }
     return {
         promotionEnabled: record.promotionEnabled === true,
-        ecommerceEnabled: typeof record.ecommerceEnabled === "boolean" ? record.ecommerceEnabled : false,
         welcomeEnabled: record.welcomeEnabled as boolean,
         shortDramaEnabled: record.shortDramaEnabled as boolean,
         taskCenterEnabled: record.taskCenterEnabled as boolean,

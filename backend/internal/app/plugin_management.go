@@ -15,7 +15,6 @@ const (
 	PluginAIArtCritique       = "ai-art-critique"
 	PluginMediaConversion     = "media-conversion"
 	PluginEditorShell         = "editor-shell"
-	PluginEcommerceStudio     = model.EcommercePluginID
 
 	PluginOriginOfficial = "official"
 	PluginOriginSystem   = "system"
@@ -60,7 +59,6 @@ type AdminPluginStateView struct {
 }
 
 var officialApplicationPolicies = map[string]PluginManagementView{
-	PluginEcommerceStudio: {Origin: PluginOriginOfficial, Kind: PluginKindApplication, ActivationScope: PluginScopeUser, ConfigurationScope: PluginConfigurationNone},
 	WorkflowPluginRunningHub: {
 		Origin: PluginOriginOfficial, Kind: PluginKindApplication,
 		ActivationScope: PluginScopeUser, ConfigurationScope: PluginConfigurationUser,
@@ -199,9 +197,6 @@ func (s *Service) pluginStateForUser(actor *model.User, pluginID string, items [
 	}
 	policy := pluginManagement(pluginID, source)
 	platformAvailable := policy.Kind == PluginKindApplication
-	if pluginID == PluginEcommerceStudio {
-		platformAvailable = false
-	}
 	if hasRuntime && (policy.ActivationScope == PluginScopeSystem || s.repo == nil) {
 		platformAvailable = runtimePlugin.Status == "enabled"
 	}
@@ -231,7 +226,7 @@ func (s *Service) pluginStateForUser(actor *model.User, pluginID string, items [
 		// explicitly saves a personal choice. Other official applications were
 		// already controlled by each user's local installation state.
 		if !userConfigured {
-			if pluginID == PluginMediaConversion || pluginID == PluginEcommerceStudio {
+			if pluginID == PluginMediaConversion {
 				userEnabled = true
 			} else if hasRuntime && pluginID == WorkflowPluginRunningHub {
 				userEnabled = runtimePlugin.Status == "enabled"
@@ -253,13 +248,6 @@ func (s *Service) pluginStateForUser(actor *model.User, pluginID string, items [
 		state.BlockedReason = "管理员已停用该插件"
 	} else if policy.ActivationScope == PluginScopeSystem {
 		state.BlockedReason = "系统插件由管理员统一管理"
-	}
-	if pluginID == PluginEcommerceStudio {
-		if !platformAvailable {
-			state.BlockedReason = "商品套图暂未开放"
-		} else if !userEnabled {
-			state.BlockedReason = "你已停用商品套图"
-		}
 	}
 	return state, nil
 }
@@ -311,29 +299,12 @@ func (s *Service) AdminPluginStates(actor *model.User) (map[string]AdminPluginSt
 	for pluginID, state := range states {
 		result[pluginID] = AdminPluginStateView{PluginStateView: state, EnabledUserCount: counts[pluginID]}
 	}
-	if state, ok := result[PluginEcommerceStudio]; ok {
-		count, e := s.repo.EcommerceDefaultEnabledUserCount()
-		if e != nil {
-			return nil, e
-		}
-		state.EnabledUserCount = count
-		result[PluginEcommerceStudio] = state
-	}
 	return result, nil
 }
 
 func (s *Service) SetPluginPlatformAvailability(actor *model.User, pluginID string, available bool) (AdminPluginStateView, error) {
 	if err := s.RequireAdmin(actor); err != nil {
 		return AdminPluginStateView{}, err
-	}
-	if pluginID == PluginEcommerceStudio && available {
-		settings, e := s.ecommerceDomain().Settings()
-		if e != nil {
-			return AdminPluginStateView{}, e
-		}
-		if e := (ecommerceHost{svc: s}).ValidateConfig(actor.ID, settings.Defaults); e != nil {
-			return AdminPluginStateView{}, e
-		}
 	}
 	items := s.Plugins()
 	runtimePlugin, hasRuntime := runtimePluginByID(items, pluginID)

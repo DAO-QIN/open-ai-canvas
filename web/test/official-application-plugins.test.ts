@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { OFFICIAL_APPLICATION_PLUGIN_IDS, isOfficialApplicationPluginId } from "../src/lib/plugins/official-applications";
+import {
+    OFFICIAL_APPLICATION_PLUGIN_IDS,
+    isOfficialApplicationPluginId,
+} from "../src/lib/plugins/official-applications";
 
 describe("official application plugin classification", () => {
     test("covers every built-in application plugin, including editor and art critique", () => {
@@ -26,13 +29,18 @@ describe("official application plugin classification", () => {
     test("exposes a single de-duplicated id list", () => {
         const ids = [...OFFICIAL_APPLICATION_PLUGIN_IDS];
         expect(new Set(ids).size).toBe(ids.length);
-        expect(ids.length).toBe(6);
-        expect(ids).toContain("ecommerce-studio");
+        expect(ids.length).toBe(5);
     });
 
     test("both plugin pages consume the shared list instead of a local copy", () => {
-        const adminPage = readFileSync(resolve(import.meta.dir, "../src/pages/admin/plugins/plugins-page.tsx"), "utf8");
-        const userPage = readFileSync(resolve(import.meta.dir, "../src/pages/plugins/index.tsx"), "utf8");
+        const adminPage = readFileSync(
+            resolve(import.meta.dir, "../src/pages/admin/plugins/plugins-page.tsx"),
+            "utf8",
+        );
+        const userPage = readFileSync(
+            resolve(import.meta.dir, "../src/pages/plugins/index.tsx"),
+            "utf8",
+        );
 
         expect(adminPage).toContain("isOfficialApplicationPluginId");
         expect(userPage).toContain("isOfficialApplicationPluginId");

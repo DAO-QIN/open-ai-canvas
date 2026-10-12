@@ -311,15 +311,6 @@ func recoveryURLForAudit(value *url.URL) string {
 }
 
 func (s *Service) queryFailedVideoTask(ctx context.Context, task *model.Task, claimUserID string) (*ProviderTaskQueryResult, error) {
-	if task == nil || (!strings.HasPrefix(task.Type, "canvas_video") && !strings.HasPrefix(task.Type, "video_")) {
-		return nil, BadAuthRequest("该任务不是视频生成任务")
-	}
-	return s.queryFailedProviderTask(ctx, task, claimUserID)
-}
-
-// The caller authorizes the task kind. This helper only polls the original
-// provider ID and settles the existing order; it never invokes create/generate.
-func (s *Service) queryFailedProviderTask(ctx context.Context, task *model.Task, claimUserID string) (*ProviderTaskQueryResult, error) {
 	billing := s.taskBilling()
 	ctx = withProtocolRegistry(ctx, s.protocolRegistry())
 	if task == nil || task.ID == "" {
@@ -330,6 +321,9 @@ func (s *Service) queryFailedProviderTask(ctx context.Context, task *model.Task,
 	}
 	if task.MediaRecoveryJSON != "" {
 		return nil, BadAuthRequest("该任务已生成作品，请在任务中心重试保存，无需重新查询生成")
+	}
+	if !strings.HasPrefix(task.Type, "canvas_video") && !strings.HasPrefix(task.Type, "video_") {
+		return nil, BadAuthRequest("该任务不是视频生成任务")
 	}
 
 	s.hydrateTaskProviderRequestID(task)

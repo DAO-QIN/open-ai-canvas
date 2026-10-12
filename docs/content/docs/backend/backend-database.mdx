@@ -5,20 +5,6 @@ description: 影策后端核心持久化表与状态边界
 
 # 后端数据库
 
-## 商品套图
-
-可选智能质检沿用 Schema 51，无新增表或列。用户配置 JSON 增加 qualityCheck 和可选 reviewModel，未指定审查模型时采用后台默认；移除独立 titleModel，标题与策划统一使用 planner。后台 ecommerce_studio 设置 JSON 增加 reviewAvailable/reviewModel。quality 执行步骤保存在 ecommerce_steps：RequestJSON 固定原图、成图资源、图片版本与模型，ResultJSON 保存版本 ID 及检查报告；报价/授权 PricesJSON 保存用户选择或默认的质检模型与价格快照。阶段唯一键、步骤任务关联及账务原子性继续使用已有约束，历史版本不覆盖。轮次 checking 表示正在检查，和生成一样可暂停、恢复与租约协调。
-
-Schema 51 接续 50，新增 ecommerce_batches、ecommerce_products、ecommerce_runs、ecommerce_branches、ecommerce_slots、ecommerce_image_versions、ecommerce_steps、ecommerce_quotes、ecommerce_authorizations、ecommerce_presets、ecommerce_operations。全部业务对象保存 user_id；步骤按 run_id/stage_key 唯一，操作按 user_id/operation_id 唯一。ecommerce_steps.price_signature 使用 TEXT 保存宿主模型、价格档和计费设置的完整快照。
-
-tasks 增加可空且唯一的 ecommerce_step_id。历史任务继续为空，ProjectID 和账务不迁入商品 ID。子任务、原账务预授权、步骤关联及授权预算占用原子提交；保存点失败整体回滚。
-
-轮次保存不可变商品与配置快照、版本化标题、lease_owner、lease_epoch、lease_expires_at 和 next_check_at；PostgreSQL 使用 SKIP LOCKED 公平领取，代次防止过期 worker 写入或释放新租约。分支保存已接受方案与视觉配置，单图保留全部成功版本及当前选择。
-
-平台开放状态只存 plugin_platform_states 的 ecommerce-studio 记录，迁移默认关闭且重复迁移保留管理员配置；个人开关在 user_plugin_states。system_settings 的 ecommerce_studio 保存管理员默认模型、规格和编排限制及修订号。个人默认设置复用名称为 default 的预设。
-
-商品结构字节计入账号容量，原图及历史图片版本加入资源引用检查。database.Models 与 SQLite → PostgreSQL 复制清单均包含上述新表；仅在已验证空目标库的新建结构阶段移除新建编号和插件种子，再复制源序列与官方状态，已有业务数据的目标库不清理。升级与回退遵循 schema 51 的正式迁移及数据库备份。
-
 ## 邀请返利
 
 Schema 50 追加 `promotion_profiles`、`invitations`、`commission_records`、`promotion_transfers` 和 `commission_allocations`；`payment_orders.promotion_snapshot` 保存内部 JSON 快照，`o_auth_states.invite_code` 保存注册流程的邀请码。旧订单快照为空，不回溯返利。
@@ -47,17 +33,21 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 后端通过 GORM 管理 SQLite 与 PostgreSQL 表结构。结构变化由 `migrate-schema` 按版本顺序执行并写入 `schema_migrations`；受管生产部署在 Backend 启动前运行独立迁移服务，Backend 只校验当前 Schema 是否与二进制兼容。业务写路径必须通过 service 和 repository 的状态约束，不能直接依赖前端状态。
 
+商品套图模块已撤回，用户界面及业务接口恢复到引入前版本。数据库保留已发布的 Schema 51 `official_ecommerce_studio`，校验和不变：11 张 `ecommerce_*` 表以及 `tasks.ecommerce_step_id` 仅用于兼容已有数据。没有商品派发 Worker、商品 API 或平台开放入口；历史关联任务禁止通过通用重试再次收费，原图和版本引用继续参加资源删除检查与容量统计。
+
+回退程序必须支持当前 Schema 51；不能直接运行仅支持 Schema 50 的旧镜像，不能调低迁移版本，也不能用旧数据库覆盖当前账号、作品和账务。部署前备份当前数据库和媒体，先在隔离副本验证业务内容，再切换应用镜像。
+
 ## 素材资源引用边界
 
 资源引用快照同时读取素材表现的 `resource_id` 和 `metadata_json`（包括嵌套资源字段）；不能先按 `resource_id` 过滤表现记录，否则仅在 metadata 中引用的共享资源会漏检。素材批量删除保留其他素材仍引用的资源；管理员删除也复用这一引用边界。
 
 ## 结构迁移与版本
 
-当前结构版本为 51。版本 51 official_ecommerce_studio 接入商品套图，详见上文。版本 50 `invitation_rebates` 增加邀请返利账务表、订单规则快照及 OAuth 邀请码，详见上文。版本 49 `banner_sort_order` 为 `banner_announcements` 增加可配置的 `sort_order` 展示顺序；版本 48 `channel_proxy_url` 为 `model_channels` 增加渠道级出站代理地址 `proxy_url`，支持 `socks5://`、`http://`、`https://`；留空时沿用全局代理。代理地址只返回管理员视图，普通用户目录不暴露渠道代理或其中的认证信息。版本 42 `cloud_agent_pi_sessions` 新增 `cloud_agent_pi_sessions` 表，按运行 ID 保存 Pi 原生 JSONL 会话快照、用户 ID、乐观并发 revision 和更新时间；会话正文由 Agent runtime 管理，Go 只将其作为不透明快照读写，不替代有界控制检查点、事件日志或任务记录。版本 41 `resource_thumbnail` 为 `resources` 增加缩略图元数据。版本 40 `builtin_skill_tombstones` 新增内置技能删除记录，管理员删除平台技能后，后续启动同步不会重新创建该技能；版本 39 `skill_library_categories` 新增 `skill_library_categories` 表，并为 `user_skill_states` 增加 `library_category_id`，保存个人技能库分类及每个用户对技能的归类；分类不改变 `skills.tag` 的技能广场共享分类。版本 38 `prefixed_id_sequence_reconcile` 创建（若缺失）并校准 `id_sequences`：`CHANNEL`、`MODEL`、`PTIER`、`ATTEMPT`、`LMODEL`、`REVISION`、`ROUTE` 按对应业务表的最大有效 ID 前移，包含软删除记录，不回退已有序列、不重写业务 ID。分配新 ID 时再次校准并检查冲突；SQLite → PostgreSQL 迁移完成后也校准序列。
+当前结构版本为 51；版本 51 的表仅用于撤回模块后的数据兼容。版本 50 `invitation_rebates` 增加邀请返利账务表、订单规则快照及 OAuth 邀请码，详见上文。版本 49 `banner_sort_order` 为 `banner_announcements` 增加可配置的 `sort_order` 展示顺序；版本 48 `channel_proxy_url` 为 `model_channels` 增加渠道级出站代理地址 `proxy_url`，支持 `socks5://`、`http://`、`https://`；留空时沿用全局代理。代理地址只返回管理员视图，普通用户目录不暴露渠道代理或其中的认证信息。版本 42 `cloud_agent_pi_sessions` 新增 `cloud_agent_pi_sessions` 表，按运行 ID 保存 Pi 原生 JSONL 会话快照、用户 ID、乐观并发 revision 和更新时间；会话正文由 Agent runtime 管理，Go 只将其作为不透明快照读写，不替代有界控制检查点、事件日志或任务记录。版本 41 `resource_thumbnail` 为 `resources` 增加缩略图元数据。版本 40 `builtin_skill_tombstones` 新增内置技能删除记录，管理员删除平台技能后，后续启动同步不会重新创建该技能；版本 39 `skill_library_categories` 新增 `skill_library_categories` 表，并为 `user_skill_states` 增加 `library_category_id`，保存个人技能库分类及每个用户对技能的归类；分类不改变 `skills.tag` 的技能广场共享分类。版本 38 `prefixed_id_sequence_reconcile` 创建（若缺失）并校准 `id_sequences`：`CHANNEL`、`MODEL`、`PTIER`、`ATTEMPT`、`LMODEL`、`REVISION`、`ROUTE` 按对应业务表的最大有效 ID 前移，包含软删除记录，不回退已有序列、不重写业务 ID。分配新 ID 时再次校准并检查冲突；SQLite → PostgreSQL 迁移完成后也校准序列。
 
 版本 36 `cloud_agent_gemini_cache` 创建 `cloud_agent_gemini_caches`，保存用户范围内的官方 Gemini 缓存元数据；版本 37 `cloud_agent_gemini_cache_identity` 将缓存标识约束修正为 `(user_id, cache_key)`，移除旧的全局 cache_key 唯一索引。版本 35 `auth_notifications` 为认证通知与组合验证补齐 `auth_verifications`、`notification_quotas`、`sms_channels`、`sms_records` 四张表，并为 `users` 增加 `phone`、`email_verified_at`、`phone_verified_at`，为 `email_verification_codes` 增加 `attempts`；同时创建非空手机号唯一索引。版本 34 `task_media_recovery` 为 `tasks` 增加 `media_recovery_json`（text）和 `media_stage`（最长 24 字）。版本 33 `oauth_state_accepted_terms` 为 `o_auth_states` 增加非空布尔列 `accepted_terms`，默认 `false`，不替历史流程补造同意记录。
 
-升级前备份，按既有流程执行 `migrate-schema up` 和 `verify` 后再启动新后端。结构版本低于 51 的旧二进制不能连接版本 51 的数据库，回退需恢复匹配的数据库备份，并评估备份之后的新写入；不能只切回旧镜像。关闭自动迁移的生产环境必须运行正式迁移；手工改表不能更新 `schema_migrations` 的版本与校验和记录。
+升级前备份，按既有流程执行 `migrate-schema up` 和 `verify` 后再启动新后端。结构版本低于 50 的旧二进制不能连接版本 50 的数据库，回退需恢复匹配的数据库备份，并评估备份之后的新写入；不能只切回旧镜像。关闭自动迁移的生产环境必须运行正式迁移；手工改表不能更新 `schema_migrations` 的版本与校验和记录。
 
 ### 生成成功后的作品保存恢复
 
@@ -70,13 +60,13 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 每轮 Agent 存为 `tasks` 中 `operation = cloud_agent` 的 `canvas_text` 任务，任务 `input_json.cloudAgent` 保存版本 1 的已校验请求、父轮 ID、请求指纹和技能快照；历史从服务端父轮结果构造。任务 ID 由用户与幂等键确定，利用现有主键、任务 admission 和积分预留事务防止重复提交重复扣费。Agent 的模型循环、工具调用、审批、子任务和事件写入 `cloud_agent_executions.state_json`，任务 Worker 只负责推进状态，不依赖浏览器连接。公共任务创建与重试接口禁止绕过 Agent admission；删除任务会影响该轮继续对话与回放。
 
-| 表                       | 用途                                                                      | 关键边界                                                                                                                                                                                |
-| ------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema_migrations`      | 保存已成功应用的结构版本、名称、校验和与时间                              | 已应用版本的校验和发生变化时拒绝启动；数据库版本高于当前二进制支持版本时拒绝旧程序连接                                                                                                  |
-| `cloud_agent_executions` | 保存 Agent 每轮的持久化执行状态、修订号和运行状态                         | `(id, user_id)` 归属受服务端校验；状态通过 revision CAS 更新；`state_json` 包含技能快照、工具调用、审批、活动子任务、事件、最近一次语义压缩检查点与"正在压缩"的压缩态，不保存浏览器密钥 |
-| `agent_profiles`         | 保存用户、项目和画布层的 Agent 常驻偏好、哈希和独立 revision              | `(user_id, scope, project_id, canvas_id)` 唯一；归属由 service 校验，写入使用 revision CAS；正文不能授权新能力                                                                          |
-| `agent_lessons`          | 用户私有的 Agent 记忆。Agent 写入待审，用户自己批准后才会注入该用户的会话 | 按 `author_user_id` 隔离；写入机械脱敏；`steps_json` 存路线；`hits` 是主动查阅、`injected` 是自动注入；管理员可按用户查看和删除，不能代批                                               |
-| `agent_memory_settings`  | 用户私有的记忆压缩周期、文本模型和最近一次压缩任务状态                    | 主键 `user_id`；压缩结果只在 `compact_task_id` 匹配时应用到该用户已批准记忆                                                                                                             |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `schema_migrations` | 保存已成功应用的结构版本、名称、校验和与时间 | 已应用版本的校验和发生变化时拒绝启动；数据库版本高于当前二进制支持版本时拒绝旧程序连接 |
+| `cloud_agent_executions` | 保存 Agent 每轮的持久化执行状态、修订号和运行状态 | `(id, user_id)` 归属受服务端校验；状态通过 revision CAS 更新；`state_json` 包含技能快照、工具调用、审批、活动子任务、事件、最近一次语义压缩检查点与"正在压缩"的压缩态，不保存浏览器密钥 |
+| `agent_profiles` | 保存用户、项目和画布层的 Agent 常驻偏好、哈希和独立 revision | `(user_id, scope, project_id, canvas_id)` 唯一；归属由 service 校验，写入使用 revision CAS；正文不能授权新能力 |
+| `agent_lessons` | 用户私有的 Agent 记忆。Agent 写入待审，用户自己批准后才会注入该用户的会话 | 按 `author_user_id` 隔离；写入机械脱敏；`steps_json` 存路线；`hits` 是主动查阅、`injected` 是自动注入；管理员可按用户查看和删除，不能代批 |
+| `agent_memory_settings` | 用户私有的记忆压缩周期、文本模型和最近一次压缩任务状态 | 主键 `user_id`；压缩结果只在 `compact_task_id` 匹配时应用到该用户已批准记忆 |
 
 容器内命令 `migrate-schema up` 应用缺失迁移，`migrate-schema status` 输出当前和期望版本，`migrate-schema verify` 只检查兼容性。`CANVAS_AUTO_MIGRATE=true` 仅用于开发和旧部署兼容；受管生产部署设置为 `false`，并由 Compose 的一次性 `migrate` 服务先完成迁移。后续迁移必须新增版本，不得修改已经发布迁移的实现或校验和。
 
@@ -92,11 +82,11 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 ## 画布版本与快照
 
-| 表                          | 用途                                                           | 关键边界                                                                 |
-| --------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `canvas_projects`           | 当前画布内容及递增 `revision`（非空，默认 1）                  | 客户端新建传 0；后续写入按用户、ID、原版本原子校验，成功才加 1           |
-| `canvas_snapshots`          | 结构 JSON、版本、标题、节点/连线数、字节数、内容时间和备份时间 | `(canvas_id, revision)` 唯一；列表只读摘要，正文按需加载；不复制媒体文件 |
-| `canvas_snapshot_resources` | 历史快照引用的资源                                             | `(snapshot_id, resource_id)` 联合主键；资源外键禁止删除被引用记录        |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `canvas_projects` | 当前画布内容及递增 `revision`（非空，默认 1） | 客户端新建传 0；后续写入按用户、ID、原版本原子校验，成功才加 1 |
+| `canvas_snapshots` | 结构 JSON、版本、标题、节点/连线数、字节数、内容时间和备份时间 | `(canvas_id, revision)` 唯一；列表只读摘要，正文按需加载；不复制媒体文件 |
+| `canvas_snapshot_resources` | 历史快照引用的资源 | `(snapshot_id, resource_id)` 联合主键；资源外键禁止删除被引用记录 |
 
 浏览器、云端 Agent 和创作任务共用保存事务。内容变化时备份旧内容，普通备份最短间隔 5 分钟，每画布最多保留 20 份；恢复前强制备份当前内容。版本号每次成功写入递增，快照按间隔采样，两者不是一一对应。画布关联项目或解除关联同样推进版本，使旧页面的全量保存失效。
 
@@ -153,12 +143,12 @@ docker compose -f docker-compose.deploy.yml up -d backend web
 
 ## 账号认证与密码找回
 
-| 表                         | 用途                                                                        | 关键边界                                                                                                   |
-| -------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `users`                    | 保存用户名、唯一非空邮箱、本地密码哈希、角色和状态                          | 密码只保存 bcrypt 哈希；密码找回只面向状态正常且已有本地密码的账号                                         |
-| `auth_sessions`            | 保存登录 Cookie 对应的服务端会话和令牌哈希                                  | 密码重置成功时删除该用户全部会话，旧 Cookie 立即失效                                                       |
-| `o_auth_states`            | 保存一次性 OAuth state、PKCE verifier、跳转路径和本次 `accepted_terms` 标志 | 有效期 10 分钟且只能消费一次；仅新建第三方账号时要求同意，已有账号登录不受该标志影响；不是长期协议签署记录 |
-| `email_verification_codes` | 保存注册和密码重置的一次性邮箱验证码                                        | 只保存带用途隔离的 HMAC 哈希；验证码 10 分钟过期、只能消费一次，明文不进入数据库                           |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `users` | 保存用户名、唯一非空邮箱、本地密码哈希、角色和状态 | 密码只保存 bcrypt 哈希；密码找回只面向状态正常且已有本地密码的账号 |
+| `auth_sessions` | 保存登录 Cookie 对应的服务端会话和令牌哈希 | 密码重置成功时删除该用户全部会话，旧 Cookie 立即失效 |
+| `o_auth_states` | 保存一次性 OAuth state、PKCE verifier、跳转路径和本次 `accepted_terms` 标志 | 有效期 10 分钟且只能消费一次；仅新建第三方账号时要求同意，已有账号登录不受该标志影响；不是长期协议签署记录 |
+| `email_verification_codes` | 保存注册和密码重置的一次性邮箱验证码 | 只保存带用途隔离的 HMAC 哈希；验证码 10 分钟过期、只能消费一次，明文不进入数据库 |
 
 密码重置在单个数据库事务中条件消费 `password_reset` 验证码、更新 `users.password_hash` 并删除 `auth_sessions`。任一步失败都会回滚，不能出现密码已修改但旧会话仍有效，或验证码已消耗但密码未更新的部分状态。
 
@@ -166,13 +156,13 @@ docker compose -f docker-compose.deploy.yml up -d backend web
 
 ## 技能包与版本
 
-| 表                         | 用途                                                                   | 关键边界                                                                                                               |
-| -------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `skills`                   | 保存技能公开元数据、当前版本指针、来源和 GitHub 同步状态               | `instruction` 仅保留入口 `SKILL.md` 的兼容投影；目录文件不展开写入该字段                                               |
-| `skill_versions`           | 保存每次安装、编辑或同步形成的不可变技能版本                           | 记录内容哈希、入口路径、规范化 ZIP 的存储键、文件数、总大小和 GitHub commit                                            |
-| `skill_files`              | 保存某个版本的文件索引                                                 | `(skill_version_id, path)` 唯一；只保存路径、类型、MIME、大小和 SHA-256，不保存正文                                    |
-| `skill_library_categories` | 保存个人技能库分类和管理员创建的平台分类                               | personal 分类按用户隔离；platform 分类对所有用户可见；分类名在用户可见范围内唯一，删除分类只清除归类引用               |
-| `user_skill_states`        | 保存用户的加入、收藏、安装版本、自动更新选择及该用户对技能的技能库分类 | `library_category_id` 属于用户技能库元数据，不修改 `skills.tag` 等技能广场共享分类；技能正文读取仍经过公开性和归属校验 |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `skills` | 保存技能公开元数据、当前版本指针、来源和 GitHub 同步状态 | `instruction` 仅保留入口 `SKILL.md` 的兼容投影；目录文件不展开写入该字段 |
+| `skill_versions` | 保存每次安装、编辑或同步形成的不可变技能版本 | 记录内容哈希、入口路径、规范化 ZIP 的存储键、文件数、总大小和 GitHub commit |
+| `skill_files` | 保存某个版本的文件索引 | `(skill_version_id, path)` 唯一；只保存路径、类型、MIME、大小和 SHA-256，不保存正文 |
+| `skill_library_categories` | 保存个人技能库分类和管理员创建的平台分类 | personal 分类按用户隔离；platform 分类对所有用户可见；分类名在用户可见范围内唯一，删除分类只清除归类引用 |
+| `user_skill_states` | 保存用户的加入、收藏、安装版本、自动更新选择及该用户对技能的技能库分类 | `library_category_id` 属于用户技能库元数据，不修改 `skills.tag` 等技能广场共享分类；技能正文读取仍经过公开性和归属校验 |
 
 技能库分类由 schema migration 39 创建/扩展；内置技能删除记录由 schema migration 40 创建。删除分类时在事务内清空对应 `user_skill_states.library_category_id` 后删除分类记录，不会级联删除任何技能。删除内置技能时写入 tombstone，后续启动同步会跳过该技能。
 
@@ -180,30 +170,30 @@ docker compose -f docker-compose.deploy.yml up -d backend web
 
 ## 提示词模板
 
-| 表                           | 用途                                 | 关键边界                                                                                                         |
-| ---------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `prompt_templates`           | 保存每个操作的平台提示词版本         | `(operation, version)` 唯一；同一操作同一时间只能有一个启用版本；启用中的版本不能直接改文案或停用                |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `prompt_templates` | 保存每个操作的平台提示词版本 | `(operation, version)` 唯一；同一操作同一时间只能有一个启用版本；启用中的版本不能直接改文案或停用 |
 | `user_prompt_customizations` | 保存用户对某个操作的跟随、追加或改写 | `(user_id, operation)` 唯一；只覆盖创作层。任务事实和 JSON 输出契约由 `compilePrompt` 注入，不能写进这张表来绕过 |
 
 启动时 `EnsureDefaultPromptTemplates` 只为尚无任何版本的操作写入内置默认稿。新增操作（当前包括短剧大纲 `short_drama_outline` 和技能草稿 `skill_draft`）会在下次启动补种，不改已有操作的启用版本。
 
 ## 短剧分镜生产
 
-| 表                                                                              | 用途                                                              | 关键边界                                                                                                                                                                                                                       |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `projects`                                                                      | 保存短剧项目基础设置、画幅、画风快照、项目主图和默认图片/视频模型 | `default_image_model` / `default_video_model` 保存前端模型选择器的渠道限定引用；模型下架或渠道停用时前端回退当前全局默认。`cover_resource_id` 只能引用当前用户已就绪的图片资源；资源删除检查会阻止仍被项目主图使用的图片被回收 |
-| `project_units`                                                                 | 保存项目章节或集数的正文、排序和状态                              | `word_count` 在正文创建、导入和更新时同步维护，项目详情只返回摘要和字数，不批量返回长篇正文；升级时会为旧正文回填字数                                                                                                          |
-| `assets` / `asset_folders` / `asset_versions` / `project_asset_links`           | 保存用户资产、自定义分类、不可变版本及项目引用                    | 业务分类统一为 `character`、`environment`、`prop`、`material`、`other`；自定义分类通过用户级 `asset_folders` 与 `assets.folder_id` 表达，不改变业务分类语义                                                                    |
-| `project_asset_candidates`                                                      | 保存章节或 Agent 提取后等待用户确认的资产候选                     | `name_key` 保存规范化名称，`source` 记录提取入口；角色候选只允许来自 `chapter_character_extract` 且必须关联章节，同一项目、分类和规范化名称的待确认候选保持唯一                                                                |
-| `shots`                                                                         | 保存章节内稳定的镜头身份、排序和当前版本指针                      | 不保存完整生成历史；`current_revision_id` 指向当前采用的分镜脚本版本                                                                                                                                                           |
-| `shot_revisions`                                                                | 保存画面、动作、台词、景别、机位、运镜、提示词和动作节拍          | 每次编辑创建新版本；历史版本不可被静默覆盖                                                                                                                                                                                     |
-| `shot_asset_references`                                                         | 将镜头绑定到具体资产版本                                          | 修改引用时只使该镜头的下游产物过期，不影响其他镜头                                                                                                                                                                             |
-| `shot_artifacts`                                                                | 保存分镜图、动作预演、首尾帧、视频等版本化产物                    | `selected` 表示当前采用版本；上游变化后状态转为 `stale`，历史资源继续保留                                                                                                                                                      |
-| `production_task_links`                                                         | 显式记录生成任务所属的领域项目、画布、章节、镜头和工作流步骤      | `Task.project_id` 仍兼容画布任务身份，不再用它单独推断短剧领域归属                                                                                                                                                             |
-| `creation_runs`                                                                 | 保存创作 Agent 的服务端权威状态、执行租约、已批准提案和画布快照   | `(user_id, client_key)` 唯一；客户端会话只作为输入，修订号、执行 epoch 和租约由 service 强校验，不能据前端状态跳过审批或重复执行                                                                                               |
-| `creation_submissions`                                                          | 保存创作提案中每个生成项的请求、报价签名、审批和任务绑定          | `(run_id, item_key)` 与 `task_id` 分别唯一；相同提交只允许创建一个任务，过期、撤销或提案哈希不一致时拒绝执行                                                                                                                   |
-| `tasks.creation_submission_id`                                                  | 将生成任务反向绑定到已批准的创作提交                              | 字段可空以兼容普通任务和旧数据；非空值唯一，阻止同一提交产生多个任务                                                                                                                                                           |
-| `workflow_template_versions` / `workflow_instances` / `workflow_step_instances` | 保存短剧生产模板和项目、章节实例                                  | 短剧分镜工作流 v2 顺序为剧情、资产、分镜、动作预演、视频、交付                                                                                                                                                                 |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `projects` | 保存短剧项目基础设置、画幅、画风快照、项目主图和默认图片/视频模型 | `default_image_model` / `default_video_model` 保存前端模型选择器的渠道限定引用；模型下架或渠道停用时前端回退当前全局默认。`cover_resource_id` 只能引用当前用户已就绪的图片资源；资源删除检查会阻止仍被项目主图使用的图片被回收 |
+| `project_units` | 保存项目章节或集数的正文、排序和状态 | `word_count` 在正文创建、导入和更新时同步维护，项目详情只返回摘要和字数，不批量返回长篇正文；升级时会为旧正文回填字数 |
+| `assets` / `asset_folders` / `asset_versions` / `project_asset_links` | 保存用户资产、自定义分类、不可变版本及项目引用 | 业务分类统一为 `character`、`environment`、`prop`、`material`、`other`；自定义分类通过用户级 `asset_folders` 与 `assets.folder_id` 表达，不改变业务分类语义 |
+| `project_asset_candidates` | 保存章节或 Agent 提取后等待用户确认的资产候选 | `name_key` 保存规范化名称，`source` 记录提取入口；角色候选只允许来自 `chapter_character_extract` 且必须关联章节，同一项目、分类和规范化名称的待确认候选保持唯一 |
+| `shots` | 保存章节内稳定的镜头身份、排序和当前版本指针 | 不保存完整生成历史；`current_revision_id` 指向当前采用的分镜脚本版本 |
+| `shot_revisions` | 保存画面、动作、台词、景别、机位、运镜、提示词和动作节拍 | 每次编辑创建新版本；历史版本不可被静默覆盖 |
+| `shot_asset_references` | 将镜头绑定到具体资产版本 | 修改引用时只使该镜头的下游产物过期，不影响其他镜头 |
+| `shot_artifacts` | 保存分镜图、动作预演、首尾帧、视频等版本化产物 | `selected` 表示当前采用版本；上游变化后状态转为 `stale`，历史资源继续保留 |
+| `production_task_links` | 显式记录生成任务所属的领域项目、画布、章节、镜头和工作流步骤 | `Task.project_id` 仍兼容画布任务身份，不再用它单独推断短剧领域归属 |
+| `creation_runs` | 保存创作 Agent 的服务端权威状态、执行租约、已批准提案和画布快照 | `(user_id, client_key)` 唯一；客户端会话只作为输入，修订号、执行 epoch 和租约由 service 强校验，不能据前端状态跳过审批或重复执行 |
+| `creation_submissions` | 保存创作提案中每个生成项的请求、报价签名、审批和任务绑定 | `(run_id, item_key)` 与 `task_id` 分别唯一；相同提交只允许创建一个任务，过期、撤销或提案哈希不一致时拒绝执行 |
+| `tasks.creation_submission_id` | 将生成任务反向绑定到已批准的创作提交 | 字段可空以兼容普通任务和旧数据；非空值唯一，阻止同一提交产生多个任务 |
+| `workflow_template_versions` / `workflow_instances` / `workflow_step_instances` | 保存短剧生产模板和项目、章节实例 | 短剧分镜工作流 v2 顺序为剧情、资产、分镜、动作预演、视频、交付 |
 
 短剧项目状态以这些领域表为准。自由画布可以承载探索节点，但画布 metadata 不作为生产完成度、镜头版本或交付可用性的真相源。
 
@@ -211,16 +201,16 @@ docker compose -f docker-compose.deploy.yml up -d backend web
 
 短剧工作台不再通过单个项目详情响应下载全部章节正文、镜头历史、产物、画布和资产。读取按页面职责拆分：
 
-| 接口                                            | 返回范围                                                          |
-| ----------------------------------------------- | ----------------------------------------------------------------- |
-| `GET /api/projects/:id/core`                    | 项目基础设置，不包含业务集合                                      |
-| `GET /api/projects/:id/overview`                | 项目聚合计数与前 8 个章节进度                                     |
-| `GET /api/projects/:id/units`                   | 全部章节摘要与字数，不包含正文                                    |
-| `GET /api/projects/:id/units/:unitId`           | 单章正文                                                          |
-| `GET /api/projects/:id/units/:unitId/workspace` | 当前章节的镜头、版本、产物、引用、候选、相关任务和已绑定资产      |
-| `GET /api/projects/:id/canvases`                | 项目画布与当前页章节关联，使用 `page`、`pageSize`                 |
-| `GET /api/projects/:id/assets`                  | 项目资产分页、分类/目录计数，支持分类、媒体类型、目录和关键词筛选 |
-| `GET /api/projects/:id/asset-candidates`        | 资产候选分页，支持章节、状态、分类和名称关键词筛选                |
+| 接口 | 返回范围 |
+| --- | --- |
+| `GET /api/projects/:id/core` | 项目基础设置，不包含业务集合 |
+| `GET /api/projects/:id/overview` | 项目聚合计数与前 8 个章节进度 |
+| `GET /api/projects/:id/units` | 全部章节摘要与字数，不包含正文 |
+| `GET /api/projects/:id/units/:unitId` | 单章正文 |
+| `GET /api/projects/:id/units/:unitId/workspace` | 当前章节的镜头、版本、产物、引用、候选、相关任务和已绑定资产 |
+| `GET /api/projects/:id/canvases` | 项目画布与当前页章节关联，使用 `page`、`pageSize` |
+| `GET /api/projects/:id/assets` | 项目资产分页、分类/目录计数，支持分类、媒体类型、目录和关键词筛选 |
+| `GET /api/projects/:id/asset-candidates` | 资产候选分页，支持章节、状态、分类和名称关键词筛选 |
 
 旧 `GET /api/projects/:id` 暂时保留给尚未迁移的调用方；短剧工作台页面不得重新依赖该整包接口。
 
@@ -237,24 +227,24 @@ docker compose -f docker-compose.deploy.yml up -d backend web
 
 ## 支付与插件版本
 
-| 表                                                             | 用途                                       | 关键边界                                                                                                 |
-| -------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `topup_products`                                               | 保存服务端维护的充值商品、金额和积分快照   | 客户端只能提交商品 ID；金额和积分由 service 读取，不能由请求覆盖                                         |
-| `payment_provider_configs`                                     | 保存支付插件某个渠道配置的不可变版本       | `provider_id + version` 唯一；密钥只保存加密密文；`plugin_id` / `plugin_version` 记录配置对应的插件版本  |
-| `payment_orders`                                               | 保存充值订单、幂等键、渠道交易号和入账状态 | 创建订单时固定 `plugin_id`、`plugin_version`、配置 ID 与配置版本；回调、查单、关单必须使用同一运行时版本 |
-| `payment_notifications`                                        | 保存已验签的支付通知收件箱                 | 以渠道事件 ID 幂等；只保存用于异步入账的标准化证据，重复通知不会重复发放积分                             |
-| `payment_reconciliation_runs` / `payment_reconciliation_items` | 保存渠道账单下载和对账结果                 | 账单只能作为发现线索，金额、币种和交易号仍需由插件查单确认；历史订单继续绑定原插件版本                   |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `topup_products` | 保存服务端维护的充值商品、金额和积分快照 | 客户端只能提交商品 ID；金额和积分由 service 读取，不能由请求覆盖 |
+| `payment_provider_configs` | 保存支付插件某个渠道配置的不可变版本 | `provider_id + version` 唯一；密钥只保存加密密文；`plugin_id` / `plugin_version` 记录配置对应的插件版本 |
+| `payment_orders` | 保存充值订单、幂等键、渠道交易号和入账状态 | 创建订单时固定 `plugin_id`、`plugin_version`、配置 ID 与配置版本；回调、查单、关单必须使用同一运行时版本 |
+| `payment_notifications` | 保存已验签的支付通知收件箱 | 以渠道事件 ID 幂等；只保存用于异步入账的标准化证据，重复通知不会重复发放积分 |
+| `payment_reconciliation_runs` / `payment_reconciliation_items` | 保存渠道账单下载和对账结果 | 账单只能作为发现线索，金额、币种和交易号仍需由插件查单确认；历史订单继续绑定原插件版本 |
 
 支付宝、微信及后续聚合平台都只作为支付插件包提供 `yingce.payment/v1` 适配器，宿主数据库不保存平台专用字段。插件升级不会改写历史订单的 `plugin_version`；存在未完成订单时，原插件版本和配置必须继续可解析通知、查单和关单。
 
 ## 模型渠道与目录
 
-| 表                          | 用途                                                                                                  | 关键边界                                                                                                                                                                                                                          |
-| --------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model_channels`            | 保存系统渠道与用户渠道的连接配置和排序                                                                | 系统渠道密钥不进入公开目录；废弃渠道级前台名称，历史 `public_alias` 列保留但不再用于取名或 API 返回；按 `sort_order, created_at, id` 升序展示                                                                                     |
-| `channel_models`            | 保存系统渠道中的调用标识、上游模型 ID、模型展示名、渠道展示名、描述、Logo、排序、能力、协议和版本状态 | 创作目录跨渠道按 `display_name` 分组一级，`channel_label` 为二级、最长 80 字、空值使用所属渠道名称；`description` 最长 500 字、非空、默认空字符串；同一渠道内调用标识唯一，跨渠道归组不依赖调用标识；模型排序不递增价格或能力版本 |
-| `channel_model_price_tiers` | 保存系统模型按规格匹配的上游 SKU 与价格                                                               | 价格档与渠道模型同事务保存；未启用或未完成定价的规格不进入普通用户目录。档位 `provider_model_key` 非空时优先于渠道模型上游键发往供应商；管理端修改模型级上游 ID 时，与旧值相同的档位键自动级联跟随，其余显式 SKU 保持不变         |
-| `logical_models`            | 保存逻辑模型的名称、Logo、能力类型和归档状态                                                          | 不再作为创作端模型选择目录的数据源；既有任务与供应线路仍通过 revision 和 route 关联；`code` 仅在 `archived_at IS NULL` 的活动记录中唯一                                                                                           |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `model_channels` | 保存系统渠道与用户渠道的连接配置和排序 | 系统渠道密钥不进入公开目录；废弃渠道级前台名称，历史 `public_alias` 列保留但不再用于取名或 API 返回；按 `sort_order, created_at, id` 升序展示 |
+| `channel_models` | 保存系统渠道中的调用标识、上游模型 ID、模型展示名、渠道展示名、描述、Logo、排序、能力、协议和版本状态 | 创作目录跨渠道按 `display_name` 分组一级，`channel_label` 为二级、最长 80 字、空值使用所属渠道名称；`description` 最长 500 字、非空、默认空字符串；同一渠道内调用标识唯一，跨渠道归组不依赖调用标识；模型排序不递增价格或能力版本 |
+| `channel_model_price_tiers` | 保存系统模型按规格匹配的上游 SKU 与价格 | 价格档与渠道模型同事务保存；未启用或未完成定价的规格不进入普通用户目录。档位 `provider_model_key` 非空时优先于渠道模型上游键发往供应商；管理端修改模型级上游 ID 时，与旧值相同的档位键自动级联跟随，其余显式 SKU 保持不变 |
+| `logical_models` | 保存逻辑模型的名称、Logo、能力类型和归档状态 | 不再作为创作端模型选择目录的数据源；既有任务与供应线路仍通过 revision 和 route 关联；`code` 仅在 `archived_at IS NULL` 的活动记录中唯一 |
 
 schema v27 为 `channel_model_price_tiers` 和 `billing_orders` 添加 `cost_configured`（非空、默认 false）及 `cost_unit_price_microcredits`、`cost_input_token_price_microcredits`、`cost_output_token_price_microcredits`、`cost_cached_token_price_microcredits`（非空整数、默认 0）。账单另外保存 `cost_billing_mode`（默认空字符串）、`cost_quantity`、`cost_video_formula_tokens`（默认 0），构成下单时不可变成本快照。请求日志成本从内部账单快照计算，非持久字段 `creditCostMicrocredits` 仅供管理端投影；旧订单不反查新价格，不回填假零成本。已有售价、余额和结算金额不变。
 
@@ -272,21 +262,21 @@ schema v27 为 `channel_model_price_tiers` 和 `billing_orders` 添加 `cost_con
 
 ## 插件管理
 
-| 表                       | 用途                                 | 关键边界                                                                |
-| ------------------------ | ------------------------------------ | ----------------------------------------------------------------------- |
-| `plugin_platform_states` | 保存管理员设置的平台可用状态         | `plugin_id` 为主键；平台停用是所有用户的硬上限，管理员变更写入审计日志  |
-| `user_plugin_states`     | 保存用户对官方应用插件的个人启用状态 | `(user_id, plugin_id)` 唯一；系统协议和管理员上传插件不得写入用户级状态 |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `plugin_platform_states` | 保存管理员设置的平台可用状态 | `plugin_id` 为主键；平台停用是所有用户的硬上限，管理员变更写入审计日志 |
+| `user_plugin_states` | 保存用户对官方应用插件的个人启用状态 | `(user_id, plugin_id)` 唯一；系统协议和管理员上传插件不得写入用户级状态 |
 
 有效状态由服务端计算为 `platform_available AND user_enabled`。官方应用插件没有平台状态记录时默认可用；用户没有个人记录时默认停用，历史上全局启用的工作流插件在用户首次保存个人选择前沿用旧状态。管理员上传包的来源和作用域由宿主覆盖，不能通过 Manifest 提权。
 
 ## 系统公告
 
-| 表                          | 用途                             | 关键边界                                                                                                                                                                                                                                                                                                                                            |
-| --------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `announcements`             | 保存管理员发布的系统公告         | `pinned` 只改变排序；`image_resource_id` 只能绑定由当前管理员上传并在发布事务中消费的公告配图草稿                                                                                                                                                                                                                                                   |
-| `announcement_image_drafts` | 标记尚未发布的公告配图资源       | 发布/更新事务消费草稿；取消编辑显式回收，超过 24 小时的异常遗留草稿由后台清理                                                                                                                                                                                                                                                                       |
-| `user_announcement_reads`   | 保存用户已读状态                 | 同一用户和公告唯一；公告重新发布时清除旧已读记录                                                                                                                                                                                                                                                                                                    |
-| `banner_announcements`      | 保存首页顶部常驻展示的滚动通知条 | 与系统公告完全独立：只有标题、图标与跳转链接，无正文、无配图、无已读状态；`link` 仅接受 `http(s)` 外链或 `/` 开头的站内路径；`status` 为 `active` / `disabled`，`sort_order` 越小越靠前，`starts_at` / `ends_at` 构成生效窗口（可预约未来开始）；`title_runs` 以 JSON 文本保存标题的样式分段；`notice_type` 决定通知条底色，`icon` 是标题前的图标键 |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `announcements` | 保存管理员发布的系统公告 | `pinned` 只改变排序；`image_resource_id` 只能绑定由当前管理员上传并在发布事务中消费的公告配图草稿 |
+| `announcement_image_drafts` | 标记尚未发布的公告配图资源 | 发布/更新事务消费草稿；取消编辑显式回收，超过 24 小时的异常遗留草稿由后台清理 |
+| `user_announcement_reads` | 保存用户已读状态 | 同一用户和公告唯一；公告重新发布时清除旧已读记录 |
+| `banner_announcements` | 保存首页顶部常驻展示的滚动通知条 | 与系统公告完全独立：只有标题、图标与跳转链接，无正文、无配图、无已读状态；`link` 仅接受 `http(s)` 外链或 `/` 开头的站内路径；`status` 为 `active` / `disabled`，`sort_order` 越小越靠前，`starts_at` / `ends_at` 构成生效窗口（可预约未来开始）；`title_runs` 以 JSON 文本保存标题的样式分段；`notice_type` 决定通知条底色，`icon` 是标题前的图标键 |
 
 活动公告按置顶状态优先、发布时间倒序返回；置顶不会绕过关闭状态或用户登录校验。公告只要求标题，正文和配图均可为空。用户首次进入工作区时会自动看到未读公告，可以只关闭本次或选择今日不再提醒；主动打开公告中心后才会写入服务端已读状态。替换或移除配图时，公告更新、旧资源记录删除和物理删除任务入队在同一数据库事务完成。
 
@@ -300,11 +290,11 @@ schema v27 为 `channel_model_price_tiers` 和 `billing_orders` 添加 `cost_con
 
 ## 资源存储
 
-| 表                       | 用途                                               | 关键边界                                                                                                                             |
-| ------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `resources`              | 保存资源元数据和实际存储位置引用                   | `user_id + upload_key` 唯一约束保证逻辑上传幂等；S3 资源必须通过 `storage_setting_id` 固定绑定创建时的位置；浏览器默认经同源接口读取 |
-| `storage_locations`      | 保存平台或个人 S3 位置版本、加密凭据和连接测试摘要 | Endpoint、Bucket、Region、PathStyle、PathPrefix、Provider 组成不可变位置；同位置只轮换凭据，位置变化创建新记录                       |
-| `resource_deletion_jobs` | 在业务记录删除后可靠清理物理对象                   | 固化资源的存储位置与对象键；删除失败保留任务并重试，S3 404 按幂等成功处理                                                            |
+| 表 | 用途 | 关键边界 |
+| --- | --- | --- |
+| `resources` | 保存资源元数据和实际存储位置引用 | `user_id + upload_key` 唯一约束保证逻辑上传幂等；S3 资源必须通过 `storage_setting_id` 固定绑定创建时的位置；浏览器默认经同源接口读取 |
+| `storage_locations` | 保存平台或个人 S3 位置版本、加密凭据和连接测试摘要 | Endpoint、Bucket、Region、PathStyle、PathPrefix、Provider 组成不可变位置；同位置只轮换凭据，位置变化创建新记录 |
+| `resource_deletion_jobs` | 在业务记录删除后可靠清理物理对象 | 固化资源的存储位置与对象键；删除失败保留任务并重试，S3 404 按幂等成功处理 |
 
 `storage_locations.value_json` 中的 Secret Key 和 Session Token 使用后端设置密钥加密。启用 S3 前，关键位置字段和凭据摘要必须与最近一次 Put、Range Get、Delete 连接测试结果一致；历史资源继续按绑定的位置读取和删除，不随当前配置切换。
 

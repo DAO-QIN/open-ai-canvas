@@ -80,12 +80,10 @@ export default function AdminPluginsPage() {
         setSavingId(item.manifest.id);
         try {
             const state = await setPluginPlatformAvailability(item.manifest.id, available);
-            if (state.pluginId !== item.manifest.id || state.platformAvailable !== available) throw new Error("开关响应不确定，请刷新核对实际状态");
             setStates((current) => ({ ...current, [item.manifest.id]: state }));
             message.success(`${item.manifest.name}${available ? "已开放" : "已停用"}`);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "更新插件可用状态失败");
-            await reload();
         } finally {
             setSavingId("");
         }

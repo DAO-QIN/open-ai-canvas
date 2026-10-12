@@ -2,7 +2,7 @@
 
 import { useAppearanceStore } from "@/stores/use-appearance-store";
 import type { CreationMode } from "./creation-assets";
-import { ArrowUp, ChevronDown, Clapperboard, FileText, Image as ImageIcon, Sparkles, ShoppingBag } from "lucide-react";
+import { ArrowUp, ChevronDown, Clapperboard, FileText, Image as ImageIcon, Sparkles } from "lucide-react";
 import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { aceternityMotion } from "@/lib/aceternity-motion";
@@ -40,23 +40,12 @@ export const creationEmptySuggestions: Array<{ mode: CreationMode; icon: typeof 
     { mode: "video", icon: Sparkles, title: "引用技能增强", hint: "@技能 调用分镜、配音等专业能力", prompt: "调用分镜技能，帮我规划这个镜头的拍摄方案：" },
 ];
 
-export function CreationEmptySuggest({ onStartPrompt, onOpenLibrary, onOpenProductImages }: { onStartPrompt: (mode: CreationMode, prompt: string) => void; onOpenLibrary: () => void; onOpenProductImages?: () => void }) {
+export function CreationEmptySuggest({ onStartPrompt, onOpenLibrary }: { onStartPrompt: (mode: CreationMode, prompt: string) => void; onOpenLibrary: () => void }) {
     const reducedMotion = useReducedMotion();
     const [hovered, setHovered] = useState<string | null>(null);
     return (
         <LayoutGroup id="creation-empty-suggest">
             <div className="creation-empty-suggest" aria-label="快捷创作入口">
-                {onOpenProductImages && (
-                    <button type="button" className="suggest-card" onClick={onOpenProductImages}>
-                        <span className="library-icon-tile suggest-icon">
-                            <ShoppingBag size={18} />
-                        </span>
-                        <span className="suggest-copy">
-                            <strong>商品套图</strong>
-                            <span>一张原图，成套主图与详情图</span>
-                        </span>
-                    </button>
-                )}
                 {creationEmptySuggestions.map((item) => {
                     const Icon = item.icon;
                     const start = () => {
