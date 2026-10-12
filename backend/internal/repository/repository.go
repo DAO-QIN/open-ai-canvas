@@ -38,8 +38,6 @@ type Repository struct {
 }
 
 type UserStorageUsage struct {
-	EcommerceCount int64 `json:"ecommerceCount"`
-	EcommerceBytes int64 `json:"ecommerceBytes"`
 	AssetCount     int64 `json:"assetCount"`
 	AssetBytes     int64 `json:"assetBytes"`
 	CanvasCount    int64 `json:"canvasCount"`
@@ -102,9 +100,6 @@ func (r *Repository) UserStorageUsage(userID string) (UserStorageUsage, error) {
 		query = strings.ReplaceAll(query, ", '') AS BLOB))", ", ''))")
 	}
 	err := r.db.Raw(query, userID, userID, userID, userID, userID, userID, userID, userID, userID, userID, userID).Scan(&usage).Error
-	if err == nil {
-		usage.EcommerceCount, usage.EcommerceBytes, err = r.EcommerceStorageUsage(userID)
-	}
 	return usage, err
 }
 

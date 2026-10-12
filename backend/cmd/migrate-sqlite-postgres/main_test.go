@@ -76,10 +76,13 @@ func TestFreshMigrationPreservesSourceSequencesAndOfficialAvailability(t *testin
 	if err := database.MigrateSchema(source); err != nil {
 		t.Fatal(err)
 	}
+	if err := verifyMigrationCoverage(source); err != nil {
+		t.Fatal(err)
+	}
 	if err := source.Model(&model.IDSequence{}).Where("name = ?", "id:MODEL").Update("value", 41).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := source.Model(&model.PluginPlatformState{}).Where("plugin_id = ?", model.EcommercePluginID).Update("available", true).Error; err != nil {
+	if err := source.Create(&model.PluginPlatformState{PluginID: "test-official-plugin", Available: true}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := target.Transaction(func(tx *gorm.DB) error {
@@ -103,5 +106,11 @@ func TestFreshMigrationPreservesSourceSequencesAndOfficialAvailability(t *testin
 	id, err := database.AllocatePrefixedID(target, "MODEL")
 	if err != nil || id != "MODEL_000042" {
 		t.Fatalf("source sequence was not preserved: %s %v", id, err)
+	}
+	if err := source.Exec("DELETE FROM schema_migrations WHERE version = ?", database.CurrentSchemaVersion).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyMigrationCoverage(source); err == nil {
+		t.Fatal("an old SQLite schema must be upgraded before row copying can discard retired task links")
 	}
 }

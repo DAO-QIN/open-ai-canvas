@@ -1,8 +1,10 @@
-package model
+package database
 
 import "time"
 
-const EcommercePluginID = "ecommerce-studio"
+// Frozen schema definitions used only by migration 51. Runtime models must not
+// register these tables; migration 53 removes them after test-task cleanup.
+const ecommercePluginID = "ecommerce-studio"
 
 // Parent records organize work; only Task/BillingOrder carry model charges.
 type EcommerceBatch struct {

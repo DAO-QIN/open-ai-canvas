@@ -18,7 +18,7 @@ func TestCanvasReceiptsUpgradePreservesDeployedMigrationsAndTasks(t *testing.T) 
 	if err := db.Migrator().DropTable(&model.CanvasMutationReceipt{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Delete(&schemaMigration{}, "version = ?", 52).Error; err != nil {
+	if err := db.Delete(&schemaMigration{}, "version >= ?", 52).Error; err != nil {
 		t.Fatal(err)
 	}
 	var before []schemaMigration
@@ -28,8 +28,7 @@ func TestCanvasReceiptsUpgradePreservesDeployedMigrationsAndTasks(t *testing.T) 
 	if before[len(before)-2].Name != "invitation_rebates" || before[len(before)-1].Name != "official_ecommerce_studio" {
 		t.Fatal("deployed migrations 50 and 51 must retain their identity")
 	}
-	stepID := "retired-step"
-	task := model.Task{ID: "existing-task", UserID: "existing-user", EcommerceStepID: &stepID}
+	task := model.Task{ID: "existing-task", UserID: "existing-user"}
 	if err := db.Create(&task).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +59,7 @@ func TestCanvasReceiptsUpgradePreservesDeployedMigrationsAndTasks(t *testing.T) 
 		t.Fatal("canvas receipt table or idempotency index missing")
 	}
 	status, err := ReadSchemaStatus(db)
-	if err != nil || !status.Ready || status.Current != 52 {
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
 		t.Fatalf("upgraded schema not ready: %+v %v", status, err)
 	}
 }

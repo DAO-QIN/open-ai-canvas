@@ -67,6 +67,9 @@ func main() {
 		} else if err := validateTargetTableNames(tableNames); err != nil {
 			return err
 		}
+		if err := database.RequireSchemaVersion(tx); err != nil {
+			return fmt.Errorf("目标数据库结构版本不兼容：%w", err)
+		}
 
 		total := 0
 		for _, migration := range migrations() {
@@ -97,10 +100,7 @@ func createFreshMigrationSchema(tx *gorm.DB) error {
 	if err := database.MigrateSchema(tx); err != nil {
 		return err
 	}
-	if err := tx.Where("1 = 1").Delete(&model.IDSequence{}).Error; err != nil {
-		return err
-	}
-	return tx.Delete(&model.PluginPlatformState{}, "plugin_id = ?", model.EcommercePluginID).Error
+	return tx.Where("1 = 1").Delete(&model.IDSequence{}).Error
 }
 
 func verifySQLite(db *gorm.DB) error {
@@ -353,6 +353,9 @@ func equivalent(left reflect.Value, right reflect.Value) bool {
 }
 
 func verifyMigrationCoverage(db *gorm.DB) error {
+	if err := database.RequireSchemaVersion(db); err != nil {
+		return fmt.Errorf("SQLite 源库必须先升级到当前 Schema 后再迁移：%w", err)
+	}
 	expected := make(map[string]struct{}, len(database.Models()))
 	for _, value := range database.Models() {
 		statement := &gorm.Statement{DB: db}
@@ -469,17 +472,6 @@ func migrations() []tableMigration {
 		migrateTable[model.BannerAnnouncement]("banner_announcements"),
 		migrateTable[model.CreationRun]("creation_runs"),
 		migrateTable[model.CreationSubmission]("creation_submissions"),
-		migrateTable[model.EcommerceBatch]("ecommerce_batches"),
-		migrateTable[model.EcommerceProduct]("ecommerce_products"),
-		migrateTable[model.EcommerceRun]("ecommerce_runs"),
-		migrateTable[model.EcommerceBranch]("ecommerce_branches"),
-		migrateTable[model.EcommerceSlot]("ecommerce_slots"),
-		migrateTable[model.EcommerceImageVersion]("ecommerce_image_versions"),
-		migrateTable[model.EcommerceStep]("ecommerce_steps"),
-		migrateTable[model.EcommerceQuote]("ecommerce_quotes"),
-		migrateTable[model.EcommerceAuthorization]("ecommerce_authorizations"),
-		migrateTable[model.EcommercePreset]("ecommerce_presets"),
-		migrateTable[model.EcommerceOperation]("ecommerce_operations"),
 		migrateTable[model.Task]("tasks"),
 		migrateTable[model.CloudAgentExecution]("cloud_agent_executions"),
 		migrateTable[model.CloudAgentEventRecord]("cloud_agent_event_records"),

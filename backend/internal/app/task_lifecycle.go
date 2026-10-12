@@ -45,9 +45,6 @@ func (w *taskLifecycleCoordinator) retryTask(userID string, id string) (*model.T
 	if task.CreationSubmissionID != nil {
 		return nil, creationConflict("智能创作重做需要新的报价批准，请回到创作会话继续")
 	}
-	if task.EcommerceStepID != nil {
-		return nil, Forbidden("商品套图已撤回，历史任务不能重新生成")
-	}
 	if task.AgentRunID != "" || task.GenerationID != "" || strings.HasPrefix(task.Operation, "cloud_agent") || taskHasAgentOrigin(task.InputJSON) {
 		return nil, BadAuthRequest("Agent 重试需要新的幂等键和预算校验，请回到 Agent 对话重新发送")
 	}

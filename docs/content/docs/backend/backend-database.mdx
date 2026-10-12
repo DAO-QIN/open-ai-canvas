@@ -33,9 +33,9 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 后端通过 GORM 管理 SQLite 与 PostgreSQL 表结构。结构变化由 `migrate-schema` 按版本顺序执行并写入 `schema_migrations`；受管生产部署在 Backend 启动前运行独立迁移服务，Backend 只校验当前 Schema 是否与二进制兼容。业务写路径必须通过 service 和 repository 的状态约束，不能直接依赖前端状态。
 
-商品套图模块已撤回，用户界面及业务接口恢复到引入前版本。数据库保留已发布的 Schema 51 `official_ecommerce_studio`，校验和不变：11 张 `ecommerce_*` 表以及 `tasks.ecommerce_step_id` 仅用于兼容已有数据。没有商品派发 Worker、商品 API 或平台开放入口；历史关联任务禁止通过通用重试再次收费，原图和版本引用继续参加资源删除检查与容量统计。
+商品套图模块已移除。Schema 53 `remove_ecommerce_studio` 删除 11 张 `ecommerce_*` 表、`tasks.ecommerce_step_id` 及其唯一索引，同时删除平台和用户的 `ecommerce-studio` 插件状态。当前模型、容量统计、资源引用查询和 SQLite → PostgreSQL 复制清单不再包含该模块。迁移 51 的名称、校验和和应用时间保持原样，旧结构定义仅封存在历史迁移中，新建数据库最终也不保留商品结构。
 
-回退程序必须支持当前 Schema 51；不能直接运行仅支持 Schema 50 的旧镜像，不能调低迁移版本，也不能用旧数据库覆盖当前账号、作品和账务。部署前备份当前数据库和媒体，先在隔离副本验证业务内容，再切换应用镜像。
+执行 53 前必须备份当前数据库，按任务关联字段、步骤和图片版本收集测试任务 ID，确认任务已经结束、账单已经结算或退款、积分预留已释放，再清理这些测试任务及其日志和结果。不能只清空关联字段：旧任务可能使用通用的 `image_to_image` operation，删除关联后会重新获得重试资格。迁移发现关联任务或 `ecommerce_` operation 时会拒绝执行，不自动删除任务、账单、积分流水或媒体文件。共用原图和仍被画布、素材等引用的资源继续保留；独占测试产物通过现有资源引用检查和删除流程处理。
 
 ## 素材资源引用边界
 
@@ -43,11 +43,11 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 ## 结构迁移与版本
 
-当前结构版本为 52。版本 52 `canvas_mutation_receipts` 新增画布操作回执，按 `(user_id, canvas_id, mutation_id)` 唯一保存请求摘要、结果及提交 revision，并与画布内容在同一事务提交，支持响应丢失后的幂等重放。上游将此迁移编号设为 50，本分支保留已经部署的 50、51 名称与校验和，将新迁移顺延为 52；不修改既有迁移记录或恢复旧数据库。版本 51 的表仅用于撤回模块后的数据兼容。版本 50 `invitation_rebates` 增加邀请返利账务表、订单规则快照及 OAuth 邀请码，详见上文。版本 49 `banner_sort_order` 为 `banner_announcements` 增加可配置的 `sort_order` 展示顺序；版本 48 `channel_proxy_url` 为 `model_channels` 增加渠道级出站代理地址 `proxy_url`，支持 `socks5://`、`http://`、`https://`；留空时沿用全局代理。代理地址只返回管理员视图，普通用户目录不暴露渠道代理或其中的认证信息。版本 42 `cloud_agent_pi_sessions` 新增 `cloud_agent_pi_sessions` 表，按运行 ID 保存 Pi 原生 JSONL 会话快照、用户 ID、乐观并发 revision 和更新时间；会话正文由 Agent runtime 管理，Go 只将其作为不透明快照读写，不替代有界控制检查点、事件日志或任务记录。版本 41 `resource_thumbnail` 为 `resources` 增加缩略图元数据。版本 40 `builtin_skill_tombstones` 新增内置技能删除记录，管理员删除平台技能后，后续启动同步不会重新创建该技能；版本 39 `skill_library_categories` 新增 `skill_library_categories` 表，并为 `user_skill_states` 增加 `library_category_id`，保存个人技能库分类及每个用户对技能的归类；分类不改变 `skills.tag` 的技能广场共享分类。版本 38 `prefixed_id_sequence_reconcile` 创建（若缺失）并校准 `id_sequences`：`CHANNEL`、`MODEL`、`PTIER`、`ATTEMPT`、`LMODEL`、`REVISION`、`ROUTE` 按对应业务表的最大有效 ID 前移，包含软删除记录，不回退已有序列、不重写业务 ID。分配新 ID 时再次校准并检查冲突；SQLite → PostgreSQL 迁移完成后也校准序列。
+当前结构版本为 53。版本 53 移除商品套图结构，执行条件和数据清理边界见上文。版本 52 `canvas_mutation_receipts` 新增画布操作回执，按 `(user_id, canvas_id, mutation_id)` 唯一保存请求摘要、结果及提交 revision，并与画布内容在同一事务提交，支持响应丢失后的幂等重放。上游将此迁移编号设为 50，本分支保留已经部署的 50、51 名称与校验和，将新迁移顺延为 52；不修改既有迁移记录或恢复旧数据库。版本 51 引入的商品结构由版本 53 删除。版本 50 `invitation_rebates` 增加邀请返利账务表、订单规则快照及 OAuth 邀请码，详见上文。版本 49 `banner_sort_order` 为 `banner_announcements` 增加可配置的 `sort_order` 展示顺序；版本 48 `channel_proxy_url` 为 `model_channels` 增加渠道级出站代理地址 `proxy_url`，支持 `socks5://`、`http://`、`https://`；留空时沿用全局代理。代理地址只返回管理员视图，普通用户目录不暴露渠道代理或其中的认证信息。版本 42 `cloud_agent_pi_sessions` 新增 `cloud_agent_pi_sessions` 表，按运行 ID 保存 Pi 原生 JSONL 会话快照、用户 ID、乐观并发 revision 和更新时间；会话正文由 Agent runtime 管理，Go 只将其作为不透明快照读写，不替代有界控制检查点、事件日志或任务记录。版本 41 `resource_thumbnail` 为 `resources` 增加缩略图元数据。版本 40 `builtin_skill_tombstones` 新增内置技能删除记录，管理员删除平台技能后，后续启动同步不会重新创建该技能；版本 39 `skill_library_categories` 新增 `skill_library_categories` 表，并为 `user_skill_states` 增加 `library_category_id`，保存个人技能库分类及每个用户对技能的归类；分类不改变 `skills.tag` 的技能广场共享分类。版本 38 `prefixed_id_sequence_reconcile` 创建（若缺失）并校准 `id_sequences`：`CHANNEL`、`MODEL`、`PTIER`、`ATTEMPT`、`LMODEL`、`REVISION`、`ROUTE` 按对应业务表的最大有效 ID 前移，包含软删除记录，不回退已有序列、不重写业务 ID。分配新 ID 时再次校准并检查冲突；SQLite → PostgreSQL 迁移完成后也校准序列。
 
 版本 36 `cloud_agent_gemini_cache` 创建 `cloud_agent_gemini_caches`，保存用户范围内的官方 Gemini 缓存元数据；版本 37 `cloud_agent_gemini_cache_identity` 将缓存标识约束修正为 `(user_id, cache_key)`，移除旧的全局 cache_key 唯一索引。版本 35 `auth_notifications` 为认证通知与组合验证补齐 `auth_verifications`、`notification_quotas`、`sms_channels`、`sms_records` 四张表，并为 `users` 增加 `phone`、`email_verified_at`、`phone_verified_at`，为 `email_verification_codes` 增加 `attempts`；同时创建非空手机号唯一索引。版本 34 `task_media_recovery` 为 `tasks` 增加 `media_recovery_json`（text）和 `media_stage`（最长 24 字）。版本 33 `oauth_state_accepted_terms` 为 `o_auth_states` 增加非空布尔列 `accepted_terms`，默认 `false`，不替历史流程补造同意记录。
 
-升级前备份，按既有流程执行 `migrate-schema up` 和 `verify` 后再启动新后端。结构版本低于 52 的旧二进制不能连接版本 52 的数据库；需要修复部署时应使用支持当前结构的程序，不得以旧备份覆盖现有业务数据或只切回旧镜像。关闭自动迁移的生产环境必须运行正式迁移；手工改表不能更新 `schema_migrations` 的版本与校验和记录。
+升级前备份，按既有流程执行 `migrate-schema up` 和 `verify` 后再启动新后端。旧二进制不能连接版本 53 的数据库；需要修复部署时应使用支持当前结构的程序，不得以旧备份覆盖现有业务数据或只切回旧镜像。关闭自动迁移的生产环境必须运行正式迁移；手工改表不能更新 `schema_migrations` 的版本与校验和记录。SQLite → PostgreSQL 工具要求源库先升级到当前结构，避免静默遗漏旧任务关联。
 
 ### 生成成功后的作品保存恢复
 
