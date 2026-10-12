@@ -38,13 +38,13 @@ type Repository struct {
 }
 
 type UserStorageUsage struct {
-	AssetCount     int64 `json:"assetCount"`
-	AssetBytes     int64 `json:"assetBytes"`
-	CanvasCount    int64 `json:"canvasCount"`
-	CanvasBytes    int64 `json:"canvasBytes"`
-	TaskCount      int64 `json:"taskCount"`
-	TaskBytes      int64 `json:"taskBytes"`
-	APICallCount   int64 `json:"apiCallCount"`
+	AssetCount   int64 `json:"assetCount"`
+	AssetBytes   int64 `json:"assetBytes"`
+	CanvasCount  int64 `json:"canvasCount"`
+	CanvasBytes  int64 `json:"canvasBytes"`
+	TaskCount    int64 `json:"taskCount"`
+	TaskBytes    int64 `json:"taskBytes"`
+	APICallCount int64 `json:"apiCallCount"`
 }
 
 func New(db *gorm.DB) *Repository {
