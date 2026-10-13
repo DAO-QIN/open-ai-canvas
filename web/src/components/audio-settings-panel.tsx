@@ -6,7 +6,8 @@ import { audioFormatOptionsForConfig, audioSpeedLabel, audioVoiceOptionsForConfi
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import type { AiConfig } from "@/stores/use-config-store";
 import type { CanvasAudioSettingKey } from "@/components/canvas/canvas-audio-settings-popover";
-import { isMusicAudioConfig } from "@/lib/audio-generation";
+import { isGeminiTTSAudioConfig, isMusicAudioConfig } from "@/lib/audio-generation";
+import { geminiDefaultAudioInstructions } from "@/lib/gemini-audio";
 
 type AudioSettingsPanelProps = { config: AiConfig; onConfigChange: (key: CanvasAudioSettingKey, value: string) => void; theme: CanvasTheme; showTitle?: boolean; className?: string };
 
@@ -25,6 +26,7 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
             </ImageSettingsTheme>
         );
     const streaming = isDoubaoAudioConfig(config);
+    const geminiTTS = isGeminiTTSAudioConfig(config);
     const voice = normalizeAudioVoiceForConfig(config, config.audioVoice);
     const voices = audioVoiceOptionsForConfig(config);
     const currentVoice = voices.some((item) => item.value === voice) ? voices : [{ value: voice, label: voice || "不指定音色" }, ...voices];
@@ -49,7 +51,7 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
                         </>
                     ) : (
                         <>
-                            <Input aria-label="渠道音色 ID" value={config.audioVoice || ""} list={listId} placeholder="输入渠道音色 ID" onChange={(event) => selectVoice(event.target.value)} />
+                            <Input aria-label="渠道音色 ID" value={geminiTTS ? voice : config.audioVoice || ""} list={listId} placeholder="输入渠道音色 ID" onChange={(event) => selectVoice(event.target.value)} />
                             <datalist id={listId}>
                                 {currentVoice.map((item) => (
                                     <option value={item.value} key={item.value}>
@@ -67,7 +69,7 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
                     </legend>
                     <Radio.Group aria-label="音频格式" value={format} options={formats} onChange={(event) => onConfigChange("audioFormat", event.target.value)} className="flex flex-wrap gap-2" />
                 </fieldset>
-                <fieldset className="space-y-2">
+                {!geminiTTS && <fieldset className="space-y-2">
                     <legend className="mb-2 text-xs" style={{ color: theme.node.muted }}>
                         语速
                     </legend>
@@ -83,13 +85,14 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
                             if (value !== null) onConfigChange("audioSpeed", normalizeAudioSpeedValue(String(value)));
                         }}
                     />
-                </fieldset>
+                </fieldset>}
                 {!streaming ? (
                     <label className="flex flex-col gap-2 text-xs" style={{ color: theme.node.muted }}>
                         声音指令
-                        <Input.TextArea aria-label="声音指令" rows={3} value={config.audioInstructions || ""} placeholder="例如：自然、温暖的旁白" onChange={(event) => onConfigChange("audioInstructions", event.target.value)} />
+                        <Input.TextArea aria-label="声音指令" rows={3} value={config.audioInstructions || ""} placeholder={geminiTTS ? geminiDefaultAudioInstructions : "例如：自然、温暖的旁白"} onChange={(event) => onConfigChange("audioInstructions", event.target.value)} />
                     </label>
                 ) : null}
+                {geminiTTS && <p className="text-xs leading-5" style={{ color: theme.node.muted }}>朗读提示词中的原文；在声音指令中描述语气、节奏和音量。默认自然、友好、清晰，输出 24kHz 单声道 WAV。</p>}
             </section>
         </ImageSettingsTheme>
     );

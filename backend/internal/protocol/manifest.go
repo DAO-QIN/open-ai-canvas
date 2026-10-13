@@ -46,16 +46,28 @@ type ManifestResponse struct {
 	BinaryPayload bool `json:"binaryPayload,omitempty"`
 	// StreamedJSONAudio 表示 create 返回由连续 JSON 对象组成的 HTTP chunked 音频流；
 	// 每个对象可携带 data（Base64 音频片段）、code/message 和 usage。
-	StreamedJSONAudio bool `json:"streamedJsonAudio,omitempty"`
-	TaskID            any  `json:"taskId,omitempty"`
-	Status            any  `json:"status,omitempty"`
-	Message           any  `json:"message,omitempty"`
-	Text              any  `json:"text,omitempty"`
-	Reasoning         any  `json:"reasoning,omitempty"`
-	Images            any  `json:"images,omitempty"`
-	Videos            any  `json:"videos,omitempty"`
-	Audios            any  `json:"audios,omitempty"`
-	Usage             any  `json:"usage,omitempty"`
+	StreamedJSONAudio bool                 `json:"streamedJsonAudio,omitempty"`
+	InlineAudio       *ManifestInlineAudio `json:"inlineAudio,omitempty"`
+	TaskID            any                  `json:"taskId,omitempty"`
+	Status            any                  `json:"status,omitempty"`
+	Message           any                  `json:"message,omitempty"`
+	Text              any                  `json:"text,omitempty"`
+	Reasoning         any                  `json:"reasoning,omitempty"`
+	Images            any                  `json:"images,omitempty"`
+	Videos            any                  `json:"videos,omitempty"`
+	Audios            any                  `json:"audios,omitempty"`
+	Usage             any                  `json:"usage,omitempty"`
+}
+
+// ManifestInlineAudio joins ordered Base64 PCM parts into one playable WAV.
+// Paths and PCM format belong to the plugin contract, not to a provider ID.
+type ManifestInlineAudio struct {
+	PartsPath    string `json:"partsPath"`
+	DataPath     string `json:"dataPath"`
+	MIMETypePath string `json:"mimeTypePath"`
+	Encoding     string `json:"encoding"`
+	SampleRate   int    `json:"sampleRate"`
+	Channels     int    `json:"channels"`
 }
 
 // ManifestAgentResponse describes the provider response shape for a
@@ -309,6 +321,13 @@ func ValidateManifest(manifest Manifest) error {
 		}
 		if err := validateManifestOperation(provider.Create); err != nil {
 			return fmt.Errorf("provider %q create operation: %w", provider.ID, err)
+		}
+		if inline := provider.Response.InlineAudio; inline != nil {
+			if provider.Response.ResultKind != "audio" || provider.Response.BinaryPayload || provider.Response.StreamedJSONAudio ||
+				strings.TrimSpace(inline.PartsPath) == "" || strings.TrimSpace(inline.DataPath) == "" || strings.TrimSpace(inline.MIMETypePath) == "" ||
+				inline.Encoding != "pcm-s16le" || inline.SampleRate < 8000 || inline.SampleRate > 192000 || inline.Channels < 1 || inline.Channels > 8 {
+				return fmt.Errorf("provider %q has an invalid inline audio contract", provider.ID)
+			}
 		}
 		if provider.Agent != nil {
 			if err := validateManifestOperation(*provider.Agent); err != nil {

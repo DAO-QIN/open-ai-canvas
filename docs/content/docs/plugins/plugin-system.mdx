@@ -119,11 +119,13 @@ eagle-asset-connector.yingce-plugin
 
 - `id`：全局唯一，使用小写 kebab-case；安装后不能随意变更。
 - `version`：遵循 SemVer，用于更新和回滚判断。
-- `apiVersion`：固定为 `yingce.plugin/v1`，不接受旧版本或平行 Manifest。
+- `apiVersion`：接受 `yingce.plugin/v1` 和 `yingce.plugin/v2`；独立声明式协议包使用 v2，不建立平行的插件安装系统。
 - `contributes`：声明 provider、workflow、canvasNodes、transforms、assetSources、agents 等能力。
 - `permissions`：最小权限集合，宿主在安装和首次使用时展示。
 - `dependencies`：插件依赖的其他插件或宿主能力。
 - `integrity`：用于校验远程产物是否被替换。
+
+声明式音频 Provider 可用 `response.inlineAudio` 声明有序内联音频片段：`partsPath` 指向片段数组，`dataPath` 和 `mimeTypePath` 是相对于片段的路径；`encoding` 为 `pcm-s16le`，并明确 `sampleRate`（8000–192000）和 `channels`（1–8）。该响应必须设置 `resultKind="audio"`，不能同时声明 `binaryPayload` 或 `streamedJsonAudio`。宿主逐段解码 Base64、验证格式并拼接为一段 WAV；非法片段或规格不一致返回失败。上游已返回 WAV 时先提取其 PCM，避免拼接容器头。清单只描述路径和媒体规格，不包含可执行转换代码。
 
 ## 6. 宿主 API 边界
 

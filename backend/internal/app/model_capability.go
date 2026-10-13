@@ -154,7 +154,7 @@ func normalizedChannelModelCapability(channelModel *model.ChannelModel) (*ModelC
 		return nil, errors.New("渠道模型为空")
 	}
 	capability := normalizeCapability(channelModel.Capability)
-	if capability == "audio" && string(channelModel.Protocol) != "kacang-suno" {
+	if capability == "audio" && defaultAudioCapabilityConfig(string(channelModel.Protocol)) == nil {
 		return nil, nil
 	}
 	if capability != "text" && capability != "image" && capability != "video" && capability != "audio" {
@@ -275,7 +275,7 @@ func applyModelSpecificVideoCapability(profile *VideoCapabilityConfig, protocol 
 func CapabilitySpecFromModelCapabilityConfig(config *ModelCapabilityConfig, capability string) (CapabilitySpec, error) {
 	spec := CapabilitySpec{Version: 1, Capability: capability, Inputs: map[string]InputConstraint{}, Options: map[string]OptionConstraint{}}
 	if capability == "audio" {
-		if config != nil && config.Audio != nil && config.Audio.GenerationType == "music" {
+		if config != nil && config.Audio != nil && (config.Audio.GenerationType == "music" || config.Audio.GenerationType == "speech") {
 			for _, kind := range []string{"image", "video", "audio"} {
 				spec.Inputs[kind] = InputConstraint{Min: 0, Max: 0}
 			}

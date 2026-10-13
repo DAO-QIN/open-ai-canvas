@@ -370,7 +370,23 @@ export function ChannelModelEditor({
                                             </div>
                                         </section>
                                     ) : null}
-                                        {modelCapability === "audio" && (capabilityConfig?.audio ? <>
+                                        {modelCapability === "audio" && (capabilityConfig?.audio?.speech ? <>
+                                            <Descriptions title="语音合成默认参数" bordered size="small" column={2} items={[
+                                                { key: "input", label: "输入", children: "纯文本朗读稿件" },
+                                                { key: "outputs", label: "每次返回", children: "1 段语音" },
+                                                { key: "voice", label: "默认音色", children: capabilityConfig.audio.speech.defaultVoice },
+                                                { key: "voices", label: "预置音色", children: `${capabilityConfig.audio.speech.voices.length} 个` },
+                                                { key: "style", label: "默认声音指令", children: capabilityConfig.audio.speech.defaultInstructions },
+                                                { key: "format", label: "保存格式", children: "WAV" },
+                                                { key: "sample", label: "采样规格", children: "24kHz · 单声道 · 16-bit" },
+                                                { key: "streaming", label: "流式输出", children: "关闭" },
+                                                { key: "inputLimit", label: "输入上限", children: `${capabilityConfig.audio.speech.inputMaxTokens} token` },
+                                                { key: "outputLimit", label: "音频输出上限", children: `${capabilityConfig.audio.speech.outputMaxTokens} token` },
+                                                { key: "references", label: "参考素材", children: "不支持" },
+                                                { key: "voiceList", label: "可选音色", span: 2, children: capabilityConfig.audio.speech.voices.join("、") },
+                                            ]} />
+                                            <Alert type="info" title="按供应商合同自动配置" description="提示词作为逐字朗读稿件；音色和声音指令在生成设置中选择，语气、节奏与音量由声音指令控制。每次按请求计费。" />
+                                        </> : capabilityConfig?.audio ? <>
                                             <Descriptions title="音乐生成默认参数" bordered size="small" column={2} items={[
                                                 { key: "input", label: "输入", children: "纯文本音乐描述" },
                                                 { key: "tasks", label: "任务数（n）", children: capabilityConfig.audio.taskCount },

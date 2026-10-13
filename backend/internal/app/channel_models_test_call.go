@@ -25,7 +25,7 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 	if err != nil {
 		return nil, err
 	}
-	if capability == "text" || capability == "image" || capability == "video" {
+	if capability == "text" || capability == "image" || capability == "video" || (capability == "audio" && defaultAudioCapabilityConfig(string(protocol)) != nil) {
 		if _, err := NormalizeModelCapabilityConfigForModel(capability, string(protocol), providerModelKey, req.CapabilityConfig); err != nil {
 			return nil, err
 		}
@@ -111,6 +111,11 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 	}
 	if capability == "video" {
 		input.VideoCapability = videoProfile
+	}
+	if profile := defaultAudioCapabilityConfig(string(protocol)); capability == "audio" && profile != nil && profile.Speech != nil {
+		input.Config.AudioVoice = profile.Speech.DefaultVoice
+		input.Config.AudioInstructions = profile.Speech.DefaultInstructions
+		input.Config.AudioFormat = profile.Speech.OutputFormat
 	}
 
 	// 测试复用真实生成协议、运行时并发和熔断策略，但不创建用户任务或计费订单。

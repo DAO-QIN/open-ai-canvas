@@ -1,0 +1,249 @@
+{
+  "apiVersion": "yingce.plugin/v2",
+  "id": "kacang-gemini-tts",
+  "name": "卡藏 Gemini 语音合成",
+  "version": "1.0.0",
+  "author": "卡藏 API / 影策",
+  "description": "gemini-3.8-flash-tts 专用语音协议，默认 Kore 音色，按顺序拼接内联音频并保存 WAV。",
+  "permissions": [
+    "generation.run",
+    "media.read"
+  ],
+  "configuration": {
+    "fields": [
+      {
+        "name": "apiKey",
+        "type": "secret",
+        "label": "API Key",
+        "required": true
+      }
+    ]
+  },
+  "contributes": {
+    "providers": [
+      {
+        "id": "kacang-gemini-tts",
+        "label": "卡藏 Gemini TTS",
+        "description": "Gemini 原生 generateContent 语音合成；纯文本朗读，30 个预置音色，默认 WAV / 24kHz / 单声道。",
+        "capabilities": [
+          "audio"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://newapi.prompt-hubs.com/v1",
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model / URL model",
+            "description": "固定 API 模型 ID：gemini-3.8-flash-tts。"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "contents[0].parts[0].text",
+            "description": "逐字朗读稿件，纯文本；上游输入上限 8192 token。"
+          },
+          {
+            "name": "audioVoice",
+            "type": "string",
+            "mapping": "generationConfig.speechConfig.voiceConfig.voice",
+            "description": "默认 Kore；支持已公布的 30 个音色，以及用户明确提供的扩展音色 ID。"
+          },
+          {
+            "name": "audioInstructions",
+            "type": "string",
+            "mapping": "contents[0].parts[0].speech_metadata.style",
+            "description": "语气、节奏和音量；默认自然、友好、清晰。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$ref": "request.model"
+                },
+                "gemini-3.8-flash-tts"
+              ]
+            },
+            "message": "卡藏 Gemini TTS 协议仅适用于 gemini-3.8-flash-tts"
+          },
+          {
+            "assert": {
+              "$gt": [
+                {
+                  "$len": {
+                    "$trim": {
+                      "$ref": "request.prompt"
+                    }
+                  }
+                },
+                0
+              ]
+            },
+            "message": "朗读稿件不能为空"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                0
+              ]
+            },
+            "message": "卡藏 Gemini TTS 不支持参考图片"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
+                  }
+                },
+                0
+              ]
+            },
+            "message": "卡藏 Gemini TTS 不支持参考视频"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                0
+              ]
+            },
+            "message": "卡藏 Gemini TTS 不支持参考音频"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v1beta/models/{{model}}:generateContent",
+          "originPath": true,
+          "contentType": "application/json",
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": {
+                      "$ref": "request.prompt"
+                    },
+                    "speech_metadata": {
+                      "style": {
+                        "$coalesce": [
+                          {
+                            "$ref": "request.extra.audioInstructions"
+                          },
+                          "自然、友好、清晰"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "generationConfig": {
+              "responseModalities": [
+                "AUDIO"
+              ],
+              "speechConfig": {
+                "voiceConfig": {
+                  "voice": {
+                    "$if": {
+                      "condition": {
+                        "$in": [
+                          {
+                            "$coalesce": [
+                              {
+                                "$ref": "request.extra.audioVoice"
+                              },
+                              "alloy"
+                            ]
+                          },
+                          [
+                            "alloy"
+                          ]
+                        ]
+                      },
+                      "then": "Kore",
+                      "else": {
+                        "$ref": "request.extra.audioVoice"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "response": {
+          "status": {
+            "$if": {
+              "condition": {
+                "$in": [
+                  {
+                    "$ref": "response.candidates.0.finishReason"
+                  },
+                  [
+                    "MAX_TOKENS",
+                    "SAFETY",
+                    "RECITATION",
+                    "OTHER"
+                  ]
+                ]
+              },
+              "then": "failed",
+              "else": "succeeded"
+            }
+          },
+          "errorPaths": [
+            "error",
+            "promptFeedback.blockReason"
+          ],
+          "messagePaths": [
+            "error.message",
+            "promptFeedback.blockReason",
+            "candidates.0.finishReason"
+          ],
+          "resultKind": "audio",
+          "inlineAudio": {
+            "partsPath": "candidates.0.content.parts",
+            "dataPath": "inlineData.data",
+            "mimeTypePath": "inlineData.mimeType",
+            "encoding": "pcm-s16le",
+            "sampleRate": 24000,
+            "channels": 1
+          },
+          "usage": {
+            "$ref": "response.usageMetadata"
+          }
+        }
+      }
+    ]
+  },
+  "documentation": "# 卡藏 Gemini 语音合成\n\n独立 `yingce.plugin/v2` 声明式音频插件，无可执行运行时。适配精确模型 `gemini-3.8-flash-tts`，通过渠道原有 Bearer 凭证调用 Gemini 原生接口。\n\n选择 `kacang-gemini-tts` 后，“能力与参数”自动配置纯文本语音、单段输出、Kore 默认音色、自然/友好/清晰的声音指令、30 个预置音色、24kHz 单声道 16-bit WAV、8192/16384 token 输入/输出上限和非流式调用。生成页可选择音色及声音指令；稿件原文不被默认指令改写。音色扩展 ID 按用户明确输入传递。\n\n音频按次计费。售价、成本和启用状态由管理员单独设置。旧 Suno 音乐插件与本插件分别使用自己的接口和默认值。\n\n完整映射见 [docs/interface.md](docs/interface.md)。运行 `python build.py` 同步完整包内文档并生成 `.yingce-plugin` 安装包。\n\n---\n\n# 卡藏 Gemini TTS 接口合同\n\n- 插件及 Provider ID：`kacang-gemini-tts`；模型 `model`：`gemini-3.8-flash-tts`。\n- Base URL：`https://newapi.prompt-hubs.com/v1`；鉴权字段 `apiKey` 使用 Bearer 请求头，不写入 URL 或清单。\n- 创建：`POST /v1beta/models/gemini-3.8-flash-tts:generateContent`，`application/json`。`originPath=true` 从站点根路径请求，避免渠道 `/v1` 与 `/v1beta` 错误拼接。\n- `prompt` 原样写入 `contents[0].parts[0].text`；纯文本输入，不接受图片、视频、音频参考。\n- `audioVoice` 写入 `generationConfig.speechConfig.voiceConfig.voice`，默认 `Kore`；切换协议残留的 OpenAI `alloy` 使用默认音色。\n- `audioInstructions` 写入文本 part 的 `speech_metadata.style`；默认 `自然、友好、清晰`。语速、音量、情绪和节奏通过声音指令描述，不发送未公布的数值 speed 参数。\n- `generationConfig.responseModalities` 固定 `['AUDIO']`。单次输入上限 8192 token、音频输出上限 16384 token；此插件不把 token 数推测为字符数或音频秒数。\n- 不发送 `response_format`、数值 `speed`、时长、temperature、参考素材或未选择的 Provider Options；不声明未验证的多说话人设置、轮询、取消或流式端点。\n\n## 响应与保存\n\n`candidates[0].content.parts[].inlineData` 每段有 `mimeType` 和 Base64 `data`。声明式 `response.inlineAudio` 指定有序音频路径及 `pcm-s16le` / 24000 Hz / 1 声道。宿主逐段解码后拼接完整 PCM，封装一次 RIFF/WAV 头；不拼接带 padding 的 Base64 字符串，不把每个片段保存为独立音频。若上游返回完整 WAV，先验证相同的 PCM 规格再提取样本，避免重复容器头。\n\nPCM MIME 接受 `audio/l16`、`audio/pcm`，已提供的 rate/channels 必须符合声明；WAV 接受 `audio/wav`、`audio/x-wav`。未知 MIME、非法 Base64、空片段、缺少音频、截断样本、格式不一致或超过 64 MiB 失败关闭。上游 error、内容拦截及已知非完整 finishReason 保持失败语义。最终只有一段 `audio/wav` 媒体，交由宿主资源库正常保存与权限控制。\n\n一次合成只提交一次，不自动重新创建付费请求。`usageMetadata` 保留为用量信息，不改变按次计费口径。\n\n## 一手依据\n\n[卡藏 Gemini TTS 文档](https://console.prompt-hubs.com/docs/model/gemini-3.8-flash-tts)确认实际代理端点、voice 字段、style、30 音色和多段 raw PCM。\n[Google 音频格式文档](https://ai.google.dev/gemini-api/docs/speech-generation)确认 16-bit signed little-endian PCM。请求形状以卡藏代理文档为准，不套用 Google Interactions 接口。\n\n核对日期：2026-10-14。预置音色：Zephyr、Puck、Charon、Kore、Fenrir、Leda、Orus、Aoede、Callirrhoe、Autonoe、Enceladus、Iapetus、Umbriel、Algieba、Despina、Erinome、Algenib、Rasalgethi、Laomedeia、Achernar、Alnilam、Schedar、Gacrux、Pulcherrima、Achird、Zubenelgenubi、Vindemiatrix、Sadachbia、Sadaltager、Sulafat。\n\n<!-- YINGCE_MANIFEST_CONTRACT_START -->\n## Manifest 完整接口定义\n\n```json\n{\n  \"apiVersion\": \"yingce.plugin/v2\",\n  \"id\": \"kacang-gemini-tts\",\n  \"name\": \"卡藏 Gemini 语音合成\",\n  \"version\": \"1.0.0\",\n  \"author\": \"卡藏 API / 影策\",\n  \"description\": \"gemini-3.8-flash-tts 专用语音协议，默认 Kore 音色，按顺序拼接内联音频并保存 WAV。\",\n  \"permissions\": [\n    \"generation.run\",\n    \"media.read\"\n  ],\n  \"configuration\": {\n    \"fields\": [\n      {\n        \"name\": \"apiKey\",\n        \"type\": \"secret\",\n        \"label\": \"API Key\",\n        \"required\": true\n      }\n    ]\n  },\n  \"contributes\": {\n    \"providers\": [\n      {\n        \"id\": \"kacang-gemini-tts\",\n        \"label\": \"卡藏 Gemini TTS\",\n        \"description\": \"Gemini 原生 generateContent 语音合成；纯文本朗读，30 个预置音色，默认 WAV / 24kHz / 单声道。\",\n        \"capabilities\": [\n          \"audio\"\n        ],\n        \"scopes\": [\n          \"admin.system-channel\",\n          \"user.custom-channel\",\n          \"canvas\",\n          \"creation\",\n          \"agent\"\n        ],\n        \"baseUrl\": \"https://newapi.prompt-hubs.com/v1\",\n        \"auth\": {\n          \"type\": \"bearer\",\n          \"field\": \"apiKey\"\n        },\n        \"parameters\": [\n          {\n            \"name\": \"model\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"model / URL model\",\n            \"description\": \"固定 API 模型 ID：gemini-3.8-flash-tts。\"\n          },\n          {\n            \"name\": \"prompt\",\n            \"type\": \"string\",\n            \"required\": true,\n            \"mapping\": \"contents[0].parts[0].text\",\n            \"description\": \"逐字朗读稿件，纯文本；上游输入上限 8192 token。\"\n          },\n          {\n            \"name\": \"audioVoice\",\n            \"type\": \"string\",\n            \"mapping\": \"generationConfig.speechConfig.voiceConfig.voice\",\n            \"description\": \"默认 Kore；支持已公布的 30 个音色，以及用户明确提供的扩展音色 ID。\"\n          },\n          {\n            \"name\": \"audioInstructions\",\n            \"type\": \"string\",\n            \"mapping\": \"contents[0].parts[0].speech_metadata.style\",\n            \"description\": \"语气、节奏和音量；默认自然、友好、清晰。\"\n          }\n        ],\n        \"validations\": [\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$ref\": \"request.model\"\n                },\n                \"gemini-3.8-flash-tts\"\n              ]\n            },\n            \"message\": \"卡藏 Gemini TTS 协议仅适用于 gemini-3.8-flash-tts\"\n          },\n          {\n            \"assert\": {\n              \"$gt\": [\n                {\n                  \"$len\": {\n                    \"$trim\": {\n                      \"$ref\": \"request.prompt\"\n                    }\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"朗读稿件不能为空\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.images\"\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"卡藏 Gemini TTS 不支持参考图片\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.videos\"\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"卡藏 Gemini TTS 不支持参考视频\"\n          },\n          {\n            \"assert\": {\n              \"$eq\": [\n                {\n                  \"$len\": {\n                    \"$ref\": \"request.audios\"\n                  }\n                },\n                0\n              ]\n            },\n            \"message\": \"卡藏 Gemini TTS 不支持参考音频\"\n          }\n        ],\n        \"create\": {\n          \"method\": \"POST\",\n          \"path\": \"/v1beta/models/{{model}}:generateContent\",\n          \"originPath\": true,\n          \"contentType\": \"application/json\",\n          \"body\": {\n            \"model\": {\n              \"$ref\": \"request.model\"\n            },\n            \"contents\": [\n              {\n                \"role\": \"user\",\n                \"parts\": [\n                  {\n                    \"text\": {\n                      \"$ref\": \"request.prompt\"\n                    },\n                    \"speech_metadata\": {\n                      \"style\": {\n                        \"$coalesce\": [\n                          {\n                            \"$ref\": \"request.extra.audioInstructions\"\n                          },\n                          \"自然、友好、清晰\"\n                        ]\n                      }\n                    }\n                  }\n                ]\n              }\n            ],\n            \"generationConfig\": {\n              \"responseModalities\": [\n                \"AUDIO\"\n              ],\n              \"speechConfig\": {\n                \"voiceConfig\": {\n                  \"voice\": {\n                    \"$if\": {\n                      \"condition\": {\n                        \"$in\": [\n                          {\n                            \"$coalesce\": [\n                              {\n                                \"$ref\": \"request.extra.audioVoice\"\n                              },\n                              \"alloy\"\n                            ]\n                          },\n                          [\n                            \"alloy\"\n                          ]\n                        ]\n                      },\n                      \"then\": \"Kore\",\n                      \"else\": {\n                        \"$ref\": \"request.extra.audioVoice\"\n                      }\n                    }\n                  }\n                }\n              }\n            }\n          }\n        },\n        \"response\": {\n          \"status\": {\n            \"$if\": {\n              \"condition\": {\n                \"$in\": [\n                  {\n                    \"$ref\": \"response.candidates.0.finishReason\"\n                  },\n                  [\n                    \"MAX_TOKENS\",\n                    \"SAFETY\",\n                    \"RECITATION\",\n                    \"OTHER\"\n                  ]\n                ]\n              },\n              \"then\": \"failed\",\n              \"else\": \"succeeded\"\n            }\n          },\n          \"errorPaths\": [\n            \"error\",\n            \"promptFeedback.blockReason\"\n          ],\n          \"messagePaths\": [\n            \"error.message\",\n            \"promptFeedback.blockReason\",\n            \"candidates.0.finishReason\"\n          ],\n          \"resultKind\": \"audio\",\n          \"inlineAudio\": {\n            \"partsPath\": \"candidates.0.content.parts\",\n            \"dataPath\": \"inlineData.data\",\n            \"mimeTypePath\": \"inlineData.mimeType\",\n            \"encoding\": \"pcm-s16le\",\n            \"sampleRate\": 24000,\n            \"channels\": 1\n          },\n          \"usage\": {\n            \"$ref\": \"response.usageMetadata\"\n          }\n        }\n      }\n    ]\n  },\n  \"documentation\": \"<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>\"\n}\n```\n<!-- YINGCE_MANIFEST_CONTRACT_END -->"
+}

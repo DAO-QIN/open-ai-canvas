@@ -1,6 +1,7 @@
 import { doubaoAudioVoiceOptions, doubaoDefaultAudioVoice } from "@/lib/doubao-audio-voices";
 import { resolveModelRequestConfig } from "@/stores/use-config-store";
 import type { AiConfig } from "@/stores/use-config-store";
+import { geminiAudioVoices, geminiDefaultAudioVoice } from "./gemini-audio";
 
 export { doubaoAudioVoiceOptions, doubaoDefaultAudioVoice };
 
@@ -91,17 +92,24 @@ export function isMusicAudioConfig(config: AiConfig) {
     return resolveModelRequestConfig(config, config.model || config.audioModel).interfaceType === "kacang-suno";
 }
 
+export function isGeminiTTSAudioConfig(config: AiConfig) {
+    return resolveModelRequestConfig(config, config.model || config.audioModel).interfaceType === "kacang-gemini-tts";
+}
+
 export function audioVoiceOptionsForConfig(config: AiConfig) {
+    if (isGeminiTTSAudioConfig(config)) return geminiAudioVoices.map((value) => ({ value, label: value }));
     return isDoubaoAudioConfig(config) ? doubaoAudioVoiceOptions : openAIAudioVoiceOptions;
 }
 
 export function audioFormatOptionsForConfig(config: AiConfig) {
+    if (isGeminiTTSAudioConfig(config)) return [{ value: "wav", label: "WAV" }];
     return isDoubaoAudioConfig(config) ? doubaoAudioFormatOptions : openAIAudioFormatOptions;
 }
 
 export function normalizeAudioVoiceForConfig(config: AiConfig, value: string) {
     const options = audioVoiceOptionsForConfig(config);
     const normalized = String(value || "").trim();
+    if (isGeminiTTSAudioConfig(config)) return !normalized || normalized === "alloy" ? geminiDefaultAudioVoice : normalized;
     if (isDoubaoAudioConfig(config)) {
         if (!normalized || normalized === "alloy") return "";
         return normalized;
@@ -111,6 +119,7 @@ export function normalizeAudioVoiceForConfig(config: AiConfig, value: string) {
 }
 
 export function normalizeAudioFormatForConfig(config: AiConfig, value: string) {
+    if (isGeminiTTSAudioConfig(config)) return "wav";
     const options = audioFormatOptionsForConfig(config);
     return options.some((item) => item.value === value) ? value : "mp3";
 }

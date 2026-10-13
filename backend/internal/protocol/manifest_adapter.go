@@ -105,7 +105,19 @@ func (a manifestAdapter) ParseCreateWithRequest(_ context.Context, request Gener
 	if err != nil {
 		return CreateResult{}, err
 	}
-	return a.parse(payload, PollContext{}), nil
+	result := a.parse(payload, PollContext{Request: request})
+	if inline := a.manifest.Response.InlineAudio; inline != nil && result.Status != StatusFailed && result.Status != StatusCancelled {
+		reference, err := inlineAudioReference(payload, *inline)
+		if err != nil {
+			return CreateResult{}, err
+		}
+		if result.Result == nil {
+			result.Result = &Result{}
+		}
+		result.Result.Audios = []MediaReference{reference}
+		result.Status = StatusSucceeded
+	}
+	return result, nil
 }
 
 // streamedJSONAudioCreateResult decodes the chunked JSON response used by
@@ -350,7 +362,7 @@ func (a manifestAdapter) parse(payload map[string]any, c PollContext) CreateResu
 	if status == StatusPending && (result.Text != "" || len(result.Images) > 0 || len(result.Videos) > 0 || len(result.Audios) > 0) {
 		status = StatusSucceeded
 	}
-	if result.Text == "" && result.Reasoning == "" && len(result.Images) == 0 && len(result.Videos) == 0 && len(result.Audios) == 0 {
+	if result.Text == "" && result.Reasoning == "" && len(result.Images) == 0 && len(result.Videos) == 0 && len(result.Audios) == 0 && response.InlineAudio == nil {
 		result = nil
 	}
 	return CreateResult{TaskID: id, Status: status, Result: result, Message: message}

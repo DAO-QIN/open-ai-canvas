@@ -4,6 +4,7 @@ import { imagePresetForRatio } from "./image-size-presets";
 import { kemeiSeedreamPresets } from "./kemei-image-presets";
 import { type WorkflowVideoFieldLike, workflowImageCapabilityConfig, workflowVideoCapabilityConfig } from "./model-capabilities-workflow";
 import { resolveWorkflowVideoScreenSpec } from "./video-screen-specs";
+import { geminiAudioVoices, geminiDefaultAudioInstructions, geminiDefaultAudioVoice } from "./gemini-audio";
 
 export {
     workflowFieldChoiceValues,
@@ -37,10 +38,18 @@ export type ModelCapabilityConfig = {
     audio?: AudioCapabilityConfig;
 };
 
-export type AudioCapabilityConfig = { generationType: "music"; taskCount: number; outputCount: number; streaming: boolean };
+export type AudioCapabilityConfig = {
+    generationType: "music" | "speech"; taskCount: number; outputCount: number; streaming: boolean;
+    speech?: { voices: string[]; defaultVoice: string; defaultInstructions: string; outputFormat: string; sampleRate: number; channels: number; inputMaxTokens: number; outputMaxTokens: number };
+};
 
 export function defaultAudioCapabilityConfig(protocol?: ModelProtocol): AudioCapabilityConfig | undefined {
-    return protocol === "kacang-suno" ? { generationType: "music", taskCount: 1, outputCount: 2, streaming: false } : undefined;
+    if (protocol === "kacang-suno") return { generationType: "music", taskCount: 1, outputCount: 2, streaming: false };
+    if (protocol === "kacang-gemini-tts") return {
+        generationType: "speech", taskCount: 1, outputCount: 1, streaming: false,
+        speech: { voices: [...geminiAudioVoices], defaultVoice: geminiDefaultAudioVoice, defaultInstructions: geminiDefaultAudioInstructions, outputFormat: "wav", sampleRate: 24000, channels: 1, inputMaxTokens: 8192, outputMaxTokens: 16384 },
+    };
+    return undefined;
 }
 
 export type TextCapabilityConfig = {
