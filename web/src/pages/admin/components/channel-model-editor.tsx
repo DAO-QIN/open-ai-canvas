@@ -382,7 +382,7 @@ export function ChannelModelEditor({
                                                 { key: "streaming", label: "流式输出", children: "关闭" },
                                                 { key: "inputLimit", label: "输入上限", children: `${capabilityConfig.audio.speech.inputMaxTokens} token` },
                                                 { key: "outputLimit", label: "音频输出上限", children: `${capabilityConfig.audio.speech.outputMaxTokens} token` },
-                                                { key: "references", label: "参考素材", children: "不支持" },
+                                                { key: "references", label: "参考素材", span: 2, children: "不支持" },
                                                 { key: "voiceList", label: "可选音色", span: 2, children: capabilityConfig.audio.speech.voices.join("、") },
                                             ]} />
                                             <Alert type="info" title="按供应商合同自动配置" description="提示词作为逐字朗读稿件；音色和声音指令在生成设置中选择，语气、节奏与音量由声音指令控制。每次按请求计费。" />
