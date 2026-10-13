@@ -67,7 +67,7 @@ func TestForkV53UpgradePreservesDeployedLedgerAndBusinessData(t *testing.T) {
 				{&model.AuthSession{}, "ReauthenticatedAt"}, {&model.OAuthState{}, "ReauthUserID"}, {&model.OAuthState{}, "ReauthSessionID"},
 				{&model.AuthVerification{}, "SessionID"}, {&model.AuthVerification{}, "CredentialHash"}, {&model.Task{}, "WorkbenchKind"},
 			} {
-				if db.Migrator().HasIndex(field.entity, field.name) {
+				if driver == "sqlite" && db.Migrator().HasIndex(field.entity, field.name) {
 					if err := db.Migrator().DropIndex(field.entity, field.name); err != nil {
 						t.Fatal(err)
 					}

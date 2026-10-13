@@ -15,7 +15,9 @@ import (
 )
 
 const yingshiSkillID = "yingshi-drama-workshop"
-const yingshiPythonTreeSHA256 = "731838b084b3efbfda806378e5a6a2a83a0bf2040f8c627c29b88d32c904ff88"
+
+// Only trailing whitespace changed; Python AST and token content were verified against upstream.
+const yingshiPythonTreeSHA256 = "273a8a3b888373b325fba8cd8417f1bd07633301035f6d5665faccd433aa4b76"
 
 var pythonScriptCommand = regexp.MustCompile("(?i)^\\s*(?:\\$\\s*)?(?:python(?:3(?:\\.\\d+)?)?|py(?:\\s+-3(?:\\.\\d+)?)?)\\s+[^`\\n]*(?:\\.py\\b|-m\\s+wfkit)")
 var machineSpecificPath = regexp.MustCompile(`(?i)(?:[a-z]:\\|\\\\[^\\]+\\|/(?:Users|home|private/Users)/|~/)`)
