@@ -84,7 +84,7 @@ func TestInvitationRegistrationConsumesVerificationAtomically(t *testing.T) {
 			if err := db.Create(&model.SystemSetting{Key: authPolicyKey, ValueJSON: string(encoded)}).Error; err != nil {
 				t.Fatal(err)
 			}
-			req := RegisterRequest{Username: "invited-user", Password: "strong-password", AcceptedTerms: true, InviteCode: "INVALID"}
+			req := RegisterRequest{Username: "invited-user", Password: "strong-password", AcceptedTerms: true, InviteCode: "INVALID", LoginContext: LoginContext{IP: "192.0.2.10", UserAgent: "invitation-test"}}
 			if method != "sms" {
 				req.Email = "invited@example.com"
 			}
@@ -145,6 +145,10 @@ func TestInvitationRegistrationConsumesVerificationAtomically(t *testing.T) {
 			invitation, err := svc.repo.InvitationForUser(result.User.ID)
 			if err != nil || invitation.InviterID != "promoter" {
 				t.Fatalf("invitation=%+v err=%v", invitation, err)
+			}
+			var event model.LoginLog
+			if err := db.First(&event, "user_id = ? AND source = ?", result.User.ID, "registration").Error; err != nil || event.Result != "success" || event.IP != req.LoginContext.IP {
+				t.Fatalf("invitation registration lost login context: %+v %v", event, err)
 			}
 			if (req.Email != "" && result.User.EmailVerifiedAt == nil) || (req.Phone != "" && result.User.PhoneVerifiedAt == nil) {
 				t.Fatalf("verified contacts missing: %+v", result.User)
@@ -226,7 +230,7 @@ func TestLinuxDOInvitationStateAndExistingAccount(t *testing.T) {
 			if err := db.First(&stored, "state_hash = ?", HashToken(state)).Error; err != nil || stored.InviteCode != tc.code {
 				t.Fatalf("state=%+v err=%v", stored, err)
 			}
-			result, err := svc.CompleteLinuxDOLogin(state, "test-code")
+			result, err := svc.CompleteLinuxDOLogin(state, "test-code", "", LoginContext{IP: "192.0.2.11", UserAgent: "oauth-invitation-test"})
 			if tc.reason != "" {
 				var appErr *kernel.AppError
 				if !errors.As(err, &appErr) || string(appErr.Reason) != tc.reason {
@@ -249,6 +253,17 @@ func TestLinuxDOInvitationStateAndExistingAccount(t *testing.T) {
 			}
 			if tc.existing && result.Session.User.ID != "old-oauth" {
 				t.Fatal("existing account replaced")
+			}
+			var event model.LoginLog
+			if err := db.First(&event, "user_id = ?", result.Session.User.ID).Error; err != nil || event.Result != "success" || event.Method != "linuxdo" || event.IP != "192.0.2.11" {
+				t.Fatalf("OAuth invitation lost login context: %+v %v", event, err)
+			}
+			wantSource := "registration"
+			if tc.existing {
+				wantSource = "login"
+			}
+			if event.Source != wantSource {
+				t.Fatalf("OAuth source=%q want=%q", event.Source, wantSource)
 			}
 		})
 	}

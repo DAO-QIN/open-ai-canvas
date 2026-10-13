@@ -27,6 +27,23 @@ describe("Kacang Suno music", () => {
         expect(audioChannelCapabilityConfig("openai-audio")).toBeUndefined();
     });
 
+    test("persisted Suno audio settings and tags survive editor reopen and resave", () => {
+        const capabilityConfig = { version: 1, audio: { generationType: "music" as const, taskCount: 2, outputCount: 3, streaming: true } };
+        const modelTags = [{ text: "音乐", color: "green" }];
+        const item = {
+            modelKey: "suno",
+            capability: "audio" as const,
+            protocol: "kacang-suno",
+            capabilityConfig,
+            tags: modelTags,
+        } as NonNullable<Parameters<typeof initialChannelModelValues>[0]>;
+        const reopened = initialChannelModelValues(item, protocols);
+
+        expect(reopened.capabilityConfig).toEqual(capabilityConfig);
+        expect(channelModelCapabilityConfigForSave(reopened)).toEqual(capabilityConfig);
+        expect(reopened.tags).toEqual(modelTags);
+    });
+
     test("saving a disabled unpriced music model retains its capability contract", () => {
         const selected = changeChannelModelCapability({ ...initialChannelModelValues(null, protocols), capability: "audio", protocol: "kacang-suno", modelKey: "suno", enabled: false }, protocols);
         selected.priceTiers[0].priceConfigured = false;

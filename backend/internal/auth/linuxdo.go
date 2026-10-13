@@ -81,8 +81,9 @@ type linuxDOSettingValue struct {
 }
 
 type LinuxDOCallbackResult struct {
-	Session *AuthSessionResult
-	Next    string
+	Session         *AuthSessionResult
+	Next            string
+	Reauthenticated bool
 }
 
 func (s *Service) AdminLinuxDOSetting(actor *model.User) (*PublicLinuxDOSetting, error) {
@@ -163,14 +164,44 @@ func (s *Service) BeginLinuxDOLogin(nextPath string, acceptedTerms bool, inviteC
 	if !setting.Enabled {
 		return "", kernel.Forbidden("Linux.do 登录尚未启用")
 	}
+	return s.beginLinuxDOAuthorization(setting, &model.OAuthState{NextPath: safeOAuthNext(nextPath), AcceptedTerms: acceptedTerms, InviteCode: inviteCode})
+}
+
+func (s *Service) BeginLinuxDOReauthentication(actor *model.User, cookie string) (string, error) {
+	user, session, err := s.profileSession(actor, cookie)
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.repo.UserIdentityForUser(user.ID, "linuxdo"); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", kernel.Forbidden("该账号没有关联 Linux.do 身份")
+		}
+		return "", err
+	}
+	_, setting, err := s.readLinuxDOSetting()
+	if err != nil {
+		return "", err
+	}
+	if !setting.Enabled {
+		return "", kernel.Forbidden("Linux.do 登录尚未启用")
+	}
+	return s.beginLinuxDOAuthorization(setting, &model.OAuthState{NextPath: "/settings?section=profile&reauth=success", ReauthUserID: user.ID, ReauthSessionID: session.ID})
+}
+
+func (s *Service) LinuxDOReauthenticationState(stateValue string) (bool, error) {
+	if strings.TrimSpace(stateValue) == "" {
+		return false, nil
+	}
+	return s.repo.LinuxDOReauthenticationState(HashToken(stateValue))
+}
+
+func (s *Service) beginLinuxDOAuthorization(setting linuxDOSettingValue, record *model.OAuthState) (string, error) {
 	state := RandomToken()
 	verifier := RandomToken()
 	challengeBytes := sha256.Sum256([]byte(verifier))
 	challenge := base64.RawURLEncoding.EncodeToString(challengeBytes[:])
-	if err := s.repo.CreateOAuthState(&model.OAuthState{
-		ID: kernel.NewID(), Provider: "linuxdo", StateHash: HashToken(state), CodeVerifier: verifier,
-		NextPath: safeOAuthNext(nextPath), AcceptedTerms: acceptedTerms, InviteCode: inviteCode, ExpiresAt: time.Now().Add(10 * time.Minute),
-	}); err != nil {
+	record.ID, record.Provider, record.StateHash, record.CodeVerifier, record.ExpiresAt = kernel.NewID(), "linuxdo", HashToken(state), verifier, time.Now().Add(10*time.Minute)
+	if err := s.repo.CreateOAuthState(record); err != nil {
 		return "", err
 	}
 	authorizeURL, err := url.Parse(setting.AuthorizationURL)
@@ -191,7 +222,25 @@ func (s *Service) BeginLinuxDOLogin(nextPath string, acceptedTerms bool, inviteC
 	return authorizeURL.String(), nil
 }
 
-func (s *Service) CompleteLinuxDOLogin(stateValue string, code string) (*LinuxDOCallbackResult, error) {
+func (s *Service) CompleteLinuxDOLogin(stateValue string, code string, cookieValue string, contexts ...LoginContext) (result *LinuxDOCallbackResult, err error) {
+	var context LoginContext
+	if len(contexts) > 0 {
+		context = contexts[0]
+	}
+	event := NewLoginLog("linuxdo", "login", context)
+	logFailure := true
+	defer func() {
+		if err != nil && logFailure {
+			err = s.recordLoginFailure(event, err)
+		}
+	}()
+	if strings.TrimSpace(stateValue) != "" {
+		reauth, stateErr := s.LinuxDOReauthenticationState(stateValue)
+		if stateErr != nil {
+			return nil, stateErr
+		}
+		logFailure = !reauth
+	}
 	if strings.TrimSpace(stateValue) == "" || strings.TrimSpace(code) == "" {
 		return nil, kernel.BadAuthRequest("Linux.do 登录回调缺少必要参数")
 	}
@@ -202,9 +251,27 @@ func (s *Service) CompleteLinuxDOLogin(stateValue string, code string) (*LinuxDO
 	if err != nil {
 		return nil, err
 	}
+	logFailure = state.ReauthUserID == "" && state.ReauthSessionID == ""
 	_, setting, err := s.readLinuxDOSetting()
 	if err != nil {
 		return nil, err
+	}
+	if !setting.Enabled {
+		return nil, kernel.Forbidden("Linux.do 登录尚未启用")
+	}
+	var reauthUser *model.User
+	var reauthSession *model.AuthSession
+	if state.ReauthUserID != "" || state.ReauthSessionID != "" {
+		if cookieValue == "" {
+			return nil, kernel.Unauthorized("重新验证需要当前登录会话")
+		}
+		reauthUser, reauthSession, err = s.profileSession(&model.User{ID: state.ReauthUserID}, cookieValue)
+		if err != nil {
+			return nil, err
+		}
+		if reauthSession.ID != state.ReauthSessionID {
+			return nil, kernel.Unauthorized("重新验证与当前登录会话不匹配")
+		}
 	}
 	accessToken, err := exchangeLinuxDOCode(setting, code, state.CodeVerifier)
 	if err != nil {
@@ -217,6 +284,12 @@ func (s *Service) CompleteLinuxDOLogin(stateValue string, code string) (*LinuxDO
 	subject := profileString(profile, setting.SubjectField)
 	if subject == "" {
 		return nil, errors.New("Linux.do 用户信息缺少稳定用户 ID")
+	}
+	if reauthUser != nil {
+		if err := s.repo.ReauthenticateLinuxDOSession(reauthUser, reauthSession, subject, time.Now()); err != nil {
+			return nil, profileWriteError(err)
+		}
+		return &LinuxDOCallbackResult{Next: "/settings?section=profile&reauth=success", Reauthenticated: true}, nil
 	}
 	providerUsername := profileString(profile, setting.UsernameField)
 	displayName := kernel.FirstNonEmpty(profileString(profile, setting.DisplayNameField), providerUsername, "Linux.do 用户")
@@ -235,6 +308,7 @@ func (s *Service) CompleteLinuxDOLogin(stateValue string, code string) (*LinuxDO
 			return nil, err
 		}
 	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		event.Source = "registration"
 		policy, policyErr := s.verificationPolicy()
 		if policyErr != nil {
 			return nil, policyErr
@@ -264,6 +338,7 @@ func (s *Service) CompleteLinuxDOLogin(stateValue string, code string) (*LinuxDO
 	} else {
 		return nil, err
 	}
+	loginLogUser(event, user)
 	if user.Status != model.UserStatusActive {
 		return nil, kernel.Forbidden("该账号已被禁用")
 	}
@@ -276,8 +351,7 @@ func (s *Service) CompleteLinuxDOLogin(stateValue string, code string) (*LinuxDO
 	if err := s.repo.UpdateUserLoginTime(user.ID, now); err != nil {
 		return nil, err
 	}
-	s.host.RecordActivity(user.ID, "login", 1)
-	session, err := s.createAuthSession(user)
+	session, err := s.createAuthSession(user, event)
 	if err != nil {
 		return nil, err
 	}

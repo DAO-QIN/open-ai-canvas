@@ -15,21 +15,64 @@ description: 信封、错误码与 OpenAPI
 
 新接口的所有微积分金额都是字符串；比例为整数基点。转入重复请求金额不同返回 40901 / `idempotency_conflict`，可用余额不足返回 409 / `insufficient_promotion_balance`，钱包超过上限返回 409 / `credit_balance_overflow`，配置版本冲突返回 409 / `conflict`。活动关闭不禁止历史查询或已有返利转入。详细规则见 [邀请返利](./invitation-rebates)。
 
+## 用户登录日志
+
+菜单“用户与运营 → 用户登录日志”，页面 `/admin/login-logs`。查询在 service 校验管理员权限：匿名 401、普通用户 403。
+
+- `GET /api/admin/login-logs`：支持 `keyword`（用户名、昵称、脱敏账号或用户 ID）、`event=login|logout`、`method=password|email|sms|linuxdo|verification|unknown`、`result=success|failed`、精确 `ip`、RFC3339 `from/to`（含边界）、`page/pageSize`。开始时间不能晚于结束时间。默认每页 20 条、时间倒序；成功 `data={logs,total,page,pageSize}`，空结果 `logs=[]`。
+- `GET /api/admin/login-logs/:id`：成功 `data={log}`；不存在返回 404。包含用户快照、时间、事件、来源、方式、IP、UA、安全原因码/文案和非凭据的关联会话标识。
+
+后端在密码、邮箱/短信验证码、Linux.do 登录、注册后自动登录及主动退出的真实认证路径记录，不提供客户端任意新增日志接口。`verification` 表示凭据/请求无效导致方式无法识别；`unknown` 表示上线前会话未保存方式。`source=registration` 标记注册自动登录。退出失败不清 Cookie，不再忽略撤销错误。刷新状态和会话自然过期不新增事件。浏览器/系统由页面根据 UA 展示，无法识别时明确标注；UA 是客户端自报信息。
+
+## 个人信息
+
+所有 `/auth/profile` 路径均要求当前活动用户的登录 Cookie，不能通过用户 ID 修改他人资料。
+
+| 路径                                | 入参与结果                                                                                                                                         |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/profile`                 | 返回 `user`、`hasPassword`、`emailEnabled`、`linuxdoEnabled` 和可选 `reauthenticatedUntil`；密码散列、头像图片正文、内部缓存版本均不在用户 JSON 中 |
+| `PUT /auth/profile/avatar`          | multipart `file`，只接受真实 PNG/JPEG、最大 5 MiB；返回 `{ user }`，包含带版本的头像地址                                                           |
+| `DELETE /auth/profile/avatar`       | 清除个人头像并明确选择系统默认头像；第三方重新登录不会覆盖该选择；返回 `{ user }`                                                                  |
+| `POST /auth/profile/avatar/default` | `{ preset }`，只接受 `person/director/camera/cat/rabbit/robot/rocket/sparkles`；保存选择并清除个人图片，返回 `{ user }`                            |
+| `GET /auth/profile/avatar/:userId`  | 只读取本账号的 PNG，`Cache-Control: private, no-store`；账号之间拒绝读取                                                                           |
+| `POST /auth/profile/password`       | `{ currentPassword, newPassword }`；新密码至少 8 个 Unicode 字符、UTF-8 不超过 72 字节；返回 `{ changed: true }` 并清除 Cookie、撤销全部会话       |
+| `POST /auth/profile/email-code`     | `{ email, currentPassword }`；向未占用的新邮箱发送验证码，返回 `{ ticket, expiresIn, retryAfter }`                                                 |
+| `POST /auth/profile/email`          | `{ ticket, emailCode, currentPassword }`；验证后更新邮箱及验证时间、撤销全部会话并清除 Cookie；返回 `{ changed: true, notificationStatus }`        |
+| `GET /auth/profile/linuxdo/start`   | 纯第三方账号重新核验身份的入口；绑定原用户和原会话，成功回到 `/settings?section=profile&reauth=success`，失败回到该页的 `reauth=error` 状态        |
+
+已有本地密码的账号必须验证当前密码。纯 Linux.do 账号设置密码或更换邮箱时，必须先完成同一会话内的重新授权，核验必须匹配原第三方用户标识；有效期为 5 分钟。邮箱验证码用途固定为 `profile_email`，绑定当前会话与凭据状态，6 位数字、10 分钟有效、最多 5 次核验；收件地址跨场景共享 60 秒发送冷却、每小时 5 次和每天 20 次额度。发送失败明确报错；邮件服务未启用时禁止更换邮箱。
+
+新邮箱验证之前保留原绑定。更新及验证码消费、登录会话撤销一起提交，唯一性检查在事务内重复执行。更新后向原邮箱发通知，`notificationStatus` 为 `sent`、`failed` 或 `not_needed`；`failed` 表示邮箱已更新、原邮箱通知失败，不能把已成功更新显示成未保存。接口使用现有业务错误信封和限流规则，密码、验证码和 ticket 不进入 URL。
+
+上传头像先通过共享裁剪弹窗选择 1:1 区域，支持拖动、缩放裁剪框、键盘调整与重置；确认后导出最大 512×512 的 PNG 到待保存预览，点击“保存头像”才上传。取消裁剪保留原头像；待保存图片可重新调整裁剪。选择系统头像使用现有 AppModal、Avatar 与主题 token，支持 8 个预设，确认后才写入服务端。
+
+## 生图与视频工作台 API
+
+以下 `/workbench` 路径需要当前用户登录，并受对应工作台开关控制；功能默认关闭。启用入口不会自动安装工具预设、启用模型或修改价格。
+
+- `GET /workbench/tools?kind=image|video`：读取当前用户可见且启用的工具及预设目录；未开放或无权使用时由服务端拒绝。
+- `GET /workbench/tasks?kind=image|video&activeOnly=true&pageSize=50`：读取当前用户该类型任务；`activeOnly` 仅在 `true` 时筛选活动任务，`pageSize` 默认 50、最大 100。
+- `POST /workbench/tasks`：提交 `{ kind, prompt, model, modelChoice, parameters, references, toolId?, presetId?, logicalModelId? }`。服务端重新校验开关、工具/预设、模型能力、参考资源归属及媒体类型，并复用统一任务准入和计费；不接受客户端 provider 配置、密钥或上游 URL。
+- `GET /admin/workbench/tools?kind=image|video`：管理员读取工具目录。管理员写入使用 `POST /admin/workbench/tools`、`PATCH /admin/workbench/tools/:id`、`POST /admin/workbench/tools/:id/publish|unpublish`，并使用 `POST /admin/workbench/tools/:id/presets`、`PATCH /admin/workbench/tools/:id/presets/:presetId` 和相应的预设发布/取消发布路径维护预设。写操作须通过管理员校验和审计；工具图标、封面及示例素材引用受资源归属、就绪状态与删除保护约束。
+
 ## Agent 画布权限与大事件
 
 自由画布和项目关联画布均使用 `canvas_projects`。Agent 运行时按登录账号和画布 ID 查询归属，不能把所属项目 ID 当作画布 ID；画布不存在、属于其他账号或数据库读取失败时，不声明读写及导出权限。
 
 `canvas_updated` 的画布增量超过单事件 128 KiB 上限时，复用 `requiresRefresh: true` 通知客户端重新读取完整画布，优先保留操作摘要；摘要仍超限则仅发送刷新通知。画布正文、历史和操作回执仍完整保存，普通大小事件继续携带 `canvasPatch`。不提高事件上限、不截断正文、不修改审批暂停或模型调度判断。
+
 ## Agent 模型输出限制
 
 Pi 模型桥在保存待执行调用之前，复用单步输出限制校验：一次回复最多 8 个工具调用，正文最多 32000 字节。超限时整批未执行，释放本步模型任务并附带 `invalid_output` 及具体上限要求模型分批纠正；与既有异常重试共用首次失败后最多 3 次的上限，不截取部分调用执行。纠正请求仍是正常计费的文本模型任务，不创建媒体任务。
 
 系统行为策略版本升至 14，明确工具调用数量与单个 `canvas_apply_ops` 操作数量的区别。已有会话保留其冻结策略快照；部署后用新会话验证新提示词，不修改历史检查点。
+
 ## Agent 分镜连线参数反馈
 
 素材绑定使用“素材→分镜”和 `toHandleId: row:<rowId>`；镜头输出使用“分镜→图片/视频”和 `fromHandleId: row:<rowId>`。`rowId` 必须是读取工具返回的真实行 ID，不能用镜头编号代替。普通节点连线与镜头行连线按 handle 区分，已有整表连线不代表该行已经绑定。
 
 handle 放错端点、格式错误或行 ID 不存在时，工具错误回执提供具体 `field`（如 `ops[0].fromHandleId`）、`issue`、方向说明及连线参数模板，不再使用无关的新增节点示例。模板不会被自动执行，不自动交换端点或修改原调用。权限、快照和重复连线校验保持不变；工具契约版本为 v4，重启后端后新会话使用更新后的说明。
+
 ## KM 图片尺寸能力
 
 图片能力 `size.presets[].tier` 在已有档位之外接受 `1.5k`；前端档位选择、请求归一化与服务端预设校验保持一致。`km-kemei-seedream` 默认 `2048x2048`、单次一张、最多十张参考图，提供二十四个精确尺寸。透明输出使用插件扩展字段，不开启宿主通用透明背景开关。模型能力仍保存在现有 JSON 字段，无数据库迁移或新端点。
@@ -140,6 +183,7 @@ CANVAS_BACKEND_DATA_DIR=/明确的数据目录 ./migrate-schema repair-canvas-re
 读取注册配置失败（如 JSON 损坏）时，`RegistrationAgreement` 返回空标题而不是品牌名兜底标题，注册页据此隐藏协议入口并提示可重新读取，避免展示后台并不存在的协议名称；此时错误提示统一回落为“请先同意服务协议”。
 
 `PATCH /admin/settings/registration` 的两个协议字段为可选指针语义：不提交表示保留已保存内容，提交空串表示明确清空。注册开关与协议正文可以分开保存，单独切换 `enabled` 不会覆盖协议。当前只校验本次注册的同意标志，不保存长期协议版本或签署凭证。前后端需一起更新，旧客户端缺少同意标志时无法注册。
+
 ## 站点皮肤主按钮
 
 ### 画布配置、更新公告与 Live2D（外观合同版本 10）
@@ -166,15 +210,19 @@ CANVAS_BACKEND_DATA_DIR=/明确的数据目录 ./migrate-schema repair-canvas-re
 
 ```json
 {
-  "models": [{
-    "modelId": "MODEL001",
-    "priceVersion": 4,
-    "priceTiers": [{
-      "id": "TIER001",
-      "priceVersion": 8,
-      "prices": { "unitPriceMicrocredits": 1370000 }
-    }]
-  }]
+  "models": [
+    {
+      "modelId": "MODEL001",
+      "priceVersion": 4,
+      "priceTiers": [
+        {
+          "id": "TIER001",
+          "priceVersion": 8,
+          "prices": { "unitPriceMicrocredits": 1370000 }
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -200,10 +248,10 @@ CANVAS_BACKEND_DATA_DIR=/明确的数据目录 ./migrate-schema repair-canvas-re
 
 以下接口需要登录 Cookie，返回 `data.quote`，仅校验和报价，不创建任务、账单或冻结余额，不调用供应商生成接口。
 
-| 接口 | 请求 |
-| --- | --- |
+| 接口                        | 请求                                                                                                  |
+| --------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `POST /model-catalog/quote` | `{ channelId, modelKey, intent }`，仅允许启用的系统渠道与可用模型，复用任务准入、默认参数和价格档选择 |
-| `POST /models/:id/quote` | 直接提交 `intent`，按前台逻辑模型当前可用线路和价格策略报价 |
+| `POST /models/:id/quote`    | 直接提交 `intent`，按前台逻辑模型当前可用线路和价格策略报价                                           |
 
 `intent` 包含 `capability`（`text/image/video/audio`）、`operation`、`inputs`（素材类型到数量的映射）和 `options`（请求规格）。素材数量必须为 0–128 的整数，再按模型能力限制校验。视频规格包括 `vquality`、`size`、`videoSeconds`、布尔值 `videoGenerateAudio`，显式 `false` 必须保留。
 
@@ -229,11 +277,11 @@ Token 报价的 `estimated` 为 `true`，`quantity` 是预留 Token 数。参考
 
 画布写入统一使用 `PATCH /canvas-projects/:id/operations`。请求只携带对象级或字段级变更，不提交整批画布快照；`mutationId` 是一次写入的幂等身份，客户端在响应丢失、断网、刷新或后台重试时必须复用同一个 ID 和原始 `operations`。`baseRevision` 记录生成请求时的已确认基线版本，用于诊断和响应；字段/对象的 `before`、`expected`、`beforeValue` 是实际并发校验，允许不同字段合并，拒绝同字段覆盖和缺失对象更新。可选顶层字段缺失时必须显式编码为 JSON `null`；服务端仅对早期客户端省略这些可选字段的 `value` 或 `beforeValue` 按 `null` 兼容处理，并继续执行基线校验。
 
-| 接口 | 行为 |
-| --- | --- |
-| `GET /canvas-projects/:id` | 返回当前完整画布及权威 `revision`；响应包含基于数据库版本的弱 `ETag` 和 `Cache-Control: private, no-cache`。请求可用 `If-None-Match` 做条件读取，版本未变化时返回 `304`。 |
+| 接口                                    | 行为                                                                                                                                                                                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /canvas-projects/:id`              | 返回当前完整画布及权威 `revision`；响应包含基于数据库版本的弱 `ETag` 和 `Cache-Control: private, no-cache`。请求可用 `If-None-Match` 做条件读取，版本未变化时返回 `304`。                                                           |
 | `PATCH /canvas-projects/:id/operations` | 接收 `{ mutationId, baseRevision?, operations[] }`，返回当前项目摘要和 `mutationId`。支持 `create_canvas`、`create_node`、`patch_node`、`remove_node`、`create_connection`、`update_connection`、`remove_connection`、`set_field`。 |
-| `DELETE /canvas-projects/:id` | 显式删除画布。删除后迟到的更新不会重新创建画布；只有新的 `create_canvas` 操作可以显式创建同 ID 画布。 |
+| `DELETE /canvas-projects/:id`           | 显式删除画布。删除后迟到的更新不会重新创建画布；只有新的 `create_canvas` 操作可以显式创建同 ID 画布。                                                                                                                               |
 
 `create_node`、`create_connection` 和 `create_canvas` 是唯一的创建语义；更新、删除和连接操作都要求目标存在并通过对象基线校验。节点删除会同步移除关联连接，迟到媒体回写或编辑更新返回结构化冲突，不会复活已删除节点。请求摘要与确定性结果写入 `canvas_mutation_receipts`，画布内容、版本递增和 receipt 在同一数据库事务完成；同一 `mutationId` 和相同摘要返回原结果，摘要不同返回 `canvas_mutation_id_reused`。
 
@@ -337,11 +385,11 @@ Skills 的 `tool_completed` / `tool_failed` 事件附带 `skillId`、`skillName`
 
 三个只读导出接口均在 service 校验管理员权限，返回 `text/csv; charset=utf-8` 附件，设置 `Cache-Control: no-store`。导出复用列表筛选条件，不受 `page`、`pageSize` 影响：
 
-| 接口 | 参数与内容 |
-| --- | --- |
-| `GET /api/admin/payments/orders/export.csv` | 与订单列表相同的筛选；完整订单号、渠道交易号、用户身份、商品、渠道、金额、币种、积分、订单/渠道状态及各阶段时间 |
-| `GET /api/admin/payments/reconciliations/export.csv` | 与对账列表相同的筛选；每日执行状态、总笔数、一致/补发/异常笔数、失败原因、发起人 ID 或系统、开始/完成时间 |
-| `GET /api/admin/payments/reconciliations/:id/items/export.csv` | `result`；单次对账的完整交易明细及对账开始/完成时间，便于区分同日重跑结果 |
+| 接口                                                           | 参数与内容                                                                                                      |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `GET /api/admin/payments/orders/export.csv`                    | 与订单列表相同的筛选；完整订单号、渠道交易号、用户身份、商品、渠道、金额、币种、积分、订单/渠道状态及各阶段时间 |
+| `GET /api/admin/payments/reconciliations/export.csv`           | 与对账列表相同的筛选；每日执行状态、总笔数、一致/补发/异常笔数、失败原因、发起人 ID 或系统、开始/完成时间       |
+| `GET /api/admin/payments/reconciliations/:id/items/export.csv` | `result`；单次对账的完整交易明细及对账开始/完成时间，便于区分同日重跑结果                                       |
 
 最多导出 10000 行数据（不含表头）；超限返回 400 业务错误，提示缩小筛选范围，不截断文件。无匹配数据时接口返回仅含表头的 CSV；前端无数据时禁用导出。导出不查单、不重跑对账、不补发积分。
 
@@ -376,7 +424,12 @@ CSV 使用中文表头、UTF-8 BOM、CRLF；金额按整数分精确转换为两
 失败：HTTP status 与 `code` 都不是成功；`reason` 是稳定机器可读原因。
 
 ```json
-{ "code": 40301, "data": null, "msg": "账号素材数量已达到 100 个上限", "reason": "quota_exceeded" }
+{
+  "code": 40301,
+  "data": null,
+  "msg": "账号素材数量已达到 100 个上限",
+  "reason": "quota_exceeded"
+}
 ```
 
 `code === 0` 才是业务成功。HTTP 200 但 `code !== 0` 必须当失败。前端判断类型用 `ApiError.reason` / `ApiError.code`，不要解析 `msg`。
@@ -385,23 +438,23 @@ CSV 使用中文表头、UTF-8 BOM、CRLF；金额按整数分精确转换为两
 
 `code` 默认等于 HTTP 状态。需要区分同一状态的不同原因时，使用 `status * 100 + n`。没有单独的 1001/2001 号段，以免和 HTTP 状态、现有 42901 以及重试判断打架。
 
-| code | HTTP | reason | 含义 |
-| --- | --- | --- | --- |
-| 0 | 200 | — | 成功 |
-| 400 | 400 | `invalid_argument` | 请求不合法 |
-| 401 | 401 | `unauthorized` | 未登录 |
-| 403 | 403 | `forbidden` | 无权限 |
-| 404 | 404 | `not_found` | 资源不存在 |
-| 409 | 409 | `conflict` | 冲突 |
-| 409 | 409 | `project_name_conflict` | `POST /projects` 同一用户下已有同名项目；客户端可有限更换名称重试 |
-| 429 | 429 | `rate_limited` | 限流（未细分） |
-| 500 | 500 | `internal` | 内部错误 |
-| 502 | 502 | `bad_gateway` | 上游失败 |
-| 503 | 503 | `unavailable` | 暂时不可用 |
-| 504 | 504 | `timeout` | 超时 |
-| 40301 | 403 | `quota_exceeded` | 账号配额用尽（不自动重试） |
-| 40901 | 409 | `conflict` | 幂等冲突 |
-| 42901 | 429 | `rate_limited` | 请求限流（可带 Retry-After） |
+| code  | HTTP | reason                  | 含义                                                              |
+| ----- | ---- | ----------------------- | ----------------------------------------------------------------- |
+| 0     | 200  | —                       | 成功                                                              |
+| 400   | 400  | `invalid_argument`      | 请求不合法                                                        |
+| 401   | 401  | `unauthorized`          | 未登录                                                            |
+| 403   | 403  | `forbidden`             | 无权限                                                            |
+| 404   | 404  | `not_found`             | 资源不存在                                                        |
+| 409   | 409  | `conflict`              | 冲突                                                              |
+| 409   | 409  | `project_name_conflict` | `POST /projects` 同一用户下已有同名项目；客户端可有限更换名称重试 |
+| 429   | 429  | `rate_limited`          | 限流（未细分）                                                    |
+| 500   | 500  | `internal`              | 内部错误                                                          |
+| 502   | 502  | `bad_gateway`           | 上游失败                                                          |
+| 503   | 503  | `unavailable`           | 暂时不可用                                                        |
+| 504   | 504  | `timeout`               | 超时                                                              |
+| 40301 | 403  | `quota_exceeded`        | 账号配额用尽（不自动重试）                                        |
+| 40901 | 409  | `conflict`              | 幂等冲突                                                          |
+| 42901 | 429  | `rate_limited`          | 请求限流（可带 Retry-After）                                      |
 
 模型错误把已有字符串码放进 `reason`（如 `model_capability_not_supported`），`code` 仍为 400。
 
@@ -411,12 +464,12 @@ CSV 使用中文表头、UTF-8 BOM、CRLF；金额按整数分精确转换为两
 
 以下接口需要登录。技能库分类与技能广场共享分类分离：`skills.tag` 仍表示共享市场分类；用户技能库分类记录在用户自己的技能状态中，只影响该用户技能库和画布 Agent。
 
-| 方法 | 路径 | 行为 |
-| --- | --- | --- |
-| GET | `/api/skills/library-categories?scope=mine\|created` | 返回当前用户可见的个人分类和平台分类，以及所选视图下每类数量、全部技能数和未分类数量。`mine` 包含自己创建及已加入的公开技能；`created` 只统计自己创建的技能。 |
-| POST | `/api/skills/library-categories` | 请求 `{ "name": "分镜", "scope": "personal" }`。`scope` 可省略并默认为 `personal`；管理员可指定 `platform`，该分类对所有用户可见、可分配和筛选。同一用户可见范围内分类名唯一。 |
-| DELETE | `/api/skills/library-categories/:id` | 删除个人分类（仅分类所有者）或平台分类（仅管理员），只解除该分类与技能的关联，不删除技能。 |
-| PATCH | `/api/skills/:id/library-category` | 请求 `{ "categoryId": "分类 ID" }` 设置分类；空字符串清除分类。仅允许对自己创建或已加入的技能操作，并且只能使用当前用户的个人分类或平台分类。 |
+| 方法   | 路径                                                 | 行为                                                                                                                                                                           |
+| ------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/api/skills/library-categories?scope=mine\|created` | 返回当前用户可见的个人分类和平台分类，以及所选视图下每类数量、全部技能数和未分类数量。`mine` 包含自己创建及已加入的公开技能；`created` 只统计自己创建的技能。                  |
+| POST   | `/api/skills/library-categories`                     | 请求 `{ "name": "分镜", "scope": "personal" }`。`scope` 可省略并默认为 `personal`；管理员可指定 `platform`，该分类对所有用户可见、可分配和筛选。同一用户可见范围内分类名唯一。 |
+| DELETE | `/api/skills/library-categories/:id`                 | 删除个人分类（仅分类所有者）或平台分类（仅管理员），只解除该分类与技能的关联，不删除技能。                                                                                     |
+| PATCH  | `/api/skills/:id/library-category`                   | 请求 `{ "categoryId": "分类 ID" }` 设置分类；空字符串清除分类。仅允许对自己创建或已加入的技能操作，并且只能使用当前用户的个人分类或平台分类。                                  |
 
 `GET /api/skills` 可带 `libraryCategoryId` 或 `libraryUncategorized=true`，仅用于 `scope=mine` / `scope=created`，且两者不能同时使用。它们可与共享分类筛选 `tag` 同时提供，结果需同时满足两个筛选条件。分类列表的数量不受搜索词影响，表示对应技能库范围内的完整数量。
 
@@ -426,13 +479,13 @@ CSV 使用中文表头、UTF-8 BOM、CRLF；金额按整数分精确转换为两
 
 以下接口均要求登录，使用标准业务信封：
 
-| 方法 | 路径 | 行为 |
-| --- | --- | --- |
-| GET | `/api/tools` | 分页列表；`scope=public/favorites/custom`，默认 public；可按 `type=style/motion/nine_grid/effect`、tag、search 筛选。page 从 1 开始，pageSize 默认 20、最大 80；返回 tools、totalCount、page、pageSize、hasMore |
-| GET | `/api/tools/:id` | 可见且启用的工具详情，包含 prompt 和 extraInfo；列表不含这两个大字段 |
-| POST | `/api/tools` | 新建自己的工具；type、label、prompt 必填，visibility 默认 private；预览仅支持本人已上传完成的资源，公开工具暂不接受私人预览 |
-| POST / DELETE | `/api/tools/:id/favorite` | 幂等收藏 / 取消收藏，仅允许操作可见且启用工具 |
-| DELETE | `/api/tools/:id` | 仅删除自己的用户工具，不能删除内置或他人工具 |
+| 方法          | 路径                      | 行为                                                                                                                                                                                                            |
+| ------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET           | `/api/tools`              | 分页列表；`scope=public/favorites/custom`，默认 public；可按 `type=style/motion/nine_grid/effect`、tag、search 筛选。page 从 1 开始，pageSize 默认 20、最大 80；返回 tools、totalCount、page、pageSize、hasMore |
+| GET           | `/api/tools/:id`          | 可见且启用的工具详情，包含 prompt 和 extraInfo；列表不含这两个大字段                                                                                                                                            |
+| POST          | `/api/tools`              | 新建自己的工具；type、label、prompt 必填，visibility 默认 private；预览仅支持本人已上传完成的资源，公开工具暂不接受私人预览                                                                                     |
+| POST / DELETE | `/api/tools/:id/favorite` | 幂等收藏 / 取消收藏，仅允许操作可见且启用工具                                                                                                                                                                   |
+| DELETE        | `/api/tools/:id`          | 仅删除自己的用户工具，不能删除内置或他人工具                                                                                                                                                                    |
 
 生成提示词工具引用格式为 `@[tool:type:ID:label:icon]`，label 使用 URI 编码。名称和图标只用于展示，不作为授权依据。服务端在任务入队及执行前检查用户可见性、启用状态、工具类型和生成模式；无效、越权、嵌套工具或数据库错误必须失败，不能把未解析 token 发送给模型。风格和九宫格仅用于图片，运镜和特效仅用于视频。入队校验不冻结工具快照：排队期间删除工具将导致执行失败。
 

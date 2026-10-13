@@ -11,7 +11,8 @@ import { useUserStore, type FeatureAvailability } from "@/stores/use-user-store"
 import { AdminStatusBadge } from "./admin-ui";
 import { Link } from "react-router";
 
-type EditableFeatureKey = "shortDramaEnabled" | "taskCenterEnabled" | "creditsEnabled" | "customChannelsEnabled" | "inspirationSourcesVisible" | "frontendModelsEnabled" | "pluginCenterEnabled" | "systemPluginsVisibleToUsers";
+type EditableFeatureKey =
+    "shortDramaEnabled" | "taskCenterEnabled" | "creditsEnabled" | "customChannelsEnabled" | "inspirationSourcesVisible" | "frontendModelsEnabled" | "pluginCenterEnabled" | "systemPluginsVisibleToUsers" | "imageWorkbenchEnabled" | "videoWorkbenchEnabled";
 type FeatureKey = EditableFeatureKey | "promotionEnabled";
 type FeatureRow = {
     key: FeatureKey;
@@ -21,7 +22,18 @@ type FeatureRow = {
     dependsOn?: FeatureKey;
 };
 
-const editableFeatureKeys: EditableFeatureKey[] = ["shortDramaEnabled", "taskCenterEnabled", "creditsEnabled", "customChannelsEnabled", "inspirationSourcesVisible", "frontendModelsEnabled", "pluginCenterEnabled", "systemPluginsVisibleToUsers"];
+const editableFeatureKeys: EditableFeatureKey[] = [
+    "shortDramaEnabled",
+    "taskCenterEnabled",
+    "creditsEnabled",
+    "customChannelsEnabled",
+    "inspirationSourcesVisible",
+    "imageWorkbenchEnabled",
+    "videoWorkbenchEnabled",
+    "frontendModelsEnabled",
+    "pluginCenterEnabled",
+    "systemPluginsVisibleToUsers",
+];
 
 const workspaceFeatureRows: FeatureRow[] = [
     {
@@ -66,6 +78,18 @@ const workspaceFeatureRows: FeatureRow[] = [
             </>
         ),
         icon: <Gift className="size-4" aria-hidden="true" />,
+    },
+    {
+        key: "imageWorkbenchEnabled",
+        title: "图片生成",
+        description: "开放生图入口并允许创建新的工作台图片任务；关闭不删除结果和历史。",
+        icon: <Sparkles className="size-4" aria-hidden="true" />,
+    },
+    {
+        key: "videoWorkbenchEnabled",
+        title: "视频生成",
+        description: "开放视频入口并允许创建新的工作台视频任务；关闭不删除结果和历史。",
+        icon: <Clapperboard className="size-4" aria-hidden="true" />,
     },
 ];
 
@@ -187,7 +211,7 @@ function FeatureAvailabilitySettings({ userID }: { userID: string }) {
             } else {
                 const result = await updateAdminFeatureAvailability(toEditablePayload(expected));
                 if (!current()) return;
-                value = parseFeatureAvailability(result.features);
+                value = { ...parseFeatureAvailability(result.features), promotionEnabled: promotionPolicy.enabled };
                 if (!sameEditableFeatures(value, expected)) throw new Error("服务端返回的功能状态与本次保存内容不一致，请重新读取后核对");
             }
             setSavedFeatures(value);
@@ -412,6 +436,8 @@ function toEditablePayload(features: FeatureAvailability) {
         creditsEnabled: features.creditsEnabled,
         customChannelsEnabled: features.customChannelsEnabled,
         inspirationSourcesVisible: features.inspirationSourcesVisible,
+        imageWorkbenchEnabled: features.imageWorkbenchEnabled,
+        videoWorkbenchEnabled: features.videoWorkbenchEnabled,
         frontendModelsEnabled: features.frontendModelsEnabled,
         pluginCenterEnabled: features.pluginCenterEnabled,
         systemPluginsVisibleToUsers: features.systemPluginsVisibleToUsers,
@@ -436,6 +462,8 @@ function parseFeatureAvailability(value: unknown): FeatureAvailability {
         creditsEnabled: record.creditsEnabled as boolean,
         customChannelsEnabled: record.customChannelsEnabled as boolean,
         inspirationSourcesVisible: record.inspirationSourcesVisible as boolean,
+        imageWorkbenchEnabled: record.imageWorkbenchEnabled as boolean,
+        videoWorkbenchEnabled: record.videoWorkbenchEnabled as boolean,
         frontendModelsEnabled: record.frontendModelsEnabled as boolean,
         pluginCenterEnabled: record.pluginCenterEnabled as boolean,
         systemPluginsVisibleToUsers: record.systemPluginsVisibleToUsers as boolean,

@@ -169,7 +169,7 @@ func TestEcommerceRemovalFreshAndUpgrade(t *testing.T) {
 					t.Fatal(err)
 				}
 				assertEcommerceSchemaRemoved(t, db)
-				if status, err := ReadSchemaStatus(db); err != nil || !status.Ready || status.Current != 53 {
+				if status, err := ReadSchemaStatus(db); err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
 					t.Fatalf("cleaned schema not ready: %+v %v", status, err)
 				}
 			})

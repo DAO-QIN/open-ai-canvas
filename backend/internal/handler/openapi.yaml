@@ -27,6 +27,7 @@ tags:
   - name: admin
   - name: skills
   - name: promotion
+  - name: workbench
 paths:
   /auth/register:
     post:
@@ -42,20 +43,20 @@ paths:
               type: object
               required: [username, password, acceptedTerms]
               properties:
-                username: {type: string}
-                password: {type: string, format: password}
-                acceptedTerms: {type: boolean}
-                displayName: {type: string}
-                email: {type: string}
-                emailCode: {type: string}
-                phone: {type: string}
-                smsCode: {type: string}
-                ticket: {type: string}
-                inviteCode: {type: string, maxLength: 16}
+                username: { type: string }
+                password: { type: string, format: password }
+                acceptedTerms: { type: boolean }
+                displayName: { type: string }
+                email: { type: string }
+                emailCode: { type: string }
+                phone: { type: string }
+                smsCode: { type: string }
+                ticket: { type: string }
+                inviteCode: { type: string, maxLength: 16 }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "400": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /auth/linuxdo/start:
     get:
       tags: [auth]
@@ -63,13 +64,17 @@ paths:
       summary: 发起 Linux.do 登录或注册
       description: 邀请码保存在服务端 OAuth state，仅新建账号时使用；已有账号登录不重新绑定。
       parameters:
-        - {in: query, name: next, schema: {type: string}}
-        - {in: query, name: acceptedTerms, schema: {type: boolean}}
-        - {in: query, name: inviteCode, schema: {type: string, maxLength: 16}}
+        - { in: query, name: next, schema: { type: string } }
+        - { in: query, name: acceptedTerms, schema: { type: boolean } }
+        - {
+            in: query,
+            name: inviteCode,
+            schema: { type: string, maxLength: 16 },
+          }
       responses:
-        "302": {description: 跳转到身份提供方}
-        "400": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "302": { description: 跳转到身份提供方 }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /public/invite-code/{code}:
     get:
       tags: [promotion]
@@ -77,10 +82,10 @@ paths:
       summary: 匿名验证邀请码，不公开邀请人身份
       description: 每 IP 每分钟最多 30 次；成功信封 data 为 {valid:boolean}，活动或推广暂停时返回 false。
       parameters:
-        - {in: path, name: code, required: true, schema: {type: string}}
+        - { in: path, name: code, required: true, schema: { type: string } }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "429": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "429": { $ref: "#/components/responses/Error" }
   /promotion/overview:
     get:
       tags: [promotion]
@@ -93,45 +98,45 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - {$ref: "#/components/schemas/Envelope"}
+                  - { $ref: "#/components/schemas/Envelope" }
                   - type: object
                     properties:
-                      data: {$ref: "#/components/schemas/PromotionOverview"}
+                      data: { $ref: "#/components/schemas/PromotionOverview" }
   /promotion/code:
     post:
       tags: [promotion]
       summary: 主动生成邀请码，已存在时返回原邀请码
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "403": { $ref: "#/components/responses/Error" }
   /promotion/invitations:
     get:
       tags: [promotion]
       summary: 当前用户的邀请分页，用户名已在后端脱敏
       parameters:
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
   /promotion/records:
     get:
       tags: [promotion]
       summary: 当前用户的返利分页
       description: data 为 {items,total,page,pageSize}；items 为 CommissionRecord。冻结可用性以服务端 availableAt 为准。
       parameters:
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
   /promotion/transfers:
     get:
       tags: [promotion]
       summary: 当前用户的转入凭据分页
       parameters:
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
     post:
       tags: [promotion]
       summary: 手动将可用返利按 1:1 转入钱包
@@ -144,27 +149,37 @@ paths:
               type: object
               required: [requestId, amountMicrocredits]
               properties:
-                requestId: {type: string, pattern: "^[a-zA-Z0-9_-]{8,80}$"}
-                amountMicrocredits: {type: string, pattern: "^[1-9][0-9]{0,15}$", description: "1～9007199254740991 微积分的十进制字符串；入账后还须满足钱包余额上限"}
+                requestId: { type: string, pattern: "^[a-zA-Z0-9_-]{8,80}$" }
+                amountMicrocredits:
+                  {
+                    type: string,
+                    pattern: "^[1-9][0-9]{0,15}$",
+                    description: "1～9007199254740991 微积分的十进制字符串；入账后还须满足钱包余额上限",
+                  }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "409": {$ref: "#/components/responses/Error"}
-        "429": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /promotion/transfers/{requestId}:
     get:
       tags: [promotion]
       summary: 核对当前用户原请求的转入结果
       parameters:
-        - {in: path, name: requestId, required: true, schema: {type: string}}
+        - {
+            in: path,
+            name: requestId,
+            required: true,
+            schema: { type: string },
+          }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "404": {description: 尚无已提交凭据，可使用同一请求 ID 重试}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "404": { description: 尚无已提交凭据，可使用同一请求 ID 重试 }
   /admin/promotion/policy:
     get:
       tags: [admin, promotion]
       summary: 管理员读取全局推广规则
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
     put:
       tags: [admin, promotion]
       summary: 按版本保存完整推广规则并原子记录审计
@@ -173,26 +188,26 @@ paths:
         required: true
         content:
           application/json:
-            schema: {$ref: "#/components/schemas/PromotionPolicy"}
+            schema: { $ref: "#/components/schemas/PromotionPolicy" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "409": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "409": { $ref: "#/components/responses/Error" }
   /admin/promotion/profiles:
     get:
       tags: [admin, promotion]
       summary: 管理员按用户名或用户 ID 查询推广档案
       parameters:
-        - {in: query, name: keyword, schema: {type: string, maxLength: 120}}
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { in: query, name: keyword, schema: { type: string, maxLength: 120 } }
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
   /admin/promotion/profiles/{userId}:
     put:
       tags: [admin, promotion]
       summary: 按版本配置个人比例和暂停状态
       parameters:
-        - {in: path, name: userId, required: true, schema: {type: string}}
+        - { in: path, name: userId, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
@@ -201,28 +216,35 @@ paths:
               type: object
               required: [version, paused, ratioOverrideBps]
               properties:
-                version: {type: integer, format: int64, minimum: 0}
-                paused: {type: boolean}
-                ratioOverrideBps: {type: integer, minimum: 0, maximum: 10000, nullable: true, description: "null 继承全局；0 明确不返利"}
+                version: { type: integer, format: int64, minimum: 0 }
+                paused: { type: boolean }
+                ratioOverrideBps:
+                  {
+                    type: integer,
+                    minimum: 0,
+                    maximum: 10000,
+                    nullable: true,
+                    description: "null 继承全局；0 明确不返利",
+                  }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "409": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "409": { $ref: "#/components/responses/Error" }
   /admin/promotion/records:
     get:
       tags: [admin, promotion]
       summary: 管理员查询返利分页
       parameters:
-        - {in: query, name: userId, schema: {type: string}}
-        - {$ref: "#/components/parameters/PromotionPage"}
-        - {$ref: "#/components/parameters/PromotionPageSize"}
+        - { in: query, name: userId, schema: { type: string } }
+        - { $ref: "#/components/parameters/PromotionPage" }
+        - { $ref: "#/components/parameters/PromotionPageSize" }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
+        "200": { $ref: "#/components/responses/Envelope" }
   /admin/promotion/records/{id}/void:
     post:
       tags: [admin, promotion]
       summary: 作废该记录剩余未转入的返利，与审计原子提交
       parameters:
-        - {in: path, name: id, required: true, schema: {type: string}}
+        - { in: path, name: id, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
@@ -231,10 +253,118 @@ paths:
               type: object
               required: [reason]
               properties:
-                reason: {type: string, minLength: 1, maxLength: 500}
+                reason: { type: string, minLength: 1, maxLength: 500 }
       responses:
-        "200": {$ref: "#/components/responses/Envelope"}
-        "409": {$ref: "#/components/responses/Error"}
+        "200": { $ref: "#/components/responses/Envelope" }
+        "409": { $ref: "#/components/responses/Error" }
+  /admin/login-logs:
+    get:
+      tags: [admin]
+      summary: 管理员分页查询用户登录登出日志
+      description: 按时间倒序，保留用户快照；失败账号脱敏，无密码、验证码或会话凭据。
+      parameters:
+        - {
+            in: query,
+            name: keyword,
+            schema: { type: string, maxLength: 160 },
+            description: 用户名、昵称、脱敏账号或用户 ID,
+          }
+        - {
+            in: query,
+            name: event,
+            schema: { type: string, enum: [login, logout] },
+          }
+        - {
+            in: query,
+            name: method,
+            schema:
+              {
+                type: string,
+                enum: [password, email, sms, linuxdo, verification, unknown],
+              },
+          }
+        - {
+            in: query,
+            name: result,
+            schema: { type: string, enum: [success, failed] },
+          }
+        - {
+            in: query,
+            name: ip,
+            schema: { type: string },
+            description: 精确匹配 IPv4 或 IPv6,
+          }
+        - {
+            in: query,
+            name: from,
+            schema: { type: string, format: date-time },
+            description: 包含开始时刻，RFC3339,
+          }
+        - {
+            in: query,
+            name: to,
+            schema: { type: string, format: date-time },
+            description: 包含结束时刻，RFC3339,
+          }
+        - {
+            in: query,
+            name: page,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            in: query,
+            name: pageSize,
+            schema: { type: integer, minimum: 1, default: 20 },
+          }
+      responses:
+        "200":
+          description: 成功信封 data={logs,total,page,pageSize}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: integer, enum: [0] }
+                  msg: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      logs:
+                        {
+                          type: array,
+                          items: { $ref: "#/components/schemas/LoginLog" },
+                        }
+                      total: { type: integer }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+  /admin/login-logs/{id}:
+    get:
+      tags: [admin]
+      summary: 管理员读取单条登录日志详情
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 成功信封 data.log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: integer, enum: [0] }
+                  msg: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      log: { $ref: "#/components/schemas/LoginLog" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
   /admin/settings/appearance/live2d:
     post:
       tags: [admin]
@@ -248,7 +378,7 @@ paths:
               type: object
               required: [file]
               properties:
-                file: {type: string, format: binary}
+                file: { type: string, format: binary }
       responses:
         "200":
           description: 成功信封 data.model 包含 resourceId 和服务端确认的 entry
@@ -257,8 +387,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  code: {type: integer, enum: [0]}
-                  msg: {type: string}
+                  code: { type: integer, enum: [0] }
+                  msg: { type: string }
                   data:
                     type: object
                     properties:
@@ -266,51 +396,90 @@ paths:
                         type: object
                         required: [resourceId, entry]
                         properties:
-                          resourceId: {type: string}
-                          entry: {type: string}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
-        "429": {$ref: "#/components/responses/Error"}
+                          resourceId: { type: string }
+                          entry: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /admin/settings/appearance/live2d/{id}/{file}:
     get:
       tags: [admin]
       summary: 读取模型草稿文件（管理员所有者或当前配置引用）
       parameters:
-        - {in: path, name: id, required: true, schema: {type: string}}
-        - {in: path, name: file, required: true, description: ZIP 内相对路径，可包含多级目录, schema: {type: string}}
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - {
+            in: path,
+            name: file,
+            required: true,
+            description: ZIP 内相对路径，可包含多级目录,
+            schema: { type: string },
+          }
       responses:
-        "200": {description: JSON、PNG 或 MOC3 文件，非 JSON 信封}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200": { description: JSON、PNG 或 MOC3 文件，非 JSON 信封 }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /public/appearance/live2d/{id}/{file}:
     get:
       tags: [meta]
       security: []
       summary: 读取当前启用的 Live2D 模型文件
       parameters:
-        - {in: path, name: id, required: true, schema: {type: string}}
-        - {in: path, name: file, required: true, description: ZIP 内相对路径，可包含多级目录, schema: {type: string}}
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - {
+            in: path,
+            name: file,
+            required: true,
+            description: ZIP 内相对路径，可包含多级目录,
+            schema: { type: string },
+          }
       responses:
-        "200": {description: JSON、PNG 或 MOC3 文件，非 JSON 信封；停用后拒绝公开读取}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200":
+          {
+            description: JSON、PNG 或 MOC3 文件，非 JSON 信封；停用后拒绝公开读取,
+          }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /tools:
     get:
       tags: [canvas]
       summary: 列出可见且启用的生成工具
       parameters:
-        - {in: query, name: scope, schema: {type: string, enum: [public, favorites, custom], default: public}}
-        - {in: query, name: type, schema: {type: string, enum: [style, motion, nine_grid, effect]}}
-        - {in: query, name: tag, schema: {type: string}}
-        - {in: query, name: search, schema: {type: string}}
-        - {in: query, name: page, schema: {type: integer, minimum: 1, default: 1}}
-        - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 80, default: 20}}
+        - {
+            in: query,
+            name: scope,
+            schema:
+              {
+                type: string,
+                enum: [public, favorites, custom],
+                default: public,
+              },
+          }
+        - {
+            in: query,
+            name: type,
+            schema: { type: string, enum: [style, motion, nine_grid, effect] },
+          }
+        - { in: query, name: tag, schema: { type: string } }
+        - { in: query, name: search, schema: { type: string } }
+        - {
+            in: query,
+            name: page,
+            schema: { type: integer, minimum: 1, default: 1 },
+          }
+        - {
+            in: query,
+            name: pageSize,
+            schema: { type: integer, minimum: 1, maximum: 80, default: 20 },
+          }
       responses:
-        "200": {description: "标准信封 data 为 tools（摘要不含 prompt/extraInfo）、totalCount、page、pageSize、hasMore"}
-        "401": {description: 未登录}
+        "200":
+          {
+            description: "标准信封 data 为 tools（摘要不含 prompt/extraInfo）、totalCount、page、pageSize、hasMore",
+          }
+        "401": { description: 未登录 }
     post:
       tags: [canvas]
       summary: 创建当前用户的工具
@@ -318,11 +487,11 @@ paths:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/ToolMutation'}
+            schema: { $ref: "#/components/schemas/ToolMutation" }
       responses:
-        "200": {description: 标准信封 data 为完整工具}
-        "400": {description: 参数无效或预览资源不符合要求}
-        "401": {description: 未登录}
+        "200": { description: 标准信封 data 为完整工具 }
+        "400": { description: 参数无效或预览资源不符合要求 }
+        "401": { description: 未登录 }
   /skills/presets:
     get:
       tags: [canvas]
@@ -331,30 +500,59 @@ paths:
       responses:
         "200":
           description: 标准信封 data 为 presets 数组；预设只引用公开且启用的种子技能
-        "500": {$ref: "#/components/responses/Error"}
+        "500": { $ref: "#/components/responses/Error" }
   /skills:
     get:
       tags: [skills]
       summary: 列出技能；在个人技能视图按技能库分类筛选
       parameters:
-        - {in: query, name: scope, schema: {type: string, enum: [public, mine, created, favorites], default: public}}
-        - {in: query, name: libraryCategoryId, description: 用户技能库分类 ID，仅支持 mine 或 created 视图；与 libraryUncategorized 互斥, schema: {type: string}}
-        - {in: query, name: libraryUncategorized, description: 仅列出未归类技能，仅支持 mine 或 created 视图；与 libraryCategoryId 互斥, schema: {type: boolean}}
+        - {
+            in: query,
+            name: scope,
+            schema:
+              {
+                type: string,
+                enum: [public, mine, created, favorites],
+                default: public,
+              },
+          }
+        - {
+            in: query,
+            name: libraryCategoryId,
+            description: 用户技能库分类 ID，仅支持 mine 或 created 视图；与 libraryUncategorized 互斥,
+            schema: { type: string },
+          }
+        - {
+            in: query,
+            name: libraryUncategorized,
+            description: 仅列出未归类技能，仅支持 mine 或 created 视图；与 libraryCategoryId 互斥,
+            schema: { type: boolean },
+          }
       responses:
-        "200": {description: 标准信封 data 为技能列表及分页信息；categories 含共享分类 value、label 和技能广场公开技能 count}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
-        "404": {$ref: "#/components/responses/Error"}
+        "200":
+          {
+            description: 标准信封 data 为技能列表及分页信息；categories 含共享分类 value、label 和技能广场公开技能 count,
+          }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /skills/library-categories:
     get:
       tags: [skills]
       summary: 获取当前用户可见的技能库分类和数量
       parameters:
-        - {in: query, name: scope, schema: {type: string, enum: [mine, created], default: mine}}
+        - {
+            in: query,
+            name: scope,
+            schema: { type: string, enum: [mine, created], default: mine },
+          }
       responses:
-        "200": {description: 标准信封 data 为 categories、totalCount、uncategorizedCount；分类含 id、name、scope、count}
-        "401": {$ref: "#/components/responses/Error"}
+        "200":
+          {
+            description: 标准信封 data 为 categories、totalCount、uncategorizedCount；分类含 id、name、scope、count,
+          }
+        "401": { $ref: "#/components/responses/Error" }
     post:
       tags: [skills]
       summary: 创建个人或平台技能库分类
@@ -366,27 +564,38 @@ paths:
               type: object
               required: [name]
               properties:
-                name: {type: string, minLength: 1, maxLength: 64}
-                scope: {type: string, enum: [personal, platform], default: personal}
+                name: { type: string, minLength: 1, maxLength: 64 }
+                scope:
+                  {
+                    type: string,
+                    enum: [personal, platform],
+                    default: personal,
+                  }
       responses:
-        "200": {description: 标准信封 data.category 为新分类}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
+        "200": { description: 标准信封 data.category 为新分类 }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /skills/library-categories/{id}:
     parameters:
-      - {in: path, name: id, required: true, schema: {type: string}}
+      - { in: path, name: id, required: true, schema: { type: string } }
     delete:
       tags: [skills]
       summary: 删除技能库分类并解除相关技能归类，不删除技能
       responses:
-        "200": {description: "标准信封 data 为 {deleted: true}"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
-        "404": {$ref: "#/components/responses/Error"}
+        "200": { description: "标准信封 data 为 {deleted: true}" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /skills/{id}/library-category:
     parameters:
-      - {in: path, name: id, required: true, description: 技能 ID, schema: {type: string}}
+      - {
+          in: path,
+          name: id,
+          required: true,
+          description: 技能 ID,
+          schema: { type: string },
+        }
     patch:
       tags: [skills]
       summary: 为当前用户已加入或自建的技能设置/清除技能库分类
@@ -398,43 +607,58 @@ paths:
               type: object
               required: [categoryId]
               properties:
-                categoryId: {type: string, description: 个人分类或可见平台分类 ID；空字符串表示取消归类}
+                categoryId:
+                  {
+                    type: string,
+                    description: 个人分类或可见平台分类 ID；空字符串表示取消归类,
+                  }
       responses:
-        "200": {description: 标准信封 data.skill 为更新后的技能}
-        "400": {$ref: "#/components/responses/Error"}
-        "401": {$ref: "#/components/responses/Error"}
-        "403": {$ref: "#/components/responses/Error"}
-        "404": {$ref: "#/components/responses/Error"}
+        "200": { description: 标准信封 data.skill 为更新后的技能 }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /tools/{id}:
     parameters:
-      - {in: path, name: id, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      - {
+          in: path,
+          name: id,
+          required: true,
+          schema: { type: integer, format: int64, minimum: 1 },
+        }
     get:
       tags: [canvas]
       summary: 查询可见且启用工具的完整详情
       responses:
-        "200": {description: 标准信封 data 为完整工具，包含 prompt 和 extraInfo}
-        "404": {description: 工具不存在或不可见}
+        "200":
+          { description: 标准信封 data 为完整工具，包含 prompt 和 extraInfo }
+        "404": { description: 工具不存在或不可见 }
     delete:
       tags: [canvas]
       summary: 删除自己的用户工具及关联收藏，不删除预览文件
       responses:
-        "200": {description: "标准信封 data 为 {deleted: true}"}
-        "404": {description: 工具不存在或不能删除}
+        "200": { description: "标准信封 data 为 {deleted: true}" }
+        "404": { description: 工具不存在或不能删除 }
   /tools/{id}/favorite:
     parameters:
-      - {in: path, name: id, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      - {
+          in: path,
+          name: id,
+          required: true,
+          schema: { type: integer, format: int64, minimum: 1 },
+        }
     post:
       tags: [canvas]
       summary: 幂等收藏可见工具
       responses:
-        "200": {description: 标准信封 data 为完整工具和收藏状态}
-        "404": {description: 工具不存在或不可见}
+        "200": { description: 标准信封 data 为完整工具和收藏状态 }
+        "404": { description: 工具不存在或不可见 }
     delete:
       tags: [canvas]
       summary: 幂等取消收藏可见工具
       responses:
-        "200": {description: 标准信封 data 为完整工具和收藏状态}
-        "404": {description: 工具不存在或不可见}
+        "200": { description: 标准信封 data 为完整工具和收藏状态 }
+        "404": { description: 工具不存在或不可见 }
   /model-catalog:
     get:
       tags: [models]
@@ -508,7 +732,15 @@ paths:
                                           maxLength: 12
                                         color:
                                           type: string
-                                          enum: [purple, blue, green, gold, orange, pink]
+                                          enum:
+                                            [
+                                              purple,
+                                              blue,
+                                              green,
+                                              gold,
+                                              orange,
+                                              pink,
+                                            ]
                                   description:
                                     type: string
                                     maxLength: 500
@@ -1031,7 +1263,7 @@ paths:
                   type: string
                   minLength: 64
                   maxLength: 64
-                  pattern: '^[0-9a-fA-F]{64}$'
+                  pattern: "^[0-9a-fA-F]{64}$"
                 reason:
                   type: string
                   maxLength: 2000
@@ -1184,17 +1416,59 @@ paths:
                           required: [id, priceVersion, prices]
                           properties:
                             id: { type: string, minLength: 1 }
-                            priceVersion: { type: integer, format: int64, minimum: 1 }
+                            priceVersion:
+                              { type: integer, format: int64, minimum: 1 }
                             prices:
                               type: object
                               additionalProperties: false
                               description: 按次/秒仅unit字段；文本Token为输入、输出、缓存；视频Token仅输出。必须完整提交对应字段。
                               properties:
-                                unitPriceMicrocredits: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
-                                inputTokenPriceMicrocredits: { type: integer, format: int64, minimum: 0, maximum: 1000000000000 }
-                                outputTokenPriceMicrocredits: { type: integer, format: int64, minimum: 0, maximum: 1000000000000 }
-                                cachedTokenPriceMicrocredits: { type: integer, format: int64, minimum: 0, maximum: 1000000000000 }
-            example: { models: [{ modelId: MODEL001, priceVersion: 4, priceTiers: [{ id: TIER001, priceVersion: 8, prices: { unitPriceMicrocredits: 1370000 } }] }] }
+                                unitPriceMicrocredits:
+                                  {
+                                    type: integer,
+                                    format: int64,
+                                    minimum: 0,
+                                    maximum: 9007199254740991,
+                                  }
+                                inputTokenPriceMicrocredits:
+                                  {
+                                    type: integer,
+                                    format: int64,
+                                    minimum: 0,
+                                    maximum: 1000000000000,
+                                  }
+                                outputTokenPriceMicrocredits:
+                                  {
+                                    type: integer,
+                                    format: int64,
+                                    minimum: 0,
+                                    maximum: 1000000000000,
+                                  }
+                                cachedTokenPriceMicrocredits:
+                                  {
+                                    type: integer,
+                                    format: int64,
+                                    minimum: 0,
+                                    maximum: 1000000000000,
+                                  }
+            example:
+              {
+                models:
+                  [
+                    {
+                      modelId: MODEL001,
+                      priceVersion: 4,
+                      priceTiers:
+                        [
+                          {
+                            id: TIER001,
+                            priceVersion: 8,
+                            prices: { unitPriceMicrocredits: 1370000 },
+                          },
+                        ],
+                    },
+                  ],
+              }
       responses:
         "200":
           description: 更新成功，data.updated 为更新的模型数量
@@ -1263,6 +1537,212 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+  /auth/profile:
+    get:
+      tags: [auth]
+      summary: 当前用户个人信息及安全能力
+      description: 返回 user、hasPassword、emailEnabled、linuxdoEnabled 和可选 reauthenticatedUntil；个人头像选择覆盖第三方头像。内部密码散列与头像版本字段不返回。
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /auth/profile/avatar:
+    put:
+      tags: [auth]
+      summary: 保存当前用户头像
+      description: 真实 PNG/JPEG，最大 5 MiB、1600 万像素，居中裁剪并缩小到最大512像素PNG。响应 data.user 包含更新后的头像地址。
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [auth]
+      summary: 使用系统默认头像
+      description: 清除本用户头像并保存 default 选择，后续第三方登录仍使用系统头像。返回 data.user。
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /auth/profile/avatar/default:
+    post:
+      tags: [auth]
+      summary: 选择系统头像
+      description: 保存选择并原子清除自定义图片，返回 data.user。系统头像由共享组件渲染；不接受客户端 URL 或任意图标标识。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [preset]
+              properties:
+                preset:
+                  type: string
+                  enum:
+                    [
+                      person,
+                      director,
+                      camera,
+                      cat,
+                      rabbit,
+                      robot,
+                      rocket,
+                      sparkles,
+                    ]
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /auth/profile/avatar/{userId}:
+    get:
+      tags: [auth]
+      summary: 读取当前账号头像 PNG
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: v
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: 仅当前用户可读，private no-store
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /auth/profile/password:
+    post:
+      tags: [auth]
+      summary: 修改或设置本地密码并撤销所有会话
+      description: 已有密码必须校验 currentPassword；纯第三方账号须在当前会话完成5分钟内的Linux.do重新授权核验。成功返回 data.changed=true 并清除会话 Cookie。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 8
+                  maxLength: 72
+                  description: 至少8个Unicode字符，UTF-8字节长度不超过72
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /auth/profile/email-code:
+    post:
+      tags: [auth]
+      summary: 向新邮箱发送专用验证码
+      description: 验证当前密码或当前会话最近的Linux.do核验；新地址未被占用且不同于旧地址。返回 ticket、expiresIn=600、retryAfter=60；票据绑定用户/会话/凭据，仅profile_email用途有效。发送失败显式报错。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                currentPassword: { type: string, format: password }
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /auth/profile/email:
+    post:
+      tags: [auth]
+      summary: 验证新邮箱并更新绑定
+      description: 原子校验邮箱唯一性、消费验证码、更新已验证邮箱并撤销全部会话；清除Cookie。返回changed=true及notificationStatus(sent/failed/not_needed)，failed仅表示已更新后的原邮箱通知失败。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ticket, emailCode]
+              properties:
+                ticket: { type: string }
+                emailCode: { type: string, pattern: "^[0-9]{6}$" }
+                currentPassword: { type: string, format: password }
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /auth/profile/linuxdo/start:
+    get:
+      tags: [auth]
+      summary: 发起当前账号Linux.do身份重新核验
+      description: OAuth state绑定当前账号和当前会话，回调只接受原绑定subject；不创建账号或新登录会话。授权成功返回/settings?section=profile&reauth=success，失败返回reauth=error。
+      responses:
+        "302":
+          description: 跳转到第三方授权页面
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
           $ref: "#/components/responses/Error"
   /auth/session:
     get:
@@ -1348,9 +1828,26 @@ paths:
                 type: object
                 required: [resourceId]
                 properties:
-                  resourceId: {type: string}
-                  purpose: {type: string, enum: [display, copy, download, browser-process, provider-input], default: display}
-                  variant: {type: string, enum: [original, playback], default: original}
+                  resourceId: { type: string }
+                  purpose:
+                    {
+                      type: string,
+                      enum:
+                        [
+                          display,
+                          copy,
+                          download,
+                          browser-process,
+                          provider-input,
+                        ],
+                      default: display,
+                    }
+                  variant:
+                    {
+                      type: string,
+                      enum: [original, playback],
+                      default: original,
+                    }
       responses:
         "200":
           $ref: "#/components/responses/Envelope"
@@ -1373,16 +1870,142 @@ paths:
           description: 仅返回统一访问描述，不返回文件正文。
         - in: query
           name: variant
-          schema: { type: string, enum: [original, playback], default: original }
+          schema:
+            { type: string, enum: [original, playback], default: original }
         - in: query
           name: purpose
-          schema: { type: string, enum: [display, download, browser-process], default: display }
+          schema:
+            {
+              type: string,
+              enum: [display, download, browser-process],
+              default: display,
+            }
       responses:
         "200":
           description: 文件流
         "401":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+  /workbench/tools:
+    get:
+      tags: [workbench]
+      summary: 获取当前用户可用的工作台工具
+      parameters:
+        - in: query
+          name: kind
+          required: true
+          schema: { type: string, enum: [image, video] }
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /workbench/tasks:
+    get:
+      tags: [workbench]
+      summary: 查询当前用户的工作台任务
+      parameters:
+        - in: query
+          name: kind
+          required: true
+          schema: { type: string, enum: [image, video] }
+        - in: query
+          name: activeOnly
+          schema: { type: boolean, default: false }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [workbench]
+      summary: 创建工作台生成任务
+      description: 仅接受模型选择意图、资源 ID、提示词和允许的生成参数；toolId 可选，服务端校验开关、所选工具、资源、模型能力和账单，不接受客户端 providerConfig、密钥或上游 URL。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                [kind, prompt, model, modelChoice, parameters, references]
+              properties:
+                kind: { type: string, enum: [image, video] }
+                toolId: { type: string }
+                presetId: { type: string }
+                prompt: { type: string, minLength: 1, maxLength: 32000 }
+                model: { type: string }
+                logicalModelId: { type: string }
+                modelChoice:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    logicalModelId: { type: string }
+                    modelName: { type: string }
+                workbench:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    kind: { type: string, enum: [image, video] }
+                    toolId: { type: string }
+                    presetId: { type: string }
+                parameters:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    size: { type: string }
+                    quality: { type: string }
+                    count: { type: integer, minimum: 1 }
+                    videoSeconds: { type: integer, minimum: 1 }
+                    ratio: { type: string }
+                    resolution: { type: string }
+                    generateAudio: { type: boolean }
+                    watermark: { type: boolean }
+                references:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [resourceId, kind, role]
+                    properties:
+                      resourceId: { type: string }
+                      kind: { type: string, enum: [image, video, audio] }
+                      role:
+                        {
+                          type: string,
+                          enum: [reference, first_frame, last_frame],
+                        }
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /admin/workbench/tools:
+    get:
+      tags: [workbench, admin]
+      summary: 管理工作台工具目录
+      parameters:
+        - in: query
+          name: kind
+          schema: { type: string, enum: [image, video] }
+      responses:
+        "200":
+          $ref: "#/components/responses/Envelope"
+        "403":
           $ref: "#/components/responses/Error"
   /tasks:
     post:
@@ -1496,8 +2119,18 @@ paths:
           $ref: "#/components/responses/Error"
 components:
   parameters:
-    PromotionPage: {in: query, name: page, schema: {type: integer, minimum: 1, maximum: 1000000, default: 1}}
-    PromotionPageSize: {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+    PromotionPage:
+      {
+        in: query,
+        name: page,
+        schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 },
+      }
+    PromotionPageSize:
+      {
+        in: query,
+        name: pageSize,
+        schema: { type: integer, minimum: 1, maximum: 100, default: 20 },
+      }
     AgentRunID:
       name: id
       in: path
@@ -1518,64 +2151,106 @@ components:
       type: object
       required: [enabled, ratioBps, freezeDays, version]
       properties:
-        enabled: {type: boolean, default: false}
-        ratioBps: {type: integer, minimum: 0, maximum: 10000, default: 0}
-        freezeDays: {type: integer, minimum: 0, maximum: 365, default: 0}
-        version: {type: integer, format: int64, minimum: 0}
+        enabled: { type: boolean, default: false }
+        ratioBps: { type: integer, minimum: 0, maximum: 10000, default: 0 }
+        freezeDays: { type: integer, minimum: 0, maximum: 365, default: 0 }
+        version: { type: integer, format: int64, minimum: 0 }
     PromotionOverview:
       type: object
       properties:
-        policy: {$ref: "#/components/schemas/PromotionPolicy"}
+        policy: { $ref: "#/components/schemas/PromotionPolicy" }
         profile:
           type: object
           properties:
-            userId: {type: string}
-            inviteCode: {type: string, nullable: true}
-            paused: {type: boolean}
-            ratioOverrideBps: {type: integer, nullable: true}
-            version: {type: integer, format: int64}
-        effectiveRatioBps: {type: integer}
-        canPromote: {type: boolean}
-        inviteCount: {type: integer}
-        totalMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        frozenMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        availableMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        transferredMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        voidedMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        serverTime: {type: string, format: date-time}
+            userId: { type: string }
+            inviteCode: { type: string, nullable: true }
+            paused: { type: boolean }
+            ratioOverrideBps: { type: integer, nullable: true }
+            version: { type: integer, format: int64 }
+        effectiveRatioBps: { type: integer }
+        canPromote: { type: boolean }
+        inviteCount: { type: integer }
+        totalMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        frozenMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        availableMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        transferredMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        voidedMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        serverTime: { type: string, format: date-time }
     CommissionRecord:
       type: object
       properties:
-        id: {type: string}
-        paymentOrderId: {type: string}
-        inviterId: {type: string}
-        baseMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        amountMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        transferredMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        voidedMicrocredits: {$ref: "#/components/schemas/PromotionMicrocredits"}
-        ratioBps: {type: integer}
-        policyVersion: {type: integer, format: int64}
-        profileVersion: {type: integer, format: int64}
-        freezeDays: {type: integer}
-        availableAt: {type: string, format: date-time}
-        createdAt: {type: string, format: date-time}
-        updatedAt: {type: string, format: date-time}
-        voidReason: {type: string}
-        voidedBy: {type: string}
+        id: { type: string }
+        paymentOrderId: { type: string }
+        inviterId: { type: string }
+        baseMicrocredits: { $ref: "#/components/schemas/PromotionMicrocredits" }
+        amountMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        transferredMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        voidedMicrocredits:
+          { $ref: "#/components/schemas/PromotionMicrocredits" }
+        ratioBps: { type: integer }
+        policyVersion: { type: integer, format: int64 }
+        profileVersion: { type: integer, format: int64 }
+        freezeDays: { type: integer }
+        availableAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        voidReason: { type: string }
+        voidedBy: { type: string }
+    LoginLog:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string, nullable: true }
+        username: { type: string, description: 事件时用户名快照 }
+        displayName: { type: string }
+        account: { type: string, description: 用户名或脱敏的尝试账号 }
+        event: { type: string, enum: [login, logout] }
+        method:
+          {
+            type: string,
+            enum: [password, email, sms, linuxdo, verification, unknown],
+          }
+        source: { type: string, enum: [login, registration, logout] }
+        result: { type: string, enum: [success, failed] }
+        ip: { type: string }
+        userAgent:
+          {
+            type: string,
+            maxLength: 512,
+            description: 客户端自报信息，不作为身份判断依据,
+          }
+        sessionRef:
+          {
+            type: string,
+            description: 会话 ID 的单向哈希，仅关联历史事件，不含 Token,
+          }
+        reason: { type: string }
+        message: { type: string }
+        createdAt: { type: string, format: date-time }
     ToolMutation:
       type: object
       required: [type, label, prompt]
       properties:
-        type: {type: string, enum: [style, motion, nine_grid, effect]}
-        label: {type: string, description: 名称最多 120 字节}
-        prompt: {type: string, description: 最多 8000 字节，不允许嵌套工具标签}
-        visibility: {type: string, enum: [private, public], default: private}
-        desc: {type: string}
-        tag: {type: string}
-        cover: {type: string, description: 本人已上传完成的资源 URL，仅限私有工具}
-        mediaUrl: {type: string, description: 本人已上传完成的资源 URL，仅限私有工具}
-        extraInfo: {type: array, items: {type: string}}
-        ratio: {type: string}
+        type: { type: string, enum: [style, motion, nine_grid, effect] }
+        label: { type: string, description: 名称最多 120 字节 }
+        prompt:
+          { type: string, description: 最多 8000 字节，不允许嵌套工具标签 }
+        visibility: { type: string, enum: [private, public], default: private }
+        desc: { type: string }
+        tag: { type: string }
+        cover:
+          { type: string, description: 本人已上传完成的资源 URL，仅限私有工具 }
+        mediaUrl:
+          { type: string, description: 本人已上传完成的资源 URL，仅限私有工具 }
+        extraInfo: { type: array, items: { type: string } }
+        ratio: { type: string }
     ModelRequestIntent:
       type: object
       required: [capability]
@@ -1604,7 +2279,8 @@ components:
             videoGenerateAudio: true
     LogicalModelQuote:
       type: object
-      required: [logicalModelId, billingMode, quantity, amountMicrocredits, estimated]
+      required:
+        [logicalModelId, billingMode, quantity, amountMicrocredits, estimated]
       properties:
         logicalModelId:
           type: string
@@ -1630,7 +2306,19 @@ components:
     VideoTokenEstimate:
       type: object
       description: 仅视频 Token 报价返回；将火山公式用量和平台预留余量分开披露
-      required: [formulaTokens, reservedTokens, outputWidth, outputHeight, framesPerSecond, outputSeconds, referenceSeconds, referenceDurationEstimated, dimensionsEstimated, reservationMarginPercent]
+      required:
+        [
+          formulaTokens,
+          reservedTokens,
+          outputWidth,
+          outputHeight,
+          framesPerSecond,
+          outputSeconds,
+          referenceSeconds,
+          referenceDurationEstimated,
+          dimensionsEstimated,
+          reservationMarginPercent,
+        ]
       properties:
         formulaTokens:
           type: integer
@@ -1711,7 +2399,8 @@ components:
     CloudAgentRequest:
       type: object
       additionalProperties: false
-      required: [canvasId, prompt, permissionMode, contextScope, budget, idempotencyKey]
+      required:
+        [canvasId, prompt, permissionMode, contextScope, budget, idempotencyKey]
       properties:
         canvasId:
           type: string
@@ -1790,7 +2479,22 @@ components:
           properties:
             code:
               type: integer
-              enum: [400, 401, 403, 404, 409, 429, 500, 502, 503, 504, 40301, 40901, 42901]
+              enum:
+                [
+                  400,
+                  401,
+                  403,
+                  404,
+                  409,
+                  429,
+                  500,
+                  502,
+                  503,
+                  504,
+                  40301,
+                  40901,
+                  42901,
+                ]
             data:
               nullable: true
             reason:

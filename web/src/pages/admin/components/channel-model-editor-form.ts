@@ -4,7 +4,7 @@ import { imagePresetForRatio, imageSizePresets } from "@/lib/image-size-presets"
 import { modelProtocolSupportsTokenBilling, type ModelProtocolDefinition } from "@/lib/model-protocols";
 import type { ChannelModel } from "@/services/api/wallet";
 import type { ModelTag } from "@/lib/model-tags";
-import { defaultPriceTier, legacyPriceTierToForm, priceTierToForm, type PriceTierFormValues } from "./channel-model-price-tier-form";
+import { defaultPriceTier, legacyPriceTierToForm, normalizeUpstreamModelKey, priceTierToForm, type PriceTierFormValues } from "./channel-model-price-tier-form";
 
 export type ChannelModelFormValues = {
     modelKey: string;
@@ -31,6 +31,8 @@ export function initialChannelModelValues(item: ChannelModel | null, protocols: 
     const capability = item?.capability || "text";
     const protocol = item ? item.protocol : protocols.find((p) => p.capability === capability && p.enabled !== false)?.value;
     const upstreamModel = item?.providerModelKey || item?.modelKey || "";
+    const capabilityConfig = item?.capabilityConfig;
+    const audioConfig = audioChannelCapabilityConfig(protocol);
     return {
         modelKey: item?.modelKey || "",
         providerModelKey: upstreamModel,
@@ -43,7 +45,19 @@ export function initialChannelModelValues(item: ChannelModel | null, protocols: 
         protocol,
         priceTiers: item ? (item.priceTiers?.length ? item.priceTiers.map(priceTierToForm) : [legacyPriceTierToForm(item)]) : [defaultPriceTier()],
         enabled: item?.enabled ?? true,
-        capabilityConfig: capability === "audio" ? audioChannelCapabilityConfig(protocol) : normalizeModelCapabilityConfig(item?.capabilityConfig || defaultModelCapabilityConfig(protocol, upstreamModel)),
+        capabilityConfig:
+            capability === "audio" ? (audioConfig && capabilityConfig?.audio ? normalizeModelCapabilityConfig(capabilityConfig) : audioConfig) : normalizeModelCapabilityConfig(capabilityConfig || defaultModelCapabilityConfig(protocol, upstreamModel)),
+    };
+}
+
+export function duplicateChannelModelValues(item: ChannelModel, protocols: ModelProtocolDefinition[]): ChannelModelFormValues {
+    const values = initialChannelModelValues(item, protocols);
+    const sourceUpstream = normalizeUpstreamModelKey(item.providerModelKey || item.modelKey);
+    return {
+        ...values,
+        modelKey: "",
+        providerModelKey: "",
+        priceTiers: values.priceTiers.map((tier) => (normalizeUpstreamModelKey(tier.providerModelKey) === sourceUpstream ? { ...tier, providerModelKey: "" } : tier)),
     };
 }
 
@@ -93,7 +107,10 @@ export function audioChannelCapabilityConfig(protocol?: string): ModelCapability
 }
 
 export function channelModelCapabilityConfigForSave(values: ChannelModelFormValues): ModelCapabilityConfig | undefined {
-    if (values.capability === "audio") return audioChannelCapabilityConfig(values.protocol);
+    if (values.capability === "audio") {
+        const defaultAudioConfig = audioChannelCapabilityConfig(values.protocol);
+        return defaultAudioConfig && values.capabilityConfig?.audio ? normalizeModelCapabilityConfig(values.capabilityConfig) : defaultAudioConfig;
+    }
     const upstreamModel = values.providerModelKey?.trim() || values.modelKey.trim();
     return normalizeModelCapabilityConfig(values.capabilityConfig || defaultModelCapabilityConfig(values.protocol, upstreamModel));
 }
