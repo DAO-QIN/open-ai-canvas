@@ -27,8 +27,8 @@ describe("Kacang Suno music", () => {
         expect(audioChannelCapabilityConfig("openai-audio")).toBeUndefined();
     });
 
-    test("persisted Suno audio settings and tags survive editor reopen and resave", () => {
-        const capabilityConfig = { version: 1, audio: { generationType: "music" as const, taskCount: 2, outputCount: 3, streaming: true } };
+    test("valid persisted Suno audio contract and tags survive editor reopen and resave", () => {
+        const capabilityConfig = { version: 1, audio: { generationType: "music" as const, taskCount: 1, outputCount: 2, streaming: false } };
         const modelTags = [{ text: "音乐", color: "green" }];
         const item = {
             modelKey: "suno",

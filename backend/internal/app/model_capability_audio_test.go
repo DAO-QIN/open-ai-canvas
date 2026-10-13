@@ -45,6 +45,36 @@ func TestKacangSunoAdminSavePersistsCapabilitiesDisabledUnpriced(t *testing.T) {
 	if err != nil || len(published) != 1 || published[0].CapabilityConfig == nil {
 		t.Fatalf("music capabilities missing from admin readback: %#v, %v", published, err)
 	}
+	// Reopen the persisted capability contract and save a tag-only edit through
+	// the real service write path; a pure form helper cannot prove API acceptance.
+	tags := []model.ChannelModelTag{{Text: "音乐", Color: "green"}}
+	req := ChannelModelRequest{
+		ModelKey: "suno", ProviderModelKey: "suno", Capability: "audio", Protocol: "kacang-suno", CapabilityConfig: decoded, Enabled: &disabled, Tags: tags,
+		PriceTiers: []ChannelModelPriceTierRequest{{BillingMode: "fixed_request", PriceConfigured: false, Enabled: &disabled}},
+	}
+	if _, err := svc.SaveAdminChannelModel(admin, channel.ID, saved.ID, req); err != nil {
+		t.Fatalf("legal audio contract cannot be resaved: %v", err)
+	}
+	resaved, err := svc.repo.ChannelModelByID(channel.ID, saved.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resaved.CapabilityConfigJSON != stored.CapabilityConfigJSON || !reflect.DeepEqual(resaved.Tags, tags) || resaved.Enabled || resaved.PriceConfigured || resaved.UnitPriceMicrocredits != stored.UnitPriceMicrocredits {
+		t.Fatal("tag edit changed audio contract, availability or pricing")
+	}
+	invalid := *decoded.Audio
+	invalid.TaskCount = 2
+	req.CapabilityConfig = &ModelCapabilityConfig{Version: 1, Audio: &invalid}
+	if _, err := svc.SaveAdminChannelModel(admin, channel.ID, saved.ID, req); err == nil {
+		t.Fatal("unsupported Suno settings were accepted by the save API")
+	}
+	afterRejectedSave, err := svc.repo.ChannelModelByID(channel.ID, saved.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(resaved, afterRejectedSave) {
+		t.Fatal("rejected audio contract modified the persisted model")
+	}
 }
 
 func TestKacangSunoStoresTwoTracksWithoutDuplicatePrimary(t *testing.T) {
