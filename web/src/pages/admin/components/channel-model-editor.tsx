@@ -14,7 +14,7 @@ import type { ModelChannel } from "@/stores/use-config-store";
 import { defaultPriceTier, normalizeUpstreamModelKey, priceTierPayloadFromForm } from "./channel-model-price-tier-form";
 import { PriceTierFields } from "./channel-model-price-tier-fields";
 import { ChannelModelTagsEditor } from "./channel-model-tags-editor";
-import { channelModelCapabilityConfigForSave, changeChannelModelCapability, changeChannelModelProtocol, editorSectionForField, initialChannelModelValues, updateChannelModelUpstreamCapabilities, validateChannelModelPrices, validateChannelModelProtocol, type ChannelModelFormValues as FormValues, type EditorSection } from "./channel-model-editor-form";
+import { channelModelCapabilityConfigForSave, changeChannelModelCapability, changeChannelModelProtocol, editorSectionForField, initialChannelModelValues, replaceChannelModelFormValues, updateChannelModelUpstreamCapabilities, validateChannelModelPrices, validateChannelModelProtocol, type ChannelModelFormValues as FormValues, type EditorSection } from "./channel-model-editor-form";
 
 export function ChannelModelEditor({
     channel,
@@ -76,10 +76,10 @@ export function ChannelModelEditor({
     const handleFormValuesChange = (changed: Partial<FormValues>) => {
         dirtyRef.current = true;
         if (changed.capability) {
-            form.setFieldsValue(changeChannelModelCapability(form.getFieldsValue(true), protocols));
+            replaceChannelModelFormValues(form, changeChannelModelCapability(form.getFieldsValue(true), protocols));
             setConfigurationChanged(true);
         } else if (changed.protocol) {
-            form.setFieldsValue(changeChannelModelProtocol(form.getFieldsValue(true), changed.protocol, protocols));
+            replaceChannelModelFormValues(form, changeChannelModelProtocol(form.getFieldsValue(true), changed.protocol, protocols));
             setConfigurationChanged(true);
         } else if (changed.providerModelKey !== undefined || changed.modelKey !== undefined) {
             const values = form.getFieldsValue(true);

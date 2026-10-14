@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { FormStore } from "@rc-component/form/lib/hooks/useForm";
 import { defaultModelCapabilityConfig, normalizeModelCapabilityConfig, normalizeVideoValue, videoDurationOptions } from "../src/lib/model-capabilities";
-import { changeChannelModelProtocol, channelModelCapabilityConfigForSave, initialChannelModelValues } from "../src/pages/admin/components/channel-model-editor-form";
+import { changeChannelModelProtocol, channelModelCapabilityConfigForSave, initialChannelModelValues, replaceChannelModelFormValues } from "../src/pages/admin/components/channel-model-editor-form";
 import type { ModelProtocolDefinition } from "../src/lib/model-protocols";
 
 const definitions: ModelProtocolDefinition[] = ["rolldek-gemini-omni-video", "rolldek-veo-fast-video", "rolldek-wan-video"].map((value) => ({
@@ -14,6 +15,28 @@ const definitions: ModelProtocolDefinition[] = ["rolldek-gemini-omni-video", "ro
 }));
 
 describe("RollDek Gemini and Veo defaults", () => {
+    test("the real form store removes omitted Gemini fields when switching protocols", () => {
+        const form = new FormStore(() => {}).getForm();
+        const values = initialChannelModelValues(null, definitions);
+        values.capability = "video";
+        values.modelKey = "gemini-omni-1.1-flash";
+        values.enabled = false;
+        values.priceTiers[0].unitPrice = 23;
+        const omni = changeChannelModelProtocol(values, "rolldek-gemini-omni-video", definitions);
+        form.setFieldsValue(omni);
+        const fast = changeChannelModelProtocol(omni, "rolldek-veo-fast-video", definitions);
+        form.setFieldsValue(fast);
+        expect(form.getFieldValue(["capabilityConfig", "video", "references", "maxReferenceImages"])).toBe(1);
+        replaceChannelModelFormValues(form, fast);
+        expect(form.getFieldValue(["capabilityConfig", "video", "references", "maxReferenceImages"])).toBeUndefined();
+        expect(form.getFieldValue("capabilityConfig").video.references.maxImages).toBe(0);
+        expect(form.getFieldValue("enabled")).toBe(false);
+        expect(form.getFieldValue("priceTiers")[0].unitPrice).toBe(23);
+        replaceChannelModelFormValues(form, changeChannelModelProtocol(fast, "rolldek-gemini-omni-video", definitions));
+        expect(form.getFieldValue("capabilityConfig").video.references).toMatchObject({ maxImages: 3, maxReferenceImages: 1 });
+        replaceChannelModelFormValues(form, changeChannelModelProtocol(omni, "rolldek-wan-video", definitions));
+        expect(form.getFieldValue("capabilityConfig").video.references.maxReferenceImages).toBeUndefined();
+    });
     test("selection replaces stale WAN values, saves and reopens without changing prices", () => {
         const before = initialChannelModelValues(null, definitions);
         before.modelKey = "gemini-omni-1.1-flash";

@@ -1,4 +1,5 @@
 import type { ModelCapabilityChoice } from "@/components/model-protocol-picker";
+import type { FormInstance } from "antd";
 import { defaultAudioCapabilityConfig, defaultModelCapabilityConfig, normalizeLegacyImageResolutionConfig, normalizeModelCapabilityConfig, type ModelCapabilityConfig } from "@/lib/model-capabilities";
 import { imagePresetForRatio, imageSizePresets } from "@/lib/image-size-presets";
 import { modelProtocolSupportsTokenBilling, type ModelProtocolDefinition } from "@/lib/model-protocols";
@@ -23,6 +24,13 @@ export type ChannelModelFormValues = {
 };
 
 export type EditorSection = "identity" | "capabilities" | "pricing";
+
+export function replaceChannelModelFormValues(form: Pick<FormInstance<ChannelModelFormValues>, "setFieldsValue" | "setFieldValue">, values: ChannelModelFormValues) {
+    const { capabilityConfig, ...fields } = values;
+    form.setFieldsValue(fields);
+    // setFieldsValue deep-merges objects and otherwise retains omitted protocol fields.
+    form.setFieldValue("capabilityConfig", capabilityConfig);
+}
 
 export function editorSectionForField(name: (string | number)[]): EditorSection {
     return name[0] === "priceTiers" ? "pricing" : name[0] === "capabilityConfig" ? "capabilities" : "identity";
