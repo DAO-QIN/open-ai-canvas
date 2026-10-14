@@ -64,19 +64,20 @@ for provider, model, label, durations, ratios in [
             "last_frame_url": {"$first": urls(last)},
             "videos": omit(urls({"$sortByOrder": ref("request.videos")})),
             "audios": omit(urls({"$sortByOrder": ref("request.audios")})),
-            "generateAudio": fallback(ref("request.output.generateAudio"), False),
+            "generateAudio": False,
             "preprocess": omit(ref("request.providerOptions." + provider + ".preprocess")),
             "seed": omit(ref("request.providerOptions." + provider + ".seed")),
         })
         checks.extend([
             ({"$lte": [{"$len": first}, 1]}, "首帧最多一张"),
             ({"$lte": [{"$len": last}, 1]}, "尾帧最多一张"),
+            ({"$eq": [fallback(ref("request.output.generateAudio"), False), False]}, "音轨由上游决定，当前未开放音频生成开关"),
         ])
         parameters.extend([
             ("images", "media[]", False, "images/first_frame_url/last_frame_url", "普通图片保序，首尾帧使用独立字段，不在 images 中重复。数量取后台能力配置。"),
             ("videos", "media[]", False, "videos", "HTTPS 视频地址数组；默认最多一项，后台可调整。"),
             ("audios", "media[]", False, "audios", "HTTPS 音频地址数组；默认最多一项，后台可调整。"),
-            ("generateAudio", "boolean", False, "generateAudio", "生成音频开关，默认 false；与输入参考音频 audios 分开。"),
+            ("generateAudio", "boolean", False, "generateAudio=false", "固定发送 false；实测仍返回有声音轨，暂不提供可控开关，与输入参考音频 audios 分开。"),
             ("providerOptions." + provider + ".preprocess", "boolean", False, "preprocess", "可选人脸预处理开关，显式 false 保留。"),
             ("providerOptions." + provider + ".seed", "integer", False, "seed", "可选随机种子，显式 0 保留。"),
         ])
@@ -127,10 +128,12 @@ readme = """# RollDek Gemini Omni 与 Veo Fast 视频
 
 | 协议 | 精确模型 | 默认配置 |
 | --- | --- | --- |
-| rolldek-gemini-omni-video | gemini-omni-1.1-flash | 4 秒，720p，16:9，单条，生成音频关闭 |
+| rolldek-gemini-omni-video | gemini-omni-1.1-flash | 4 秒，720p，16:9，单条，音轨由上游决定 |
 | rolldek-veo-fast-video | veo-3.1-fast | 8 秒，720p，16:9，单条，文生视频 |
 
 Gemini 可选 4/6/8/10 秒及 16:9、9:16。平台默认普通参考图 1 张、首帧 1 张、尾帧 1 张，图片合计最多 3 张；视频和音频各 1 项。后台分别调整图片总数、普通参考图及视频/音频数量。未公布的素材字节和时长上限为 0，仍受宿主资源策略约束；提示词 8000 字符是平台默认限制。以上数量是用户选定的平台配置，不代表供应商实际极限。
+
+真实验证中，顶层 `generateAudio:false` 被发送，但供应商返回的 MP4 仍带有声 AAC 音轨。按用户选择暂不提供音频生成开关，不宣称能控制成片静音；参考音频输入继续独立支持。测试原片保留，另行移除音轨得到无声交付副本，视频数据不重新编码；该交付处理不代表在线宿主自动去音轨。
 
 Veo Fast 仅开放供应商文档示例规格；Veo Lite 暂不开放，不沿用 Gemini 的参考素材或时长范围。销售价格、成本与模型启用状态由管理员单独配置。
 
@@ -144,7 +147,7 @@ interface = """# RollDek 视频接口合同
 - 创建 `POST /v1/videos`；查询 `GET /v1/videos/{{taskId}}`；结果 `GET /v1/videos/{{taskId}}/content`。均使用 `originPath=true`，渠道已有 `/v1` 时也只从站点根路径拼接一次。
 - 请求为顶层 JSON：`model`、`prompt`、整数 `duration`、`resolution`、`aspect_ratio`、`n=1`。不发送 WAN 的 `seconds`、`reference_images` 或嵌套 metadata；可选 `size` 与已发送清晰度和比例重复，故省略。
 - Gemini `images`、`videos`、`audios` 是保序 HTTPS 地址数组。`first_frame` / `last_frame` 分别映射 `first_frame_url` / `last_frame_url`，不重复放入 `images`。其他明确图片参考角色映射普通参考图；未知角色拒绝，首尾帧各最多一张。
-- Gemini `generateAudio` 使用驼峰字段，默认显式 false。`providerOptions.rolldek-gemini-omni-video.preprocess` 和 `.seed` 可选；false 和 0 保留，未设置时省略。参考 `audios` 与生成音频开关独立。
+- Gemini `generateAudio` 使用驼峰字段，固定显式 false。实测上游仍返回有声音轨，当前能力配置关闭并隐藏可控音轨开关，音轨由上游决定；输入 `audios` 独立支持。`providerOptions.rolldek-gemini-omni-video.preprocess` 和 `.seed` 可选；false 和 0 保留，未设置时省略。
 - Veo Fast 不发送参考输入、音轨开关、水印或未知字段；拒绝 Lite 及其他模型 ID。只开放文档所证实的 8 秒/720p/16:9。
 - 普通参考图上限为能力配置 `video.references.maxReferenceImages`，图片总数为 `maxImages`，视频/音频上限分别为 `maxVideos` / `maxAudios`，宿主生成前校验。管理员可调整平台数量；插件不把未知供应商极限写死为该默认值。
 

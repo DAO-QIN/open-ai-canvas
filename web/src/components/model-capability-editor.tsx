@@ -63,6 +63,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
     const durationValues = (profile.duration.values || []).join(",");
     const resolutionOptions = Array.from(new Set([...VIDEO_RESOLUTION_CAPABILITY_OPTIONS, ...profile.resolutions]));
     const autoDLSpecFields = <AutoDLScreenSpecFields profile={profile} workflow={workflow} disabled={disabled} onChange={(video) => onChange?.({ version: 1, video })} />;
+    const generateAudioField = protocol === "rolldek-gemini-omni-video" ? <p className="text-[var(--fs-label)] leading-relaxed text-foreground/60">音轨由上游决定，当前不提供音频生成开关。参考音频用于输入。</p> : <BooleanField label="同步音频" value={profile.generateAudio} disabled={disabled} onChange={(generateAudio) => update({ generateAudio })} />;
 
     if (section === "references") {
         return (
@@ -93,7 +94,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                         <NumberField label="最大音频引用" value={profile.references.maxAudios} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxAudios: value || 0 })} />
                         <NumberField label="单个音频上限 MB" value={bytesToMB(profile.references.maxAudioBytes)} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxAudioBytes: mbToBytes(value) })} />
                         <NumberField label="单个音频最长秒数" value={profile.references.maxAudioDurationSeconds} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxAudioDurationSeconds: value || 0 })} />
-                        <BooleanField label="同步音频" value={profile.generateAudio} disabled={disabled} onChange={(generateAudio) => update({ generateAudio })} />
+                        {generateAudioField}
                     </ReferenceCard>
                     <ReferenceCard title="视频引用" description="视频数量、大小与时长限制">
                         <NumberField label="最大视频引用" value={profile.references.maxVideos} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideos: value || 0 })} />
@@ -364,7 +365,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                             <NumberField label="单个音频上限 MB" value={bytesToMB(profile.references.maxAudioBytes)} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxAudioBytes: mbToBytes(value) })} />
                             <NumberField label="单个音频最长秒数" value={profile.references.maxAudioDurationSeconds} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxAudioDurationSeconds: value || 0 })} />
                         </div>
-                        <BooleanField label="同步音频" value={profile.generateAudio} disabled={disabled} onChange={(generateAudio) => update({ generateAudio })} />
+                        {generateAudioField}
                     </CapabilityGroup>
 
                     <CapabilityGroup title="通用限制" description="不属于单一媒体类型的请求与输出约束">

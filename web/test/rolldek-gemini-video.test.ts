@@ -27,7 +27,7 @@ describe("RollDek Gemini and Veo defaults", () => {
         const profile = changed.capabilityConfig!.video!;
         expect(profile.references).toMatchObject({ maxImages: 3, maxReferenceImages: 1, maxVideos: 1, maxAudios: 1, maxImageBytes: 0, maxVideoBytes: 0, maxAudioBytes: 0 });
         expect(videoDurationOptions(profile)).toEqual([4, 6, 8, 10]);
-        expect(profile.generateAudio).toEqual({ supported: true, default: false });
+        expect(profile.generateAudio).toEqual({ supported: false, default: false });
         expect(profile.watermark).toEqual({ supported: false, default: false });
         expect(normalizeVideoValue(profile, { seconds: "5", ratio: "1:1", resolution: "1080p" })).toMatchObject({ seconds: "4", ratio: "16:9", resolution: "720p" });
         profile.references.maxImages = 5;

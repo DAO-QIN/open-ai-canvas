@@ -67,6 +67,7 @@ func TestRollDekGeminiDefaultsAndValidation(t *testing.T) {
 		"bad-ratio":         func(r *GenerationRequest) { r.AspectRatio = "1:1" },
 		"multiple-output":   func(r *GenerationRequest) { r.ImageCount = 2 },
 		"watermark":         func(r *GenerationRequest) { r.Watermark = true },
+		"forced-audio":      func(r *GenerationRequest) { r.GenerateAudio = true },
 		"data-url":          func(r *GenerationRequest) { r.Images = []MediaReference{{DataURL: "data:image/png;base64,AA=="}} },
 		"http-url":          func(r *GenerationRequest) { r.Videos = []MediaReference{{URL: "http://cdn.example/a.mp4"}} },
 		"unknown-role": func(r *GenerationRequest) {

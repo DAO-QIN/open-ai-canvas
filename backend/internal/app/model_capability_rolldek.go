@@ -17,7 +17,6 @@ func rolldekGeminiVideoCapability(profile *VideoCapabilityConfig, protocol strin
 		value.References.MaxVideos, value.References.MaxAudios = 1, 1
 		value.Duration = VideoDurationConfig{Selection: "enum", Values: []int{4, 6, 8, 10}, Default: 4}
 		value.Ratios = []string{"16:9", "9:16"}
-		value.GenerateAudio.Supported = true
 		value.Operations = []string{"text_to_video", "image_to_video", "reference_to_video", "audio_to_video"}
 	}
 	return &value

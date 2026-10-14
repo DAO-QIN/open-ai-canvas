@@ -6,7 +6,7 @@
 - 创建 `POST /v1/videos`；查询 `GET /v1/videos/{{taskId}}`；结果 `GET /v1/videos/{{taskId}}/content`。均使用 `originPath=true`，渠道已有 `/v1` 时也只从站点根路径拼接一次。
 - 请求为顶层 JSON：`model`、`prompt`、整数 `duration`、`resolution`、`aspect_ratio`、`n=1`。不发送 WAN 的 `seconds`、`reference_images` 或嵌套 metadata；可选 `size` 与已发送清晰度和比例重复，故省略。
 - Gemini `images`、`videos`、`audios` 是保序 HTTPS 地址数组。`first_frame` / `last_frame` 分别映射 `first_frame_url` / `last_frame_url`，不重复放入 `images`。其他明确图片参考角色映射普通参考图；未知角色拒绝，首尾帧各最多一张。
-- Gemini `generateAudio` 使用驼峰字段，默认显式 false。`providerOptions.rolldek-gemini-omni-video.preprocess` 和 `.seed` 可选；false 和 0 保留，未设置时省略。参考 `audios` 与生成音频开关独立。
+- Gemini `generateAudio` 使用驼峰字段，固定显式 false。实测上游仍返回有声音轨，当前能力配置关闭并隐藏可控音轨开关，音轨由上游决定；输入 `audios` 独立支持。`providerOptions.rolldek-gemini-omni-video.preprocess` 和 `.seed` 可选；false 和 0 保留，未设置时省略。
 - Veo Fast 不发送参考输入、音轨开关、水印或未知字段；拒绝 Lite 及其他模型 ID。只开放文档所证实的 8 秒/720p/16:9。
 - 普通参考图上限为能力配置 `video.references.maxReferenceImages`，图片总数为 `maxImages`，视频/音频上限分别为 `maxVideos` / `maxAudios`，宿主生成前校验。管理员可调整平台数量；插件不把未知供应商极限写死为该默认值。
 
@@ -32,7 +32,7 @@
 | `images` | media[] | `images/first_frame_url/last_frame_url` | 普通图片保序，首尾帧使用独立字段，不在 images 中重复。数量取后台能力配置。 |
 | `videos` | media[] | `videos` | HTTPS 视频地址数组；默认最多一项，后台可调整。 |
 | `audios` | media[] | `audios` | HTTPS 音频地址数组；默认最多一项，后台可调整。 |
-| `generateAudio` | boolean | `generateAudio` | 生成音频开关，默认 false；与输入参考音频 audios 分开。 |
+| `generateAudio` | boolean | `generateAudio=false` | 固定发送 false；实测仍返回有声音轨，暂不提供可控开关，与输入参考音频 audios 分开。 |
 | `providerOptions.rolldek-gemini-omni-video.preprocess` | boolean | `preprocess` | 可选人脸预处理开关，显式 false 保留。 |
 | `providerOptions.rolldek-gemini-omni-video.seed` | integer | `seed` | 可选随机种子，显式 0 保留。 |
 
@@ -162,8 +162,8 @@
             "name": "generateAudio",
             "type": "boolean",
             "required": false,
-            "mapping": "generateAudio",
-            "description": "生成音频开关，默认 false；与输入参考音频 audios 分开。"
+            "mapping": "generateAudio=false",
+            "description": "固定发送 false；实测仍返回有声音轨，暂不提供可控开关，与输入参考音频 audios 分开。"
           },
           {
             "name": "providerOptions.rolldek-gemini-omni-video.preprocess",
@@ -356,6 +356,22 @@
               ]
             },
             "message": "尾帧最多一张"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.output.generateAudio"
+                    },
+                    false
+                  ]
+                },
+                false
+              ]
+            },
+            "message": "音轨由上游决定，当前未开放音频生成开关"
           },
           {
             "assert": {
@@ -719,14 +735,7 @@
                 }
               }
             },
-            "generateAudio": {
-              "$coalesce": [
-                {
-                  "$ref": "request.output.generateAudio"
-                },
-                false
-              ]
-            },
+            "generateAudio": false,
             "preprocess": {
               "$omitEmpty": {
                 "$ref": "request.providerOptions.rolldek-gemini-omni-video.preprocess"
