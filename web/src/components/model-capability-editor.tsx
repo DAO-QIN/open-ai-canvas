@@ -68,7 +68,7 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
         return (
             <div className="admin-capability-reference-editor">
                 <div className="admin-capability-reference-grid">
-                    <ReferenceCard title="图片引用" description="首帧、参考图与多图输入限制">
+                    <ReferenceCard title="图片引用" description={profile.references.maxReferenceImages !== undefined ? "总数包含首尾帧；普通参考图单独限制" : "首帧、参考图与多图输入限制"}>
                         <NumberField label="最少图片引用" value={profile.references.minImages} min={0} max={profile.references.maxImages} disabled={disabled} onChange={(value) => updateReferences({ minImages: value || 0 })} />
                         <NumberField
                             label="最大图片引用"
@@ -77,9 +77,16 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                             disabled={disabled}
                             onChange={(value) => {
                                 const maxImages = value || 0;
-                                updateReferences({ maxImages, minImages: Math.min(profile.references.minImages, maxImages) });
+                                updateReferences({
+                                    maxImages,
+                                    minImages: Math.min(profile.references.minImages, maxImages),
+                                    ...(profile.references.maxReferenceImages !== undefined ? { maxReferenceImages: Math.min(profile.references.maxReferenceImages, maxImages) } : {}),
+                                });
                             }}
                         />
+                        {profile.references.maxReferenceImages !== undefined ? (
+                            <NumberField label="普通参考图上限（不含首尾帧）" value={profile.references.maxReferenceImages} min={0} max={profile.references.maxImages} disabled={disabled} onChange={(value) => updateReferences({ maxReferenceImages: value || 0 })} />
+                        ) : null}
                         <NumberField label="单张图片上限 MB" value={bytesToMB(profile.references.maxImageBytes)} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxImageBytes: mbToBytes(value) })} />
                     </ReferenceCard>
                     <ReferenceCard title="音频引用" description="音频输入与同步输出限制">
@@ -337,9 +344,16 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                                 disabled={disabled}
                                 onChange={(value) => {
                                     const maxImages = value || 0;
-                                    updateReferences({ maxImages, minImages: Math.min(profile.references.minImages, maxImages) });
+                                    updateReferences({
+                                        maxImages,
+                                        minImages: Math.min(profile.references.minImages, maxImages),
+                                        ...(profile.references.maxReferenceImages !== undefined ? { maxReferenceImages: Math.min(profile.references.maxReferenceImages, maxImages) } : {}),
+                                    });
                                 }}
                             />
+                            {profile.references.maxReferenceImages !== undefined ? (
+                                <NumberField label="普通参考图上限（不含首尾帧）" value={profile.references.maxReferenceImages} min={0} max={profile.references.maxImages} disabled={disabled} onChange={(value) => updateReferences({ maxReferenceImages: value || 0 })} />
+                            ) : null}
                             <NumberField label="单张图片上限 MB" value={bytesToMB(profile.references.maxImageBytes)} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxImageBytes: mbToBytes(value) })} />
                         </div>
                     </CapabilityGroup>

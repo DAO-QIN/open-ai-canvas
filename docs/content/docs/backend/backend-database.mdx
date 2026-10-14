@@ -5,6 +5,10 @@ description: 影策后端核心持久化表与状态边界
 
 # 后端数据库
 
+## 视频普通参考图限制
+
+`channel_models.capability_config_json` 的 `video.references` 新增可选 `maxReferenceImages`，限定不含首尾帧的普通图片数；`maxImages` 仍限制包括首尾帧的总图片数。省略该字段时沿用原总数校验；显式 `0` 表示不接受普通参考图。保存校验要求该值介于 0 和总图片上限之间，生成前按同一素材角色映射计数。此变化只扩展现有 JSON，不新增表或 Schema 迁移。
+
 ## 邀请返利
 
 Schema 50 追加 `promotion_profiles`、`invitations`、`commission_records`、`promotion_transfers` 和 `commission_allocations`；`payment_orders.promotion_snapshot` 保存内部 JSON 快照，`o_auth_states.invite_code` 保存注册流程的邀请码。旧订单快照为空，不回溯返利。

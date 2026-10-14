@@ -5,6 +5,13 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+## RollDek Gemini Omni 与 Veo Fast 视频
+
+- `plugin-packages/rolldek-gemini-video/build.py`：两种精确模型的声明式请求、首尾帧、状态和鉴权结果端点，生成安装包及完整接口文档。
+- `internal/app/model_capability_rolldek.go` 与 `web/src/lib/model-capabilities.ts`：前后端默认规格；`model-capability-editor.tsx` 编辑普通参考图上限。
+- `VideoReferenceConfig.maxReferenceImages` 与 `validateVideoTask`：普通参考图独立计数，首尾帧仍计入总图片数；未配置此可选字段的既有模型沿用原行为。
+- `internal/protocol/rolldek_gemini_video_test.go`、`internal/app/rolldek_gemini_video_test.go`、`web/test/rolldek-gemini-video.test.ts`：包合同、宿主任务恢复/重试、配置保存回读和协议切换验证。
+
 ## 邀请返利
 
 - `internal/promotion`：推广资格、注册绑定、订单快照、返利计算、用户概览及管理员操作。

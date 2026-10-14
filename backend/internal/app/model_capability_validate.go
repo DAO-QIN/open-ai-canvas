@@ -152,6 +152,9 @@ func validateVideoCapabilityConfig(value *VideoCapabilityConfig) error {
 	if value.References.MinImages > value.References.MaxImages {
 		return BadAuthRequest("最少图片引用数不能超过最大图片引用数")
 	}
+	if limit := value.References.MaxReferenceImages; limit != nil && (*limit < 0 || *limit > value.References.MaxImages) {
+		return BadAuthRequest("普通参考图上限必须在 0 与最大图片引用数之间")
+	}
 	if value.References.MaxImageBytes < 0 || value.References.MaxVideoBytes < 0 || value.References.MaxAudioBytes < 0 || value.References.MaxVideoDuration < 0 || value.References.MaxAudioDuration < 0 {
 		return BadAuthRequest("引用素材限制不能小于 0")
 	}
@@ -338,6 +341,18 @@ func validateVideoTask(profile *VideoCapabilityConfig, input canvasGenerationInp
 	}
 	if len(input.ReferenceImages) > profile.References.MaxImages || len(input.ReferenceVideos) > profile.References.MaxVideos || len(input.ReferenceAudios) > profile.References.MaxAudios {
 		return newModelCapabilityArgumentError("referenceNodeIds", "item_count", BadAuthRequest("参考素材数量超过当前模型限制"))
+	}
+	if limit := profile.References.MaxReferenceImages; limit != nil {
+		input.VideoCapability = profile
+		ordinaryImages := 0
+		for _, image := range protocolVideoImageReferences(input) {
+			if image.Role != "first_frame" && image.Role != "last_frame" {
+				ordinaryImages++
+			}
+		}
+		if ordinaryImages > *limit {
+			return newModelCapabilityArgumentError("referenceNodeIds", "item_count", BadAuthRequest(fmt.Sprintf("普通参考图最多支持 %d 张（不含首尾帧）", *limit)))
+		}
 	}
 	if model.IsVolcengineArkVideoProtocol(model.ChannelInterfaceType(input.Config.InterfaceType)) && len(input.ReferenceAudios) > 0 && len(input.ReferenceImages) == 0 && len(input.ReferenceVideos) == 0 {
 		return newModelCapabilityArgumentError("referenceNodeIds", "invalid_combination", BadAuthRequest("火山方舟全模态参考不支持纯音频或文本+音频，请同时添加参考图片或参考视频"))

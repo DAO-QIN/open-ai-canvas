@@ -42,16 +42,23 @@ export type ModelCapabilityConfig = {
 };
 
 export type AudioCapabilityConfig = {
-    generationType: "music" | "speech"; taskCount: number; outputCount: number; streaming: boolean;
+    generationType: "music" | "speech";
+    taskCount: number;
+    outputCount: number;
+    streaming: boolean;
     speech?: { voices: string[]; defaultVoice: string; defaultInstructions: string; outputFormat: string; sampleRate: number; channels: number; inputMaxTokens: number; outputMaxTokens: number };
 };
 
 export function defaultAudioCapabilityConfig(protocol?: ModelProtocol): AudioCapabilityConfig | undefined {
     if (protocol === "kacang-suno") return { generationType: "music", taskCount: 1, outputCount: 2, streaming: false };
-    if (protocol === "kacang-gemini-tts") return {
-        generationType: "speech", taskCount: 1, outputCount: 1, streaming: false,
-        speech: { voices: [...geminiAudioVoices], defaultVoice: geminiDefaultAudioVoice, defaultInstructions: geminiDefaultAudioInstructions, outputFormat: "wav", sampleRate: 24000, channels: 1, inputMaxTokens: 8192, outputMaxTokens: 16384 },
-    };
+    if (protocol === "kacang-gemini-tts")
+        return {
+            generationType: "speech",
+            taskCount: 1,
+            outputCount: 1,
+            streaming: false,
+            speech: { voices: [...geminiAudioVoices], defaultVoice: geminiDefaultAudioVoice, defaultInstructions: geminiDefaultAudioInstructions, outputFormat: "wav", sampleRate: 24000, channels: 1, inputMaxTokens: 8192, outputMaxTokens: 16384 },
+        };
     return undefined;
 }
 
@@ -119,6 +126,7 @@ export type VideoCapabilityConfig = {
         promptMaxChars: number;
         minImages: number;
         maxImages: number;
+        maxReferenceImages?: number;
         maxImageBytes: number;
         maxVideos: number;
         maxVideoBytes: number;
@@ -541,7 +549,18 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         const gemini = protocol === "kacang-gemini-omni-video";
         const grok = protocol === "kacang-grok-video-15";
         const variant = protocol === "kacang-grok-video-15-fast" || protocol === "kacang-grok-video-15-route8";
-        video.references = { promptMaxChars: DEFAULT_VIDEO_PROMPT_MAX_CHARS, minImages: 0, maxImages: gemini ? 4 : grok ? 14 : variant ? 7 : 1, maxImageBytes: 0, maxVideos: gemini ? 1 : 0, maxVideoBytes: 0, maxVideoDurationSeconds: 0, maxAudios: 0, maxAudioBytes: 0, maxAudioDurationSeconds: 0 };
+        video.references = {
+            promptMaxChars: DEFAULT_VIDEO_PROMPT_MAX_CHARS,
+            minImages: 0,
+            maxImages: gemini ? 4 : grok ? 14 : variant ? 7 : 1,
+            maxImageBytes: 0,
+            maxVideos: gemini ? 1 : 0,
+            maxVideoBytes: 0,
+            maxVideoDurationSeconds: 0,
+            maxAudios: 0,
+            maxAudioBytes: 0,
+            maxAudioDurationSeconds: 0,
+        };
         video.duration = { selection: "range", min: gemini ? 3 : grok || variant ? 4 : 1, max: gemini ? 10 : 15, step: 1, default: gemini ? 3 : grok ? 8 : variant ? 6 : 5 };
         video.ratios = grok ? ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"] : variant ? ["16:9", "9:16", "1:1", "4:3", "3:4"] : ["16:9", "9:16"];
         video.defaultRatio = "16:9";
@@ -550,6 +569,31 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.generateAudio = { supported: false, default: false };
         video.watermark = { supported: false, default: false };
         video.operations = ["text_to_video", "image_to_video", ...(gemini || grok || variant ? ["reference_to_video"] : [])];
+        video.defaultOperation = "text_to_video";
+    }
+    if (protocol === "rolldek-gemini-omni-video" || protocol === "rolldek-veo-fast-video") {
+        const omni = protocol === "rolldek-gemini-omni-video";
+        video.references = {
+            promptMaxChars: DEFAULT_VIDEO_PROMPT_MAX_CHARS,
+            minImages: 0,
+            maxImages: omni ? 3 : 0,
+            ...(omni ? { maxReferenceImages: 1 } : {}),
+            maxImageBytes: 0,
+            maxVideos: omni ? 1 : 0,
+            maxVideoBytes: 0,
+            maxVideoDurationSeconds: 0,
+            maxAudios: omni ? 1 : 0,
+            maxAudioBytes: 0,
+            maxAudioDurationSeconds: 0,
+        };
+        video.duration = { selection: "enum", values: omni ? [4, 6, 8, 10] : [8], default: omni ? 4 : 8 };
+        video.ratios = omni ? ["16:9", "9:16"] : ["16:9"];
+        video.defaultRatio = "16:9";
+        video.resolutions = ["720p"];
+        video.defaultResolution = "720p";
+        video.generateAudio = { supported: omni, default: false };
+        video.watermark = { supported: false, default: false };
+        video.operations = omni ? ["text_to_video", "image_to_video", "reference_to_video", "audio_to_video"] : ["text_to_video"];
         video.defaultOperation = "text_to_video";
     }
     return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video, audio: defaultAudioCapabilityConfig(protocol) };

@@ -508,7 +508,10 @@ func videoImageRoleOrDefault(input canvasGenerationInput, image providerMedia, f
 	if image.Role == "first_frame" || image.Role == "last_frame" {
 		return image.Role
 	}
-	if metadataString(input.Metadata, "videoEditOperation") == "reference_to_video" {
+	// A separate ordinary-image limit declares a profile that can mix explicitly
+	// selected frames with references. Legacy reference-only profiles keep their roles.
+	mixedFrames := input.VideoCapability != nil && input.VideoCapability.References.MaxReferenceImages != nil
+	if metadataString(input.Metadata, "videoEditOperation") == "reference_to_video" && !mixedFrames {
 		return "reference_image"
 	}
 	if id := metadataString(input.Metadata, "videoStartFrameNodeId"); id != "" && image.ID == id {
@@ -516,6 +519,9 @@ func videoImageRoleOrDefault(input canvasGenerationInput, image providerMedia, f
 	}
 	if id := metadataString(input.Metadata, "videoEndFrameNodeId"); id != "" && image.ID == id {
 		return "last_frame"
+	}
+	if metadataString(input.Metadata, "videoEditOperation") == "reference_to_video" {
+		return "reference_image"
 	}
 	return fallback
 }
