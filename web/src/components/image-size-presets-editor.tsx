@@ -124,7 +124,11 @@ export function ImageSizePresetsEditor({
                             </header>
                         ) : null}
                         <div className="image-size-preset-body">
-                            {items.some((item) => !item.width || !item.height || !item.size) ? <p role="alert" className="image-size-error">请填写所选比例的宽度和高度，完成像素尺寸配置后再保存。</p> : null}
+                            {items.some((item) => !item.width || !item.height || !item.size) ? (
+                                <p role="alert" className="image-size-error">
+                                    请填写所选比例的宽度和高度，完成像素尺寸配置后再保存。
+                                </p>
+                            ) : null}
                             {imageResolutionUsesQuality(profile) && !imageTierAvailable(profile, tier) ? <p className="image-size-hint">需先配置此档位对应的质量值，用户端才会开放。</p> : null}
                             <div className="image-size-preset-options" role="group" aria-label={grouped ? `${tier.toUpperCase()} 支持的宽高比` : "支持的宽高比"}>
                                 {ratios.map((ratio) => {
