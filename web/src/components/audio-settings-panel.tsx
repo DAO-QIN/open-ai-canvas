@@ -69,30 +69,42 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
                     </legend>
                     <Radio.Group aria-label="音频格式" value={format} options={formats} onChange={(event) => onConfigChange("audioFormat", event.target.value)} className="flex flex-wrap gap-2" />
                 </fieldset>
-                {!geminiTTS && <fieldset className="space-y-2">
-                    <legend className="mb-2 text-xs" style={{ color: theme.node.muted }}>
-                        语速
-                    </legend>
-                    <Radio.Group aria-label="常用语速" value={speed} options={["0.75", "1", "1.25", "1.5"].map((value) => ({ value, label: audioSpeedLabel(value) }))} onChange={(event) => onConfigChange("audioSpeed", event.target.value)} />
-                    <InputNumber
-                        aria-label="自定义语速"
-                        min={0.25}
-                        max={4}
-                        step={0.05}
-                        value={Number(speed)}
-                        className="w-full"
-                        onChange={(value) => {
-                            if (value !== null) onConfigChange("audioSpeed", normalizeAudioSpeedValue(String(value)));
-                        }}
-                    />
-                </fieldset>}
+                {!geminiTTS && (
+                    <fieldset className="space-y-2">
+                        <legend className="mb-2 text-xs" style={{ color: theme.node.muted }}>
+                            语速
+                        </legend>
+                        <Radio.Group aria-label="常用语速" value={speed} options={["0.75", "1", "1.25", "1.5"].map((value) => ({ value, label: audioSpeedLabel(value) }))} onChange={(event) => onConfigChange("audioSpeed", event.target.value)} />
+                        <InputNumber
+                            aria-label="自定义语速"
+                            min={0.25}
+                            max={4}
+                            step={0.05}
+                            value={Number(speed)}
+                            className="w-full"
+                            onChange={(value) => {
+                                if (value !== null) onConfigChange("audioSpeed", normalizeAudioSpeedValue(String(value)));
+                            }}
+                        />
+                    </fieldset>
+                )}
                 {!streaming ? (
                     <label className="flex flex-col gap-2 text-xs" style={{ color: theme.node.muted }}>
                         声音指令
-                        <Input.TextArea aria-label="声音指令" rows={3} value={config.audioInstructions || ""} placeholder={geminiTTS ? geminiDefaultAudioInstructions : "例如：自然、温暖的旁白"} onChange={(event) => onConfigChange("audioInstructions", event.target.value)} />
+                        <Input.TextArea
+                            aria-label="声音指令"
+                            rows={3}
+                            value={config.audioInstructions || ""}
+                            placeholder={geminiTTS ? geminiDefaultAudioInstructions : "例如：自然、温暖的旁白"}
+                            onChange={(event) => onConfigChange("audioInstructions", event.target.value)}
+                        />
                     </label>
                 ) : null}
-                {geminiTTS && <p className="text-xs leading-5" style={{ color: theme.node.muted }}>朗读提示词中的原文；在声音指令中描述语气、节奏和音量。默认自然、友好、清晰，输出 24kHz 单声道 WAV。</p>}
+                {geminiTTS && (
+                    <p className="text-xs leading-5" style={{ color: theme.node.muted }}>
+                        朗读提示词中的原文；在声音指令中描述语气、节奏和音量。默认自然、友好、清晰，输出 24kHz 单声道 WAV。
+                    </p>
+                )}
             </section>
         </ImageSettingsTheme>
     );

@@ -36,7 +36,9 @@ export function initialChannelModelValues(item: ChannelModel | null, protocols: 
     const audioConfig = audioChannelCapabilityConfig(protocol);
     let capabilityConfig =
         capability === "audio"
-            ? (audioConfig && rawCapabilityConfig?.audio ? normalizeModelCapabilityConfig(rawCapabilityConfig) : audioConfig)
+            ? audioConfig && rawCapabilityConfig?.audio
+                ? normalizeModelCapabilityConfig(rawCapabilityConfig)
+                : audioConfig
             : (() => {
                   const normalized = normalizeModelCapabilityConfig(rawCapabilityConfig);
                   return normalized.image ? { ...normalized, image: normalizeLegacyImageResolutionConfig(protocol, normalized.image) } : normalized;
@@ -75,29 +77,38 @@ export function changeChannelModelCapability(values: ChannelModelFormValues, pro
     const capability = values.capability;
     const protocol = protocols.find((p) => p.value === values.protocol && p.capability === capability && p.enabled !== false)?.value || protocols.find((p) => p.capability === capability && p.enabled !== false)?.value;
     const capabilityConfig = capability === "audio" ? audioChannelCapabilityConfig(protocol) : defaultModelCapabilityConfig(protocol, values.providerModelKey?.trim() || values.modelKey.trim());
-    if (capabilityConfig?.image && protocols.find((p) => p.value === protocol)?.imageParameters) { capabilityConfig.image.parameters = []; capabilityConfig.image.size.presets = undefined; }
-    return updateChannelModelUpstreamCapabilities({
-        ...values,
-        protocol,
-        capabilityConfig,
-        priceTiers: values.priceTiers.map((tier) => ({
-            ...tier,
-            operation: "*",
-            imageSelector: {},
-            imageResolution: "*",
-            quality: "*",
-            size: "*",
-            resolution: "*",
-            videoSeconds: 0,
-            videoGenerateAudio: "*",
-            imageCount: 0,
-        })),
-    }, protocols);
+    if (capabilityConfig?.image && protocols.find((p) => p.value === protocol)?.imageParameters) {
+        capabilityConfig.image.parameters = [];
+        capabilityConfig.image.size.presets = undefined;
+    }
+    return updateChannelModelUpstreamCapabilities(
+        {
+            ...values,
+            protocol,
+            capabilityConfig,
+            priceTiers: values.priceTiers.map((tier) => ({
+                ...tier,
+                operation: "*",
+                imageSelector: {},
+                imageResolution: "*",
+                quality: "*",
+                size: "*",
+                resolution: "*",
+                videoSeconds: 0,
+                videoGenerateAudio: "*",
+                imageCount: 0,
+            })),
+        },
+        protocols,
+    );
 }
 
 export function changeChannelModelProtocol(values: ChannelModelFormValues, protocol: string, protocols: ModelProtocolDefinition[] = []): ChannelModelFormValues {
     const capabilityConfig = values.capability === "audio" ? audioChannelCapabilityConfig(protocol) : defaultModelCapabilityConfig(protocol, values.providerModelKey?.trim() || values.modelKey.trim());
-    if (capabilityConfig?.image && protocols.find((p) => p.value === protocol)?.imageParameters) { capabilityConfig.image.parameters = []; capabilityConfig.image.size.presets = undefined; }
+    if (capabilityConfig?.image && protocols.find((p) => p.value === protocol)?.imageParameters) {
+        capabilityConfig.image.parameters = [];
+        capabilityConfig.image.size.presets = undefined;
+    }
     const next: ChannelModelFormValues = {
         ...values,
         protocol,
@@ -176,7 +187,8 @@ export function validateChannelModelPrices(values: Pick<ChannelModelFormValues, 
             if (tier.operation && tier.operation !== "*" && !operations[capability]?.includes(tier.operation)) fail("生成方式与模型能力不匹配");
             const specific = (value: string | undefined) => Boolean(value && value !== "*");
             const image = values.capabilityConfig?.image;
-            const imageCondition = Object.values(tier.imageSelector || {}).some(specific) ||
+            const imageCondition =
+                Object.values(tier.imageSelector || {}).some(specific) ||
                 (image?.resolution.supported !== false && specific(tier.imageResolution)) ||
                 (image?.quality.supported !== false && specific(tier.quality)) ||
                 specific(tier.resolution) ||
