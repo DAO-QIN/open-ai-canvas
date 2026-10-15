@@ -14,6 +14,7 @@ import { setMediaBlob } from "@/services/file-storage";
 import { setImageBlob } from "@/services/image-storage";
 import { CanvasFolderCard } from "@/components/canvas/canvas-folder-card";
 import { CanvasHistoryDrawer } from "@/components/canvas/canvas-history-drawer";
+import { CanvasSyncRecovery } from "@/components/canvas/canvas-sync-recovery";
 import type { CanvasExportFile } from "@/types/canvas-export";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 import { flushCanvasStorePersistence, useCanvasStore } from "@/stores/canvas/use-canvas-store";
@@ -143,7 +144,7 @@ export default function CanvasPage() {
         try {
             for (const id of selectedIds) await loadCanvasProjectForEditing(id);
             selectedIds.forEach((id) => updateProject(id, { projectId }));
-            await saveRemoteUserDataNow();
+            await saveRemoteUserDataNow(selectedIds);
             message.success(projectId ? "已加入项目" : "已移出项目，画布仍保留");
             setAssociationOpen(false);
         } catch (error) {
@@ -415,6 +416,7 @@ export default function CanvasPage() {
                     meta={<span className="app-projects-header-meta">{totalProjects} 个</span>}
                     actions={
                         <div className="collection-header-actions">
+                            <CanvasSyncRecovery />
                             <Button type="primary" disabled={!hydrated} icon={<Plus />} onClick={createAndEnter}>
                                 新建画布
                             </Button>

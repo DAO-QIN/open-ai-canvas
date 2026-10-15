@@ -1,5 +1,7 @@
 import { CloudCheck, CloudOff, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Popover } from "antd";
+import { CanvasSyncRecovery } from "@/components/canvas/canvas-sync-recovery";
 import { useSyncProgressStore } from "@/stores/use-sync-progress-store";
 import "./canvas-sync-status.css";
 
@@ -30,8 +32,18 @@ export function CanvasSyncStatus({ projectId }: { projectId: string }) {
     const label = cloudError ? "云端暂未同步" : localError ? "本地暂未保存" : saving ? "正在同步画布" : phase === "done" ? "已同步" : localPhase === "saved" ? "已保存" : "尚未同步";
 
     return (
-        <span className={`canvas-sync-status-trigger canvas-sync-status-trigger--${tone} inline-flex size-8 items-center justify-center rounded-full`} aria-label={label} role="status" data-canvas-no-zoom>
-            {showErrorIcon ? <CloudOff className="size-4" /> : saving || cloudError || localError ? <LoaderCircle className={`size-4 ${statusIconClass || ""}`} /> : <CloudCheck className="size-4" />}
-        </span>
+        <Popover
+            trigger={["click"]}
+            content={
+                <div className="max-w-80 space-y-2">
+                    <p>{progress?.message || label}</p>
+                    {cloudError ? <CanvasSyncRecovery projectId={projectId} /> : null}
+                </div>
+            }
+        >
+            <button type="button" className={`canvas-sync-status-trigger canvas-sync-status-trigger--${tone} inline-flex size-8 items-center justify-center rounded-full`} aria-label={label} data-canvas-no-zoom>
+                {showErrorIcon ? <CloudOff className="size-4" /> : saving || cloudError || localError ? <LoaderCircle className={`size-4 ${statusIconClass || ""}`} /> : <CloudCheck className="size-4" />}
+            </button>
+        </Popover>
     );
 }

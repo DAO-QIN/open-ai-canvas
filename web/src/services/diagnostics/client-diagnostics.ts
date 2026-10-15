@@ -20,6 +20,9 @@ export type ClientDiagnosticEvent = {
     taskId?: string;
     projectId?: string;
     canvasId?: string;
+    assetId?: string;
+    syncStage?: "canvas" | "asset" | "project";
+    operationFields?: string[];
     nodes_before?: number;
     nodes_after?: number;
     stack?: string;
@@ -135,6 +138,9 @@ export function recordDiagnosticEvent(input: DiagnosticEventInput) {
         taskId: safeDiagnosticId(input.taskId),
         projectId: safeDiagnosticId(input.projectId),
         canvasId: safeDiagnosticId(input.canvasId),
+        assetId: safeDiagnosticId(input.assetId),
+        syncStage: input.syncStage,
+        operationFields: input.operationFields?.slice(0, 30).filter((field) => /^[A-Za-z][A-Za-z0-9_.]*$/.test(field)).map((field) => field.slice(0, 120)),
         nodes_before: input.nodes_before === undefined ? undefined : clampNumber(input.nodes_before, 0, 10_000_000),
         nodes_after: input.nodes_after === undefined ? undefined : clampNumber(input.nodes_after, 0, 10_000_000),
         stack: redactClientText(input.stack, 4000),

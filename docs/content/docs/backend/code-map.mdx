@@ -5,6 +5,15 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+## 画布同步、冲突恢复与浏览器迁移
+
+- `web/src/services/user-data-sync.ts`：按画布和素材保存、账号会话与跨页面 journal 互斥、明确拒绝后的重放恢复、失效队列暂停。
+- `web/src/lib/canvas/canvas-mutation-recovery.ts`：基于历史快照的三方合并与同一生成任务的终态校准。
+- `web/src/services/canvas-sync-drafts.ts`、`web/src/components/canvas/canvas-sync-recovery.tsx`：账号隔离的草稿保存、导出、恢复副本、安全重试和采用云端版本。
+- `web/src/services/project-asset-sync.ts`、`web/src/services/generation-media-download.ts`：多输出素材身份、媒体下载校验、坏缓存重取与项目关联确认。
+- `web/src/services/browser-storage-migration.ts`：启动前统一 `yingce` 存储命名，保留旧库与原请求，支持写入失败后继续迁移。
+- `web/test/canvas-sync-recovery.test.ts`、`web/test/browser-storage-driver.test.ts`：同步回归与 localforage IndexedDB 驱动迁移验证。
+
 ## 爱困 omni-flash 视频
 
 - `plugin-packages/yunfei-omni-video/build.py`：JSON 请求、素材角色与互斥校验、任务状态及成片 URL 解析，生成标准安装包和完整嵌入文档。

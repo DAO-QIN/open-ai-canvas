@@ -25,7 +25,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ASSET_CATEGORY_OPTIONS } from "@/lib/asset-category";
 import { downloadBrowserMedia } from "@/services/browser-download";
 import { flushAssetStorePersistence, useAssetStore, type AssetCategory, type AssetKind, type ImageAsset } from "@/stores/use-asset-store";
-import { loadAssetLibraryPage, loadAssetsForUse, saveRemoteUserDataNow, localSavedRemotePendingMessage, deleteAssetsWithRemoteSync, deleteAssetWithRemoteSync } from "@/services/user-data-sync";
+import { loadAssetLibraryPage, loadAssetsForUse, saveRemoteAssetsNow, localSavedRemotePendingMessage, deleteAssetsWithRemoteSync, deleteAssetWithRemoteSync } from "@/services/user-data-sync";
 import { useUserStore } from "@/stores/use-user-store";
 import { createAssetFolder, deleteAssetFolder, listAssetFolders, updateAssetFolder, type AssetFolder, moveRemoteAssetsToFolder } from "@/services/api/user-data";
 import { assetCountMap, assetSearchText, readAssetGridDensity, assetKindIcons } from "./asset-library-format";
@@ -339,21 +339,22 @@ export default function AssetsPage() {
             metadata: editingAsset?.metadata || { source: "manual" },
         };
 
+        let savedAssetId: string;
         if (values.kind === "text") {
             const asset = { ...base, kind: "text" as const, data: { content: (values.content || "").trim() } };
-            editingAsset ? updateAsset(editingAsset.id, asset) : addAsset(asset);
+            if (editingAsset) { updateAsset(editingAsset.id, asset); savedAssetId = editingAsset.id; } else savedAssetId = addAsset(asset);
         } else {
             if (!imageData) {
                 message.error("请选择图片文件");
                 return;
             }
             const asset = { ...base, kind: "image" as const, data: imageData };
-            editingAsset ? updateAsset(editingAsset.id, asset) : addAsset(asset);
+            if (editingAsset) { updateAsset(editingAsset.id, asset); savedAssetId = editingAsset.id; } else savedAssetId = addAsset(asset);
         }
 
         await flushAssetStorePersistence();
         try {
-            await saveRemoteUserDataNow();
+            await saveRemoteAssetsNow([savedAssetId]);
             await invalidateAssetLibrary();
             message.success(editingAsset ? "素材已更新" : "素材已保存");
         } catch (error) {
@@ -449,7 +450,7 @@ export default function AssetsPage() {
             await ensureAssetsInStore([asset.id]);
             updateAsset(asset.id, { status: "confirmed" });
             await flushAssetStorePersistence();
-            await saveRemoteUserDataNow();
+            await saveRemoteAssetsNow([asset.id]);
             message.success(`已还原素材「${asset.title}」`);
         } catch (error) {
             message.warning(localSavedRemotePendingMessage("已在本地还原", error));
@@ -464,7 +465,7 @@ export default function AssetsPage() {
             const count = selectedIds.length;
             setSelectedIds([]);
             await flushAssetStorePersistence();
-            await saveRemoteUserDataNow();
+            await saveRemoteAssetsNow(selectedIds);
             message.success(`已还原 ${count} 个素材`);
         } catch (error) {
             message.warning(localSavedRemotePendingMessage("已在本地还原", error));
@@ -476,7 +477,7 @@ export default function AssetsPage() {
             await ensureAssetsInStore([asset.id]);
             updateAsset(asset.id, { status: "archived" });
             await flushAssetStorePersistence();
-            await saveRemoteUserDataNow();
+            await saveRemoteAssetsNow([asset.id]);
             message.success(`已将「${asset.title}」移入回收站`);
         } catch (error) {
             message.warning(localSavedRemotePendingMessage("已移入回收站", error));
@@ -491,7 +492,7 @@ export default function AssetsPage() {
             const count = selectedIds.length;
             setSelectedIds([]);
             await flushAssetStorePersistence();
-            await saveRemoteUserDataNow();
+            await saveRemoteAssetsNow(selectedIds);
             message.success(`已将 ${count} 个素材移入回收站`);
         } catch (error) {
             message.warning(localSavedRemotePendingMessage("已移入回收站", error));

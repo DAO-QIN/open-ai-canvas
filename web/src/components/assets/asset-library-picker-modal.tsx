@@ -14,7 +14,7 @@ import { PaginationBar } from "@/components/layout/workspace-page";
 import { cn } from "@/lib/utils";
 import type { ExternalAssetPickerReference } from "@/lib/plugins/plugin-types";
 import { flushAssetStorePersistence, useAssetStore, type Asset } from "@/stores/use-asset-store";
-import { deleteAssetsWithRemoteSync, loadAssetLibraryPage, localSavedRemotePendingMessage, saveRemoteUserDataNow } from "@/services/user-data-sync";
+import { deleteAssetsWithRemoteSync, loadAssetLibraryPage, localSavedRemotePendingMessage, saveRemoteAssetsNow } from "@/services/user-data-sync";
 
 export type AssetPickerMediaKind = "image" | "video" | "audio" | "text";
 
@@ -331,7 +331,7 @@ export function AssetLibraryPickerModal({
                 useAssetStore.getState().updateAsset(id, { status: "confirmed" });
             }
             await flushAssetStorePersistence();
-            await saveRemoteUserDataNow();
+            await saveRemoteAssetsNow(archivedSelectedIds);
             setSelected(new Set());
             message.success(`已还原 ${archivedSelectedIds.length} 个素材至素材库`);
             setCategory("all");

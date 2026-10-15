@@ -4,6 +4,9 @@ import { deleteRemoteAssets, deleteRemoteCanvasProject, applyRemoteCanvasOperati
 import type { CanvasOperation, CanvasOperationsRequest } from "@/services/api/user-data";
 import { ApiError } from "@/services/api/request";
 import { canvasContentHash, sameCanvasContent } from "@/lib/canvas/canvas-content";
+import { reconcileCanvasMutation } from "@/lib/canvas/canvas-mutation-recovery";
+import { saveCanvasSyncDraft, type CanvasSyncDraft } from "@/services/canvas-sync-drafts";
+import { recordDiagnosticEvent } from "@/services/diagnostics/client-diagnostics";
 import { getActiveUserScope } from "@/lib/user-scope";
 import { localForageStorageForScope } from "@/lib/localforage-storage";
 import { appQueryClient } from "@/lib/query-client";
@@ -34,7 +37,7 @@ let remoteOperationTail: Promise<void> = Promise.resolve();
 let subscriptionsInstalled = false;
 let acknowledgedAssets = new Map<string, Asset>();
 let acknowledgedProjects = new Map<string, CanvasProject>();
-type PendingCanvasMutation = { projectId: string; request: CanvasOperationsRequest; baseline?: CanvasProject; prepared: CanvasProject; createdAt: string };
+type PendingCanvasMutation = { projectId: string; request: CanvasOperationsRequest; baseline?: CanvasProject; prepared: CanvasProject; createdAt: string; blocked?: "conflict" | "unavailable"; message?: string };
 const pendingCanvasMutations = new Map<string, PendingCanvasMutation>();
 const pendingCanvasMutationKey = "yingce:canvas-mutation-journal";
 let pendingJournalScope = "";
@@ -54,8 +57,8 @@ export function remoteUserDataRetryDelay(attempt: number, retryAfterMs = 0) {
     return Math.max(delay, retryAfterMs);
 }
 
-async function loadPendingCanvasMutationJournal(scope = getActiveUserScope()) {
-    if (pendingJournalLoaded && pendingJournalScope === scope) return;
+async function loadPendingCanvasMutationJournal(scope = getActiveUserScope(), force = false) {
+    if (!force && pendingJournalLoaded && pendingJournalScope === scope) return;
     pendingJournalScope = scope;
     pendingJournalLoaded = true;
     pendingCanvasMutations.clear();
@@ -71,8 +74,11 @@ async function loadPendingCanvasMutationJournal(scope = getActiveUserScope()) {
             pendingCanvasMutations.set(entry.projectId, request === entry.request ? entry : { ...entry, request });
         }
         if (repaired) await persistPendingCanvasMutationJournal();
-    } catch {
-        await localForageStorageForScope(scope).removeItem(pendingCanvasMutationKey);
+    } catch (error) {
+        // Preserve unreadable data for recovery; a parse failure must not erase
+        // the only copy of an unconfirmed request.
+        await localForageStorageForScope(scope).setItem(`${pendingCanvasMutationKey}:unreadable:${Date.now()}`, raw);
+        throw error;
     }
 }
 
@@ -149,9 +155,15 @@ export async function initializeRemoteUserDataSession(userId: string) {
         activeRemoteUserId = userId;
         await loadPendingCanvasMutationJournal();
         incrementalSession = true;
-        acknowledgedProjects = new Map(useCanvasStore.getState().projects.map((project) => [project.id, project]));
+        acknowledgedProjects = new Map(
+            useCanvasStore
+                .getState()
+                .projects.filter((project) => project.revision !== 0)
+                .map((project) => [project.id, project]),
+        );
         for (const pending of pendingCanvasMutations.values()) {
             if (pending.baseline) acknowledgedProjects.set(pending.projectId, pending.baseline);
+            if (pending.blocked) useSyncProgressStore.getState().setProjectProgress(pending.projectId, { phase: "error", errorKind: "conflict", pendingChanges: 1, message: pending.message || "未确认内容已保留为草稿，请在同步面板处理" });
         }
         acknowledgedAssets = new Map(useAssetStore.getState().assets.map((asset) => [asset.id, asset]));
         remoteUserDataPhase = "ready";
@@ -198,6 +210,7 @@ export async function loadCanvasProjectForEditing(id: string, options: { onLoad?
                 options.onLoad?.(local);
                 return local;
             }
+            if (local && error instanceof ApiError && (error.status === 404 || error.status === 403)) await retainUnconfirmedCanvas(local, error, "unavailable");
             throw error;
         }
         if (epoch !== sessionEpoch) throw new Error("账号已切换，请重新打开画布");
@@ -209,12 +222,32 @@ export async function loadCanvasProjectForEditing(id: string, options: { onLoad?
         const dirty = local && (!verifiedProjects.has(id) && incrementalSession ? !cachedClean : !sameCanvasContent(acknowledgedProjects.get(id), local));
         if (dirty && !sameCanvasContent(local, remote)) {
             const live = requireUnchangedLocal(local, "画布仍在更新，未确认操作已保留");
+            const pending = pendingCanvasMutations.get(id);
+            if (pending?.blocked) {
+                options.onLoad?.(local);
+                return local;
+            }
+            const baseline = pending?.baseline || acknowledgedProjects.get(id);
+            const trustworthy = pending?.baseline || (baseline?.remoteContentHash && baseline.remoteContentHash === (await canvasContentHash(baseline)));
+            let merged: CanvasProject;
+            try {
+                if (!trustworthy && local.revision !== remote.revision) throw new Error("缺少本地编辑的历史基线");
+                merged = reconcileCanvasMutation(trustworthy ? baseline! : remote, remote, local);
+            } catch (error) {
+                await retainUnconfirmedCanvas(local, error, "conflict");
+                options.onLoad?.(local);
+                return local;
+            }
+            requireUnchangedLocal(live, "画布仍在更新，未确认操作已保留");
             acknowledgedProjects.set(id, { ...remote, remoteContentHash: hash });
             verifiedProjects.add(id);
-            useSyncProgressStore.getState().setProjectProgress(id, { phase: "pending", cloudRevision: remote.revision, pendingChanges: 1, message: "保留本地未确认操作，等待自动重放" });
-            options.onLoad?.(live || local);
+            const projected = { ...merged, remoteContentHash: hash };
+            options.onLoad?.(projected);
+            useCanvasStore.setState((state) => ({ projects: state.projects.map((item) => (item.id === id ? projected : item)) }));
+            await flushCanvasStorePersistence();
+            useSyncProgressStore.getState().setProjectProgress(id, { phase: "pending", cloudRevision: remote.revision, pendingChanges: 1, message: "已合并云端更新，本地修改等待保存" });
             scheduleRemoteUserDataSync();
-            return live || local;
+            return projected;
         }
         // Editing/generation may continue during the network request or draft write.
         // Viewport-only updates are not document edits and must not block adopting cloud content.
@@ -372,9 +405,11 @@ export function mergeRemoteAssetsWithLocalPending(remoteAssets: Asset[], localAs
     return [...merged.values()];
 }
 
-async function waitForRemoteProjectLoads() {
-    const pending = [...remoteProjectLoadPromises.values()].map((item) => item.promise);
-    if (pending.length) await Promise.all(pending);
+async function waitForRemoteProjectLoads(projectId?: string | readonly string[]) {
+    const ids = projectId === undefined ? undefined : new Set(typeof projectId === "string" ? [projectId] : projectId);
+    const pending = [...remoteProjectLoadPromises].filter(([id]) => ids === undefined || ids.has(id)).map(([, item]) => item.promise);
+    if (ids) await Promise.all(pending);
+    else await Promise.allSettled(pending);
 }
 
 export async function loadAssetLibraryPage(options: Parameters<typeof listRemoteAssetsPage>[0]) {
@@ -454,13 +489,11 @@ export async function syncRemoteUserData(userId?: string | null) {
                 const remote = remoteById.get(local.id);
                 if (!remote) {
                     if (pending && !pendingMutationCreatesCanvas(pending)) {
-                        remoteDeletedProjects.add(local.id);
-                        useSyncProgressStore.getState().setProjectProgress(local.id, { phase: "error", errorKind: "conflict", pendingChanges: 1, message: "云端画布已删除，未确认操作不会重新创建它" });
+                        await retainUnconfirmedCanvas(local, new Error("画布不存在或无权访问"), "unavailable");
                         continue;
                     }
                     if (!pending && (local.revision ?? 0) > 0) {
-                        remoteDeletedProjects.add(local.id);
-                        useSyncProgressStore.getState().setProjectProgress(local.id, { phase: "error", errorKind: "conflict", pendingChanges: 1, message: "云端画布已删除，未确认操作不会重新创建它" });
+                        await retainUnconfirmedCanvas(local, new Error("画布不存在或无权访问"), "unavailable");
                         continue;
                     }
                 }
@@ -468,6 +501,10 @@ export async function syncRemoteUserData(userId?: string | null) {
                 if (pending) continue;
                 const clean = local.remoteContentHash && local.remoteContentHash === (await canvasContentHash(local));
                 if (clean || sameCanvasContent(local, remote)) continue;
+                if (remote && local.revision !== remote.revision) {
+                    await retainUnconfirmedCanvas(local, new Error("缺少本地编辑的历史基线"), "conflict");
+                    continue;
+                }
                 const operations = buildCanvasOperations(remote, local);
                 if (operations.length) {
                     pendingCanvasMutations.set(local.id, {
@@ -591,7 +628,17 @@ export function withRemoteUserDataSyncExclusive<T>(operation: () => Promise<T>):
             () => undefined,
             () => undefined,
         )
-        .then(operation);
+        .then(async () => {
+            const scope = getActiveUserScope();
+            const run = async () => {
+                if (activeRemoteUserId && remoteUserDataPhase === "ready" && pendingJournalScope === scope) await loadPendingCanvasMutationJournal(scope, true);
+                return operation();
+            };
+            // Other tabs must finish/confirm their durable journal before this
+            // tab can replace it. Per-tab promise tails alone cannot do that.
+            const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+            return locks ? locks.request(`yingce:remote-user-data-sync:${scope}`, run) : run();
+        });
     remoteOperationTail = pending.then(
         () => undefined,
         () => undefined,
@@ -665,9 +712,9 @@ export function formatLocalSavedRemotePending(localAction: string, error: unknow
         return `${localAction}，云端同步已暂停：${detail}。资源补齐后会自动重放未确认操作。`;
     }
     if (error instanceof ApiError && (error.status === 409 || error.status === 428)) {
-        return `${localAction}，云端同步已暂停：${detail}。未确认操作会保留并按原请求自动重放。`;
+        return `${localAction}，云端同步已暂停：${detail}。内容已保留，请在同步恢复中处理。`;
     }
-    return `${localAction}，云端同步失败：${detail}。将自动重试。`;
+    return `${localAction}，云端同步失败：${detail}。${isRetryableRemoteSyncError(error) ? "将自动重试。" : "请检查后重试。"}`;
 }
 
 /** 本地写已成功、云端同步失败：排队同一幂等重试，并返回可直接展示的 warning。不得回滚本地写，也不得说成已保存到云端。 */
@@ -735,8 +782,13 @@ export async function deleteCanvasProjectsWithRemoteSync(ids: string[]) {
             try {
                 if (activeRemoteUserId) {
                     await deleteRemoteCanvasProject(id);
+                    const pending = pendingCanvasMutations.get(id);
+                    const local = projectById.get(id);
+                    if (pending && local) await saveCanvasSyncDraft(local, "删除画布前保留的未确认内容", pending.request.mutationId);
+                    pendingCanvasMutations.delete(id);
+                    await persistPendingCanvasMutationJournal();
                     acknowledgedProjects.delete(id);
-                    remoteDeletedProjects.delete(id);
+                    remoteDeletedProjects.add(id);
                 }
                 useCanvasStore.getState().deleteProjects([id]);
                 // 批量删除允许部分成功；每个已成功远端删除的实体都立即落实到本地 durable cache。
@@ -834,34 +886,43 @@ export async function deleteCanvasProjectsWithRemoteSync(ids: string[]) {
     });
 }
 
-export async function saveRemoteUserDataNow(input?: string | readonly string[]) {
-    const projectId = input;
+type RemoteSaveOptions = { projectId?: string | readonly string[]; assetIds?: readonly string[] };
+
+export function saveRemoteUserDataNow(projectId?: string | readonly string[]) {
+    return saveRemoteUserData({ projectId });
+}
+
+/** Asset persistence does not depend on a canvas operation or unrelated assets. */
+export function saveRemoteAssetsNow(assetIds: readonly string[]) {
+    return saveRemoteUserData({ projectId: [], assetIds });
+}
+
+async function saveRemoteUserData(options: RemoteSaveOptions) {
     const epoch = sessionEpoch;
     if (!activeRemoteUserId) throw new Error("云端同步会话尚未建立，当前内容已保留在本地");
     requireRemoteUserDataBaseline();
-    await waitForRemoteProjectLoads();
-    if (syncPromise) {
-        syncQueued = true;
-        await syncPromise;
-        if (epoch !== sessionEpoch) throw new Error("账号已切换，已停止旧会话保存");
-        return;
-    }
-    syncPromise = withRemoteUserDataSyncExclusive(async () => {
+    await waitForRemoteProjectLoads(options.projectId);
+    // Every explicit save gets its own operation. The serial tail absorbs a
+    // previous failure without passing it to a different canvas or asset save.
+    const pending = withRemoteUserDataSyncExclusive(async () => {
         requireRemoteUserDataBaseline();
         if (epoch !== sessionEpoch) throw new Error("账号已切换，已停止旧会话保存");
-        await drainRemoteUserDataChanges({ projectId });
+        await drainRemoteUserDataChanges(options);
     });
+    syncPromise = pending;
     let syncFailed = false;
     let syncError: unknown;
     try {
-        await syncPromise;
+        await pending;
         syncRetryAttempt = 0;
     } catch (error) {
         syncFailed = true;
         syncError = error;
     } finally {
-        syncPromise = null;
-        if (syncQueued) scheduleRemoteUserDataSync();
+        if (syncPromise === pending) {
+            syncPromise = null;
+            if (syncQueued) scheduleRemoteUserDataSync();
+        }
     }
     if (syncFailed) {
         scheduleRemoteUserDataRetry(syncError);
@@ -962,135 +1023,347 @@ export function buildCanvasOperations(base: CanvasProject | undefined, next: Can
     return operations;
 }
 
-async function drainRemoteUserDataChanges(options: { projectId?: string | readonly string[] } = {}) {
+async function drainRemoteUserDataChanges(options: RemoteSaveOptions = {}) {
     const uploaded = new Map<string, string>();
+    if (options.projectId !== undefined) {
+        const ids = new Set(typeof options.projectId === "string" ? [options.projectId] : options.projectId);
+        const hasSelectedChanges = () => {
+            const projects = useCanvasStore.getState().projects.filter((project) => ids.has(project.id));
+            if (projects.some((project) => !pendingCanvasMutations.get(project.id)?.blocked && (pendingCanvasMutations.has(project.id) || !sameCanvasContent(acknowledgedProjects.get(project.id), project)))) return true;
+            const assetIds = options.assetIds ? new Set(options.assetIds) : collectAssetIds(projects);
+            return useAssetStore.getState().assets.some((asset) => assetIds.has(asset.id) && !sameEntitySnapshot(acknowledgedAssets.get(asset.id), asset));
+        };
+        do {
+            await saveRemoteUserDataBatch(uploaded, options);
+        } while (hasSelectedChanges());
+        return;
+    }
     do {
         syncQueued = false;
         await saveRemoteUserDataBatch(uploaded, options);
     } while (syncQueued);
 }
 
-async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: { projectId?: string | readonly string[] } = {}) {
+async function blockCanvasMutation(pending: PendingCanvasMutation, error: unknown, blocked: "conflict" | "unavailable") {
+    if (pendingCanvasMutations.get(pending.projectId) !== pending) throw new Error("同步会话已变化，已停止保存旧请求");
+    const message = blocked === "unavailable" ? "云端画布已删除或无权访问，本地内容已保留为草稿" : "云端与本地修改同一内容，已保留草稿，请在同步面板处理";
+    const project = useCanvasStore.getState().openProject(pending.projectId) || pending.prepared;
+    await saveCanvasSyncDraft(project, message, pending.request.mutationId);
+    if (pendingCanvasMutations.get(pending.projectId) !== pending) throw new Error("同步会话已变化，草稿已保留在原账号");
+    pending.blocked = blocked;
+    pending.message = message;
+    if (blocked === "unavailable") remoteDeletedProjects.add(pending.projectId);
+    await persistPendingCanvasMutationJournal();
+    recordDiagnosticEvent({
+        category: "action",
+        level: "warning",
+        code: blocked === "unavailable" ? "canvas_sync_unavailable" : "canvas_sync_conflict",
+        message,
+        canvasId: pending.projectId,
+        requestId: pending.request.mutationId,
+        httpStatus: error instanceof ApiError ? error.status : undefined,
+    });
+}
+
+async function retainUnconfirmedCanvas(project: CanvasProject, error: unknown, blocked: "conflict" | "unavailable") {
+    let pending = pendingCanvasMutations.get(project.id);
+    if (!pending) {
+        pending = { projectId: project.id, prepared: project, createdAt: new Date().toISOString(), request: { mutationId: newCanvasMutationId(), operations: [] } };
+        pendingCanvasMutations.set(project.id, pending);
+    }
+    await blockCanvasMutation(pending, error, blocked);
+    useSyncProgressStore.getState().setProjectProgress(project.id, { phase: "error", errorKind: "conflict", pendingChanges: 1, message: pending.message });
+}
+
+export async function retryCanvasSync(projectId: string) {
+    const epoch = sessionEpoch;
+    await withRemoteUserDataSyncExclusive(async () => {
+        if (epoch !== sessionEpoch) throw new Error("账号已切换，请重新读取草稿");
+        const pending = pendingCanvasMutations.get(projectId);
+        if (!pending?.blocked) return;
+        if (!pending.baseline) throw new Error("缺少历史基线，请采用云端版本或恢复草稿为新画布");
+        if (pending.blocked === "unavailable") await getRemoteCanvasProject(projectId);
+        pending.blocked = undefined;
+        pending.message = undefined;
+        remoteDeletedProjects.delete(projectId);
+        await persistPendingCanvasMutationJournal();
+    });
+    await saveRemoteUserDataNow(projectId);
+}
+
+export async function adoptCloudCanvas(projectId: string) {
+    const requestedEpoch = sessionEpoch;
+    return withRemoteUserDataSyncExclusive(async () => {
+        if (requestedEpoch !== sessionEpoch) throw new Error("账号已切换，请重新读取草稿");
+        requireRemoteUserDataBaseline();
+        const scope = getActiveUserScope();
+        const epoch = sessionEpoch;
+        const local = useCanvasStore.getState().openProject(projectId);
+        const pending = pendingCanvasMutations.get(projectId);
+        if (pending && !pending.blocked) throw new Error("原保存请求尚未确认，请先重试原请求，再采用云端版本");
+        const remote = await restoreRemoteTextNodeContents((await getRemoteCanvasProject(projectId)).project);
+        if (epoch !== sessionEpoch || scope !== getActiveUserScope() || liveCanvasIfUnchanged(projectId, local) === undefined) throw new Error("画布或账号已变化，请重新处理同步");
+        if (local) await saveCanvasSyncDraft(local, "采用云端版本前保留的本地内容", pendingCanvasMutations.get(projectId)?.request.mutationId, scope);
+        const project = { ...remote, viewport: local?.viewport || remote.viewport, remoteContentHash: await canvasContentHash(remote) };
+        if (epoch !== sessionEpoch || liveCanvasIfUnchanged(projectId, local) === undefined) throw new Error("画布或账号已变化，草稿已保留");
+        for (const listener of agentCanvasListeners) listener(project, local || undefined);
+        useCanvasStore.setState((state) => ({ projects: [...state.projects.filter((item) => item.id !== projectId), project] }));
+        await flushCanvasStorePersistence();
+        acknowledgedProjects.set(projectId, project);
+        verifiedProjects.add(projectId);
+        remoteDeletedProjects.delete(projectId);
+        pendingCanvasMutations.delete(projectId);
+        await persistPendingCanvasMutationJournal();
+        useSyncProgressStore.getState().setProjectProgress(projectId, { phase: "done", errorKind: undefined, pendingChanges: 0, cloudRevision: project.revision, message: "已采用云端版本，本地内容已保留为草稿" });
+    });
+}
+
+export async function restoreCanvasDraftAsCopy(draft: CanvasSyncDraft) {
+    if (draft.scope && draft.scope !== getActiveUserScope()) throw new Error("账号已切换，请重新读取草稿");
+    const id = useCanvasStore.getState().importProject({ ...draft.project, projectId: undefined, title: `${draft.project.title}（恢复草稿）` });
+    // importProject intentionally limits import fields; preserve the timeline in
+    // a recovery copy as well. Original task identities do not create new tasks.
+    if (draft.project.timeline) useCanvasStore.getState().updateProject(id, { timeline: draft.project.timeline });
+    await flushCanvasStorePersistence();
+    scheduleRemoteUserDataSync();
+    return id;
+}
+
+async function submitCanvasMutation(pending: PendingCanvasMutation, uploaded: Map<string, string>, localSnapshot: CanvasProject): Promise<{ savedRevision?: number; remoteSnapshot?: CanvasProject; localSnapshot: CanvasProject }> {
+    const epoch = sessionEpoch;
+    const scope = getActiveUserScope();
+    const assertSession = () => {
+        if (epoch !== sessionEpoch || scope !== getActiveUserScope()) throw new DOMException("账号已切换，已停止旧会话保存", "AbortError");
+    };
+    try {
+        const response = await applyRemoteCanvasOperations(pending.projectId, pending.request);
+        assertSession();
+        return { savedRevision: response.project.revision, localSnapshot };
+    } catch (error) {
+        assertSession();
+        if (error instanceof ApiError && (error.status === 404 || error.status === 403)) {
+            await blockCanvasMutation(pending, error, "unavailable");
+            throw error;
+        }
+        // Only these definite, transactional rejections prove the old body did
+        // not commit. Timeouts/5xx and mutation-ID reuse must keep the exact body.
+        if (!(error instanceof ApiError) || error.status !== 409 || !["canvas_field_conflict", "canvas_object_missing"].includes(error.reason || "")) throw error;
+        if (!pending.baseline) {
+            await blockCanvasMutation(pending, error, "conflict");
+            throw error;
+        }
+        let remote: CanvasProject;
+        try {
+            remote = await restoreRemoteTextNodeContents((await getRemoteCanvasProject(pending.projectId)).project);
+            assertSession();
+        } catch (readError) {
+            assertSession();
+            if (readError instanceof ApiError && (readError.status === 404 || readError.status === 403)) await blockCanvasMutation(pending, readError, "unavailable");
+            throw readError;
+        }
+        if (!useCanvasStore.getState().openProject(pending.projectId)) throw new Error("画布已关闭，未确认操作已保留");
+        await saveCanvasSyncDraft(pending.prepared, "安全合并前保留的未确认内容", pending.request.mutationId, scope);
+        assertSession();
+        let merged: CanvasProject;
+        try {
+            // Replay only the recorded request's intent. Edits made while it was
+            // in flight (and their new assets) belong to a subsequent save.
+            merged = reconcileCanvasMutation(pending.baseline, remote, pending.prepared);
+        } catch (mergeError) {
+            await blockCanvasMutation(pending, mergeError, "conflict");
+            throw new ApiError(pending.message!, { status: 409, reason: "canvas_sync_blocked", cause: mergeError });
+        }
+        const prepared = await ensureRemoteResourceReferences(merged, uploaded);
+        assertSession();
+        const operations = buildCanvasOperations(remote, prepared);
+        if (!operations.length) return { remoteSnapshot: remote, localSnapshot };
+        const rebased: PendingCanvasMutation = {
+            projectId: pending.projectId,
+            baseline: remote,
+            prepared,
+            createdAt: new Date().toISOString(),
+            request: { mutationId: newCanvasMutationId(), baseRevision: remote.revision, operations },
+        };
+        pendingCanvasMutations.set(pending.projectId, rebased);
+        await persistPendingCanvasMutationJournal();
+        recordDiagnosticEvent({ category: "action", level: "info", code: "canvas_sync_rebased", message: "画布操作已基于云端版本安全合并", canvasId: pending.projectId, requestId: rebased.request.mutationId });
+        let response: Awaited<ReturnType<typeof applyRemoteCanvasOperations>>;
+        try {
+            response = await applyRemoteCanvasOperations(pending.projectId, rebased.request);
+            assertSession();
+        } catch (retryError) {
+            assertSession();
+            if (retryError instanceof ApiError && (retryError.status === 403 || retryError.status === 404)) await blockCanvasMutation(rebased, retryError, "unavailable");
+            if (retryError instanceof ApiError && retryError.status === 409 && ["canvas_field_conflict", "canvas_object_missing"].includes(retryError.reason || ""))
+                throw new ApiError("云端画布仍在更新，将重新核对本次操作", { status: 409, reason: retryError.reason, retryable: true, cause: retryError });
+            throw retryError;
+        }
+        // This snapshot includes merged cloud fields, while latest is the editor
+        // snapshot at preparation time. Use it to preserve subsequent live edits.
+        return { savedRevision: response.project.revision, localSnapshot };
+    }
+}
+
+async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: RemoteSaveOptions = {}) {
+    const epoch = sessionEpoch;
+    const scope = getActiveUserScope();
+    const assertSession = () => {
+        if (epoch !== sessionEpoch || scope !== getActiveUserScope()) throw new DOMException("账号已切换，已停止旧会话保存", "AbortError");
+    };
     // 中央兜底：任何调用方只要把持久媒体写进画布，提交前都会先补齐素材记录与 assetId。
     // 页面级入口仍主动入库，以便立即反馈；这里负责阻止遗漏入口形成远端幽灵资源。
     const projectsBeforeRepair = useCanvasStore.getState().projects;
     const selectedProjectIds = options.projectId === undefined ? undefined : new Set(typeof options.projectId === "string" ? [options.projectId] : options.projectId);
     const syncProjectIds = selectedProjectIds === undefined ? undefined : new Set([...selectedProjectIds].filter((id) => projectsBeforeRepair.some((project) => project.id === id)));
+    if (selectedProjectIds && syncProjectIds?.size !== selectedProjectIds.size) throw new Error("当前画布尚未读取，请重新打开后保存");
     const changedProjectIds = new Set(
         projectsBeforeRepair
-            .filter((project) => !remoteDeletedProjects.has(project.id) && (syncProjectIds === undefined || syncProjectIds.has(project.id)) && (pendingCanvasMutations.has(project.id) || !sameCanvasContent(acknowledgedProjects.get(project.id), project)))
+            .filter(
+                (project) =>
+                    !remoteDeletedProjects.has(project.id) &&
+                    !pendingCanvasMutations.get(project.id)?.blocked &&
+                    (syncProjectIds === undefined || syncProjectIds.has(project.id)) &&
+                    (pendingCanvasMutations.has(project.id) || !sameCanvasContent(acknowledgedProjects.get(project.id), project)),
+            )
             .map((project) => project.id),
     );
     repairMissingCanvasAssets(changedProjectIds, incrementalSession);
     const currentProjects = useCanvasStore.getState().projects;
     const currentAssets = useAssetStore.getState().assets;
+    if (options.assetIds?.some((id) => !currentAssets.some((asset) => asset.id === id))) throw new Error("素材尚未读取，请重新选择后同步");
     const dirtyProjects = currentProjects.filter((project) => {
-        const dirty = !remoteDeletedProjects.has(project.id) && (pendingCanvasMutations.has(project.id) || !sameCanvasContent(acknowledgedProjects.get(project.id), project));
+        const dirty = !remoteDeletedProjects.has(project.id) && !pendingCanvasMutations.get(project.id)?.blocked && (pendingCanvasMutations.has(project.id) || !sameCanvasContent(acknowledgedProjects.get(project.id), project));
         const selected = selectedProjectIds === undefined || selectedProjectIds.has(project.id);
         return selected && dirty;
     });
+    if (selectedProjectIds) {
+        const blocked = [...selectedProjectIds].map((id) => pendingCanvasMutations.get(id)).find((pending) => pending?.blocked);
+        if (blocked) throw new ApiError(blocked.message || "云端同步已暂停，请在同步面板恢复草稿", { status: 409, reason: "canvas_sync_blocked" });
+    }
+    const selectedAssetIds = options.assetIds
+        ? new Set(options.assetIds)
+        : selectedProjectIds
+          ? collectAssetIds([...currentProjects.filter((project) => selectedProjectIds.has(project.id)), ...[...pendingCanvasMutations.values()].filter((pending) => selectedProjectIds.has(pending.projectId)).map((pending) => pending.prepared)])
+          : undefined;
     const dirtyAssets = currentAssets.filter((asset) => {
-        const dirty = !sameEntitySnapshot(acknowledgedAssets.get(asset.id), asset);
-        return dirty;
+        const dirty = !sameEntitySnapshot(acknowledgedAssets.get(asset.id), asset) || (selectedAssetIds?.has(asset.id) && !verifiedAssets.has(asset.id));
+        return dirty && (selectedAssetIds === undefined || selectedAssetIds.has(asset.id));
     });
     if (!dirtyProjects.length && !dirtyAssets.length) return;
 
     const adoptedAssetIds = new Set<string>();
     const mergedAssets = new Map<string, Asset>();
+    const errors: unknown[] = [];
+    const failedAssetIds = new Set<string>();
     const assetSyncEpoch = sessionEpoch;
     for (const source of dirtyAssets) {
-        const baseline = acknowledgedAssets.get(source.id);
-        if (!baseline) {
-            // 空缓存重建后也可能已有用户编辑；用实际生成默认值三方合并，不能整笔覆盖。
-            let remote: Asset;
-            try {
-                remote = (await getRemoteAsset(source.id)).asset;
-            } catch (error) {
+        try {
+            const baseline = acknowledgedAssets.get(source.id);
+            if (!baseline) {
+                // 空缓存重建后也可能已有用户编辑；用实际生成默认值三方合并，不能整笔覆盖。
+                let remote: Asset;
+                try {
+                    remote = (await getRemoteAsset(source.id)).asset;
+                } catch (error) {
+                    if (assetSyncEpoch !== sessionEpoch) throw new Error("账号已切换，已停止保存素材");
+                    if (error instanceof ApiError && error.status === 404) continue;
+                    throw error;
+                }
                 if (assetSyncEpoch !== sessionEpoch) throw new Error("账号已切换，已停止保存素材");
-                if (error instanceof ApiError && error.status === 404) continue;
-                throw error;
-            }
-            if (assetSyncEpoch !== sessionEpoch) throw new Error("账号已切换，已停止保存素材");
-            const current = useAssetStore.getState().assets.find((asset) => asset.id === source.id);
-            if (!sameEntitySnapshot(current, source)) throw new Error("素材仍在编辑，请重新同步");
-            const [asset] = parseAssetRecordList([remote]);
-            const defaults = getGenerationAssetDefaults(source.id);
-            let merged: Asset;
-            let edited: boolean;
-            try {
-                const contextKeys = ["clientContext", "conversationId", "messageId", "batchIndex"];
-                // 创建/更新时间是各端记账信息，不属于用户编辑的字段。
-                const content = (value: Asset): Asset => {
-                    let result = { ...value, createdAt: asset.createdAt, updatedAt: asset.updatedAt };
-                    if (!defaults) return result;
-                    // 客户端上下文不是素材编辑；保留 projectIds 等业务元数据参与合并。
-                    const metadata = { ...result.metadata };
-                    for (const key of contextKeys) delete metadata[key];
-                    result = { ...result, metadata };
-                    if (result.kind === "image" || result.kind === "video" || result.kind === "audio") {
-                        const resourceId = resourceIdFromStorageKey(result.data.storageKey);
-                        if (resourceId) {
-                            // 同一不可变资源的授权/缓存 URL 不代表编辑；独立封面仍参与比较。
-                            const url = resourceFileUrl(resourceId);
-                            const displayUrl = result.kind === "image" ? result.data.dataUrl : result.data.url;
-                            const coverUrl = result.coverUrl === displayUrl ? (result.kind === "image" ? url : "") : result.coverUrl;
-                            result =
-                                result.kind === "image"
-                                    ? { ...result, coverUrl, data: { ...result.data, dataUrl: url } }
-                                    : result.kind === "video"
-                                      ? { ...result, coverUrl, data: { ...result.data, url } }
-                                      : { ...result, coverUrl, data: { ...result.data, url } };
-                        }
-                    }
-                    return result;
-                };
-                // 无法证明生成默认值时保持保守；刷新后的旧缓存不能充当编辑基线。
-                const remoteContent = content(asset);
-                const mergedContent = mergeThreeWayValue(content(source), defaults ? content(defaults) : undefined, remoteContent) as Asset;
-                edited = canonicalize(remoteContent) !== canonicalize(mergedContent);
-                // 投影只用于判断编辑；未改字段保留远端原值，改动字段取本机真实 payload。
-                const applyEdits = (stored: unknown, local: unknown, before: unknown, after: unknown): unknown => {
-                    if (canonicalize(before) === canonicalize(after)) return stored;
-                    if (before && after && typeof before === "object" && typeof after === "object" && !Array.isArray(before) && !Array.isArray(after)) {
-                        const result = { ...(stored as Record<string, unknown>) };
-                        for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
-                            const value = applyEdits(result[key], (local as Record<string, unknown>)?.[key], (before as Record<string, unknown>)[key], (after as Record<string, unknown>)[key]);
-                            if (value === undefined) delete result[key];
-                            else result[key] = value;
+                const current = useAssetStore.getState().assets.find((asset) => asset.id === source.id);
+                if (!sameEntitySnapshot(current, source)) throw new Error("素材仍在编辑，请重新同步");
+                const [asset] = parseAssetRecordList([remote]);
+                const defaults = getGenerationAssetDefaults(source.id);
+                let merged: Asset;
+                let edited: boolean;
+                try {
+                    const contextKeys = ["clientContext", "conversationId", "messageId", "batchIndex"];
+                    // 创建/更新时间是各端记账信息，不属于用户编辑的字段。
+                    const content = (value: Asset): Asset => {
+                        let result = { ...value, createdAt: asset.createdAt, updatedAt: asset.updatedAt };
+                        if (!defaults) return result;
+                        // 客户端上下文不是素材编辑；保留 projectIds 等业务元数据参与合并。
+                        const metadata = { ...result.metadata };
+                        for (const key of contextKeys) delete metadata[key];
+                        result = { ...result, metadata };
+                        if (result.kind === "image" || result.kind === "video" || result.kind === "audio") {
+                            const resourceId = resourceIdFromStorageKey(result.data.storageKey);
+                            if (resourceId) {
+                                // 同一不可变资源的授权/缓存 URL 不代表编辑；独立封面仍参与比较。
+                                const url = resourceFileUrl(resourceId);
+                                const displayUrl = result.kind === "image" ? result.data.dataUrl : result.data.url;
+                                const coverUrl = result.coverUrl === displayUrl ? (result.kind === "image" ? url : "") : result.coverUrl;
+                                result =
+                                    result.kind === "image"
+                                        ? { ...result, coverUrl, data: { ...result.data, dataUrl: url } }
+                                        : result.kind === "video"
+                                          ? { ...result, coverUrl, data: { ...result.data, url } }
+                                          : { ...result, coverUrl, data: { ...result.data, url } };
+                            }
                         }
                         return result;
+                    };
+                    // 无法证明生成默认值时保持保守；刷新后的旧缓存不能充当编辑基线。
+                    const remoteContent = content(asset);
+                    const mergedContent = mergeThreeWayValue(content(source), defaults ? content(defaults) : undefined, remoteContent) as Asset;
+                    edited = canonicalize(remoteContent) !== canonicalize(mergedContent);
+                    // 投影只用于判断编辑；未改字段保留远端原值，改动字段取本机真实 payload。
+                    const applyEdits = (stored: unknown, local: unknown, before: unknown, after: unknown): unknown => {
+                        if (canonicalize(before) === canonicalize(after)) return stored;
+                        if (before && after && typeof before === "object" && typeof after === "object" && !Array.isArray(before) && !Array.isArray(after)) {
+                            const result = { ...(stored as Record<string, unknown>) };
+                            for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+                                const value = applyEdits(result[key], (local as Record<string, unknown>)?.[key], (before as Record<string, unknown>)[key], (after as Record<string, unknown>)[key]);
+                                if (value === undefined) delete result[key];
+                                else result[key] = value;
+                            }
+                            return result;
+                        }
+                        return local;
+                    };
+                    merged = applyEdits(asset, source, remoteContent, mergedContent) as Asset;
+                    if (defaults) {
+                        const metadata = { ...merged.metadata };
+                        for (const key of contextKeys) {
+                            if (metadata[key] === undefined && source.metadata?.[key] !== undefined) metadata[key] = source.metadata[key];
+                        }
+                        merged = { ...merged, metadata };
                     }
-                    return local;
-                };
-                merged = applyEdits(asset, source, remoteContent, mergedContent) as Asset;
-                if (defaults) {
-                    const metadata = { ...merged.metadata };
-                    for (const key of contextKeys) {
-                        if (metadata[key] === undefined && source.metadata?.[key] !== undefined) metadata[key] = source.metadata[key];
-                    }
-                    merged = { ...merged, metadata };
+                } catch {
+                    throw assetRemoteVersionConflict();
                 }
-            } catch {
-                throw assetRemoteVersionConflict();
+                acknowledgedAssets.set(source.id, edited ? asset : merged);
+                verifiedAssets.add(source.id);
+                if (!edited) adoptedAssetIds.add(source.id);
+                else {
+                    merged = { ...merged, updatedAt: source.updatedAt };
+                    mergedAssets.set(source.id, merged);
+                }
+                useAssetStore.setState((state) => ({ assets: state.assets.map((item) => (item.id === source.id ? merged : item)) }));
             }
-            acknowledgedAssets.set(source.id, edited ? asset : merged);
-            verifiedAssets.add(source.id);
-            if (!edited) adoptedAssetIds.add(source.id);
-            else {
-                merged = { ...merged, updatedAt: source.updatedAt };
-                mergedAssets.set(source.id, merged);
-            }
-            useAssetStore.setState((state) => ({ assets: state.assets.map((item) => (item.id === source.id ? merged : item)) }));
+        } catch (error) {
+            if (assetSyncEpoch !== sessionEpoch) throw error;
+            failedAssetIds.add(source.id);
+            errors.push(error);
         }
     }
 
     if (incrementalSession) {
         for (const source of dirtyAssets) {
-            const baseline = acknowledgedAssets.get(source.id);
-            if (!baseline || verifiedAssets.has(source.id)) continue;
-            const { asset } = await getRemoteAsset(source.id);
-            if (Date.parse(asset.updatedAt) !== Date.parse(baseline.updatedAt)) throw assetRemoteVersionConflict();
-            verifiedAssets.add(source.id);
+            assertSession();
+            if (failedAssetIds.has(source.id)) continue;
+            try {
+                const baseline = acknowledgedAssets.get(source.id);
+                if (!baseline || verifiedAssets.has(source.id)) continue;
+                const { asset } = await getRemoteAsset(source.id);
+                assertSession();
+                if (Date.parse(asset.updatedAt) !== Date.parse(baseline.updatedAt)) throw assetRemoteVersionConflict();
+                verifiedAssets.add(source.id);
+            } catch (error) {
+                assertSession();
+                failedAssetIds.add(source.id);
+                errors.push(error);
+            }
         }
     }
 
@@ -1099,14 +1372,22 @@ async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: {
     // 素材先于画布提交。这样画布中的 resource: 引用一旦成为远端事实，
     // 对应 Asset 已经存在，刷新或换设备不会出现只占容量、不见素材的窗口。
     for (const dirty of dirtyAssets) {
-        if (adoptedAssetIds.has(dirty.id)) continue;
-        const source = mergedAssets.get(dirty.id) ?? dirty;
-        const remotePayload = await ensureRemoteResourceReferences(assetForRemoteSync(source), uploaded);
-        await upsertRemoteAsset(remotePayload);
-        acknowledgedAssets.set(source.id, source);
-        verifiedAssets.add(source.id);
+        assertSession();
+        if (adoptedAssetIds.has(dirty.id) || failedAssetIds.has(dirty.id)) continue;
+        try {
+            const source = mergedAssets.get(dirty.id) ?? dirty;
+            const remotePayload = await ensureRemoteResourceReferences(assetForRemoteSync(source), uploaded);
+            assertSession();
+            await upsertRemoteAsset(remotePayload);
+            assertSession();
+            acknowledgedAssets.set(source.id, source);
+            verifiedAssets.add(source.id);
+        } catch (error) {
+            assertSession();
+            failedAssetIds.add(dirty.id);
+            errors.push(error);
+        }
     }
-    const errors: unknown[] = [];
     for (const source of dirtyProjects) {
         const keysToUpload = collectLocalMediaKeys(source);
         const total = keysToUpload.length;
@@ -1125,14 +1406,39 @@ async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: {
             }
         };
         try {
-            const current = useCanvasStore.getState().openProject(source.id);
-            if (!current) throw new Error("画布已关闭，停止提交操作");
-            const base = acknowledgedProjects.get(source.id);
-            const prepared = await ensureRemoteResourceReferences(current, uploaded, onMediaUploaded);
+            assertSession();
+            if ([...collectAssetIds(source)].some((id) => failedAssetIds.has(id))) throw new Error("此画布关联的素材尚未同步，已保留画布操作");
+            if (!useCanvasStore.getState().openProject(source.id)) throw new Error("画布已关闭，停止提交操作");
+            let current = source;
+            let base = acknowledgedProjects.get(source.id);
             const pendingJournal = pendingCanvasMutations.get(source.id);
+            if (base && incrementalSession && !verifiedProjects.has(source.id) && !pendingJournal) {
+                let remote: CanvasProject;
+                try {
+                    remote = await restoreRemoteTextNodeContents((await getRemoteCanvasProject(source.id)).project);
+                } catch (error) {
+                    assertSession();
+                    if (error instanceof ApiError && (error.status === 403 || error.status === 404)) await retainUnconfirmedCanvas(source, error, "unavailable");
+                    throw error;
+                }
+                assertSession();
+                const clean = base.remoteContentHash && base.remoteContentHash === (await canvasContentHash(base));
+                try {
+                    if (!clean && base.revision !== remote.revision && !sameCanvasContent(base, remote)) throw new Error("缺少本地编辑的历史基线");
+                    current = reconcileCanvasMutation(clean ? base : remote, remote, source);
+                } catch (error) {
+                    await retainUnconfirmedCanvas(source, error, "conflict");
+                    throw error;
+                }
+                base = remote;
+                acknowledgedProjects.set(source.id, remote);
+                verifiedProjects.add(source.id);
+            }
+            const prepared = await ensureRemoteResourceReferences(current, uploaded, onMediaUploaded);
+            assertSession();
             // Compare live edits with the local snapshot used to prepare the request.
             // Its CDN/blob URLs can differ from the normalized resource payload.
-            let preparedForMutation = current;
+            let preparedForMutation = source;
             let savedRevision: number | undefined;
             let remoteSnapshot: CanvasProject | undefined;
             if (pendingJournal) {
@@ -1145,13 +1451,15 @@ async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: {
                 useSyncProgressStore.getState().setProjectProgress(source.id, { phase: "saving", message: "正在重放未确认的画布操作" });
                 // 旧队列可能只记录了 undefined 与缺省值之间的无效变化，没有需要发送的修改。
                 if (pendingJournal.request.operations.length) {
-                    const response = await applyRemoteCanvasOperations(source.id, pendingJournal.request);
-                    savedRevision = Number(response.project.revision);
+                    const result = await submitCanvasMutation(pendingJournal, uploaded, preparedForMutation);
+                    savedRevision = result.savedRevision;
+                    remoteSnapshot = result.remoteSnapshot;
+                    preparedForMutation = result.localSnapshot;
                 } else {
-                    savedRevision = Number(current.revision);
+                    // No write occurred. The shared read below confirms the
+                    // actual cloud revision and handles a deleted canvas.
+                    savedRevision = 0;
                 }
-                pendingCanvasMutations.delete(source.id);
-                await persistPendingCanvasMutationJournal();
             } else {
                 const operations = buildCanvasOperations(base, prepared);
                 if (!operations.length) {
@@ -1164,29 +1472,46 @@ async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: {
                         ...(base ? { baseRevision: base.revision } : {}),
                         operations,
                     };
-                    pendingCanvasMutations.set(source.id, { projectId: source.id, request, baseline: base, prepared, createdAt: new Date().toISOString() });
+                    const pending = { projectId: source.id, request, baseline: base, prepared, createdAt: new Date().toISOString() };
+                    pendingCanvasMutations.set(source.id, pending);
                     await persistPendingCanvasMutationJournal();
                     useSyncProgressStore.getState().setProjectProgress(source.id, { phase: "saving", message: base ? "正在提交画布操作" : "正在创建画布" });
-                    const response = await applyRemoteCanvasOperations(source.id, request);
-                    savedRevision = Number(response.project.revision);
-                    pendingCanvasMutations.delete(source.id);
-                    await persistPendingCanvasMutationJournal();
+                    const result = await submitCanvasMutation(pending, uploaded, preparedForMutation);
+                    savedRevision = result.savedRevision;
+                    remoteSnapshot = result.remoteSnapshot;
+                    preparedForMutation = result.localSnapshot;
                 }
             }
             if (!remoteSnapshot && !Number.isSafeInteger(savedRevision)) throw new Error("服务端未返回有效画布版本");
-            const remote = remoteSnapshot ?? (await restoreRemoteTextNodeContents((await getRemoteCanvasProject(source.id)).project));
+            let remote: CanvasProject;
+            try {
+                remote = remoteSnapshot ?? (await restoreRemoteTextNodeContents((await getRemoteCanvasProject(source.id)).project));
+            } catch (error) {
+                assertSession();
+                const pending = pendingCanvasMutations.get(source.id);
+                if (pending && error instanceof ApiError && (error.status === 403 || error.status === 404)) await blockCanvasMutation(pending, error, "unavailable");
+                throw error;
+            }
+            const remoteHash = await canvasContentHash(remote);
+            assertSession();
             const latest = useCanvasStore.getState().openProject(source.id);
             if (!latest) throw new Error("画布已关闭，停止提交操作");
-            const remoteHash = await canvasContentHash(remote);
             const acknowledged = { ...remote, viewport: latest.viewport || remote.viewport, remoteContentHash: remoteHash };
             acknowledgedProjects.set(source.id, acknowledged);
             verifiedProjects.add(source.id);
-            if (sameCanvasContent(latest, preparedForMutation)) {
-                useCanvasStore.setState((state) => ({ projects: state.projects.map((project) => (project === latest ? acknowledged : project)) }));
-            } else {
-                useCanvasStore.setState((state) => ({ projects: state.projects.map((project) => (project === latest ? { ...project, revision: remote.revision, remoteContentHash: remoteHash } : project)) }));
+            let projected: CanvasProject;
+            try {
+                projected = sameCanvasContent(latest, preparedForMutation) ? acknowledged : { ...reconcileCanvasMutation(preparedForMutation, remote, latest), remoteContentHash: remoteHash };
+                if (!sameCanvasContent(latest, projected)) for (const listener of agentCanvasListeners) listener(projected, latest);
+            } catch (mergeError) {
+                const pending = pendingCanvasMutations.get(source.id);
+                if (pending) await blockCanvasMutation(pending, mergeError, "conflict");
+                throw mergeError;
             }
+            useCanvasStore.setState((state) => ({ projects: state.projects.map((project) => (project === latest ? projected : project)) }));
             await flushCanvasStorePersistence();
+            pendingCanvasMutations.delete(source.id);
+            await persistPendingCanvasMutationJournal();
             const currentAfterSave = useCanvasStore.getState().openProject(source.id);
             const pending = Boolean(currentAfterSave && !sameCanvasContent(acknowledged, currentAfterSave));
             useSyncProgressStore.getState().setProjectProgress(source.id, {
@@ -1198,15 +1523,27 @@ async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: {
             });
             if (pending) syncQueued = true;
         } catch (error) {
+            assertSession();
             const resourcesMissing = error instanceof ApiError && error.reason === "canvas_history_resources_missing";
-            const errorKind = resourcesMissing ? "resources" : error instanceof ApiError && error.retryable ? "network" : "local";
+            const blocked = pendingCanvasMutations.get(source.id);
+            const errorKind = resourcesMissing ? "resources" : blocked?.blocked || (error instanceof ApiError && error.status === 409) ? "conflict" : error instanceof ApiError && error.retryable ? "network" : "local";
             useSyncProgressStore.getState().setProjectProgress(source.id, {
                 phase: "error",
                 errorKind,
                 pendingChanges: 1,
-                message: error instanceof Error ? error.message : "云端同步失败，等待自动恢复",
+                message: blocked?.message || (error instanceof Error ? error.message : "云端同步失败，请重试"),
             });
             errors.push(error);
+            recordDiagnosticEvent({
+                category: "action",
+                level: "warning",
+                code: error instanceof ApiError ? error.reason : "canvas_sync_failed",
+                message: "画布保存未确认",
+                canvasId: source.id,
+                requestId: blocked?.request.mutationId,
+                syncStage: "canvas",
+                operationFields: blocked?.request.operations.flatMap((operation) => (operation.type === "patch_node" ? Object.keys(operation.patch) : operation.type === "set_field" ? [operation.field] : [operation.type])),
+            });
         }
     }
     if (errors.length) throw errors[0];

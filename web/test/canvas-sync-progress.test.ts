@@ -14,6 +14,9 @@ const paths: Record<string, string> = {
     zustand: import.meta.resolve("zustand"),
     "@/services/api/resources": join(dir, "resources.ts"),
     "@/lib/canvas/canvas-content": join(dir, "content.ts"),
+    "@/lib/canvas/canvas-mutation-recovery": join(dir, "recovery.ts"),
+    "@/lib/canvas/agent-canvas-patch": join(dir, "patch.ts"),
+    "@/services/canvas-sync-drafts": join(dir, "drafts.ts"),
     "@/stores/use-sync-progress-store": join(dir, "progress.ts"),
     "./user-data-sync-media": join(dir, "media.ts"),
 };
@@ -35,6 +38,7 @@ export async function flushCanvasStorePersistence() { fixture.flushes++; const h
 export const flushAssetStorePersistence = async () => {};
 export const getGenerationAssetDefaults = () => undefined;
 export const appQueryClient = { invalidateQueries: async () => {} };
+export const recordDiagnosticEvent = () => {};
 export const repairMissingCanvasAssets = () => ({ createdAssets: 0, updatedProjects: 0 });
 export class ApiError extends Error { retryable = false; }
 export const apiBaseURL = "/api";
@@ -60,6 +64,9 @@ export const useCanvasHistoryStore = {};
 copySource("services/api/resources.ts", "resources.ts");
 copySource("services/user-data-sync-media.ts", "media.ts");
 copySource("lib/canvas/canvas-content.ts", "content.ts");
+copySource("lib/canvas/agent-canvas-patch.ts", "patch.ts");
+copySource("lib/canvas/canvas-mutation-recovery.ts", "recovery.ts");
+copySource("services/canvas-sync-drafts.ts", "drafts.ts");
 copySource("stores/use-sync-progress-store.ts", "progress.ts");
 copySource("services/user-data-sync.ts", "sync.ts");
 const sync: typeof import("@/services/user-data-sync") = await import(join(dir, "sync.ts"));
@@ -100,6 +107,8 @@ beforeEach(async () => {
     fixture.beforeFlush = fixture.readHook = fixture.flushError = undefined;
     useCanvasStore.setState({ projects: [base()] });
     await sync.initializeRemoteUserDataSession("sync-test-user");
+    await sync.refreshCanvasAfterAgent("canvas");
+    fixture.reads = fixture.flushes = 0;
 });
 afterEach(() => sync.resetRemoteUserDataSync());
 afterAll(() => {
@@ -157,6 +166,33 @@ describe("画布云端同步状态收尾", () => {
         expect(live().viewport).toEqual(viewport);
         expect(fixture.writes).toHaveLength(1);
         expect(useSyncProgressStore.getState().syncingProjects.canvas.phase).toBe("done");
+    });
+
+    test("云端哈希计算期间的新编辑保留，同时采用云端修改的其他节点字段", async () => {
+        useCanvasStore.setState({ projects: [withCdnUrl({ ...base(), title: "Renamed" })] });
+        fixture.readHook = () => {
+            fixture.remote = { ...fixture.remote, nodes: fixture.remote.nodes.map((node: CanvasProject["nodes"][number]) => ({ ...node, position: { x: 80, y: 30 } })) };
+        };
+        const originalDigest = crypto.subtle.digest;
+        let edited = false;
+        crypto.subtle.digest = async (...args) => {
+            const hash = await originalDigest.apply(crypto.subtle, args);
+            if (!edited) {
+                edited = true;
+                edit({ title: "Edited while hashing" });
+            }
+            return hash;
+        };
+        try {
+            await sync.saveRemoteUserDataNow("canvas");
+        } finally {
+            crypto.subtle.digest = originalDigest;
+        }
+        expect(edited).toBe(true);
+        expect(live().title).toBe("Edited while hashing");
+        expect(live().nodes[0].position).toEqual({ x: 80, y: 30 });
+        expect(fixture.remote.nodes[0].position).toEqual({ x: 80, y: 30 });
+        expect(fixture.remote.title).toBe("Edited while hashing");
     });
 
     test("空操作收尾的本地保存失败仍显示错误", async () => {

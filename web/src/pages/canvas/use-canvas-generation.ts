@@ -7,7 +7,7 @@ import { commitCanvasGenerationResult } from "@/lib/canvas/canvas-generation-res
 import { reconcileImageBatchRoot } from "@/lib/canvas/canvas-image-batch-retry";
 import { canvasTaskBindingStatus, markCanvasTaskRecoveryUnconfirmed } from "@/lib/canvas/canvas-task-state";
 import { applyCanvasGenerationTaskNodeEffect, isCanvasGenerationDurableAckError } from "@/services/canvas-generation-consumer";
-import { consumeGenerationTaskNode, ensureCanvasNodeAsset, retryCanvasAssetSyncAfterRateLimit } from "@/services/project-asset-sync";
+import { canvasAssetSyncFailureMessage, consumeGenerationTaskNode, ensureCanvasNodeAsset, retryCanvasAssetSyncAfterRateLimit } from "@/services/project-asset-sync";
 import { listGenerationTasks, listTaskLogs, queryGenerationTask, subscribeGenerationTasks, type GenerationTask, type TaskLog } from "@/services/api/task-center";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
@@ -525,10 +525,9 @@ export function useCanvasGeneration({ projectId, domainProjectId, projectLoaded,
             }).catch((error) => {
                 autoSavedTaskIdsRef.current.delete(saveKey);
                 if (error instanceof Error && error.name === "AbortError") return;
-                const detail = error instanceof Error ? error.message : "未知错误";
                 const content = hasRemoteUserDataSyncSession()
-                    ? `生成结果已保留，本地素材已保存，云端项目资产稍后重试：${detail}`
-                    : "生成结果已保留在本地素材库，登录后会继续同步到云端";
+                    ? canvasAssetSyncFailureMessage(error)
+                    : "生成结果已保留，请在任务中心核对并重新读取结果";
                 message.warning({
                     key: `canvas-asset-sync:${projectId}`,
                     content,

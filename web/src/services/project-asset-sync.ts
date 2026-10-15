@@ -6,17 +6,19 @@ import { ApiError } from "@/services/api/request";
 import { linkProjectAsset, moveProjectAsset, updateProjectAssetCategory } from "@/services/api/projects";
 import type { GenerationTask, GenerationTaskOutput } from "@/services/api/task-center";
 import { getMediaBlob, resolveMediaUrl, setMediaBlob } from "@/services/file-storage";
-import { createGenerationTaskMaterializer, createIdempotentMaterializeOutput, type MaterializeGenerationTaskOutput } from "@/services/generation-task-materializer";
+import { createGenerationTaskMaterializer, createIdempotentMaterializeOutput, materializeEffectKey, type MaterializeGenerationTaskOutput } from "@/services/generation-task-materializer";
 import { withGenerationArtifactCommitLock } from "@/services/generation-asset-repository";
 import { uploadGeneratedAssetToConfiguredSources } from "@/services/external-asset-sources";
 import { getImageBlob, resolveImageUrl, setImageBlob } from "@/services/image-storage";
 import { generationArtifactStorageKey, loadOrStoreGenerationArtifact } from "@/services/generation-artifact-sink";
+import { downloadGenerationMedia, validGenerationMedia } from "@/services/generation-media-download";
 import { createProviderNeutralGenerationTaskEffectStore } from "@/services/provider-neutral-generation-effects";
 import { getCachedResourceBlob } from "@/services/resource-blob-cache";
-import { hasRemoteUserDataSyncSession, loadAssetsForUse, saveRemoteUserDataNow } from "@/services/user-data-sync";
+import { hasRemoteUserDataSyncSession, loadAssetsForUse, saveRemoteAssetsNow } from "@/services/user-data-sync";
 import { getActiveUserScope } from "@/lib/user-scope";
 import { normalizeAssetCategory } from "@/lib/asset-category";
 import { runGenerationConsumer } from "@/services/generation-consumer-lifecycle";
+import { recordDiagnosticEvent } from "@/services/diagnostics/client-diagnostics";
 import { useAssetStore, type AssetCategory, type AssetStatus, type NewAsset } from "@/stores/use-asset-store";
 import type { CanvasNodeData } from "@/types/canvas";
 
@@ -40,6 +42,22 @@ export type CanvasNodeAssetResult = {
     created: boolean;
     linkedToProject: boolean;
 };
+
+export class CanvasAssetSyncError extends Error {
+    constructor(
+        readonly stage: "asset" | "project" | "metadata",
+        readonly assetId: string,
+        readonly cause: unknown,
+    ) {
+        super(stage === "asset" ? "素材已保存在本机，云端素材尚未确认，请重试同步" : stage === "project" ? "素材已保存到云端，项目关联尚未确认，请重试关联" : "素材与项目关联已保存，云端素材信息更新尚未确认，请重试同步");
+        this.name = "CanvasAssetSyncError";
+        recordDiagnosticEvent({ category: "action", level: "warning", code: "canvas_asset_sync_pending", message: this.message, assetId, syncStage: stage === "metadata" ? "asset" : stage });
+    }
+}
+
+export function canvasAssetSyncFailureMessage(error: unknown) {
+    return error instanceof CanvasAssetSyncError ? error.message : `生成结果已保留，素材保存尚未完成：${error instanceof Error ? error.message : "请重试读取任务结果"}`;
+}
 
 const pendingAssetSyncs = new Map<string, Promise<CanvasNodeAssetResult>>();
 const DEFAULT_RATE_LIMIT_RETRY_MS = 60_000;
@@ -77,8 +95,9 @@ export async function retryCanvasAssetSyncAfterRateLimit<T>(operation: () => Pro
         try {
             return await operation();
         } catch (error) {
-            if (!(error instanceof ApiError) || error.status !== 429 || attempt >= maxRetries) throw error;
-            const delayMs = Math.min(MAX_RATE_LIMIT_RETRY_MS, Math.max(0, error.retryAfterMs ?? DEFAULT_RATE_LIMIT_RETRY_MS));
+            const cause = error instanceof CanvasAssetSyncError ? error.cause : error;
+            if (!(cause instanceof ApiError) || cause.status !== 429 || attempt >= maxRetries) throw error;
+            const delayMs = Math.min(MAX_RATE_LIMIT_RETRY_MS, Math.max(0, cause.retryAfterMs ?? DEFAULT_RATE_LIMIT_RETRY_MS));
             await wait(delayMs, options.signal);
         }
     }
@@ -125,7 +144,11 @@ async function persistCanvasNodeAsset(options: EnsureCanvasNodeAssetOptions): Pr
     // 继续上传素材和画布，不能把一个可恢复的本地成功报告成失败。
     if (!hasRemoteUserDataSyncSession()) return { assetId: asset.id, created, linkedToProject: false };
     if (!options.domainProjectId) {
-        await saveRemoteUserDataNow();
+        try {
+            await saveRemoteAssetsNow([asset.id]);
+        } catch (error) {
+            throw new CanvasAssetSyncError("asset", asset.id, error);
+        }
         throwIfAborted(options.signal);
         return { assetId: asset.id, created, linkedToProject: false };
     }
@@ -138,35 +161,47 @@ async function syncAssetToProject(assetId: string, domainProjectId: string, cate
     const asset = useAssetStore.getState().assets.find((candidate) => candidate.id === assetId);
     if (!asset) throw new Error("素材写入本地失败");
     const linkedProjectIds = Array.isArray(asset.metadata?.projectIds) ? asset.metadata.projectIds.filter((id): id is string => typeof id === "string") : [];
-    if (linkedProjectIds.includes(domainProjectId)) {
-        if (folderId !== undefined) await moveProjectAsset(domainProjectId, asset.id, folderId, signal);
-        return;
-    }
-
     // 项目关联依赖后端 assets 记录，先强制完成素材同步，不能依赖延迟自动同步的时序。
-    await saveRemoteUserDataNow();
+    try {
+        await saveRemoteAssetsNow([assetId]);
+    } catch (error) {
+        throw new CanvasAssetSyncError("asset", assetId, error);
+    }
     throwIfAborted(signal);
-    const { asset: linkedAsset } = await linkProjectAsset(
-        domainProjectId,
-        {
-            assetId: asset.id,
-            category: normalizeAssetCategory(category || asset.category),
-            folderId,
-        },
-        signal,
-    );
-    throwIfAborted(signal);
-    let linked = category && linkedAsset.category !== category ? (await updateProjectAssetCategory(domainProjectId, asset.id, category, signal)).asset : linkedAsset;
-    if (folderId !== undefined && (linked.folderId || "") !== folderId) linked = (await moveProjectAsset(domainProjectId, asset.id, folderId, signal)).asset;
-    throwIfAborted(signal);
-    useAssetStore.getState().updateAsset(asset.id, {
-        category: normalizeAssetCategory(linked.category),
-        status: linked.status as AssetStatus,
-        primaryVersionId: linked.primaryVersionId,
-        metadata: { ...asset.metadata, projectIds: [...new Set([...linkedProjectIds, domainProjectId])] },
-    });
-    await saveRemoteUserDataNow();
-    throwIfAborted(signal);
+    try {
+        // The server endpoint is idempotent. Local metadata cannot prove that the
+        // relationship still exists after another device unlinks the asset.
+        const { asset: linkedAsset } = await linkProjectAsset(
+            domainProjectId,
+            {
+                assetId: asset.id,
+                category: normalizeAssetCategory(category || asset.category),
+                folderId,
+            },
+            signal,
+        );
+        throwIfAborted(signal);
+        let linked = category && linkedAsset.category !== category ? (await updateProjectAssetCategory(domainProjectId, asset.id, category, signal)).asset : linkedAsset;
+        if (folderId !== undefined && (linked.folderId || "") !== folderId) linked = (await moveProjectAsset(domainProjectId, asset.id, folderId, signal)).asset;
+        throwIfAborted(signal);
+        useAssetStore.getState().updateAsset(asset.id, {
+            category: normalizeAssetCategory(linked.category),
+            status: linked.status as AssetStatus,
+            primaryVersionId: linked.primaryVersionId,
+            metadata: { ...useAssetStore.getState().assets.find((item) => item.id === assetId)?.metadata, projectIds: [...new Set([...linkedProjectIds, domainProjectId])] },
+        });
+        throwIfAborted(signal);
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
+        throw new CanvasAssetSyncError("project", assetId, error);
+    }
+    // The relationship is already confirmed. Persisting its display hint is a
+    // separate asset operation and cannot be blocked by a canvas conflict.
+    try {
+        await saveRemoteAssetsNow([assetId]);
+    } catch (error) {
+        throw new CanvasAssetSyncError("metadata", assetId, error);
+    }
 }
 
 function generationTaskResult(task: GenerationTask): BackendGenerationResult {
@@ -191,15 +226,18 @@ export function projectGenerationTaskResult(task: GenerationTask, result?: Backe
                     ...(projectedResult.video.storageKey ? { providerArtifactRef: projectedResult.video.storageKey } : {}),
                 },
             ]
-          : projectedResult.audio
-            ? [
-                  {
-                      outputIndex: 0,
-                      mediaType: "audio" as const,
-                      ...(projectedResult.audio.storageKey ? { providerArtifactRef: projectedResult.audio.storageKey } : {}),
-                  },
-              ]
+          : projectedResult.audios?.length || projectedResult.audio
+            ? (projectedResult.audios?.length ? projectedResult.audios : [projectedResult.audio!]).map((audio, outputIndex) => ({
+                  outputIndex,
+                  mediaType: "audio" as const,
+                  ...(audio.storageKey ? { providerArtifactRef: audio.storageKey } : {}),
+              }))
             : (task.outputs?.map((output) => ({ ...output })) ?? []);
+
+    for (const output of outputs) {
+        const existing = task.outputs?.find((item) => item.outputIndex === output.outputIndex && item.mediaType === output.mediaType && item.providerArtifactRef === output.providerArtifactRef);
+        if (existing?.materializedAssetId) output.materializedAssetId = existing.materializedAssetId;
+    }
 
     return {
         ...task,
@@ -229,7 +267,8 @@ async function storedGenerationImage(result: NonNullable<BackendGenerationResult
     const blob = await loadOrStoreGenerationArtifact({
         effectKey: storageKey,
         read: (key) => getImageBlob(key),
-        materialize: async () => (await fetch(result.dataUrl, { signal })).blob(),
+        materialize: () => downloadGenerationMedia(result.dataUrl, "image", signal),
+        validate: (artifact) => validGenerationMedia(artifact, "image"),
         write: async (key, artifact) => {
             await setImageBlob(key, artifact);
         },
@@ -256,7 +295,8 @@ async function storedGenerationMedia(dataUrl: string, effectKey: string, mediaTy
     const blob = await loadOrStoreGenerationArtifact({
         effectKey: storageKey,
         read: (key) => getMediaBlob(key),
-        materialize: async () => (await fetch(dataUrl, { signal })).blob(),
+        materialize: () => downloadGenerationMedia(dataUrl, mediaType, signal),
+        validate: (artifact) => validGenerationMedia(artifact, mediaType),
         write: async (key, artifact) => {
             await setMediaBlob(key, artifact);
         },
@@ -281,7 +321,7 @@ async function cachedRemoteGenerationVideo(video: NonNullable<BackendGenerationR
     throwIfAborted(signal);
     const blob = await getCachedResourceBlob(video.storageKey);
     throwIfAborted(signal);
-    if (!blob) throw new Error("生成视频资源缓存失败，未标记为成功");
+    if (!blob || !(await validGenerationMedia(blob, "video"))) throw new Error("生成视频资源缓存失败，未标记为成功");
     const url = await resolveMediaUrl(video.storageKey, video.dataUrl);
     throwIfAborted(signal);
     if (!url) throw new Error("生成视频资源地址为空，未标记为成功");
@@ -374,7 +414,7 @@ async function generationOutputAsset(input: Parameters<MaterializeGenerationTask
         };
     }
 
-    const audio = result.audio;
+    const audio = result.audios?.length ? result.audios[input.output.outputIndex] : input.output.outputIndex === 0 ? result.audio : undefined;
     if (!audio) throw new Error("生成任务缺少音频输出");
     const stored = audio.storageKey
         ? {
@@ -423,14 +463,17 @@ const materializeGenerationOutput: MaterializeGenerationTaskOutput = createIdemp
             scope,
             async () => {
                 throwIfAborted(input.signal);
+                if (scope !== getActiveUserScope()) throw new DOMException("账号已切换", "AbortError");
                 const asset = await generationOutputAsset(input, scope);
                 throwIfAborted(input.signal);
+                if (scope !== getActiveUserScope()) throw new DOMException("账号已切换", "AbortError");
                 const createdAssetId = await useAssetStore.getState().addGenerationAsset(input.effectKey, asset, input.signal);
                 throwIfAborted(input.signal);
                 return createdAssetId;
             },
             { requireCrossRealmLock: true },
         );
+        if (scope !== getActiveUserScope()) throw new DOMException("账号已切换", "AbortError");
         const storedAsset = useAssetStore.getState().assets.find((candidate) => candidate.id === assetId);
         if (storedAsset) {
             const syncResult = await uploadGeneratedAssetToConfiguredSources(storedAsset, input.signal);
@@ -459,7 +502,37 @@ function generationTaskMaterializer(task: GenerationTask) {
 }
 
 export async function materializeGenerationTaskAssets(task: GenerationTask, signal?: AbortSignal): Promise<GenerationTask> {
-    return generationTaskMaterializer(task).materialize(projectGenerationTaskResult(task), signal);
+    const scope = getActiveUserScope();
+    const assertScope = () => {
+        if (scope !== getActiveUserScope()) throw new DOMException("账号已切换", "AbortError");
+    };
+    const result = await generationTaskMaterializer(task).materialize(projectGenerationTaskResult(task), signal);
+    assertScope();
+    for (const output of result.outputs || []) {
+        const asset = useAssetStore.getState().assets.find((item) => item.id === output.materializedAssetId);
+        if (!asset || (asset.kind !== "image" && asset.kind !== "video" && asset.kind !== "audio")) continue;
+        const key = asset.data.storageKey;
+        if (!key?.startsWith(`generation-${asset.kind}:`)) continue;
+        const blob = asset.kind === "image" ? await getImageBlob(key) : await getMediaBlob(key);
+        assertScope();
+        if (blob && (await validGenerationMedia(blob, asset.kind))) continue;
+        await withGenerationArtifactCommitLock(
+            scope,
+            async () => {
+                assertScope();
+                throwIfAborted(signal);
+                const repaired = await generationOutputAsset({ task: result, output, effectKey: materializeEffectKey(task.id, output.outputIndex), signal }, scope);
+                throwIfAborted(signal);
+                if (scope !== getActiveUserScope()) throw new DOMException("账号已切换", "AbortError");
+                const current = useAssetStore.getState().assets.find((item) => item.id === asset.id);
+                if (!current || current.data !== asset.data || repaired.kind !== asset.kind) return;
+                const coverUrl = asset.kind === "image" && asset.coverUrl === asset.data.dataUrl ? repaired.coverUrl : current.coverUrl;
+                useAssetStore.getState().updateAsset(asset.id, { data: repaired.data, coverUrl });
+            },
+            { requireCrossRealmLock: true },
+        );
+    }
+    return result;
 }
 
 export function attachGenerationTaskNode(task: GenerationTask, nodeId: string, outputIndex: number, consumer: Parameters<ReturnType<typeof generationTaskMaterializer>["attachNode"]>[3], signal?: AbortSignal) {

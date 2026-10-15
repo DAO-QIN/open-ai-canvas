@@ -6,7 +6,7 @@ import { FileImage, UploadCloud, X } from "lucide-react";
 import { ASSET_CATEGORY_OPTIONS, type AssetCategory } from "@/lib/asset-category";
 import { readImageMeta } from "@/lib/image-utils";
 import { uploadImage } from "@/services/image-storage";
-import { localSavedRemotePendingMessage, saveRemoteUserDataNow } from "@/services/user-data-sync";
+import { localSavedRemotePendingMessage, saveRemoteAssetsNow } from "@/services/user-data-sync";
 import { flushAssetStorePersistence, useAssetStore } from "@/stores/use-asset-store";
 import type { AssetFolder } from "@/services/api/user-data";
 import { Select } from "@/components/ui/base/select";
@@ -41,6 +41,7 @@ export function AssetBatchUploadModal({ open, defaultFolderId, folders, onClose,
         if (!pending.length) return;
         setUploading(true);
         let cursor = 0;
+        const addedAssetIds: string[] = [];
         const worker = async () => {
             while (cursor < pending.length) {
                 const item = pending[cursor++];
@@ -48,7 +49,7 @@ export function AssetBatchUploadModal({ open, defaultFolderId, folders, onClose,
                 try {
                     const uploaded = await uploadImage(item.file);
                     const meta = await readImageMeta(uploaded.url).catch(() => ({ width: uploaded.width, height: uploaded.height, mimeType: uploaded.mimeType }));
-                    addAsset({ kind: "image", title: item.file.name.replace(/\.[^.]+$/, ""), category, folderId: folderId || undefined, coverUrl: uploaded.url, tags, source: "批量上传", metadata: { source: "manual-batch" }, data: { dataUrl: uploaded.url, storageKey: uploaded.storageKey, width: meta.width || uploaded.width, height: meta.height || uploaded.height, bytes: uploaded.bytes, mimeType: uploaded.mimeType } });
+                    addedAssetIds.push(addAsset({ kind: "image", title: item.file.name.replace(/\.[^.]+$/, ""), category, folderId: folderId || undefined, coverUrl: uploaded.url, tags, source: "批量上传", metadata: { source: "manual-batch" }, data: { dataUrl: uploaded.url, storageKey: uploaded.storageKey, width: meta.width || uploaded.width, height: meta.height || uploaded.height, bytes: uploaded.bytes, mimeType: uploaded.mimeType } }));
                     setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, status: "done", percent: 100 } : entry));
                 } catch (error) {
                     setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, status: "error", error: error instanceof Error ? error.message : "上传失败" } : entry));
@@ -58,7 +59,7 @@ export function AssetBatchUploadModal({ open, defaultFolderId, folders, onClose,
         await Promise.all(Array.from({ length: Math.min(4, pending.length) }, () => worker()));
         await flushAssetStorePersistence();
         try {
-            await saveRemoteUserDataNow();
+            if (addedAssetIds.length) await saveRemoteAssetsNow(addedAssetIds);
         } catch (error) {
             message.warning(localSavedRemotePendingMessage("部分素材已保存在本地", error));
         }

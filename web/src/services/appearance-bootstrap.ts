@@ -1,5 +1,5 @@
 import { getPublicAppearance, type PublicAppearance } from "@/services/api/appearance";
-import { commitPublicAppearance, useAppearanceStore } from "@/stores/use-appearance-store";
+import { commitPublicAppearance, readConfirmedAppearance, useAppearanceStore } from "@/stores/use-appearance-store";
 
 const APPEARANCE_BOOTSTRAP_TIMEOUT_MS = 4_000;
 let refreshing: Promise<PublicAppearance | undefined> | undefined;
@@ -39,6 +39,10 @@ export async function resolvePublicAppearance(fetchAppearance: (signal: AbortSig
 
 export function bootstrapAppearance(fetchAppearance?: (signal: AbortSignal) => Promise<PublicAppearance>) {
     if (bootstrapping) return bootstrapping;
+    if (!useAppearanceStore.getState().resolved) {
+        const confirmed = readConfirmedAppearance();
+        if (confirmed) commitPublicAppearance(confirmed);
+    }
     const previous = useAppearanceStore.getState().appearance;
     useAppearanceStore.setState({ loadFailed: false });
     bootstrapping = resolvePublicAppearance(fetchAppearance)

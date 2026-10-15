@@ -23,7 +23,7 @@ import {
 import { type PrevisObject, type PrevisLight, type PrevisShot, type PrevisHumanoidBone, type PrevisQuat, type PrevisKeyframeDeleteTarget, type PrevisKeyframeEasing, type PrevisRig, type PrevisShotSize, type PrevisActorProfile } from "@/types/previs";
 import { resolvePrevisPlacementAnchor, resolvePrevisPlacement, type PrevisGroundPoint } from "@/lib/canvas/previs/previs-placement";
 import { uploadMediaFile } from "@/services/file-storage";
-import { saveRemoteUserDataNow, localSavedRemotePendingMessage } from "@/services/user-data-sync";
+import { saveRemoteAssetsNow, saveRemoteUserDataNow, localSavedRemotePendingMessage } from "@/services/user-data-sync";
 import { Camera, Lightbulb, LampDesk, UserRound, Box, Circle, Cuboid, Square, FileUp, X, Undo2, Redo2, Video, Save, Plus, WandSparkles, BoxSelect, Image as ImageIcon, Users, Route, Search } from "lucide-react";
 import { PrevisCanvasDock } from "./previs-canvas-dock";
 import { Dropdown } from "antd";
@@ -565,7 +565,8 @@ export function CanvasPrevisWorkbench({
         const asset = useAssetStore.getState().assets.find((item): item is ModelAsset => item.id === assetId && item.kind === "model");
         if (asset) addModelAsset(asset);
         try {
-            await saveRemoteUserDataNow();
+            await saveRemoteAssetsNow([assetId]);
+            if (effectiveCanvasId) await saveRemoteUserDataNow(effectiveCanvasId);
             message.success("3D 模型已加入场景和素材库");
         } catch (error) {
             message.warning(localSavedRemotePendingMessage("3D 模型已加入场景和本机素材库", error));

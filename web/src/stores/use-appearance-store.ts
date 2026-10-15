@@ -3,6 +3,7 @@ import { DEFAULT_CANVAS_APPEARANCE } from "@/lib/canvas/agent-appearance";
 import { DEFAULT_UPDATE_ANNOUNCEMENT, normalizeUpdateAnnouncement } from "@/lib/update-announcement";
 
 import type { PublicAppearance } from "@/services/api/appearance";
+import { apiBaseURL } from "@/services/api/request";
 import { applySkinTheme, DEFAULT_CLASSIC_SKIN, normalizeSkinDefinition } from "@/lib/skin-themes";
 
 export const DEFAULT_PUBLIC_APPEARANCE: PublicAppearance = {
@@ -105,11 +106,33 @@ function normalizeAppearanceCopy(value: unknown, fallback: string, allowEmpty = 
     return normalized || (allowEmpty ? "" : fallback);
 }
 
+const appearanceCacheKey = `yingce:confirmed-appearance:${apiBaseURL}`;
+
+export function readConfirmedAppearance(): PublicAppearance | undefined {
+    if (typeof window === "undefined") return undefined;
+    try {
+        const raw = window.localStorage.getItem(appearanceCacheKey);
+        if (!raw) return undefined;
+        const cached = JSON.parse(raw) as { version?: number; appearance?: PublicAppearance };
+        if (cached.version !== 1 || cached.appearance?.schemaVersion !== 10 || !cached.appearance.brandName?.trim() || !cached.appearance.revision) return undefined;
+        return normalizePublicAppearance(cached.appearance);
+    } catch {
+        return undefined;
+    }
+}
+
 export function commitPublicAppearance(value?: Partial<PublicAppearance> | null) {
     const appearance = normalizePublicAppearance(value);
     useAppearanceStore.getState().setAppearance(appearance);
     applySkinTheme(appearance.activeSkin, typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light");
     applyAppearanceMetadata(appearance);
+    if (typeof window !== "undefined" && value?.schemaVersion === 10 && value.revision) {
+        try {
+            window.localStorage.setItem(appearanceCacheKey, JSON.stringify({ version: 1, appearance }));
+        } catch {
+            /* Branding cache must not prevent use when storage is full. */
+        }
+    }
     return appearance;
 }
 

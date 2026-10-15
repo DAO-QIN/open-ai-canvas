@@ -93,3 +93,20 @@ test("a failed bootstrap cannot reset a brand already resolved in this tab", asy
     expect(useAppearanceStore.getState().appearance.brandName).toBe("影绘");
     expect(useAppearanceStore.getState().resolved).toBe(true);
 });
+
+test("a confirmed same-origin brand permits startup when the appearance endpoint is offline", async () => {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const cache = new Map<string, string>();
+    Object.defineProperty(globalThis, "window", { configurable: true, value: { localStorage: { getItem: (key: string) => cache.get(key) ?? null, setItem: (key: string, value: string) => cache.set(key, value) } } });
+    try {
+        commitPublicAppearance(normalizePublicAppearance({ brandName: "已确认品牌", revision: "saved-revision" }));
+        coldStart();
+        const bootstrap = bootstrapAppearance(async () => { throw new Error("offline"); });
+        expect(useAppearanceStore.getState().resolved).toBe(true);
+        await bootstrap;
+        expect(useAppearanceStore.getState().appearance.brandName).toBe("已确认品牌");
+    } finally {
+        if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+        else Reflect.deleteProperty(globalThis, "window");
+    }
+});

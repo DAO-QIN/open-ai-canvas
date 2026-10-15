@@ -41,7 +41,7 @@ import {
     type ProjectAsset,
     type ProjectAssetFolder,
 } from "@/services/api/projects";
-import { saveRemoteUserDataNow } from "@/services/user-data-sync";
+import { saveRemoteAssetsNow } from "@/services/user-data-sync";
 import { useAssetStore, type Asset, type AssetCategory, type AssetStatus, type EntityAsset, type ImageAsset } from "@/stores/use-asset-store";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { CanvasNodeType, type CanvasFolderStyle, type CanvasFolderTheme, type CanvasNodeData } from "@/types/canvas";
@@ -337,11 +337,11 @@ export default function ProjectAssetsView({ detail, refreshProject }: ProjectDet
     const bindImagesMutation = useMutation({
         mutationFn: async (selectedAssetId: string) => {
             if (!imageAsset) throw new Error("未选择角色");
-            await saveRemoteUserDataNow();
             const latest = useAssetStore.getState().assets;
             const pickerItem = imagePickerItems.find((item) => item.id === selectedAssetId);
             const selected = latest.find((asset) => asset.id === selectedAssetId) || (pickerItem?.external ? await externalAssetSources.importExternalAsset(pickerItem.external) : undefined);
             if (selected?.kind !== "image") throw new Error("请选择一张包含正面、侧面和背面的三视图设定图");
+            await saveRemoteAssetsNow([selected.id]);
             const resourceId = resourceIdFromStorageKey((selected as ImageAsset).data.storageKey);
             if (!resourceId) throw new Error("所选图片尚未同步到后端资源库");
             return replaceProjectCharacterRepresentations(detail.project.id, imageAsset.id, [{ role: "turnaround_sheet", resourceId, metadata: { sourceAssetId: selected.id } }, { role: "primary", resourceId, metadata: { source: "turnaround_sheet", sourceAssetId: selected.id } }]);
