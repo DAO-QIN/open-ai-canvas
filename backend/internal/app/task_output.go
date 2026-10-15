@@ -119,7 +119,7 @@ func taskSummaryForOutput(task model.Task) TaskSummary {
 		Model:                     task.Model,
 		ProviderRequestID:         task.ProviderRequestID,
 		ProviderCancelStatus:      task.ProviderCancelStatus,
-		ProviderCancelError:       task.ProviderCancelError,
+		ProviderCancelError:       publicTaskErrorMessage(task.ProviderCancelError),
 		ProviderCancelAttempts:    task.ProviderCancelAttempts,
 		ProviderCancelRequestedAt: task.ProviderCancelRequestedAt,
 		ProviderCancelledAt:       task.ProviderCancelledAt,
@@ -292,12 +292,25 @@ func truncateRunes(value string, limit int) string {
 func taskForOutput(task model.Task) *model.Task {
 	task.CanRecoverMedia = task.MediaRecoveryJSON != "" && task.Status == model.TaskStatusFailed
 	task.Diagnostic = taskExecutionDiagnostic(&task)
+	if task.Diagnostic != nil {
+		task.Diagnostic.SafeMessage = publicTaskErrorMessage(task.Diagnostic.SafeMessage)
+		task.Diagnostic.WritebackMessage = publicTaskErrorMessage(task.Diagnostic.WritebackMessage)
+	}
+	task.Error = publicTaskErrorMessage(task.Error)
+	task.ProviderCancelError = publicTaskErrorMessage(task.ProviderCancelError)
 	task.InputJSON = publicTaskInputJSON(task.InputJSON)
 	// 普通任务接口只暴露前台模型身份；渠道模型和供应线路属于管理员内部信息。
 	task.LogicalModelRevisionID = ""
 	task.RouteID = ""
 	task.ChannelModelID = ""
 	return &task
+}
+
+func taskLogForOutput(log model.TaskLog) model.TaskLog {
+	log.Message = publicTaskErrorMessage(log.Message)
+	// Payload contains internal protocol responses, not a consumer log contract.
+	log.Payload = ""
+	return log
 }
 
 func publicTaskInputJSON(raw string) string {

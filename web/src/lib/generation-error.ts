@@ -10,7 +10,7 @@ const MODEL_SERVICE_ERROR_MESSAGE = "模型服务处理失败，请稍后重试�
 
 const REASON_MESSAGES: Record<string, string> = {
     model_price_not_configured: "当前模型暂未配置价格，请换用其他模型或联系管理员。",
-    model_route_unavailable: "当前模型暂时没有可用渠道，请稍后重试或换用其他模型。",
+    model_route_unavailable: "当前模型暂时不可用，请稍后重试或换用其他模型。",
     provider_request_failed: MODEL_SERVICE_ERROR_MESSAGE,
     model_catalog_mismatch: "模型配置已更新，请重新选择模型后再试。",
     invalid_model_selection: "模型选择无效，请重新选择模型后再试。",
@@ -54,31 +54,41 @@ export function generationErrorMessage(error: unknown) {
     if (reason && REASON_MESSAGES[reason]) return REASON_MESSAGES[reason];
 
     const providerMessage = extractStructuredProviderMessage(raw) || extractWrappedProviderMessage(raw);
-    const displayMessage = providerMessage || raw;
+    const displayMessage = consumerErrorDetail(providerMessage || raw);
     if (isContentModerationError(displayMessage)) return contentModerationMessage(displayMessage);
     const resourceStorageMessage = resourceStorageFailureMessage(raw) || resourceStorageFailureMessage(displayMessage);
     if (resourceStorageMessage) return resourceStorageMessage;
     if (isNetworkFailure(displayMessage)) return NETWORK_ERROR_MESSAGE;
-    if (!providerMessage && !keepsProviderDetail(displayMessage)) {
+    if (!providerMessage && !keepsProviderDetail(raw)) {
         if (hasHttpStatus(raw, 429)) return "服务当前繁忙，请稍后重试。";
-        if (hasHttpStatus(raw, 401, 403)) return "生成服务鉴权失败，请检查渠道配置。";
-        if (hasHttpStatus(raw, 404)) return "生成服务地址不可用，请检查渠道配置。";
+        if (hasHttpStatus(raw, 401, 403, 404)) return MODEL_SERVICE_ERROR_MESSAGE;
         if (hasHttpStatus(raw, 500, 502, 503, 504)) return NETWORK_ERROR_MESSAGE;
         if (containsInfrastructureDetails(raw)) return NETWORK_ERROR_MESSAGE;
     }
     if (isModelCapabilityFailure(displayMessage)) return MODEL_CAPABILITY_ERROR_MESSAGE;
     if (isModelParameterFailure(displayMessage)) return MODEL_PARAMETER_ERROR_MESSAGE;
-    if (keepsProviderDetail(displayMessage)) return displayMessage;
+    if (containsProtocolDetails(displayMessage)) return MODEL_SERVICE_ERROR_MESSAGE;
     if (isTechnicalProviderMessage(displayMessage)) return MODEL_SERVICE_ERROR_MESSAGE;
     return displayMessage || DEFAULT_GENERATION_ERROR_MESSAGE;
 }
 
 function contentModerationMessage(raw: string) {
-    const detailIndex = raw.indexOf("；上游：");
-    // 保留服务端过滤后的拒绝原因，同时保持平台审核的积分提示及重试保护。
-    return detailIndex >= 0 && !containsInfrastructureDetails(raw)
-        ? CONTENT_MODERATION_MESSAGE + raw.slice(detailIndex)
+    const detail = raw.includes("；上游：") ? consumerErrorDetail(raw) : "";
+    // 审核细节只展示可操作原因，不带供应商来源或内部诊断。
+    return detail && !containsInfrastructureDetails(detail) && !containsProtocolDetails(detail)
+        ? `${CONTENT_MODERATION_MESSAGE} ${detail}`
         : CONTENT_MODERATION_MESSAGE;
+}
+
+function consumerErrorDetail(raw: string) {
+    const marker = "；上游：";
+    const index = raw.indexOf(marker);
+    const message = index >= 0 ? raw.slice(index + marker.length).trim() : raw;
+    return message.replace(/^声明式协议任务失败（任务 [^）]*）：/, "");
+}
+
+function containsProtocolDetails(value: string) {
+    return /(?:渠道|供应商|声明式协议|workflow_id|task_id|api[ _-]?key|authorization|cookie|secret|token|first_frame|last_frame)/i.test(value);
 }
 
 export function generationErrorCode(error: unknown) {
@@ -131,7 +141,7 @@ function isModelCapabilityFailure(value: string) {
 }
 
 function isModelParameterFailure(value: string) {
-    return /不支持参数|超出支持范围|数量需在|至少需要\s+\d+\s+个|暂时无法满足这组输入和参数/i.test(value);
+    return /不支持参数|超出支持范围|数量需在|至少需要\s+\d+\s+个|暂时无法满足这组输入和参数|缺少必填参数|ref_(?:image|audio)_\d+|first_frame|last_frame|RequestParameterIsWrong|invalid.?parameter/i.test(value);
 }
 
 function isTechnicalProviderMessage(value: string) {
@@ -201,9 +211,9 @@ function containsInfrastructureDetails(value: string) {
 
 function resourceStorageFailureMessage(value: string) {
     if (!value) return "";
-    if (/\bUserDisable\b/i.test(value)) return "对象存储账号已停用，请检查或更换对象存储配置。";
+    if (/\bUserDisable\b/i.test(value)) return "参考素材暂时无法上传，请稍后重试。";
     if (/(?:参考(?:图片|媒体)上传失败|OSS 上传失败|对象存储|腾讯云 COS|七牛云)/i.test(value)) {
-        return "参考素材上传到对象存储失败，请检查对象存储配置后重试。";
+        return "参考素材上传失败，请重新上传后重试。";
     }
     return "";
 }

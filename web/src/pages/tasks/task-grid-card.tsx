@@ -4,7 +4,7 @@ import { Tooltip } from "@/components/ui/base/tooltip";
 import { Eye, FileText, Image as ImageIcon, RotateCcw, Video } from "lucide-react";
 
 import { MediaPreview } from "@/components/media-preview";
-import { CONTENT_MODERATION_ERROR_CODE, isContentModerationError } from "@/lib/generation-error";
+import { CONTENT_MODERATION_ERROR_CODE, generationErrorMessage, isContentModerationError } from "@/lib/generation-error";
 import { generationTaskShowsProgress, generationTaskStageLabel, generationTaskStatusLabel } from "@/lib/generation-task-display";
 import type { GenerationTask } from "@/services/api/task-center";
 import { isTaskFailed, statusDotClassName, taskAttentionReason, TaskDate } from "./task-shared";
@@ -69,7 +69,7 @@ export function TaskGridCard({ task, actingId, onOpen, onRetry }: { task: Genera
                         <i><b style={{ width: `${task.progress || 0}%` }} /></i>
                     </div>
                 ) : null}
-                {isFailed ? <p className="task-grid-error" title={task.error || undefined}>{taskAttentionReason(task)}</p> : null}
+                {isFailed ? <p className="task-grid-error" title={task.error ? generationErrorMessage(task.error) : undefined}>{taskAttentionReason(task)}</p> : null}
             </div>
         </article>
     );

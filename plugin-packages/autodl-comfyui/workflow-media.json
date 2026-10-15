@@ -1,0 +1,17 @@
+{
+  "minimax_h3_b99_001": { "imageMode": "none", "minImages": 0, "maxImages": 0, "maxAudios": 0 },
+  "minimax_h3_lightx2v_no_pic": { "imageMode": "none", "minImages": 0, "maxImages": 0, "maxAudios": 0 },
+  "minimax_h3_z0901": { "imageMode": "none", "minImages": 0, "maxImages": 0, "maxAudios": 0 },
+  "minimax_h3_b99_002": { "imageMode": "frames", "minImages": 0, "maxImages": 2, "maxAudios": 0 },
+  "minimax_h3_lightx2v": { "imageMode": "frames", "minImages": 0, "maxImages": 2, "maxAudios": 0 },
+  "minimax_h3_b99_003_12s": { "imageMode": "references", "minImages": 0, "maxImages": 9, "maxAudios": 0 },
+  "minimax_h3_lightx2v_v5": { "imageMode": "references", "minImages": 0, "maxImages": 9, "maxAudios": 0 },
+  "minimax_h3_lightx2v_v5_15s": { "imageMode": "references", "minImages": 0, "maxImages": 9, "maxAudios": 0 },
+  "minimax_h3_zm_u24": { "imageMode": "references", "minImages": 1, "maxImages": 9, "maxAudios": 0 },
+  "minimax_h3_zm_u08": { "imageMode": "references", "minImages": 0, "maxImages": 9, "maxAudios": 0 },
+  "minimax_h3_z0902": { "imageMode": "references", "minImages": 0, "maxImages": 6, "maxAudios": 0 },
+  "minimax_h3_z0903": { "imageMode": "references", "minImages": 0, "maxImages": 6, "maxAudios": 3 },
+  "minimax_h3_image_audio_to_video": { "imageMode": "references", "minImages": 0, "maxImages": 1, "maxAudios": 1, "durationField": "audio_duration", "sendPrompt": false },
+  "minimax_h3_image_audio_to_video_v2": { "imageMode": "references", "minImages": 0, "maxImages": 9, "maxAudios": 3 },
+  "minimax_h3_image_audio_to_video_v2_15s": { "imageMode": "references", "minImages": 0, "maxImages": 9, "maxAudios": 3 }
+}

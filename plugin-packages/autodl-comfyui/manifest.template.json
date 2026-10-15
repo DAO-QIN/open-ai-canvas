@@ -1,0 +1,654 @@
+{
+  "apiVersion": "yingce.plugin/v2",
+  "id": "autodl-comfyui",
+  "name": "AutoDL ComfyUI 视频与音频",
+  "version": "2.3.1",
+  "author": "影策社区",
+  "description": "通过 AutoDL.Art ComfyUI 工作流 API 接入异步视频生成。",
+  "permissions": [
+    "generation.run",
+    "media.read"
+  ],
+  "configuration": {
+    "fields": [
+      {
+        "name": "apiKey",
+        "type": "secret",
+        "label": "AutoDL Token",
+        "required": true,
+        "description": "填写 AutoDL 大模型令牌管理中创建的 ComfyUI 分组 Token。"
+      }
+    ]
+  },
+  "contributes": {
+    "providers": [
+      {
+        "id": "autodl-comfyui",
+        "label": "AutoDL ComfyUI 视频",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation"
+        ],
+        "baseUrl": "https://autodl.art",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "header",
+          "field": "apiKey",
+          "header": "Authorization"
+        },
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt",
+            "description": "视频生成提示词。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长（秒）。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "description": "输出分辨率档位，如 480p竖、768p竖、1080p竖、480p横、768p横、1080p横、480p(1:1)、768p(1:1) 等。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "mapping": "first_frame/last_frame 或 ref_image_N",
+            "description": "先按 first_frame、last_frame、reference_image 等 role 分流，再按 order 为工作流生成 ref_image_N；不再用数组 0/1 猜测角色。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "mapping": "ref_audio_N",
+            "description": "按 order 生成 ref_audio_N，最多取工作流支持的前三项。"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/api/v1/comfyui/comfyui_workflow/{{model}}",
+          "contentType": "application/json"
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/api/v1/comfyui/comfyui_workflow/result/{{taskId}}"
+        },
+        "response": {
+          "taskIdPaths": [
+            "data.task_id"
+          ],
+          "statusPaths": [
+            "data.status"
+          ],
+          "errorPaths": [
+            "code"
+          ],
+          "messagePaths": [
+            "data.message",
+            "msg"
+          ],
+          "resultPaths": [
+            "data.results"
+          ],
+          "resultKind": "video",
+          "resultEphemeral": true
+        }
+      }
+    ],
+    "workflows": [
+      {
+        "id": "minimax_h3_b99_002",
+        "label": "H3 首尾帧生成视频",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "736p竖",
+              "736p横",
+              "736p(1:1)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "736p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_b99_001",
+        "label": "H3 文生视频",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "736p竖",
+              "736p横",
+              "736p(1:1)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "736p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_b99_003_12s",
+        "label": "H3 多图生视频 12 秒",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~12 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "736p竖",
+              "736p横",
+              "736p(1:1)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "736p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_image_audio_to_video_v2_15s",
+        "label": "H3 多图多音频生视频 15 秒",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "480p横",
+              "768p横"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_lightx2v_v5_15s",
+        "label": "H3 多图生视频 15 秒",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "480p横",
+              "768p横",
+              "480p(1:1)",
+              "768p(1:1)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_image_audio_to_video_v2",
+        "label": "H3 多图多音频生视频",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~10 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "1080p竖",
+              "480p横",
+              "768p横",
+              "1080p横"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_image_audio_to_video",
+        "label": "H3 图生视频音频同步",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "audio_duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "音频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "1080p竖",
+              "480p横",
+              "768p横",
+              "1080p横"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_lightx2v_v5",
+        "label": "H3 多图参考生视频",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~10 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "1080p竖",
+              "480p横",
+              "768p横",
+              "1080p横",
+              "480p(1:1)",
+              "768p(1:1)",
+              "1080p(1:1)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_lightx2v_no_pic",
+        "label": "H3 文生视频",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "480p横",
+              "768p横"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_lightx2v",
+        "label": "H3 首尾帧生成视频",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "480p横",
+              "768p横"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_zm_u24",
+        "label": "H3 ZM U24 多参考视频",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "480p横",
+              "768p横",
+              "480p(1:1)",
+              "768p(1:1)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_zm_u08",
+        "label": "H3 ZM U08 多参考视频",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "480p横",
+              "768p横",
+              "480p(1:1)",
+              "768p(1:1)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
+        }
+      },
+      {
+        "id": "minimax_h3_z0901",
+        "label": "H3 文生视频（高质量直出）",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖(480*864)",
+              "480p横(864*480)",
+              "768p竖(768*1344)",
+              "768p横(1344*768)",
+              "1088p竖(1088*1920)",
+              "1088p横(1920*1088)",
+              "1440p竖(1440*2560)",
+              "1440p横(2560*1440)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖(768*1344)"
+        }
+      },
+      {
+        "id": "minimax_h3_z0902",
+        "label": "H3 六图生视频（多图一致性创作）",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖(480*864)",
+              "480p横(864*480)",
+              "768p竖(768*1376)",
+              "768p横(1376*768)",
+              "1088p竖(1088*1920)",
+              "1088p横(1920*1088)",
+              "1440p竖(1440*2560)",
+              "1440p横(2560*1440)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖(768*1376)"
+        }
+      },
+      {
+        "id": "minimax_h3_z0903",
+        "label": "H3 六图三音频生视频（高质量音画融合）",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长 1~15 秒"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖(480*864)",
+              "480p横(864*480)",
+              "768p竖(768*1376)",
+              "768p横(1376*768)",
+              "1088p竖(1088*1920)",
+              "1088p横(1920*1088)",
+              "1440p竖(1440*2560)",
+              "1440p横(2560*1440)"
+            ]
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖(768*1376)"
+        }
+      }
+    ]
+  }
+}

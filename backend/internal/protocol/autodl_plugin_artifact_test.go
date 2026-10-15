@@ -42,7 +42,7 @@ func TestAutoDLPluginArtifact(t *testing.T) {
 	}
 
 	create, err := adapter.BuildCreate(context.Background(), RequestContext{BaseURL: "https://autodl.art", Request: GenerationRequest{
-		Model: "minimax_h3_lightx2v_no_pic", Prompt: "a cinematic test", Duration: 3, Resolution: "768P竖", Images: []MediaReference{{URL: "https://cdn.example/reference.png"}},
+		Model: "minimax_h3_lightx2v_no_pic", Prompt: "a cinematic test", Duration: 3, Resolution: "768P竖",
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +134,6 @@ func TestAutoDLPluginArtifact(t *testing.T) {
 
 	createB99001, err := adapter.BuildCreate(context.Background(), RequestContext{BaseURL: "https://autodl.art", Request: GenerationRequest{
 		Model: "minimax_h3_b99_001", Prompt: "a prompt test", Duration: 5, Resolution: "736p竖",
-		Images: []MediaReference{{URL: "https://cdn.example/should-be-omitted.png"}},
 	}})
 	if err != nil {
 		t.Fatal(err)

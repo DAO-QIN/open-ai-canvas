@@ -128,6 +128,7 @@ func TestAutoDLScreenSpecSubmissionUsesSameValueAsValidation(t *testing.T) {
 	for _, subset := range []bool{false, true} {
 		profile := normalizeAutoDLProfile(t, autoDLProfile(t, subset), "minimax_h3_zm_u24")
 		input := canvasGenerationInput{Mode: "video", Prompt: "test", VideoCapability: profile.Video, Config: providerConfig{InterfaceType: "autodl-comfyui", Model: "minimax_h3_zm_u24", Size: "16:9", VQuality: "auto", VideoSeconds: "6"}}
+		input.ReferenceImages = []providerMedia{{URL: "https://cdn.example/reference.png"}}
 		applyAutoDLVideoScreenSpec(&input, profile.Video)
 		if err := validateVideoTask(profile.Video, input); err != nil {
 			t.Fatal(err)

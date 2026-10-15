@@ -329,7 +329,14 @@ func (s *Service) CancelTask(ctx context.Context, userID string, id string) (*mo
 }
 
 func (s *Service) TaskLogs(userID string, id string) ([]model.TaskLog, error) {
-	return s.repo.TaskLogs(userID, id)
+	logs, err := s.repo.TaskLogs(userID, id)
+	if err != nil {
+		return nil, err
+	}
+	for index := range logs {
+		logs[index] = taskLogForOutput(logs[index])
+	}
+	return logs, nil
 }
 
 func (s *Service) ProcessNextTask() error {
