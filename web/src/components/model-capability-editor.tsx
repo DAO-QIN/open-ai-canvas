@@ -63,11 +63,12 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
     const durationValues = (profile.duration.values || []).join(",");
     const resolutionOptions = Array.from(new Set([...VIDEO_RESOLUTION_CAPABILITY_OPTIONS, ...profile.resolutions]));
     const autoDLSpecFields = <AutoDLScreenSpecFields profile={profile} workflow={workflow} disabled={disabled} onChange={(video) => onChange?.({ version: 1, video })} />;
-    const generateAudioField = protocol === "rolldek-gemini-omni-video" ? <p className="text-[var(--fs-label)] leading-relaxed text-foreground/60">音轨由上游决定，当前不提供音频生成开关。参考音频用于输入。</p> : <BooleanField label="同步音频" value={profile.generateAudio} disabled={disabled} onChange={(generateAudio) => update({ generateAudio })} />;
+    const generateAudioField = protocol === "rolldek-gemini-omni-video" || protocol === "yunfei-omni-flash-video" ? <p className="text-[var(--fs-label)] leading-relaxed text-foreground/60">音轨由上游决定，当前不提供音频生成开关。参考音频用于输入。</p> : <BooleanField label="同步音频" value={profile.generateAudio} disabled={disabled} onChange={(generateAudio) => update({ generateAudio })} />;
 
     if (section === "references") {
         return (
             <div className="admin-capability-reference-editor">
+                {protocol === "yunfei-omni-flash-video" ? <p className="text-[var(--fs-label)] leading-relaxed text-foreground/60">首尾帧模式与普通参考素材模式分开使用。以下数量是平台限制，可按已确认的模型能力调整。</p> : null}
                 <div className="admin-capability-reference-grid">
                     <ReferenceCard title="图片引用" description={profile.references.maxReferenceImages !== undefined ? "总数包含首尾帧；普通参考图单独限制" : "首帧、参考图与多图输入限制"}>
                         <NumberField label="最少图片引用" value={profile.references.minImages} min={0} max={profile.references.maxImages} disabled={disabled} onChange={(value) => updateReferences({ minImages: value || 0 })} />

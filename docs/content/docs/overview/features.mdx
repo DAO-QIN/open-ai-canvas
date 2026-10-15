@@ -5,6 +5,12 @@ description: 当前项目已实现的核心工作台能力与使用入口
 
 # 功能清单
 
+## 爱困 Gemini 视频 · omni-flash
+
+独立声明式插件 `yunfei-omni-video` 适配 `img.yunfei.best` 的精确模型 `omni-flash`，协议 `yunfei-omni-flash-video`。后台选中协议即填入 8秒、720p、16:9、单条及默认文生视频；该规格来自供应商通用示例，不代表全部支持范围。默认普通参考图1张、首尾帧各1张、图片总数3张，视频和音频各1项，属于用户确认的平台限制，可在后台调整。首尾帧模式与普通参考素材模式分开使用。
+
+使用顶层 JSON 的 `reference_images/reference_audios/reference_videos`，首尾帧保留角色，支持 HTTP(S) 与含媒体类型的 Base64 data URL。查询沿用同一个任务 ID，完成时读取 `url/output[].url`；无音轨或水印控制。插件不改变 Rolldek 协议、其他渠道价格或模型启用状态。接口依据见[供应商文档](https://doc.yunfei.best/#video-doc)。
+
 ## RollDek Gemini Omni 与 Veo Fast 视频
 
 `rolldek-gemini-video` 是独立声明式插件，提供 `rolldek-gemini-omni-video` 与 `rolldek-veo-fast-video` 两个协议。选择协议自动填充“能力与参数”：Gemini 默认 4 秒、720p、16:9、单条，可选 4/6/8/10 秒和竖屏；默认普通参考图 1 张及首尾帧各 1 张，图片合计 3 张，视频/音频各 1 项。普通参考图与总图片上限可分别在后台调整，数量是平台配置而非供应商极限。首尾帧使用独立上游字段，普通素材数组保序。

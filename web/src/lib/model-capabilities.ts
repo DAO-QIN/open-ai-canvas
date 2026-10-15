@@ -596,6 +596,30 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.operations = omni ? ["text_to_video", "image_to_video", "reference_to_video", "audio_to_video"] : ["text_to_video"];
         video.defaultOperation = "text_to_video";
     }
+    if (protocol === "yunfei-omni-flash-video") {
+        video.references = {
+            promptMaxChars: DEFAULT_VIDEO_PROMPT_MAX_CHARS,
+            minImages: 0,
+            maxImages: 3,
+            maxReferenceImages: 1,
+            maxImageBytes: 0,
+            maxVideos: 1,
+            maxVideoBytes: 0,
+            maxVideoDurationSeconds: 0,
+            maxAudios: 1,
+            maxAudioBytes: 0,
+            maxAudioDurationSeconds: 0,
+        };
+        video.duration = { selection: "enum", values: [8], default: 8 };
+        video.ratios = ["16:9"];
+        video.defaultRatio = "16:9";
+        video.resolutions = ["720p"];
+        video.defaultResolution = "720p";
+        video.generateAudio = { supported: false, default: false };
+        video.watermark = { supported: false, default: false };
+        video.operations = ["text_to_video", "image_to_video", "reference_to_video", "audio_to_video"];
+        video.defaultOperation = "text_to_video";
+    }
     return { version: 1, text, image: defaultImageCapabilityConfig(protocol, model), video, audio: defaultAudioCapabilityConfig(protocol) };
 }
 

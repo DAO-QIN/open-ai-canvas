@@ -218,5 +218,6 @@ func DefaultModelCapabilityConfigForModel(protocol string, modelName string) *Mo
 	}
 	video = kacangVideoCapability(xingapiVideoCapability(yuxiboxVideoCapability(api968VideoCapability(video, protocol), protocol), protocol), protocol)
 	video = rolldekGeminiVideoCapability(video, protocol)
+	video = yunfeiOmniVideoCapability(video, protocol)
 	return &ModelCapabilityConfig{Version: 1, Text: text, Image: DefaultImageCapabilityConfig(protocol, modelName), Video: video, Audio: defaultAudioCapabilityConfig(protocol)}
 }
