@@ -28,6 +28,20 @@ func DefaultImageCapabilityConfig(protocol string, modelName string) *ImageCapab
 		MaxOutputs:            15,
 	}
 	switch model.ChannelInterfaceType(protocol) {
+	case "choosec-qwen-image":
+		image.References.MaxImages = 0
+		image.References.MaxImageBytes = 0
+		image.References.MaskSupported = false
+		image.Size = ImageSizeConfig{Parameter: "size", Values: []string{}, Default: "1024x1024", AllowCustom: true, DefaultTier: "1k"}
+		for _, preset := range openAIImageDefaultSizePresets() {
+			if preset.Tier == "1k" {
+				image.Size.Presets = append(image.Size.Presets, preset)
+			}
+		}
+		image.Quality = ImageQualityConfig{Supported: true, Values: []string{}, Default: "standard"}
+		image.TransparentBackground = VideoBooleanConfig{Supported: false, Default: false}
+		image.OutputFormat = ParameterSupport{Supported: false}
+		image.MaxOutputs = 10
 	case model.ChannelInterfaceOpenAIImage:
 		// OpenAI Images 只收 WIDTHxHEIGHT：默认配置声明了 1K/2K/4K，就必须自带档位换算表，
 		// 否则运行时换算会被静默跳过（见 imageSizePresetMissing），实际出图档位与所选档位不一致。

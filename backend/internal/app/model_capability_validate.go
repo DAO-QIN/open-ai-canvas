@@ -460,7 +460,7 @@ func validateImageTask(profile *ImageCapabilityConfig, input canvasGenerationInp
 			return newModelCapabilityArgumentError("size", "unsupported_value", err)
 		}
 	}
-	if profile.Quality.Supported && quality != "" && !strings.EqualFold(quality, "auto") && !strings.EqualFold(quality, "any") && !containsCapabilityString(profile.Quality.Values, quality) {
+	if profile.Quality.Supported && len(profile.Quality.Values) > 0 && quality != "" && !strings.EqualFold(quality, "auto") && !strings.EqualFold(quality, "any") && !containsCapabilityString(profile.Quality.Values, quality) {
 		return newModelCapabilityArgumentError("quality", "unsupported_value", BadAuthRequest("图片质量不在当前模型支持范围内"))
 	}
 	if err := validateImagePresetSelection(profile, qualityForImageValidation(selectionTier, firstNonEmpty(profile.Resolution.Default, profile.Quality.Default)), firstNonEmpty(resolvedRatio, input.Config.Size, profile.Size.Default)); err != nil {

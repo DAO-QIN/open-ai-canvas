@@ -168,6 +168,10 @@ export function initializeImageRatioDefaults(profile: ImageCapabilityConfig, def
     if (!field || field.enabled === false || !definition) return profile;
     const ratios = preferredRatios.filter((ratio) => imageParameterAccepts(definition, ratio));
     if (!ratios.length) return profile;
+    if (!profile.resolution.supported && field.encoding === "pixels" && !definition.values?.length && !profile.size.presets?.length && tiers === undefined) {
+        const tier = profile.size.defaultTier || "1k";
+        return projectImageParameters({ ...profile, size: { ...profile.size, defaultTier: tier, presets: ratios.map((ratio) => imagePresetForRatio(tier, ratio)) } }, profile.parameters!);
+    }
     if (!profile.resolution.supported && field.encoding !== "pixels" && tiers === undefined) {
         return projectImageParameters(
             profile,

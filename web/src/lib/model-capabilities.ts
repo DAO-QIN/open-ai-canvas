@@ -291,6 +291,15 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
         outputFormat: { supported: true },
         maxOutputs: 15,
     };
+    if (protocol === "choosec-qwen-image") {
+        image.references = { ...image.references, maxImages: 0, maxImageBytes: 0, maskSupported: false };
+        image.size = { parameter: "size", values: [], default: "1024x1024", allowCustom: true, defaultTier: "1k", presets: IMAGE_RATIOS.map((ratio) => imagePresetForRatio("1k", ratio)) };
+        image.quality = { supported: true, values: [], default: "standard" };
+        image.transparentBackground = { supported: false, default: false };
+        image.outputFormat = { supported: false };
+        image.maxOutputs = 10;
+        return image;
+    }
     if (protocol === "km-kemei-seedream") {
         const presets = kemeiSeedreamPresets();
         image.references = { ...image.references, maxImages: 10, maskSupported: false };

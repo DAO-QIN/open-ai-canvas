@@ -5,6 +5,10 @@ description: 当前项目已实现的核心工作台能力与使用入口
 
 # 功能清单
 
+## ChooseC 千问 2.1 图片
+
+独立声明式插件 `choosec-qwen-image` 适配 `qwen-image-2.1-turbo` 的 OpenAI 形式文生图端点。选择协议自动填入 `1024x1024`、`standard`、`vivid`、`url` 和单张生成，可选 1–10 张。示例值仅作默认值，尺寸及比例预设可编辑，允许自定义像素；质量、画风和响应格式可由渠道配置并透传。参考编辑、蒙版和独立分辨率参数暂不开放；不改变售价或启用状态。接口依据见 [ChooseC 模型广场](https://api.choosec.cn/pricing)。
+
 ## 爱困 Gemini 视频 · omni-flash
 
 独立声明式插件 `yunfei-omni-video` 适配 `img.yunfei.best` 的精确模型 `omni-flash`，协议 `yunfei-omni-flash-video`。后台选中协议即填入 8秒、720p、16:9、单条及默认文生视频；该规格来自供应商通用示例，不代表全部支持范围。默认普通参考图1张、首尾帧各1张、图片总数3张，视频和音频各1项，属于用户确认的平台限制，可在后台调整。首尾帧模式与普通参考素材模式分开使用。
