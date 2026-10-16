@@ -6,7 +6,7 @@ metadata:
   author: "影策"
   owner: "yingce-official"
   skillId: "doubao-audio-prompt"
-  tag: drama
+  tag: creative
   sortWeight: 500
   source: 1
 ---

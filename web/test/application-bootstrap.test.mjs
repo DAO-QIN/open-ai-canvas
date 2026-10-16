@@ -15,9 +15,10 @@ async function prepareEntry(dev, pathname) {
             {
                 name: "entry-side-effects",
                 setup(builder) {
-                    builder.onResolve({ filter: /^(@fontsource-variable\/|@\/services\/appearance-bootstrap$|\.\/(welcome-)?application$)/ }, ({ path }) => ({ path, namespace: "entry-test" }));
+                    builder.onResolve({ filter: /^(@fontsource-variable\/|@\/services\/(appearance-bootstrap|browser-storage-migration)$|\.\/(welcome-)?application$)/ }, ({ path }) => ({ path, namespace: "entry-test" }));
                     builder.onLoad({ filter: /.*/, namespace: "entry-test" }, ({ path }) => {
                         if (path.startsWith("@fontsource-variable/")) return { contents: "", loader: "js" };
+                        if (path === "@/services/browser-storage-migration") return { contents: "export async function migrateBrowserStorage() {}", loader: "js" };
                         if (path === "@/services/appearance-bootstrap") {
                             return { contents: 'export function bootstrapAppearance() { events.push("appearance"); return appearanceReady; }', loader: "js" };
                         }

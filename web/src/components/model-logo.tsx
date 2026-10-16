@@ -5,6 +5,7 @@ import { Cpu, Search, X } from "lucide-react";
 import { toc } from "@lobehub/icons/es/toc";
 
 import { cn } from "@/lib/utils";
+import { createModelLogoResolver } from "@/lib/model-logo-id";
 
 type LobeIconComponent = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>;
 
@@ -17,6 +18,7 @@ const iconLoaders = Object.fromEntries(
         .map(([path, loader]) => [path.match(/\/([^/]+)\/components\/(?:Mono|Color)\.js$/)?.[1], loader])
         .filter((entry): entry is [string, () => Promise<LobeIconComponent>] => Boolean(entry[0] && entry[1])),
 ) as Record<string, () => Promise<LobeIconComponent>>;
+const resolveIconId = createModelLogoResolver(Object.keys(iconLoaders));
 const iconRegistry = new Map<string, LobeIconComponent>();
 const iconLoadPromises = new Map<string, Promise<LobeIconComponent | undefined>>();
 const iconOptions = toc
@@ -43,7 +45,8 @@ function loadIcon(icon?: string) {
     return promise;
 }
 
-export function ModelLogo({ icon, size = 18, className }: { icon?: string; size?: number; className?: string }) {
+export function ModelLogo({ icon: rawIcon, size = 18, className }: { icon?: string; size?: number; className?: string }) {
+    const icon = resolveIconId(rawIcon);
     const [Icon, setIcon] = useState<LobeIconComponent | undefined>(() => (icon ? iconRegistry.get(icon) : undefined));
     useEffect(() => {
         let cancelled = false;
@@ -82,7 +85,7 @@ export function ModelIconPicker({ value, onChange }: { value?: string; onChange?
         return query ? iconOptions.filter((item) => `${item.id} ${item.title}`.toLowerCase().includes(query)) : iconOptions;
     }, [keyword]);
 
-    const selectedOption = useMemo(() => (value ? iconOptions.find((item) => item.id === value) : undefined), [value]);
+    const selectedOption = useMemo(() => (value ? iconOptions.find((item) => item.id === resolveIconId(value)) : undefined), [value]);
 
     return (
         <>
@@ -148,11 +151,7 @@ export function ModelIconPicker({ value, onChange }: { value?: string; onChange?
                         placeholder="搜索品牌或模型名称（如 OpenAI, Claude, Google, Flux...）"
                         allowClear
                     />
-                    <div
-                        className="grid max-h-[380px] grid-cols-8 gap-2 overflow-y-auto pr-1 sm:grid-cols-9"
-                        role="listbox"
-                        aria-label="模型 Logo 列表"
-                    >
+                    <div className="grid max-h-[380px] grid-cols-8 gap-2 overflow-y-auto pr-1 sm:grid-cols-9" role="listbox" aria-label="模型 Logo 列表">
                         {filteredIcons.length ? (
                             filteredIcons.map((item) => {
                                 const selected = value === item.id;
@@ -165,7 +164,7 @@ export function ModelIconPicker({ value, onChange }: { value?: string; onChange?
                                         title={item.title}
                                         className={cn(
                                             "group relative flex size-12 flex-col items-center justify-center rounded-lg border border-border/50 bg-surface text-foreground/75 transition-all hover:scale-105 hover:border-primary/60 hover:bg-surface-active hover:text-foreground",
-                                            selected && "border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary"
+                                            selected && "border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary",
                                         )}
                                         onClick={() => {
                                             onChange?.(item.id);
@@ -177,9 +176,7 @@ export function ModelIconPicker({ value, onChange }: { value?: string; onChange?
                                 );
                             })
                         ) : (
-                            <div className="col-span-full py-12 text-center text-xs text-foreground/45">
-                                未找到与 “{keyword}” 相关的 Logo
-                            </div>
+                            <div className="col-span-full py-12 text-center text-xs text-foreground/45">未找到与 “{keyword}” 相关的 Logo</div>
                         )}
                     </div>
                 </div>

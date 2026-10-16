@@ -12,10 +12,11 @@ test("welcome entry loads configured appearance", async () => {
         .replace(/^import .*;\n/gm, "")
         .replace(/import\.meta\.env\.DEV/g, "false")
         .replace(/import\(/g, "loadModule(");
-    vm.runInNewContext(main, {
+    vm.runInNewContext(new Bun.Transpiler({ loader: "tsx" }).transformSync(main), {
         window: { location: { pathname: "/welcome" } },
         installChunkRecovery() {},
-        isIsolatedDirectorRepro: () => false,
+        isIsolatedPrevisRepro: () => false,
+        migrateBrowserStorage: async () => {},
         bootstrapAppearance: async () => { calls++; },
         loadModule: async (name) => { imports.push(name); },
     });

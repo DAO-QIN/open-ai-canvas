@@ -95,7 +95,12 @@ export function ChannelModelManager({ channel, onChanged }: { channel: ModelChan
                 return;
             }
             setFetchPreviewModels(result.models);
-            setSelectedFetchModels(selectExistingImportModels(result.models, items.flatMap((item) => [item.modelKey, item.providerModelKey].filter(Boolean))));
+            setSelectedFetchModels(
+                selectExistingImportModels(
+                    result.models,
+                    items.flatMap((item) => [item.modelKey, item.providerModelKey].filter(Boolean)),
+                ),
+            );
             setFetchPreviewOpen(true);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "拉取模型失败");
@@ -226,7 +231,7 @@ export function ChannelModelManager({ channel, onChanged }: { channel: ModelChan
                     <AdminStatusBadge label="待配置" tone="warning" />
                 ),
         },
-        { title: "规格成本价 / 销售价 / 利润率", width: 310, render: (_, item) => <ChannelModelCostSummary item={item} /> },
+        { title: "规格成本价 / 销售价 / 加价", width: 310, render: (_, item) => <ChannelModelCostSummary item={item} /> },
         { title: "版本", dataIndex: "priceVersion", width: 75, render: (value) => `v${value}` },
         { title: "状态", dataIndex: "enabled", width: 85, render: (enabled) => <AdminStatusBadge label={enabled ? "启用" : "停用"} tone={enabled ? "success" : "neutral"} /> },
         {
@@ -277,7 +282,7 @@ export function ChannelModelManager({ channel, onChanged }: { channel: ModelChan
                     <h3 className="admin-channel-model-heading">
                         模型管理 <span className="admin-channel-count">{items.length}</span>
                     </h3>
-                    <p className="admin-channel-model-hint">点击“自定义排序”调整模型展示顺序；规格展示成本价 / 销售价及利润率，勾选模型可统一调价</p>
+                    <p className="admin-channel-model-hint">点击“自定义排序”调整模型展示顺序；规格展示成本价 / 销售价及加价率，勾选模型可统一调价</p>
                 </div>
                 <Space wrap>
                     <ChannelOrderDialog
@@ -435,11 +440,19 @@ export function ChannelModelManager({ channel, onChanged }: { channel: ModelChan
                     />
                 }
             />
-            {repriceItems.length > 0 && <ChannelModelRepriceDialog channelId={channel.id} channelName={channel.name} items={repriceItems} onClose={() => setRepriceItems([])} onSaved={async () => {
-                setSelectedModelIds([]);
-                await reload();
-                await onChanged();
-            }} />}
+            {repriceItems.length > 0 && (
+                <ChannelModelRepriceDialog
+                    channelId={channel.id}
+                    channelName={channel.name}
+                    items={repriceItems}
+                    onClose={() => setRepriceItems([])}
+                    onSaved={async () => {
+                        setSelectedModelIds([]);
+                        await reload();
+                        await onChanged();
+                    }}
+                />
+            )}
             <Modal
                 title="选择要导入的模型"
                 open={fetchPreviewOpen}
@@ -477,18 +490,10 @@ export function ChannelModelManager({ channel, onChanged }: { channel: ModelChan
                             {fetchKeywordQuery ? `，当前匹配 ${visibleFetchModels.length} 个（其中 ${selectedVisibleFetchCount} 个已勾选）` : ""}
                         </span>
                         <Space size={4}>
-                            <Button
-                                size="small"
-                                disabled={importing || !visibleFetchModels.length || allVisibleFetchModelsSelected}
-                                onClick={() => setSelectedFetchModels((current) => selectVisibleModels(current, visibleFetchModels))}
-                            >
+                            <Button size="small" disabled={importing || !visibleFetchModels.length || allVisibleFetchModelsSelected} onClick={() => setSelectedFetchModels((current) => selectVisibleModels(current, visibleFetchModels))}>
                                 {fetchKeywordQuery ? `全选匹配的 ${visibleFetchModels.length} 个` : "全选"}
                             </Button>
-                            <Button
-                                size="small"
-                                disabled={importing || selectedVisibleFetchCount === 0}
-                                onClick={() => setSelectedFetchModels((current) => deselectVisibleModels(current, visibleFetchModels))}
-                            >
+                            <Button size="small" disabled={importing || selectedVisibleFetchCount === 0} onClick={() => setSelectedFetchModels((current) => deselectVisibleModels(current, visibleFetchModels))}>
                                 {fetchKeywordQuery ? "取消选中匹配的" : "取消全选"}
                             </Button>
                         </Space>
@@ -503,9 +508,7 @@ export function ChannelModelManager({ channel, onChanged }: { channel: ModelChan
                                 onChange={(values) => setSelectedFetchModels(values as string[])}
                             />
                         ) : (
-                            <p className="m-0 py-6 text-center text-sm text-foreground/55">
-                                没有匹配「{fetchKeyword.trim()}」的模型
-                            </p>
+                            <p className="m-0 py-6 text-center text-sm text-foreground/55">没有匹配「{fetchKeyword.trim()}」的模型</p>
                         )}
                     </div>
                     <div className="text-xs text-foreground/50">

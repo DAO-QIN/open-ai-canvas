@@ -1,5 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { AGENT_APPROVAL_SUPERSEDED_BY_NODE, agentApprovalMatchesSettings, agentApprovalModel, agentApprovalModelSelection, agentApprovalTargetGenerating, agentImageApproval, agentMediaApprovalTargetNodeId, agentVideoApproval } from "../src/lib/canvas/agent-media-approval";
+import {
+    AGENT_APPROVAL_SUPERSEDED_BY_NODE,
+    agentApprovalMatchesSettings,
+    agentApprovalModel,
+    agentApprovalModelSelection,
+    agentApprovalTargetGenerating,
+    agentImageApproval,
+    agentMediaApprovalTargetNodeId,
+    agentMediaSettings,
+    agentVideoApproval,
+} from "../src/lib/canvas/agent-media-approval";
 import type { CanvasNodeData } from "../src/types/canvas";
 import { createModelChannel, defaultConfig, encodeChannelModel } from "../src/stores/use-config-store";
 
@@ -24,11 +34,14 @@ describe("image generation approval settings", () => {
     });
     it("switches between logical and channel models without retaining the previous selector", () => {
         const cost = { model: "gpt-image-2", capability: "image" as const, billingMode: "fixed_request" as const, unitPriceMicrocredits: 1, priceConfigured: true };
-        const config = { ...defaultConfig, channels: [
-            createModelChannel({ id: "platform", scope: "system", models: [cost.model], modelCosts: [cost] }),
-            createModelChannel({ id: "managed", scope: "system", models: [cost.model], modelCosts: [{ ...cost, logicalModelId: "logical-image" }] }),
-            createModelChannel({ id: "personal", scope: "custom", models: [cost.model], modelCosts: [cost] }),
-        ] };
+        const config = {
+            ...defaultConfig,
+            channels: [
+                createModelChannel({ id: "platform", scope: "system", models: [cost.model], modelCosts: [cost] }),
+                createModelChannel({ id: "managed", scope: "system", models: [cost.model], modelCosts: [{ ...cost, logicalModelId: "logical-image" }] }),
+                createModelChannel({ id: "personal", scope: "custom", models: [cost.model], modelCosts: [cost] }),
+            ],
+        };
         const logical = agentApprovalModelSelection(config, encodeChannelModel("managed", cost.model));
         expect(logical).toEqual({ logicalModelId: "logical-image" });
         expect(agentApprovalModel(config, { ...logical, size: args.size, quality: args.quality })).toBe(encodeChannelModel("managed", cost.model));
@@ -42,10 +55,51 @@ describe("image generation approval settings", () => {
 
 describe("video generation approval settings", () => {
     it("reads video duration and audio options", () => {
-        const approval = agentVideoApproval({ toolName: "generate_media", arguments: { mode: "video", prompt: "镜头运动", size: "9:16", quality: "720p", durationSeconds: 8, videoGenerateAudio: true, channelId: "platform", channelModelKey: "seedance-test", referenceNodeIds: ["image"] } });
+        const approval = agentVideoApproval({
+            toolName: "generate_media",
+            arguments: { mode: "video", prompt: "镜头运动", size: "9:16", quality: "720p", durationSeconds: 8, videoGenerateAudio: true, channelId: "platform", channelModelKey: "seedance-test", referenceNodeIds: ["image"] },
+        });
         expect(approval?.durationSeconds).toBe(8);
         expect(approval?.videoGenerateAudio).toBe(true);
         expect(approval?.referenceNodeIds).toEqual(["image"]);
+    });
+});
+
+describe("approval media settings sent back to the backend", () => {
+    const mediaKeys = ["channelId", "channelModelKey", "durationSeconds", "imageParameters", "imageResolution", "logicalModelId", "quality", "size", "videoArkPrivateAssetUpload", "videoGenerateAudio", "videoWatermark"];
+
+    it("drops prompt and reference nodes that the decision API rejects", () => {
+        const approval = agentVideoApproval({
+            toolName: "generate_media",
+            arguments: {
+                mode: "video",
+                prompt: "镜头运动",
+                size: "9:16",
+                quality: "720p",
+                durationSeconds: 8,
+                channelId: "platform",
+                channelModelKey: "seedance-test",
+                referenceNodeIds: ["image"],
+                referenceTransientIds: ["tmp-image"],
+                sourceNodeId: "shot-1",
+            },
+        });
+        expect(approval).not.toBeNull();
+        const settings = agentMediaSettings(approval!);
+        expect(Object.keys(settings).sort()).toEqual(mediaKeys);
+        expect(JSON.stringify(settings)).not.toContain("prompt");
+        expect(settings.durationSeconds).toBe(8);
+        expect(settings.channelModelKey).toBe("seedance-test");
+    });
+
+    it("keeps image settings without leaking prompt or reference nodes", () => {
+        const approval = agentImageApproval({ toolName: "generate_media", arguments: { mode: "image", prompt: "产品图", size: "1024x1024", quality: "high", channelId: "platform", channelModelKey: "gpt-image-2", referenceNodeIds: ["product"] } });
+        expect(approval).not.toBeNull();
+        const settings = agentMediaSettings(approval!);
+        expect(Object.keys(settings).sort()).toEqual(mediaKeys);
+        expect(settings.size).toBe("1024x1024");
+        expect(settings.quality).toBe("high");
+        expect(settings.channelModelKey).toBe("gpt-image-2");
     });
 });
 

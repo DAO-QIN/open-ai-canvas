@@ -5,6 +5,8 @@ description: 影策后端核心持久化表与状态边界
 
 # 后端数据库
 
+版本 58 `provider_catalog_source` 为渠道和渠道模型增加目录来源字段 `catalog_provider_id`、`catalog_model_key`。版本 59 `sql_perf_indexes` 增加任务与调用日志的 `created_at_epoch` 及查询索引，SQLite 升级时回填历史时间戳。已有版本 50–57 的迁移记录保持原有名称和校验和。
+
 ## 视频普通参考图限制
 
 `channel_models.capability_config_json` 的 `video.references` 新增可选 `maxReferenceImages`，限定不含首尾帧的普通图片数；`maxImages` 仍限制包括首尾帧的总图片数。省略该字段时沿用原总数校验；显式 `0` 表示不接受普通参考图。保存校验要求该值介于 0 和总图片上限之间，生成前按同一素材角色映射计数。此变化只扩展现有 JSON，不新增表或 Schema 迁移。
@@ -55,7 +57,7 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 ## 结构迁移与版本
 
-当前结构版本为 57。既有版本 1–53 的迁移编号、名称和校验和保持不变；在此基础上追加版本 54–57。
+当前结构版本为 59。既有版本 1–57 的迁移编号、名称和校验和保持不变；在此基础上追加目录来源与 SQL 性能迁移。
 
 版本 54 `personal_profile_security` 为个人资料与安全流程增加 `users.avatar_mode/avatar_version`、`user_avatars`，并扩展会话重新核验状态、OAuth 重新核验绑定及 `profile_email` 验证凭据绑定。头像与账号资料隔离于创作素材；密码/邮箱变更和旧会话撤销原子提交，Linux.do 重新核验只接受原账号及会话，不创建新账号或会话。
 

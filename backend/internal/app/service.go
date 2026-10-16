@@ -18,6 +18,7 @@ import (
 	"yingce/backend/internal/payment"
 	"yingce/backend/internal/platform"
 	"yingce/backend/internal/prompts"
+	"yingce/backend/internal/providercatalog"
 	"yingce/backend/internal/repository"
 	"yingce/backend/internal/skills"
 	"yingce/backend/internal/sms"
@@ -95,6 +96,14 @@ type Service struct {
 	approvedMediaWg          sync.WaitGroup
 	approvedMediaWaiters     map[string]context.CancelFunc
 	approvedMediaClosed      bool
+	providerCatalogOnce      sync.Once
+	providerCatalog          *providercatalog.Source
+	creditPolicyMu           sync.RWMutex
+	creditPolicyCache        *CreditPolicy
+	creditPolicyAt           time.Time
+	modelAvailabilityMu      sync.RWMutex
+	modelAvailabilityCache   map[publicModelAvailabilityKey]*PublicModelAvailability
+	modelAvailabilityAt      time.Time
 }
 
 const taskWorkerConcurrency = 3
@@ -329,14 +338,7 @@ func (s *Service) CancelTask(ctx context.Context, userID string, id string) (*mo
 }
 
 func (s *Service) TaskLogs(userID string, id string) ([]model.TaskLog, error) {
-	logs, err := s.repo.TaskLogs(userID, id)
-	if err != nil {
-		return nil, err
-	}
-	for index := range logs {
-		logs[index] = taskLogForOutput(logs[index])
-	}
-	return logs, nil
+	return s.repo.TaskLogs(userID, id)
 }
 
 func (s *Service) ProcessNextTask() error {

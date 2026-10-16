@@ -153,7 +153,7 @@ func TestForkV53UpgradePreservesDeployedLedgerAndBusinessData(t *testing.T) {
 					}
 				}
 			}
-			if status, err := ReadSchemaStatus(db); err != nil || !status.Ready || status.Current != 57 {
+			if status, err := ReadSchemaStatus(db); err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
 				t.Fatalf("upgraded status: %+v %v", status, err)
 			}
 			if !db.Migrator().HasColumn(&model.Task{}, "WorkbenchKind") || !db.Migrator().HasColumn(&model.OAuthState{}, "ReauthUserID") || !db.Migrator().HasColumn(&model.User{}, "AvatarPreset") {
