@@ -4,6 +4,7 @@ import { deleteRemoteAssets, deleteRemoteCanvasProject, applyRemoteCanvasOperati
 import type { CanvasOperation, CanvasOperationsRequest } from "@/services/api/user-data";
 import { ApiError } from "@/services/api/request";
 import { canvasContentHash, sameCanvasContent } from "@/lib/canvas/canvas-content";
+import { fenceRejectedTaskTimestampMutation } from "@/lib/canvas/canvas-task-mutation";
 import { reconcileCanvasMutation } from "@/lib/canvas/canvas-mutation-recovery";
 import { saveCanvasSyncDraft, type CanvasSyncDraft } from "@/services/canvas-sync-drafts";
 import { recordDiagnosticEvent } from "@/services/diagnostics/client-diagnostics";
@@ -11,6 +12,7 @@ import { getActiveUserScope } from "@/lib/user-scope";
 import { localForageStorageForScope } from "@/lib/localforage-storage";
 import { appQueryClient } from "@/lib/query-client";
 import { parseAssetRecordList } from "@/lib/asset-record";
+import { rebaseAssetSnapshot } from "@/lib/asset-storage-revision";
 import { assetForRemoteSync } from "@/lib/asset-remote-sync";
 import type { Asset } from "@/stores/use-asset-store";
 import { flushAssetStorePersistence, getGenerationAssetDefaults, useAssetStore } from "@/stores/use-asset-store";
@@ -32,6 +34,7 @@ let remoteUserDataPhase: RemoteUserDataPhase = "inactive";
 let syncTimer: number | null = null;
 let syncPromise: Promise<void> | null = null;
 let syncQueued = false;
+let autoSyncQueued = false;
 let syncRetryAttempt = 0;
 let remoteOperationTail: Promise<void> = Promise.resolve();
 let subscriptionsInstalled = false;
@@ -420,15 +423,28 @@ export async function loadAssetLibraryPage(options: Parameters<typeof listRemote
     return { ...result, assets: parseAssetRecordList(result.assets) };
 }
 
-function acceptRemoteAssets(remoteAssets: Asset[]) {
+function acceptRemoteAssets(remoteAssets: Asset[], refresh = false) {
     const assets = parseAssetRecordList(remoteAssets);
     const current = new Map(useAssetStore.getState().assets.map((asset) => [asset.id, asset]));
     for (const asset of assets) {
         const local = current.get(asset.id);
-        if (local && !sameEntitySnapshot(acknowledgedAssets.get(asset.id), local)) continue;
+        const baseline = acknowledgedAssets.get(asset.id);
+        const dirty = local && !sameEntitySnapshot(baseline, local);
+        if (dirty && !refresh) continue;
+        const next =
+            dirty && local
+                ? parseAssetRecordList(
+                      rebaseAssetSnapshot({
+                          document: { state: { assets: [asset] }, version: 0, storageRevision: 0, tombstones: { assets: {} } },
+                          baseAssets: baseline ? [baseline] : [],
+                          localAssets: [local],
+                          baseRevision: 0,
+                      }).state.assets,
+                  )[0]
+                : asset;
         acknowledgedAssets.set(asset.id, asset);
         verifiedAssets.add(asset.id);
-        current.set(asset.id, asset);
+        current.set(asset.id, next);
     }
     useAssetStore.setState({ assets: [...current.values()] });
 }
@@ -442,21 +458,24 @@ function collectAssetIds(value: unknown, ids = new Set<string>()): Set<string> {
     return ids;
 }
 
-async function loadReferencedAssets(ids: Iterable<string>) {
+async function loadReferencedAssets(ids: Iterable<string>, refresh = false) {
+    const epoch = sessionEpoch;
     const loadedIds = new Set(useAssetStore.getState().assets.map((asset) => asset.id));
-    const pending = [...new Set(ids)].filter((id) => !loadedIds.has(id) || !verifiedAssets.has(id));
+    const pending = [...new Set(ids)].filter((id) => refresh || !loadedIds.has(id) || !verifiedAssets.has(id));
     for (let offset = 0; offset < pending.length; offset += 100) {
         const { assets } = await getRemoteAssetsByIds(pending.slice(offset, offset + 100));
-        acceptRemoteAssets(assets);
+        if (epoch !== sessionEpoch) throw new Error("账号已切换，请重新读取素材");
+        acceptRemoteAssets(assets, refresh);
     }
 }
 
-export async function loadAssetsForUse(ids: Iterable<string>) {
+export async function loadAssetsForUse(ids: Iterable<string>, options?: { refresh?: boolean }) {
     const epoch = sessionEpoch;
     const requestedIds = [...new Set(ids)];
     await withRemoteUserDataSyncExclusive(async () => {
         if (epoch !== sessionEpoch) throw new Error("账号已切换，请重新读取素材");
-        if (activeRemoteUserId) await loadReferencedAssets(requestedIds);
+        if (options?.refresh && !activeRemoteUserId) throw new Error("请登录后刷新素材");
+        if (activeRemoteUserId) await loadReferencedAssets(requestedIds, options?.refresh);
         const available = new Set(useAssetStore.getState().assets.map((asset) => asset.id));
         if (requestedIds.some((id) => !available.has(id) || (activeRemoteUserId && !verifiedAssets.has(id)))) throw new Error("部分素材不存在或无权访问，请重新选择素材");
     });
@@ -609,6 +628,7 @@ export function resetRemoteUserDataSync() {
     }
     syncRetryAttempt = 0;
     syncQueued = false;
+    autoSyncQueued = false;
     useSyncProgressStore.getState().clearAll();
 }
 
@@ -649,9 +669,10 @@ export function withRemoteUserDataSyncExclusive<T>(operation: () => Promise<T>):
 export function scheduleRemoteUserDataSync() {
     if (!activeRemoteUserId || remoteUserDataPhase !== "ready") return;
     if (syncPromise) {
-        syncQueued = true;
+        autoSyncQueued = true;
         return;
     }
+    autoSyncQueued = false;
     if (syncTimer) window.clearTimeout(syncTimer);
     syncTimer = window.setTimeout(() => {
         syncTimer = null;
@@ -914,18 +935,18 @@ async function saveRemoteUserData(options: RemoteSaveOptions) {
     let syncError: unknown;
     try {
         await pending;
-        syncRetryAttempt = 0;
+        if (epoch === sessionEpoch) syncRetryAttempt = 0;
     } catch (error) {
         syncFailed = true;
         syncError = error;
     } finally {
         if (syncPromise === pending) {
             syncPromise = null;
-            if (syncQueued) scheduleRemoteUserDataSync();
+            if (epoch === sessionEpoch && (autoSyncQueued || syncQueued)) scheduleRemoteUserDataSync();
         }
     }
     if (syncFailed) {
-        scheduleRemoteUserDataRetry(syncError);
+        if (epoch === sessionEpoch) scheduleRemoteUserDataRetry(syncError);
         throw syncError;
     }
 }
@@ -994,7 +1015,14 @@ export function buildCanvasOperations(base: CanvasProject | undefined, next: Can
             continue;
         }
         const diff = diffCanvasObject(previous as unknown as Record<string, unknown>, node as unknown as Record<string, unknown>);
-        if (Object.keys(diff.patch).length) operations.push({ type: "patch_node", id: node.id, patch: diff.patch, before: diff.previous });
+        if (Object.keys(diff.patch).length) {
+            const taskTime = diff.patch["metadata.taskUpdatedAt"];
+            const taskId = previous.metadata?.taskId;
+            if (typeof taskTime === "string" && taskTime.trim() && typeof taskId === "string" && taskId.trim() && taskId === node.metadata?.taskId && !Object.hasOwn(diff.previous, "metadata.taskId")) {
+                diff.previous["metadata.taskId"] = taskId;
+            }
+            operations.push({ type: "patch_node", id: node.id, patch: diff.patch, before: diff.previous });
+        }
     }
     for (const node of base?.nodes || []) {
         if (!nextNodes.has(node.id)) operations.push({ type: "remove_node", id: node.id, expected: node });
@@ -1021,6 +1049,39 @@ export function buildCanvasOperations(base: CanvasProject | undefined, next: Can
         if (!canvasOperationValueEqual(base[field], next[field])) operations.push({ type: "set_field", field, value: canvasOperationValue(next[field]), beforeValue: canvasOperationValue(base[field]) });
     }
     return operations;
+}
+
+async function submitPendingCanvasMutation(entry: PendingCanvasMutation) {
+    const epoch = sessionEpoch;
+    const scope = getActiveUserScope();
+    const assertSession = () => {
+        if (epoch !== sessionEpoch || scope !== getActiveUserScope()) throw new Error("账号已切换，已停止旧会话保存");
+    };
+    // Also retry a previous failed journal write before sending anything.
+    await persistPendingCanvasMutationJournal();
+    assertSession();
+    try {
+        return await applyRemoteCanvasOperations(entry.projectId, entry.request);
+    } catch (error) {
+        assertSession();
+        // A field-conflict response proves this transaction rolled back. A lost
+        // response does not: ambiguous writes must retain their exact ID/body.
+        if (!(error instanceof ApiError) || error.status !== 409 || error.reason !== "canvas_field_conflict") throw error;
+        const fenced = fenceRejectedTaskTimestampMutation(entry.request, entry.baseline, entry.prepared);
+        if (!fenced) throw error;
+        const replacement = { ...entry, request: { ...fenced, mutationId: newCanvasMutationId() } };
+        pendingCanvasMutations.set(entry.projectId, replacement);
+        try {
+            await persistPendingCanvasMutationJournal();
+        } catch (storageError) {
+            if (epoch === sessionEpoch && pendingCanvasMutations.get(entry.projectId) === replacement) pendingCanvasMutations.set(entry.projectId, entry);
+            throw storageError;
+        }
+        assertSession();
+        // The new request already carries its fence, so future retries cannot
+        // upgrade it again. All original business-field preconditions remain.
+        return applyRemoteCanvasOperations(entry.projectId, replacement.request);
+    }
 }
 
 async function drainRemoteUserDataChanges(options: RemoteSaveOptions = {}) {
@@ -1136,15 +1197,20 @@ async function submitCanvasMutation(pending: PendingCanvasMutation, uploaded: Ma
         if (epoch !== sessionEpoch || scope !== getActiveUserScope()) throw new DOMException("账号已切换，已停止旧会话保存", "AbortError");
     };
     try {
-        const response = await applyRemoteCanvasOperations(pending.projectId, pending.request);
+        const response = await submitPendingCanvasMutation(pending);
         assertSession();
         return { savedRevision: response.project.revision, localSnapshot };
     } catch (error) {
         assertSession();
+        pending = pendingCanvasMutations.get(pending.projectId) ?? pending;
         if (error instanceof ApiError && (error.status === 404 || error.status === 403)) {
             await blockCanvasMutation(pending, error, "unavailable");
             throw error;
         }
+        // Task observers keep the upstream timestamp/fence contract; never
+        // rebase a rejected task update onto a different task or business value.
+        if (error instanceof ApiError && error.status === 409 && error.reason === "canvas_field_conflict" && pending.request.operations.some((operation) => operation.type === "patch_node" && Object.hasOwn(operation.patch, "metadata.taskUpdatedAt")))
+            throw error;
         // Only these definite, transactional rejections prove the old body did
         // not commit. Timeouts/5xx and mutation-ID reuse must keep the exact body.
         if (!(error instanceof ApiError) || error.status !== 409 || !["canvas_field_conflict", "canvas_object_missing"].includes(error.reason || "")) throw error;
@@ -1189,7 +1255,7 @@ async function submitCanvasMutation(pending: PendingCanvasMutation, uploaded: Ma
         recordDiagnosticEvent({ category: "action", level: "info", code: "canvas_sync_rebased", message: "画布操作已基于云端版本安全合并", canvasId: pending.projectId, requestId: rebased.request.mutationId });
         let response: Awaited<ReturnType<typeof applyRemoteCanvasOperations>>;
         try {
-            response = await applyRemoteCanvasOperations(pending.projectId, rebased.request);
+            response = await submitPendingCanvasMutation(rebased);
             assertSession();
         } catch (retryError) {
             assertSession();
@@ -1242,12 +1308,13 @@ async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: R
     }
     const selectedAssetIds = options.assetIds
         ? new Set(options.assetIds)
-        : selectedProjectIds
+        : selectedProjectIds?.size
           ? collectAssetIds([...currentProjects.filter((project) => selectedProjectIds.has(project.id)), ...[...pendingCanvasMutations.values()].filter((pending) => selectedProjectIds.has(pending.projectId)).map((pending) => pending.prepared)])
           : undefined;
     const dirtyAssets = currentAssets.filter((asset) => {
         const dirty = !sameEntitySnapshot(acknowledgedAssets.get(asset.id), asset) || (selectedAssetIds?.has(asset.id) && !verifiedAssets.has(asset.id));
-        return dirty && (selectedAssetIds === undefined || selectedAssetIds.has(asset.id));
+        const ownedBySelectedCanvas = !options.assetIds && typeof asset.metadata?.canvasId === "string" && selectedProjectIds?.has(asset.metadata.canvasId);
+        return dirty && (selectedAssetIds === undefined || selectedAssetIds.has(asset.id) || ownedBySelectedCanvas);
     });
     if (!dirtyProjects.length && !dirtyAssets.length) return;
 
@@ -1447,6 +1514,7 @@ async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: R
                 if (repairedRequest !== pendingJournal.request) {
                     pendingJournal.request = repairedRequest;
                     await persistPendingCanvasMutationJournal();
+                    assertSession();
                 }
                 useSyncProgressStore.getState().setProjectProgress(source.id, { phase: "saving", message: "正在重放未确认的画布操作" });
                 // 旧队列可能只记录了 undefined 与缺省值之间的无效变化，没有需要发送的修改。
@@ -1475,6 +1543,7 @@ async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: R
                     const pending = { projectId: source.id, request, baseline: base, prepared, createdAt: new Date().toISOString() };
                     pendingCanvasMutations.set(source.id, pending);
                     await persistPendingCanvasMutationJournal();
+                    assertSession();
                     useSyncProgressStore.getState().setProjectProgress(source.id, { phase: "saving", message: base ? "正在提交画布操作" : "正在创建画布" });
                     const result = await submitCanvasMutation(pending, uploaded, preparedForMutation);
                     savedRevision = result.savedRevision;
@@ -1510,6 +1579,7 @@ async function saveRemoteUserDataBatch(uploaded: Map<string, string>, options: R
             }
             useCanvasStore.setState((state) => ({ projects: state.projects.map((project) => (project === latest ? projected : project)) }));
             await flushCanvasStorePersistence();
+            assertSession();
             pendingCanvasMutations.delete(source.id);
             await persistPendingCanvasMutationJournal();
             const currentAfterSave = useCanvasStore.getState().openProject(source.id);
