@@ -2,14 +2,14 @@
 
 ## 来源与协议身份
 
-- V7：https://ai.cangyuansuanli.cn/docs/models/midjourney-v7
+- 普通线路：https://ai.cangyuansuanli.cn/docs/models/midjourney
 - V8.2 / 1K / 2K：https://ai.cangyuansuanli.cn/docs/models/midjourney-1k
-- 模型清单以渠道 `GET /v1/models` 为准：`midjourney-v7`、`midjourney-1k`、`midjourney-2k`。
+- 模型清单以渠道 `GET /v1/models` 为准：`midjourney`、`midjourney-1k`、`midjourney-2k`。默认 Base URL 为 `https://direct-api.cangyuansuanli.cn/v1`。
 - 插件 ID `cangyuan-midjourney`；Provider ID `cangyuan-midjourney-v7`、`cangyuan-midjourney-v82`。
 - 配置 `apiKey`（secret、必填），由宿主渠道配置提供；鉴权 `Authorization: Bearer <TOKEN>`。
 - 创建 `POST /v1/images/generations`；源图编辑 `POST /v1/images/edits`。
 - 查询 `GET /v1/images/generations/{task_id}`；编辑查询 `GET /v1/images/edits/{task_id}`。
-- 默认同步等待（`async=false`）；保留任务 ID、查询路径以及 pending/completed/failed 的响应解析。
+- 使用异步任务（`async=true`）；保留任务 ID、查询路径以及 pending/completed/failed 的响应解析。仍能解析同步图片响应。
 - 不声明取消或单独结果下载端点，供应商未提供相应合同。
 
 ## 统一参数与上游请求
@@ -17,17 +17,17 @@
 | 参数 | 映射与约束 |
 | --- | --- |
 | `model` | 两条线路分别校验公开模型名，不自动换模型。 |
-| `prompt` | 原样传递；V7 最多 4000 字符。1K/2K 可在提示词写 `--v 8.2`，省略版本时由供应商默认 V8.2。 |
-| `images` | 依据宿主 role 排序，映射为 HTTPS URL 字符串数组；不能发 data URI 或本地文件。V7 最多 5 张，拒绝蒙版。 |
+| `prompt` | 原样传递；普通线路最多 1010 字符。1K/2K 可在提示词写 `--v 8.2`，省略版本时由供应商默认 V8.2。 |
+| `images` | 依据宿主 role 排序，映射为 HTTPS URL 字符串数组；不能发 data URI 或本地文件。普通线路最多 5 张，拒绝蒙版；1K/2K 所有参考模式最多 4 张。 |
 | `imageCount` | 只能为 1 或未设置，上游固定 `n=1`；返回多张不截断。 |
 | `aspectRatio` | 传 `size`；空值或 auto 不发送。V7 支持 1:1 / 16:9 / 9:16 / 4:3 / 3:4 / 3:2 / 2:3 / 5:4 / 4:5 / 21:9 及对应宽x高；默认 16:9。1K/2K 支持 1:2 / 6:11 / 9:16 / 2:3 / 3:4 / 4:5 / 5:6 / 1:1 及其反向比例。 |
-| `providerOptions` | 仅 1K/2K 使用 `cangyuan-midjourney-v82.speed`（relax / fast）和 `reference`（image / style / edit / moodboard / editor）。不把速度映射为 quality。 |
+| `providerOptions` | 普通线路命名空间 `cangyuan-midjourney-v7` 提供 `mj_version`（5 / 5.1 / 5.2 / 6 / 6.1 / 7 / 8 / 8.1 / 8.2）与 `niji_version`（5 / 6 / 7），两者互斥，都不传时上游默认 8.2。1K/2K 使用 `cangyuan-midjourney-v82.speed`（relax / fast）和 `reference`（image / style / edit / moodboard / editor）。不把速度映射为 quality。 |
 
 `reference=editor` 或宿主显式 `edit_source` 默认走 edits，必须只有一张源图；`reference=edit` 走 generations，最多四张图。mask role 单独映射为 `mask` HTTPS URL，仅 editor 可用。style/moodboard 等含义由调用方显式指定，插件不猜测风格用途。speed 不指定时不发送，沿用供应商默认或 prompt 中的 --fast/--relax；两者同时指定时须一致。
 
-V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resolution、background、output_format、mask。1K/2K 不发送 quality、resolution、aspect_ratio、background、output_format，不支持 b64_json；不要写 --turbo，1K 不写 --hd。
+普通线路不发送 speed、quality、resolution、background、output_format、mask；版本使用上述结构化字段。1K/2K 不发送 quality、resolution、aspect_ratio、background、output_format；不要写 --turbo，1K 不写 --hd。插件使用 URL 结果，不请求 Base64。
 
-两条线路均固定 `response_format=url`、`async=false`。请求完整字段、校验表达式与动态端点见下方 Manifest，未列出的字段不透传。
+两条线路均固定 `response_format=url`、`async=true`。请求完整字段、校验表达式与动态端点见下方 Manifest，未列出的字段不透传。普通线路有参考图时使用 edits；1K/2K editor 使用 edits，其余参考模式使用 generations；查询始终与创建路径对应。
 
 ## 响应、保存和错误
 
@@ -53,9 +53,9 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
   "apiVersion": "yingce.plugin/v2",
   "id": "cangyuan-midjourney",
   "name": "沧元 Midjourney",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "沧元算力 / 影绘",
-  "description": "独立适配 V7 与默认 V8.2 的 1K/2K 线路，按供应商合同创建、查询并提取全部图片。",
+  "description": "适配 midjourney 版本选择与独立 1K/2K 线路，异步创建、轮询并保存全部图片。",
   "enabled": true,
   "installable": true,
   "permissions": [
@@ -76,7 +76,7 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
     "providers": [
       {
         "id": "cangyuan-midjourney-v7",
-        "label": "沧元 Midjourney V7",
+        "label": "沧元 Midjourney",
         "capabilities": [
           "image"
         ],
@@ -87,7 +87,7 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
           "creation",
           "agent"
         ],
-        "baseUrl": "https://ai.cangyuansuanli.cn/v1",
+        "baseUrl": "https://direct-api.cangyuansuanli.cn/v1",
         "requiresPublicMediaUrls": true,
         "auth": {
           "type": "bearer",
@@ -109,6 +109,34 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
             "max": 1,
             "step": 1,
             "default": 1
+          },
+          {
+            "name": "mj_version",
+            "label": "Midjourney 版本",
+            "type": "string",
+            "binding": "providerOptions.cangyuan-midjourney-v7.mj_version",
+            "values": [
+              "5",
+              "5.1",
+              "5.2",
+              "6",
+              "6.1",
+              "7",
+              "8",
+              "8.1",
+              "8.2"
+            ]
+          },
+          {
+            "name": "niji_version",
+            "label": "Niji 版本",
+            "type": "string",
+            "binding": "providerOptions.cangyuan-midjourney-v7.niji_version",
+            "values": [
+              "5",
+              "6",
+              "7"
+            ]
           }
         ],
         "parameters": [
@@ -124,7 +152,7 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
             "type": "string",
             "required": true,
             "mapping": "prompt",
-            "description": "原提示词；1K/2K 默认 V8.2，可写官网 --v / --niji 参数；V7 不支持这些版本参数。"
+            "description": "原提示词；普通线路最多 1010 字符，版本通过 mj_version / niji_version 选择；1K/2K 可使用官网提示词参数。"
           },
           {
             "name": "images",
@@ -147,8 +175,8 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
           {
             "name": "providerOptions",
             "type": "object",
-            "mapping": "cangyuan-midjourney-v82.speed/reference",
-            "description": "1K/2K 插件命名空间可指定 speed=relax/fast、reference=image/style/edit/moodboard/editor。V7 没有速度或版本扩展字段。"
+            "mapping": "cangyuan-midjourney-v7.mj_version/niji_version",
+            "description": "普通线路两个版本字段互斥；都不传时沿用上游默认 8.2。"
           }
         ],
         "validations": [
@@ -159,11 +187,11 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
                   "$ref": "request.model"
                 },
                 [
-                  "midjourney-v7"
+                  "midjourney"
                 ]
               ]
             },
-            "message": "模型名与 Midjourney 线路不匹配。"
+            "message": "Midjourney 普通线路模型名必须为 midjourney；版本通过 mj_version 或 niji_version 选择。"
           },
           {
             "assert": {
@@ -248,7 +276,7 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
                 5
               ]
             },
-            "message": "Midjourney V7 参考图最多 5 张。"
+            "message": "Midjourney 普通 参考图最多 5 张。"
           },
           {
             "assert": {
@@ -274,7 +302,7 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
                 0
               ]
             },
-            "message": "Midjourney V7 线路不支持蒙版。"
+            "message": "Midjourney 普通 线路不支持蒙版。"
           },
           {
             "assert": {
@@ -284,10 +312,81 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
                     "$ref": "request.prompt"
                   }
                 },
-                4000
+                1010
               ]
             },
-            "message": "Midjourney V7 提示词最多 4000 字符。"
+            "message": "Midjourney 普通线路提示词最多 1010 字符。"
+          },
+          {
+            "assert": {
+              "$or": [
+                {
+                  "$not": {
+                    "$ref": "request.providerOptions.cangyuan-midjourney-v7.mj_version"
+                  }
+                },
+                {
+                  "$in": [
+                    {
+                      "$ref": "request.providerOptions.cangyuan-midjourney-v7.mj_version"
+                    },
+                    [
+                      "5",
+                      "5.1",
+                      "5.2",
+                      "6",
+                      "6.1",
+                      "7",
+                      "8",
+                      "8.1",
+                      "8.2"
+                    ]
+                  ]
+                }
+              ]
+            },
+            "message": "Midjourney 版本不在供应商支持列表中。"
+          },
+          {
+            "assert": {
+              "$or": [
+                {
+                  "$not": {
+                    "$ref": "request.providerOptions.cangyuan-midjourney-v7.niji_version"
+                  }
+                },
+                {
+                  "$in": [
+                    {
+                      "$ref": "request.providerOptions.cangyuan-midjourney-v7.niji_version"
+                    },
+                    [
+                      "5",
+                      "6",
+                      "7"
+                    ]
+                  ]
+                }
+              ]
+            },
+            "message": "Niji 版本不在供应商支持列表中。"
+          },
+          {
+            "assert": {
+              "$or": [
+                {
+                  "$not": {
+                    "$ref": "request.providerOptions.cangyuan-midjourney-v7.mj_version"
+                  }
+                },
+                {
+                  "$not": {
+                    "$ref": "request.providerOptions.cangyuan-midjourney-v7.niji_version"
+                  }
+                }
+              ]
+            },
+            "message": "mj_version 与 niji_version 不能同时填写。"
           }
         ],
         "create": {
@@ -380,7 +479,17 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
               }
             },
             "response_format": "url",
-            "async": false
+            "async": true,
+            "mj_version": {
+              "$omitEmpty": {
+                "$ref": "request.providerOptions.cangyuan-midjourney-v7.mj_version"
+              }
+            },
+            "niji_version": {
+              "$omitEmpty": {
+                "$ref": "request.providerOptions.cangyuan-midjourney-v7.niji_version"
+              }
+            }
           },
           "pathTemplate": {
             "$if": {
@@ -499,7 +608,7 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
           "creation",
           "agent"
         ],
-        "baseUrl": "https://ai.cangyuansuanli.cn/v1",
+        "baseUrl": "https://direct-api.cangyuansuanli.cn/v1",
         "requiresPublicMediaUrls": true,
         "auth": {
           "type": "bearer",
@@ -560,7 +669,7 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
             "type": "string",
             "required": true,
             "mapping": "prompt",
-            "description": "原提示词；1K/2K 默认 V8.2，可写官网 --v / --niji 参数；V7 不支持这些版本参数。"
+            "description": "原提示词；普通线路最多 1010 字符，版本通过 mj_version / niji_version 选择；1K/2K 可使用官网提示词参数。"
           },
           {
             "name": "images",
@@ -997,6 +1106,32 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
               ]
             },
             "message": "蒙版只能用于 editor，且必须有一张源图。"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$filter": {
+                      "from": {
+                        "$ref": "request.images"
+                      },
+                      "as": "media",
+                      "where": {
+                        "$ne": [
+                          {
+                            "$ref": "media.role"
+                          },
+                          "mask"
+                        ]
+                      }
+                    }
+                  }
+                },
+                4
+              ]
+            },
+            "message": "Midjourney 1K/2K 参考图最多 4 张。"
           }
         ],
         "create": {
@@ -1089,7 +1224,7 @@ V7 不支持 --v、--niji、--fast、--hd，且不发送 speed、quality、resol
               }
             },
             "response_format": "url",
-            "async": false,
+            "async": true,
             "speed": {
               "$omitEmpty": {
                 "$ref": "request.providerOptions.cangyuan-midjourney-v82.speed"

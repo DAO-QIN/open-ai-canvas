@@ -342,7 +342,7 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
                 ? "2k"
                 : "1k";
         const ratios = v7 ? ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "5:4", "16:9", "9:16", "21:9"] : ["1:1", "3:2", "2:3", "4:3", "3:4", "4:5", "5:4", "16:9", "9:16", "1:2", "6:11", "5:6", "2:1", "11:6", "6:5"];
-        image.references = { ...image.references, promptMaxChars: v7 ? 4000 : 32000, maxImages: v7 ? 5 : 1, maskSupported: !v7 };
+        image.references = { ...image.references, promptMaxChars: v7 ? 1010 : 32000, maxImages: v7 ? 5 : 4, maskSupported: !v7 };
         image.size = { parameter: "aspect_ratio", values: ["auto", ...ratios], default: "auto", allowCustom: false, presets: ratios.map((ratio) => imagePresetForRatio(tier, ratio)) };
         image.quality = { supported: false, values: [], default: "auto" };
         image.transparentBackground = { supported: false, default: false };

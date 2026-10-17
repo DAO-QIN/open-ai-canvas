@@ -132,7 +132,7 @@ describe("channel model editor drafts", () => {
     test("switching capability to a Midjourney protocol uses its image defaults without changing prices", () => {
         const draft = initialChannelModelValues(null, protocols);
         const next = changeChannelModelCapability({ ...draft, capability: "image", protocol: "cangyuan-midjourney-v7", modelKey: "midjourney-v7" }, [...protocols, definition("cangyuan-midjourney-v7", "image")]);
-        expect(next.capabilityConfig?.image).toMatchObject({ references: { promptMaxChars: 4000, maxImages: 5, maskSupported: false }, maxOutputs: 1 });
+        expect(next.capabilityConfig?.image).toMatchObject({ references: { promptMaxChars: 1010, maxImages: 5, maskSupported: false }, maxOutputs: 1 });
         expect(next.priceTiers[0].unitPrice).toBe(0);
     });
     test("Kacang image protocol selection fills capabilities without changing prices", () => {

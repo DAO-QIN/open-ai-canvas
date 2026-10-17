@@ -13,13 +13,13 @@ func cangyuanAdapter(t *testing.T, provider string) Adapter {
 
 func TestCangyuanMidjourneyV7RequestAndEditPolling(t *testing.T) {
 	adapter := cangyuanAdapter(t, "cangyuan-midjourney-v7")
-	request := GenerationRequest{Model: "midjourney-v7", Prompt: "生成一张氛围感美女照片", ImageCount: 1, AspectRatio: "auto", Quality: "high", Resolution: "2k", Extra: map[string]any{"transparentBackground": "true"}}
+	request := GenerationRequest{Model: "midjourney", Prompt: "生成一张氛围感美女照片", ImageCount: 1, AspectRatio: "auto", Quality: "high", Resolution: "2k", Extra: map[string]any{"transparentBackground": "true"}}
 	spec, err := adapter.BuildCreate(context.Background(), RequestContext{Request: request})
 	if err != nil {
 		t.Fatal(err)
 	}
 	body := manifestTestBody(t, spec)
-	if spec.Path != "/v1/images/generations" || body["n"] != float64(1) || body["response_format"] != "url" || body["async"] != false {
+	if spec.Path != "/v1/images/generations" || body["model"] != "midjourney" || body["n"] != float64(1) || body["response_format"] != "url" || body["async"] != true {
 		t.Fatalf("create = %#v, body = %#v", spec, body)
 	}
 	for _, key := range []string{"size", "images", "quality", "resolution", "background", "speed", "output_format", "mask"} {
@@ -90,10 +90,11 @@ func TestCangyuanMidjourneyRejectsInvalidInputs(t *testing.T) {
 	}{
 		{"model mismatch", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney-1k", Prompt: "portrait"}},
 		{"invented v82 model", "cangyuan-midjourney-v82", GenerationRequest{Model: "midjourney-v8.2", Prompt: "portrait"}},
-		{"multiple submissions", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney-v7", Prompt: "portrait", ImageCount: 2}},
-		{"long unicode prompt", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney-v7", Prompt: strings.Repeat("画", 4001)}},
-		{"data URI", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney-v7", Prompt: "portrait", Images: []MediaReference{{DataURL: "data:image/png;base64,aA=="}}}},
-		{"v7 mask", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney-v7", Prompt: "portrait", Images: []MediaReference{{URL: "https://example.com/mask.png", Role: "mask"}}}},
+		{"retired model", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney-v7", Prompt: "portrait"}},
+		{"multiple submissions", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney", Prompt: "portrait", ImageCount: 2}},
+		{"long unicode prompt", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney", Prompt: strings.Repeat("画", 1011)}},
+		{"data URI", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney", Prompt: "portrait", Images: []MediaReference{{DataURL: "data:image/png;base64,aA=="}}}},
+		{"v7 mask", "cangyuan-midjourney-v7", GenerationRequest{Model: "midjourney", Prompt: "portrait", Images: []MediaReference{{URL: "https://example.com/mask.png", Role: "mask"}}}},
 		{"editor missing source", "cangyuan-midjourney-v82", GenerationRequest{Model: "midjourney-1k", Prompt: "portrait", Images: []MediaReference{{URL: "https://example.com/mask.png", Role: "mask"}}}},
 		{"invalid speed", "cangyuan-midjourney-v82", GenerationRequest{Model: "midjourney-1k", Prompt: "portrait", ProviderOptions: map[string]map[string]any{"cangyuan-midjourney-v82": {"speed": "turbo"}}}},
 	} {
@@ -102,6 +103,61 @@ func TestCangyuanMidjourneyRejectsInvalidInputs(t *testing.T) {
 				t.Fatal("invalid input was accepted")
 			}
 		})
+	}
+}
+
+func TestCangyuanMidjourneyVersionFieldsAndReferenceLimits(t *testing.T) {
+	adapter := cangyuanAdapter(t, "cangyuan-midjourney-v7")
+	request := GenerationRequest{Model: "midjourney", Prompt: strings.Repeat("画", 1010)}
+	spec, err := adapter.BuildCreate(context.Background(), RequestContext{Request: request})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := manifestTestBody(t, spec)
+	for _, key := range []string{"mj_version", "niji_version"} {
+		if _, ok := body[key]; ok {
+			t.Fatalf("unspecified version emitted: %#v", body)
+		}
+	}
+	for key, values := range map[string][]string{"mj_version": {"5", "5.1", "5.2", "6", "6.1", "7", "8", "8.1", "8.2"}, "niji_version": {"5", "6", "7"}} {
+		for _, value := range values {
+			request.ProviderOptions = map[string]map[string]any{"cangyuan-midjourney-v7": {key: value}}
+			spec, err = adapter.BuildCreate(context.Background(), RequestContext{Request: request})
+			if err != nil || manifestTestBody(t, spec)[key] != value {
+				t.Fatalf("%s=%s: %v", key, value, err)
+			}
+		}
+	}
+	for _, options := range []map[string]any{{"mj_version": "9"}, {"niji_version": "8.2"}, {"mj_version": "8.2", "niji_version": "7"}} {
+		request.ProviderOptions = map[string]map[string]any{"cangyuan-midjourney-v7": options}
+		if _, err := adapter.BuildCreate(context.Background(), RequestContext{Request: request}); err == nil {
+			t.Fatalf("invalid versions accepted: %#v", options)
+		}
+	}
+	request.ProviderOptions = nil
+	for i := 0; i < 5; i++ {
+		request.Images = append(request.Images, MediaReference{URL: "https://example.com/source.png", Order: i})
+	}
+	if _, err := adapter.BuildCreate(context.Background(), RequestContext{Request: request}); err != nil {
+		t.Fatal(err)
+	}
+	request.Images = append(request.Images, request.Images[0])
+	if _, err := adapter.BuildCreate(context.Background(), RequestContext{Request: request}); err == nil {
+		t.Fatal("six references accepted")
+	}
+	for _, mode := range []string{"image", "style", "edit", "moodboard"} {
+		request.Model = "midjourney-1k"
+		request.ProviderOptions = map[string]map[string]any{"cangyuan-midjourney-v82": {"reference": mode}}
+		request.Images = request.Images[:4]
+		hd := cangyuanAdapter(t, "cangyuan-midjourney-v82")
+		spec, err := hd.BuildCreate(context.Background(), RequestContext{Request: request})
+		if err != nil || spec.Path != "/v1/images/generations" || manifestTestBody(t, spec)["async"] != true {
+			t.Fatalf("%s: %#v %v", mode, spec, err)
+		}
+		request.Images = append(request.Images, request.Images[0])
+		if _, err := hd.BuildCreate(context.Background(), RequestContext{Request: request}); err == nil {
+			t.Fatalf("five %s references accepted", mode)
+		}
 	}
 }
 
