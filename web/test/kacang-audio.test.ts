@@ -1,10 +1,14 @@
-import { describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
 import { audioChannelCapabilityConfig, channelModelCapabilityConfigForSave, changeChannelModelCapability, initialChannelModelValues } from "@/pages/admin/components/channel-model-editor-form";
 import type { ModelProtocolDefinition } from "@/lib/model-protocols";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
 import type { GenerationTask } from "@/services/api/task-center";
 import * as resources from "@/services/api/resources";
+import { useAssetStore, withAssetStorePersistenceSuppressed, type AudioAsset } from "@/stores/use-asset-store";
+
+const initialAssets = useAssetStore.getState().assets;
+afterEach(() => withAssetStorePersistenceSuppressed(() => useAssetStore.setState({ assets: initialAssets })));
 
 mock.module("@/services/api/resources", () => ({ ...resources, getResourceAccess: async (key: string) => ({ url: `https://media.example/${key.slice("resource:".length)}.mp3` }) }));
 const { applyGenerationTaskResultToNodes, generationTaskOutputsApplied } = await import("@/lib/canvas/canvas-generation-task-sync");
@@ -79,6 +83,20 @@ describe("Kacang Suno music", () => {
             ],
         };
         const root: CanvasNodeData = { id: "root", title: "配乐", type: CanvasNodeType.Audio, width: 420, height: 180, position: { x: 10, y: 20 }, metadata: { taskId: task.id } };
+        withAssetStorePersistenceSuppressed(() =>
+            useAssetStore.setState({
+                assets: task.outputs!.map((output, index): AudioAsset => ({
+                    id: output.materializedAssetId!,
+                    kind: "audio",
+                    title: "配乐",
+                    coverUrl: "",
+                    tags: [],
+                    createdAt: "",
+                    updatedAt: "",
+                    data: { url: `/api/resources/${index ? "two" : "one"}/file`, storageKey: `resource:${index ? "two" : "one"}`, bytes: 10, mimeType: "audio/mpeg" },
+                })),
+            }),
+        );
         const first = await applyGenerationTaskResultToNodes([root], task);
         expect(first.nodes).toHaveLength(2);
         expect(first.nodes[0].metadata).toMatchObject({ storageKey: "resource:one", assetId: "asset-one", generationOutputCount: 2, generationOutputIndex: 0 });
