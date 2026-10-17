@@ -24,7 +24,7 @@ export function CanvasImageSettingsPopover({ config, onConfigChange, showCount =
     const current = normalizeImageValue(profile, config);
     const parts: string[] = [];
     if (profile.size.parameter !== "none") parts.push(imageSizeLabel(current.size));
-    if (profile.quality.supported) parts.push(imageQualityLabel(current.quality));
+    if (profile.quality.supported && profile.parameters?.find((field) => field.name === "quality")?.userVisible !== false) parts.push(imageQualityLabel(current.quality));
     if (showCount && profile.maxOutputs > 1) parts.push(`${current.count} 张`);
     if (profile.transparentBackground.supported && current.transparentBackground === "true") parts.push("透明");
     if (!parts.length && !profile.transparentBackground.supported && !profile.parameters?.some((p) => p.enabled !== false)) return null;

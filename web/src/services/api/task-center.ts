@@ -212,6 +212,7 @@ export function queryGenerationTask(id: string, options?: { signal?: AbortSignal
 type GenerationTaskSubscriptionDependencies = {
     queryTask(id: string): Promise<GenerationTask>;
     waitTask(id: string, options?: { initialTask?: GenerationTask; onTaskUpdate?: (task: GenerationTask) => void }): Promise<GenerationTask>;
+    reconnectDelayMs?: number;
 };
 
 export function createGenerationTaskSubscriptionService(dependencies: GenerationTaskSubscriptionDependencies) {
@@ -219,6 +220,8 @@ export function createGenerationTaskSubscriptionService(dependencies: Generation
         listeners: Set<(task: GenerationTask) => void>;
         latest?: GenerationTask;
         observation?: Promise<void>;
+        reconnectTimer?: ReturnType<typeof setTimeout>;
+        failures: number;
     };
     const entries = new Map<string, Entry>();
     const publish = (entry: Entry, task: GenerationTask) => {
@@ -226,9 +229,10 @@ export function createGenerationTaskSubscriptionService(dependencies: Generation
         for (const listener of entry.listeners) listener(task);
     };
     const observe = (id: string, entry: Entry) => {
-        if (entry.observation) return;
+        if (entry.observation || entry.reconnectTimer !== undefined) return;
         entry.observation = (async () => {
             const initial = await dependencies.queryTask(id);
+            entry.failures = 0;
             publish(entry, initial);
             if (initial.status === "succeeded" || initial.status === "failed" || initial.status === "cancelled") return;
             const terminal = await dependencies.waitTask(id, {
@@ -237,23 +241,37 @@ export function createGenerationTaskSubscriptionService(dependencies: Generation
             });
             publish(entry, terminal);
         })().catch((error) => {
-            // 观察失败不能永久占住 entry，否则页面重新订阅时也不会再查询任务。
             entry.observation = undefined;
             console.warn("生成任务观察中断，后续订阅将重新建立连接", { taskId: id, error });
+            if (!entry.listeners.size || entry.latest?.status === "succeeded" || entry.latest?.status === "failed" || entry.latest?.status === "cancelled") return;
+            // 页面不一定重新挂载；只重连状态查询，绝不重提生成任务。
+            const delayMs = Math.min(30_000, (dependencies.reconnectDelayMs ?? 2_000) * 2 ** Math.min(entry.failures++, 4));
+            entry.reconnectTimer = setTimeout(() => {
+                entry.reconnectTimer = undefined;
+                if (entry.listeners.size) observe(id, entry);
+            }, delayMs);
         });
     };
     return {
         subscribe(ids: readonly string[], listener: (task: GenerationTask) => void) {
             const uniqueIds = [...new Set(ids)];
             for (const id of uniqueIds) {
-                const entry = entries.get(id) ?? { listeners: new Set<(task: GenerationTask) => void>() };
+                const entry = entries.get(id) ?? { listeners: new Set<(task: GenerationTask) => void>(), failures: 0 };
                 entries.set(id, entry);
                 entry.listeners.add(listener);
                 if (entry.latest) listener(entry.latest);
                 observe(id, entry);
             }
             return () => {
-                for (const id of uniqueIds) entries.get(id)?.listeners.delete(listener);
+                for (const id of uniqueIds) {
+                    const entry = entries.get(id);
+                    if (!entry) continue;
+                    entry.listeners.delete(listener);
+                    if (!entry.listeners.size && entry.reconnectTimer !== undefined) {
+                        clearTimeout(entry.reconnectTimer);
+                        entry.reconnectTimer = undefined;
+                    }
+                }
             };
         },
     };

@@ -2,10 +2,10 @@
 
 ## 协议身份
 
-- 插件和 Provider ID：`choosec-qwen-image`，版本 `1.1.0`。
+- 插件和 Provider ID：`choosec-qwen-image`，版本 `1.1.1`。
 - 能力：`image`；模型：`qwen-image-2.1-turbo`。
 - Base URL：`https://api.choosec.cn`；现有渠道的 `https://api.choosec.cn/v1` 同样由宿主 URL 拼接规则处理。
-- 创建：`POST /v1/images/generations`，JSON 同步图片响应。
+- 文生图：`POST /v1/images/generations`，JSON；参考图：`POST /v1/images/edits`，multipart。均在当前请求中返回图片结果。
 - 鉴权：配置字段 `apiKey` 为必填 secret，由宿主发送 `Authorization: Bearer <apiKey>`。
 - 只申请 `generation.run` 和 `media.read`；没有 `host:` 执行器、独立路由或脚本运行时。
 
@@ -17,7 +17,7 @@
 | `prompt` | `prompt` | 必填文字描述 |
 | `aspectRatio` | `size` | 默认 `2048x2048`，允许自定义像素与可编辑比例预设 |
 | `imageResolution` | 宿主换算 `size` | 默认 `2k`，初始渠道档位为 `1k/2k`；不发送独立 resolution |
-| `images` | `image` | 0–10 张，按顺序映射 URL / data URL 数组；无图时省略 |
+| `images` | `image[]` 文件 | 0–10 张，有图时切换编辑接口，宿主读取 URL / data URL 后按顺序上传；无图时无文件 |
 | `quality` | `quality` | `standard` |
 | `imageCount` | `n` | 整数 1–10，默认 1 |
 | `providerOptions.choosec-qwen-image.style` | `style` | `vivid` |
@@ -27,7 +27,7 @@
 
 页面中的尺寸、质量、画风和响应格式是默认值，不能当成唯一合法值。管理员可以配置比例、精确像素及其他参数，用户可输入自定义尺寸。初始像素预设提供 1K/2K，2K 面积不超过 2048×2048；4K 不在默认可用档位，管理员可在实际验证后配置。提示词沿用影绘现有 32000 字符平台限制，不将它描述为供应商极限。
 
-官方 [Turbo 模型卡](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) 明确支持图片编辑与 2K。[官方兼容 API](https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference) 在同一 images/generations 端点通过顶层 `image` 传图，不使用 edits 或 multipart。ChooseC 的参考图透传与更高分辨率尚未付费实调；这是使用者确认的待测适配方向，不将官方模型能力等同于中转站已经验证的能力。生成数量保留 ChooseC 页面已有 1–10 配置，区别于官方托管 API 的 1–6，以实际渠道限制为准。
+官方 [Turbo 模型卡](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) 支持图片编辑与 2K，但模型能力不代表中转协议相同。ChooseC 的真实错误响应明确要求输入图片改走 `/v1/images/edits`，因此本插件使用其 OpenAI Images 编辑入口和 [New API 文档](https://docs.newapi.pro/zh/docs/plugins/usage) 的 multipart `image[]` 文件合同，不再向生成入口发送官方托管 API 的 JSON `image`。生成数量保留 ChooseC 页面已有 1–10 配置，以实际渠道限制为准。
 
 ## 请求
 
@@ -35,7 +35,9 @@
 {"model":"qwen-image-2.1-turbo","prompt":"中文海报","size":"2048x2048","n":1}
 ```
 
-默认文生图只含 `model/prompt/size/n`；`standard/vivid/url` 采用上游缺省行为，不重复发送可选字段。管理员配置其他质量、画风或响应格式时，发送对应字段。有参考图则增加 `image:["URL 或 data URL", ...]`，无图省略该字段，不传 null 或空数组。不发送独立 `resolution`、`output_format`、`background` 或 mask，不推测 edits、任务查询和取消端点。比例和清晰度由宿主的可编辑预设换成像素后发送 `size`，精确像素原样发送。模型 ID、空提示词、参考图数量/缺少地址、独立蒙版、非法像素和数量范围在发送前校验。
+默认文生图只含 `model/prompt/size/n`；`standard/vivid/url` 采用上游缺省行为，不重复发送可选字段。管理员配置其他质量、画风或响应格式时，发送对应字段。有参考图时这四项改为 multipart 普通字段，参考图按顺序放入重复的 `image[]` 文件部分。宿主读取真实图片字节并生成 boundary，不把 base64 当普通表单文字，不要求上游访问私有素材地址。两种请求都不发送 JSON `image/images`、独立 `resolution`、`output_format`、`background` 或 mask。比例和清晰度由宿主的可编辑预设换成像素后发送 `size`，精确像素原样发送。模型 ID、空提示词、参考图数量/缺少地址、独立蒙版、非法像素和数量范围在发送前校验。
+
+提交失败后向用户返回真实失败；不因 502 或长时间等待自动重新提交创建请求，避免未知上游状态下重复出图与计费。
 
 ## 响应映射与错误
 
@@ -53,9 +55,9 @@
   "apiVersion": "yingce.plugin/v2",
   "id": "choosec-qwen-image",
   "name": "ChooseC 千问 2.1 图片",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "影绘",
-  "description": "ChooseC 千问 2.1 文生图与参考图适配，默认 2K，可编辑尺寸与前台展示。参考图中转兼容性待使用者实测。",
+  "description": "ChooseC 千问 2.1 图片适配：文生图使用 JSON，参考图通过 edits 文件上传；默认 2K，可编辑尺寸与前台展示。",
   "permissions": [
     "generation.run",
     "media.read"
@@ -171,8 +173,8 @@
           {
             "name": "images",
             "type": "media[]",
-            "mapping": "image",
-            "description": "0–10 张参考图，按顺序映射为 URL 或 data URL 数组；无图时省略 image。ChooseC 兼容性待实测。"
+            "mapping": "image[]",
+            "description": "0–10 张参考图；有图时走 edits，由宿主读取 URL / data URL 并按顺序上传 image[] 文件。"
           },
           {
             "name": "quality",
@@ -430,35 +432,55 @@
         "create": {
           "method": "POST",
           "path": "/v1/images/generations",
+          "pathTemplate": {
+            "$if": {
+              "condition": {
+                "$gt": [
+                  {
+                    "$len": {
+                      "$ref": "request.images"
+                    }
+                  },
+                  0
+                ]
+              },
+              "then": "/v1/images/edits",
+              "else": "/v1/images/generations"
+            }
+          },
           "contentType": "application/json",
+          "contentTypeTemplate": {
+            "$if": {
+              "condition": {
+                "$gt": [
+                  {
+                    "$len": {
+                      "$ref": "request.images"
+                    }
+                  },
+                  0
+                ]
+              },
+              "then": "multipart/form-data",
+              "else": "application/json"
+            }
+          },
+          "files": [
+            {
+              "name": "image[]",
+              "source": {
+                "$sortByOrder": {
+                  "$ref": "request.images"
+                }
+              }
+            }
+          ],
           "body": {
             "model": {
               "$ref": "request.model"
             },
             "prompt": {
               "$ref": "request.prompt"
-            },
-            "image": {
-              "$omitEmpty": {
-                "$map": {
-                  "from": {
-                    "$sortByOrder": {
-                      "$ref": "request.images"
-                    }
-                  },
-                  "as": "media",
-                  "in": {
-                    "$coalesce": [
-                      {
-                        "$ref": "media.dataUrl"
-                      },
-                      {
-                        "$ref": "media.url"
-                      }
-                    ]
-                  }
-                }
-              }
             },
             "size": {
               "$coalesce": [

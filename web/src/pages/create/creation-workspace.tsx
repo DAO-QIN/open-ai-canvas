@@ -498,7 +498,7 @@ function GenerationSettingsMenu(props: ComposerProps) {
     const videoResolutionSupported = props.mode === "video" && resolutions.length > 0;
     const imageSummary = [
         ...(mergedProfile.size.parameter !== "none" ? [referenceImageSizeSelected ? referenceImageSizeLabel : usesImageResolutionPicker ? formatImageResolutionSize(props.ratio, imageResolutionOptions) : props.ratio] : []),
-        ...(props.imageProfile.quality.supported ? [qualityLabel] : []),
+        ...(props.imageProfile.quality.supported && props.imageProfile.parameters?.find((field) => field.name === "quality")?.userVisible !== false ? [qualityLabel] : []),
         ...(props.imageProfile.maxOutputs > 1 ? [props.count] : []),
     ].join(" · ");
     const videoRatioSupported = props.mode === "video" && ratios.length > 0;
