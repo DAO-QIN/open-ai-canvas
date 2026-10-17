@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { App, Button } from "antd";
+import { Button } from "antd";
 import { useNavigate } from "react-router";
 import { AppDrawer } from "@/components/ui/product/app-drawer";
 import { readAllCanvasSyncDrafts, type CanvasSyncDraft } from "@/services/canvas-sync-drafts";
-import { adoptCloudCanvas, restoreCanvasDraftAsCopy, retryCanvasSync } from "@/services/user-data-sync";
+import { restoreCanvasDraftAsCopy } from "@/services/user-data-sync";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 import { getActiveUserScope } from "@/lib/user-scope";
 import { useUserStore } from "@/stores/use-user-store";
@@ -16,7 +16,7 @@ export function CanvasSyncRecovery({ projectId }: { projectId?: string }) {
     const [loadedScope, setLoadedScope] = useState("");
     const userId = useUserStore((state) => state.user?.id);
     const navigate = useNavigate();
-    const { message } = App.useApp();
+
     useEffect(() => {
         if (!open) return;
         let active = true;
@@ -56,7 +56,7 @@ export function CanvasSyncRecovery({ projectId }: { projectId?: string }) {
                 同步恢复
             </Button>
             <AppDrawer title="同步恢复" open={open} onClose={() => setOpen(false)}>
-                <p className="mb-4 text-sm text-muted-foreground">草稿保留了本机未确认的内容。恢复副本会新建画布；采用云端版本会保留草稿并更新原画布。</p>
+                <p className="mb-4 text-sm text-muted-foreground">历史草稿可导出，或恢复为新的画布。当前画布会自动同步。</p>
                 {error ? (
                     <p role="alert" className="mb-4 text-sm text-destructive">
                         {error}
@@ -84,28 +84,6 @@ export function CanvasSyncRecovery({ projectId }: { projectId?: string }) {
                                 </Button>
                                 <Button disabled={busy} onClick={() => void run(() => exportCanvasProjects([draft.project], "画布恢复草稿"))}>
                                     导出草稿
-                                </Button>
-                                <Button
-                                    disabled={busy}
-                                    onClick={() =>
-                                        void run(async () => {
-                                            await retryCanvasSync(draft.project.id);
-                                            message.success("同步已恢复");
-                                        })
-                                    }
-                                >
-                                    重试安全合并
-                                </Button>
-                                <Button
-                                    disabled={busy}
-                                    onClick={() =>
-                                        void run(async () => {
-                                            await adoptCloudCanvas(draft.project.id);
-                                            message.success("已采用云端版本，草稿仍保留");
-                                        })
-                                    }
-                                >
-                                    采用云端版本
                                 </Button>
                             </div>
                         </article>

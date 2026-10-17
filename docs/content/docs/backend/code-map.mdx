@@ -79,6 +79,12 @@ AI 拆图每层的 `generation.prompt/background` 由 `canvas-image-layer-plan.t
 - 插件合同：`plugin-packages/api968-sd-video/manifest.json`、`README.md`、`docs/interface.md` 与同名 `.yingce-plugin` 包；五个 Provider 各自校验模型 ID 与上游参数。
 - 选择协议的默认能力：`backend/internal/app/model_capability_api968.go` 与 `web/src/lib/model-capabilities.ts`；按分辨率的时长限制由前端生成入口和 `model_capability_validate.go` 校验。
 - “能力与参数”编辑：`web/src/components/model-capability-editor.tsx`；创建、查询和成片保存复用声明式协议宿主。协议及能力回归测试分别为 `api968_sd_video_test.go`、`model_capability_api968_test.go`、`web/test/api968-video.test.ts`。
+## 画布实时会话
+
+- 传输入口：`backend/internal/handler/canvas_realtime.go` 校验登录与 Origin、管理 WebSocket；`app/canvas_realtime.go` 校验画布归属，`internal/canvas/realtime.go` 负责临时 Presence、房间隔离与 Redis 分发，`realtime_devices.go` 管理跨实例统一窗口编号及临时租期。
+- 提交通知：`repository/canvas_change_notifications.go` 与 `repository.go` 在外层事务提交后合并通知，回滚丢弃；operations、历史保存、租约、Agent 任务创建及任务结果回写沿用该边界。
+- 前端连接：`web/src/services/canvas-realtime-client.ts` 管理合并发送和重连，`canvas-realtime.ts` 按账号与画布共享窗口内连接；`pages/canvas/use-canvas-project-lifecycle.ts` 联动状态校验和独立租约维护。
+- 光标与拖拽：`components/canvas/canvas-collaboration-layer.tsx` 管理设备列表和多人事件采集，单窗口停止采集；`canvas-presence-renderer.ts` 负责按帧复用 DOM 投影远端图形，高频坐标不经过 React。`nginx.conf`、`web/vite.config.ts` 转发 WebSocket Upgrade。
 
 ## 用户登录日志
 

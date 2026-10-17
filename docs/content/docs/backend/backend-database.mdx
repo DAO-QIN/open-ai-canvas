@@ -18,6 +18,13 @@ Schema 50 追加 `promotion_profiles`、`invitations`、`commission_records`、`
 推广档案按用户唯一，邀请码为可空唯一字段；被邀请人只能绑定一次；返利按支付订单唯一；转入按用户与请求 ID 唯一，分摊按转入与返利记录唯一。返利记录保存累计转入、作废金额和可用时间，冻结不依赖状态更新任务。
 
 `system_settings` 的 `promotion_policy` 保存总开关、比例基点、冻结天数与版本；缺失时关闭、比例 0、冻结 0。功能配置中的 `promotionEnabled` 从该规则投影，不能经旧功能开关接口独立修改。规则、个人覆盖与作废均与 `admin_audit_events` 在同一事务提交。详细合同见 [邀请返利](./invitation-rebates)。
+## 画布多端协作（Schema 60）
+
+迁移 `canvas_multi_session_sync` 新增 `canvas_edit_leases`，以 `(user_id, canvas_id, node_id)` 为主键，记录浏览器会话、随机租约凭据与到期时间。服务端在画布事务锁内裁决占用和写入，租约有效期 30 秒；读取状态不返回凭据，浏览器计时不能代替服务端授权。
+
+`tasks.agent_execution_ready` 标记 Agent 执行记录已建立。迁移按任务 ID 和用户归属回填，保留任务内容与状态；`EnsureCloudAgent` 在创建执行的事务内更新标记，普通任务更新不能回写该字段。增加 `idx_cloud_agent_canvas_active` 和 `idx_tasks_canvas_agent_reservation` 两个部分索引，使占用查询只检查活动执行及未建立执行的根任务，不反复遍历终态历史。
+
+新增迁移不改写 Schema 1–59 的名称或校验和。必须先执行迁移再启动新后端；历史回填与建索引需要升级窗口。执行记录不独立删除；未来新增删除路径时必须同步维护标记。
 
 ## 用户登录日志
 
@@ -57,7 +64,7 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 ## 结构迁移与版本
 
-当前结构版本为 59。既有版本 1–57 的迁移编号、名称和校验和保持不变；在此基础上追加目录来源与 SQL 性能迁移。
+当前结构版本为 60。既有版本 1–57 的迁移编号、名称和校验和保持不变；在此基础上追加目录来源与 SQL 性能迁移。
 
 版本 54 `personal_profile_security` 为个人资料与安全流程增加 `users.avatar_mode/avatar_version`、`user_avatars`，并扩展会话重新核验状态、OAuth 重新核验绑定及 `profile_email` 验证凭据绑定。头像与账号资料隔离于创作素材；密码/邮箱变更和旧会话撤销原子提交，Linux.do 重新核验只接受原账号及会话，不创建新账号或会话。
 
@@ -73,7 +80,7 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 版本 36 `cloud_agent_gemini_cache` 创建 `cloud_agent_gemini_caches`，保存用户范围内的官方 Gemini 缓存元数据；版本 37 `cloud_agent_gemini_cache_identity` 将缓存标识约束修正为 `(user_id, cache_key)`，移除旧的全局 cache_key 唯一索引。版本 35 `auth_notifications` 为认证通知与组合验证补齐 `auth_verifications`、`notification_quotas`、`sms_channels`、`sms_records` 四张表，并为 `users` 增加 `phone`、`email_verified_at`、`phone_verified_at`，为 `email_verification_codes` 增加 `attempts`；同时创建非空手机号唯一索引。版本 34 `task_media_recovery` 为 `tasks` 增加 `media_recovery_json`（text）和 `media_stage`（最长 24 字）。版本 33 `oauth_state_accepted_terms` 为 `o_auth_states` 增加非空布尔列 `accepted_terms`，默认 `false`，不替历史流程补造同意记录。
 
-升级前备份，按既有流程执行 `migrate-schema up` 和 `verify` 后再启动新后端。旧二进制不能连接版本 57 的数据库；需要修复部署时应使用支持当前结构的程序，不得以旧备份覆盖现有业务数据或只切回旧镜像。关闭自动迁移的生产环境必须运行正式迁移；手工改表不能更新 `schema_migrations` 的版本与校验和记录。SQLite → PostgreSQL 工具要求源库先升级到当前结构，避免静默遗漏旧任务关联。
+升级前备份，按既有流程执行 `migrate-schema up` 和 `verify` 后再启动新后端。旧二进制不能连接版本 60 的数据库；需要修复部署时应使用支持当前结构的程序，不得以旧备份覆盖现有业务数据或只切回旧镜像。关闭自动迁移的生产环境必须运行正式迁移；手工改表不能更新 `schema_migrations` 的版本与校验和记录。SQLite → PostgreSQL 工具要求源库先升级到当前结构，避免静默遗漏旧任务关联。
 
 ### 生成成功后的作品保存恢复
 

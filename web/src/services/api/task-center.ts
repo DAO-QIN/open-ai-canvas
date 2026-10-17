@@ -2,6 +2,7 @@ import { generationErrorMessage } from "@/lib/generation-error";
 import { http, apiBaseURL, type BackendEnvelope } from "@/services/api/request";
 import { consumeTaskTextStream, createTaskTextStreamParser, type TaskTextStreamEvent } from "@/services/api/task-text-stream";
 import { recordDiagnosticEvent } from "@/services/diagnostics/client-diagnostics";
+import { getActiveUserScope } from "@/lib/user-scope";
 
 export type { BackendEnvelope } from "@/services/api/request";
 
@@ -210,9 +211,9 @@ export function queryGenerationTask(id: string, options?: { signal?: AbortSignal
 }
 
 type GenerationTaskSubscriptionDependencies = {
-    queryTask(id: string): Promise<GenerationTask>;
-    waitTask(id: string, options?: { initialTask?: GenerationTask; onTaskUpdate?: (task: GenerationTask) => void }): Promise<GenerationTask>;
     reconnectDelayMs?: number;
+    queryTask(id: string, options?: { signal?: AbortSignal }): Promise<GenerationTask>;
+    waitTask(id: string, options?: { signal?: AbortSignal; initialTask?: GenerationTask; onTaskUpdate?: (task: GenerationTask) => void }): Promise<GenerationTask>;
 };
 
 export function createGenerationTaskSubscriptionService(dependencies: GenerationTaskSubscriptionDependencies) {
@@ -220,57 +221,84 @@ export function createGenerationTaskSubscriptionService(dependencies: Generation
         listeners: Set<(task: GenerationTask) => void>;
         latest?: GenerationTask;
         observation?: Promise<void>;
-        reconnectTimer?: ReturnType<typeof setTimeout>;
+        controller?: AbortController;
+        retry?: ReturnType<typeof setTimeout>;
         failures: number;
+        scope: string;
     };
     const entries = new Map<string, Entry>();
     const publish = (entry: Entry, task: GenerationTask) => {
+        if (entry.scope !== getActiveUserScope() || !entry.listeners.size) return;
         entry.latest = task;
         for (const listener of entry.listeners) listener(task);
     };
     const observe = (id: string, entry: Entry) => {
-        if (entry.observation || entry.reconnectTimer !== undefined) return;
+        if (entry.observation || !entry.listeners.size || entry.scope !== getActiveUserScope()) return;
+        if (entry.latest && ["succeeded", "failed", "cancelled"].includes(entry.latest.status)) return;
+        if (entry.retry) clearTimeout(entry.retry);
+        entry.retry = undefined;
+        const controller = new AbortController();
+        entry.controller = controller;
         entry.observation = (async () => {
-            const initial = await dependencies.queryTask(id);
-            entry.failures = 0;
+            const initial = await dependencies.queryTask(id, { signal: controller.signal });
+            if (controller.signal.aborted) return;
             publish(entry, initial);
             if (initial.status === "succeeded" || initial.status === "failed" || initial.status === "cancelled") return;
             const terminal = await dependencies.waitTask(id, {
                 initialTask: initial,
-                onTaskUpdate: (task) => publish(entry, task),
+                signal: controller.signal,
+                onTaskUpdate: (task) => { entry.failures = 0; publish(entry, task); },
             });
             publish(entry, terminal);
         })().catch((error) => {
+            if (controller.signal.aborted) return;
+            console.warn("生成任务观察中断，将重连原任务", { taskId: id, error });
+        }).finally(() => {
             entry.observation = undefined;
-            console.warn("生成任务观察中断，后续订阅将重新建立连接", { taskId: id, error });
-            if (!entry.listeners.size || entry.latest?.status === "succeeded" || entry.latest?.status === "failed" || entry.latest?.status === "cancelled") return;
-            // 页面不一定重新挂载；只重连状态查询，绝不重提生成任务。
+            if (controller.signal.aborted || !entry.listeners.size || entry.scope !== getActiveUserScope()) return;
+            if (entry.latest && ["succeeded", "failed", "cancelled"].includes(entry.latest.status)) return;
             const delayMs = Math.min(30_000, (dependencies.reconnectDelayMs ?? 2_000) * 2 ** Math.min(entry.failures++, 4));
-            entry.reconnectTimer = setTimeout(() => {
-                entry.reconnectTimer = undefined;
-                if (entry.listeners.size) observe(id, entry);
-            }, delayMs);
+            entry.retry = setTimeout(() => observe(id, entry), delayMs);
         });
     };
+    const reconnect = () => {
+        for (const [id, entry] of entries) observe(id, entry);
+    };
+    let listening = false;
     return {
         subscribe(ids: readonly string[], listener: (task: GenerationTask) => void) {
+            if (!listening && typeof window !== "undefined") {
+                window.addEventListener("online", reconnect);
+                listening = true;
+            }
             const uniqueIds = [...new Set(ids)];
+            const ownedEntries = new Map<string, Entry>();
             for (const id of uniqueIds) {
-                const entry = entries.get(id) ?? { listeners: new Set<(task: GenerationTask) => void>(), failures: 0 };
+                const old = entries.get(id);
+                if (old && old.scope !== getActiveUserScope()) {
+                    old.controller?.abort();
+                    if (old.retry) clearTimeout(old.retry);
+                    old.listeners.clear();
+                    entries.delete(id);
+                }
+                const entry = entries.get(id) ?? { listeners: new Set<(task: GenerationTask) => void>(), failures: 0, scope: getActiveUserScope() };
                 entries.set(id, entry);
+                ownedEntries.set(id, entry);
                 entry.listeners.add(listener);
                 if (entry.latest) listener(entry.latest);
                 observe(id, entry);
             }
             return () => {
-                for (const id of uniqueIds) {
-                    const entry = entries.get(id);
-                    if (!entry) continue;
+                for (const [id, entry] of ownedEntries) {
                     entry.listeners.delete(listener);
-                    if (!entry.listeners.size && entry.reconnectTimer !== undefined) {
-                        clearTimeout(entry.reconnectTimer);
-                        entry.reconnectTimer = undefined;
-                    }
+                    if (entry.listeners.size) continue;
+                    entry.controller?.abort();
+                    if (entry.retry) clearTimeout(entry.retry);
+                    if (entries.get(id) === entry) entries.delete(id);
+                }
+                if (!entries.size && listening) {
+                    window.removeEventListener("online", reconnect);
+                    listening = false;
                 }
             };
         },
@@ -278,7 +306,7 @@ export function createGenerationTaskSubscriptionService(dependencies: Generation
 }
 
 const generationTaskSubscriptionService = createGenerationTaskSubscriptionService({
-    queryTask: (id) => queryGenerationTask(id),
+    queryTask: (id, options) => queryGenerationTask(id, options),
     waitTask: (id, options) => waitForGenerationTask(id, options),
 });
 
@@ -566,15 +594,10 @@ function taskWaitTimeoutMs(task?: GenerationTask) {
 
 function delay(ms: number, signal?: AbortSignal) {
     return new Promise<void>((resolve, reject) => {
-        const timer = window.setTimeout(resolve, ms);
-        signal?.addEventListener(
-            "abort",
-            () => {
-                window.clearTimeout(timer);
-                reject(new DOMException("Aborted", "AbortError"));
-            },
-            { once: true },
-        );
+        if (signal?.aborted) { reject(new DOMException("Aborted", "AbortError")); return; }
+        const abort = () => { window.clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); };
+        const timer = window.setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, ms);
+        signal?.addEventListener("abort", abort, { once: true });
     });
 }
 
