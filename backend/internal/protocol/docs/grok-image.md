@@ -1,34 +1,62 @@
 # xAI Grok Images
 
-插件 `xai-grok-images`（Provider `grok-image`）使用 Bearer 鉴权及 JSON 请求。无参考图调用 `POST /v1/images/generations`，存在有效参考图时调用 `POST /v1/images/edits`，不使用 multipart。
+Grok Images 插件使用 OpenAI 风格的图片生成路径，但请求字段按 xAI 图片协议构造：`aspect_ratio`、`resolution`，并在有参考图时发送单个 `image`。它不是 OpenAI Images 插件的别名。
 
-## 参数
+## 接口与鉴权
 
 {{OPERATIONS}}
 
+```http
+POST {channel_base_url}/v1/images/generations
+Authorization: Bearer <XAI_API_KEY>
+Content-Type: application/json
+```
+
+## 模型与支持边界
+
+模型名由 xAI 账户当前可用模型决定。插件不写死模型、价格、并发或内容限制。当前实现只发送第一张参考图；多参考图、编辑专用路径、mask 和批量生成没有实现，不能因上游可能支持就展示为已支持。
+
+## 参数与字段映射
+
 {{PARAMETERS}}
 
-- `model`、`prompt`、`imageCount -> n`。
-- `aspectRatio -> aspect_ratio`，像素输入按已声明规则转换；不发送 OpenAI 的 `size`。
-- `resolution -> resolution`，兼容旧质量值的 1k/2k 映射。
-- 单张参考图使用 `image: {url: ...}`；多张使用 `images: [{url: ...}, ...]`，按 order 排序，仅接收 edit_source/reference_image/空 role。支持 URL 和 Data URL；无参考图时省略两个图片字段。蒙版未开放。
-- 后台隐藏参数 `editModel` 绑定 `providerOptions.grok-image.edit_model`：仅编辑请求替换上游模型，留空沿用当前模型；不改变无图请求、逻辑模型身份或计价规则。
+实际构造为：`aspectRatio -> aspect_ratio`，为空时默认 `1:1`；`quality -> resolution`，为空时默认 `2k`；`images[0] -> image`。`imageCount`、`resolution` 平台字段及其他图片不会发送。
 
-## Grok2API Web 账号池
+## 文生图请求
 
-模型名称相同不代表文生图和编辑具有相同路由。Grok2API 的 Web `grok-imagine-image-2.0` 提供生成，Web 编辑路由为 `grok-imagine-image-edit`，对应隐藏参数 `editModel`。实测 Web 编辑接收到正确图片但返回无关风景，不能仅凭 HTTP 200 确认效果。Console 编辑需要权限及有图片额度的账号；本渠道 Console 图片额度全部为零。用户选择不再推进 Console、Web 不可用则停止参考图。影绘因此仅保留文生图，上游模型固定为 `Web/grok-imagine-image-2.0`，参考图上限设为 0；逻辑模型身份与销售单价保持不变。此结论针对当前部署与账号池，不代表 Web 永久不支持编辑。
+```bash
+curl "{channel_base_url}/v1/images/generations" \
+  -H "Authorization: Bearer <XAI_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model":"YOUR_GROK_IMAGE_MODEL",
+    "prompt":"太空港的清晨，宽银幕概念设计",
+    "aspect_ratio":"16:9",
+    "resolution":"2k"
+  }'
+```
 
-当前 Grok2API 编辑入口最多接受 8 张输入图，Console Image 2.0 最多 3 张；这只是接口限制，不等于效果通过。Web 编辑仅支持 n=1、resolution=1k。Web 生成路由忽略 resolution/quality；不能把选中的 2K 参数等同于上游保证返回 2K。editModel 仅允许插件声明的值，渠道可进一步收窄，不能用于任意切换计价模型。重新开放本渠道参考图前，需要重新验证真实主体保留效果。
+## 单图参考请求
+
+```json
+{
+  "model":"YOUR_GROK_IMAGE_MODEL",
+  "prompt":"保持主体轮廓，改成铅笔分镜风格",
+  "aspect_ratio":"16:9",
+  "resolution":"2k",
+  "image":"https://example.com/reference.png"
+}
+```
 
 ## 响应与错误
 
-响应解析 `data[].url` 或 `data[].b64_json`。Base64 优先使用 `mime_type`，缺省才采用 image/png。模型能力配置中的返回格式开关控制 `b64_json`/`url`。
+模型能力配置中的 `response_format` 开关控制请求的返回格式：开启发送 `b64_json`，关闭发送 `url`。声明式插件和后端 Grok 手写路径共用此映射。xAI 零数据保留团队应开启该选项；Base64 图片由已有响应解析器接收，不需要另设接收开关。
 
-上游 `client_key_account_scope_unavailable` 表示密钥限制范围内缺少相应账号路由，应核对模型的接口能力和账号池，不应盲目重试或改成文生图掩盖参考图失败。
+插件按 OpenAI Images 风格解析 `data[]` 中的 `url`、`b64_json` 或 `data`。如果 xAI 的实际响应结构发生变化或只返回异步任务，当前解析会失败而不是伪造结果。素材不可达、比例/分辨率不受模型支持、模型无权限和审核拒绝应原样暴露。
 
-## 接口资料
+## 官方资料
 
-- [Grok2API 图片编辑](https://grok-api.dqin-666zj.top/docs/image/edits)
-- [Grok2API 图片生成](https://grok-api.dqin-666zj.top/docs/image/generations)
+- [xAI Image Generation](https://docs.x.ai/docs/guides/image-generation)
+- [xAI API Reference](https://docs.x.ai/docs/api-reference)
 
 {{CONTRACT}}

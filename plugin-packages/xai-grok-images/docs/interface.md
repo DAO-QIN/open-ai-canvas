@@ -1,43 +1,79 @@
 # xAI Grok Images 接口字段
 
-- 插件 ID：`xai-grok-images`，Provider ID：`grok-image`，能力：`image`。
-- 默认 Base URL：`https://api.x.ai`，API Key 使用 Bearer 鉴权。
-- 无有效参考图：`POST /v1/images/generations`；有有效参考图：`POST /v1/images/edits`。
-- 请求类型均为 `application/json`，生命周期为同步响应。
+## 协议身份
 
-## 输入字段
+- 插件 ID：`xai-grok-images`。
+- Provider ID：`grok-image`。
+- 能力：`image`。
+- 默认 Base URL：`https://api.x.ai`。
+- 鉴权驱动：`bearer`。
+- 创建：`POST /v1/images/generations`。
+- 生命周期：同步响应。
 
-| 平台字段 | 请求字段/行为 |
+## 配置字段
+
+| 字段 | 类型 | 必填 | 含义 |
+| --- | --- | --- | --- |
+| `apiKey` | secret | 是 | API Key |
+
+## 统一字段映射
+
+| 统一字段 | 类型 | 必填 | 上游映射 | 说明 |
+| --- | --- | --- | --- | --- |
+| `model` | string | 是 | `model` | 图片模型 ID。 |
+| `prompt` | string | 是 | `prompt` | 图片提示词。 |
+| `images` | media[] | 否 | `provider image/reference fields` | 参考图或编辑源图，role 由业务层确定。 |
+| `imageCount` | integer | 否 | `n/sample_count` | 输出数量。 |
+| `aspectRatio` | string | 否 | `size/aspect_ratio` | 比例或尺寸，语义按协议说明。 |
+| `resolution` | string | 否 | `resolution/imageSize` | 分辨率档位。 |
+| `quality` | string | 否 | `quality` | 质量档位。 |
+| `providerOptions` | object | 否 | `provider-specific fields` | 插件命名空间内的厂商扩展字段。 |
+
+## 上游请求模板逐字段清单
+
+下表由插件请求模板生成，覆盖 body、query、headers 和 multipart 文件声明中的每个字段。
+
+| 上游位置 | 值或转换表达式 |
 | --- | --- |
-| model | model；有图时可由后台 editModel 参数覆盖，缺省沿用当前模型 |
-| prompt | prompt |
-| imageCount | n，未指定时为 1 |
-| aspectRatio | aspect_ratio，支持比例及现有像素比例转换 |
-| resolution / 旧 quality | resolution，仅支持现有 1k/2k 映射 |
-| images | 有效 role 为 edit_source、reference_image 或空；按 order 排序 |
-| 单图 | image: {url: URL或DataURL} |
-| 多图 | images: [{url: URL或DataURL}, ...]，不丢弃后续图片 |
-| 无图 | image/images 字段均省略 |
-| providerOptions.grok-image.response_format | response_format，缺省 url |
-| providerOptions.grok-image.user | 可选 user |
-| providerOptions.grok-image.edit_model | 仅编辑请求替换 model；由隐藏图片参数 editModel 配置 |
+| `create.method` | `"POST"` |
+| `create.path` | `"/v1/images/generations"` |
+| `create.contentType` | `"application/json"` |
+| `create.body.model` | `{"$ref":"request.model"}` |
+| `create.body.prompt` | `{"$ref":"request.prompt"}` |
+| `create.body.image` | `{"$if":{"condition":{"$gt":[{"$len":{"$ref":"request.images"}},0]},"then":{"url":{"$first":{"$map":{"from":{"$filter":{"from":{"$sortByOrder":{"$ref":"request.images"}},"as":"media","where":{"$in":[{"$ref":"media.role"},["edit_source","reference_image",""]]}}},"as":"media","in":{"$ref":"media.value"}}}}},"else":null}}` |
+| `create.body.n` | `{"$if":{"condition":{"$gt":[{"$ref":"request.imageCount"},0]},"then":{"$ref":"request.imageCount"},"else":1}}` |
+| `create.body.response_format` | `{"$coalesce":[{"$ref":"request.providerOptions.grok-image.response_format"},"url"]}` |
+| `create.body.aspect_ratio` | `{"$omitEmpty":{"$switch":{"cases":[{"when":{"$in":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},["","auto"]]},"then":null},{"when":{"$in":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},["1:1","3:4","4:3","9:16","16:9","2:3","3:2","9:19.5","19.5:9","1:2","2:1"]]},"then":{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}}},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$eq":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]}]},"then":"1:1"},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$gte":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},1.7]},{"$lte":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},1.8]}]},"then":"16:9"},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$gte":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},0.5555555555555556]},{"$lte":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},0.5882352941176471]}]},"then":"9:16"},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$gt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},1.2]},{"$lt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},1.4]}]},"then":"4:3"},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$gt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},0.7]},{"$lt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},0.85]}]},"then":"3:4"},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$gte":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},0.6]},{"$lt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},0.72]}]},"then":"2:3"},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$gt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},1.35]},{"$lt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},1.6]}]},"then":"3:2"},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$gt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},0.45]},{"$lt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},0.55]}]},"then":"1:2"},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$gt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},1.85]},{"$lt":[{"$divide":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]},2.2]}]},"then":"2:1"},{"when":{"$and":[{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}}]}]},"then":"16:9"},{"when":{"$and":[{"$eq":[{"$len":{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]}},2]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},0]}},0]},{"$gt":[{"$toFloat":{"$at":[{"$split":[{"$lower":{"$trim":{"$ref":"request.aspectRatio"}}},"x"]},1]}},0]}]},"then":"9:16"}],"default":null}}}` |
+| `create.body.resolution` | `{"$omitEmpty":{"$switch":{"cases":[{"when":{"$in":[{"$lower":{"$trim":{"$coalesce":[{"$ref":"request.resolution"},{"$ref":"request.quality"}]}}},["1k","low","standard"]]},"then":"1k"},{"when":{"$in":[{"$lower":{"$trim":{"$coalesce":[{"$ref":"request.resolution"},{"$ref":"request.quality"}]}}},["2k","medium","hd","high","4k"]]},"then":"2k"}],"default":null}}}` |
+| `create.body.user` | `{"$omitEmpty":{"$ref":"request.providerOptions.grok-image.user"}}` |
 
-不使用 multipart；不发送 OpenAI size；未开放蒙版。
+## Provider 扩展键
 
-## Grok2API 账号池与模型
+- `providerOptions.grok-image.response_format`
+- `providerOptions.grok-image.user`
 
-Web 文生图 `grok-imagine-image-2.0` 与 Web 编辑模型 `grok-imagine-image-edit` 为不同路由。Web-only 密钥应配置 `editModel=grok-imagine-image-edit`。Console 的同名 Image 2.0 编辑要求 Console 账号池权限，插件不会替用户扩大密钥范围或静默切到 Console。
+动态模型或工作流允许使用文档声明的完整 `parameters/input/extra_body` 对象；该对象是协议本身的开放 schema，不会被宿主裁剪。
 
-当前 Grok2API 编辑入口最多接受 8 张输入图；Web 编辑仅支持 n=1、resolution=1k，须在渠道能力配置中限制。其他供应商依其文档配置。Web 生成路由忽略 resolution/quality，选择 2K 不代表实测输出达到 2K。editModel 仅允许插件声明的值，渠道可进一步收窄，不能用来任意替换计价模型。
+## 响应映射逐字段清单
 
-## 响应
+| 映射位置 | 上游路径或转换表达式 |
+| --- | --- |
+| `response.status` | `"succeeded"` |
+| `response.images` | `{"$map":{"from":{"$ref":"response.data"},"as":"item","in":{"url":{"$omitEmpty":{"$ref":"item.url"}},"dataUrl":{"$if":{"condition":{"$ref":"item.b64_json"},"then":{"$concat":["data:image/png;base64,",{"$ref":"item.b64_json"}]},"else":null}}}}}` |
+| `response.errorPaths[0]` | `"error.code"` |
+| `response.messagePaths[0]` | `"error.message"` |
 
-同步解析 `data[]` 中的 `url` 与 `b64_json`。Base64 的 Data URL 使用响应 `mime_type`，缺省 image/png。错误来自 `error.code` 和 `error.message`。HTTP 503 `client_key_account_scope_unavailable` 需要检查密钥账号池与编辑模型的匹配，不应改用 generations 丢失参考图。
+## 响应与错误
 
-## 参考资料
+插件把上游 task/status/text/media/usage 映射为统一结果。临时媒体 URL 标记为 ephemeral，由宿主立即下载持久化。HTTP 错误、业务 code 和 error object 保持失败语义，不包装成成功。
 
-- [Grok2API 图片编辑](https://grok-api.dqin-666zj.top/docs/image/edits)
-- [Grok2API 图片生成](https://grok-api.dqin-666zj.top/docs/image/generations)
+## 兼容边界
+
+有参考图时改走 /v1/images/edits；resolution 只接受 1k/2k；像素尺寸会换算为 aspect_ratio。
+
+## 动态图片参数
+
+`contributes.providers[].imageParameters` 是渠道模型、前台模型与生成界面共用的参数合同。`name` 为稳定身份，`type`、`values`、`min/max/step`、`default` 描述输入；`models` 限定适用上游模型，`enabled` 为初始启用状态。只有 `pricing: true` 的启用字段允许作为价格条件；其他参数仍参与生成。渠道可收窄范围，绑定与计价资格由插件拥有。`binding` 映射到统一请求或插件自己的 `providerOptions` 命名空间。
 
 <!-- YINGCE_MANIFEST_CONTRACT_START -->
 ## Manifest 完整接口定义
@@ -49,7 +85,7 @@ Web 文生图 `grok-imagine-image-2.0` 与 Web 编辑模型 `grok-imagine-image-
   "apiVersion": "yingce.plugin/v2",
   "id": "xai-grok-images",
   "name": "xAI Grok Images",
-  "version": "2.1.1",
+  "version": "2.1.0",
   "author": "xAI / 影策",
   "description": "xAI Grok Images 独立请求协议插件。",
   "documentation": "<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>",
@@ -89,19 +125,6 @@ Web 文生图 `grok-imagine-image-2.0` 与 Web 编辑模型 `grok-imagine-image-
           "field": "apiKey"
         },
         "imageParameters": [
-          {
-            "name": "editModel",
-            "label": "参考图编辑模型",
-            "type": "string",
-            "binding": "providerOptions.grok-image.edit_model",
-            "values": [
-              "",
-              "grok-imagine-image-edit"
-            ],
-            "default": "",
-            "userVisible": false,
-            "description": "仅参考图请求使用；留空沿用当前模型。Grok2API Web 账号池使用 grok-imagine-image-edit。"
-          },
           {
             "name": "size",
             "label": "画幅比例",
@@ -211,24 +234,7 @@ Web 文生图 `grok-imagine-image-2.0` 与 Web 编辑模型 `grok-imagine-image-
                 "$gt": [
                   {
                     "$len": {
-                      "$filter": {
-                        "from": {
-                          "$ref": "request.images"
-                        },
-                        "as": "media",
-                        "where": {
-                          "$in": [
-                            {
-                              "$ref": "media.role"
-                            },
-                            [
-                              "edit_source",
-                              "reference_image",
-                              ""
-                            ]
-                          ]
-                        }
-                      }
+                      "$ref": "request.images"
                     }
                   },
                   0
@@ -241,130 +247,33 @@ Web 文生图 `grok-imagine-image-2.0` 与 Web 编辑模型 `grok-imagine-image-
           "contentType": "application/json",
           "body": {
             "model": {
+              "$ref": "request.model"
+            },
+            "prompt": {
+              "$ref": "request.prompt"
+            },
+            "image": {
               "$if": {
                 "condition": {
                   "$gt": [
                     {
                       "$len": {
-                        "$filter": {
-                          "from": {
-                            "$ref": "request.images"
-                          },
-                          "as": "media",
-                          "where": {
-                            "$in": [
-                              {
-                                "$ref": "media.role"
-                              },
-                              [
-                                "edit_source",
-                                "reference_image",
-                                ""
-                              ]
-                            ]
-                          }
-                        }
+                        "$ref": "request.images"
                       }
                     },
                     0
                   ]
                 },
                 "then": {
-                  "$coalesce": [
-                    {
-                      "$ref": "request.providerOptions.grok-image.edit_model"
-                    },
-                    {
-                      "$ref": "request.model"
-                    }
-                  ]
-                },
-                "else": {
-                  "$ref": "request.model"
-                }
-              }
-            },
-            "prompt": {
-              "$ref": "request.prompt"
-            },
-            "image": {
-              "$omitEmpty": {
-                "$if": {
-                  "condition": {
-                    "$eq": [
-                      {
-                        "$len": {
+                  "url": {
+                    "$first": {
+                      "$map": {
+                        "from": {
                           "$filter": {
                             "from": {
-                              "$ref": "request.images"
-                            },
-                            "as": "media",
-                            "where": {
-                              "$in": [
-                                {
-                                  "$ref": "media.role"
-                                },
-                                [
-                                  "edit_source",
-                                  "reference_image",
-                                  ""
-                                ]
-                              ]
-                            }
-                          }
-                        }
-                      },
-                      1
-                    ]
-                  },
-                  "then": {
-                    "url": {
-                      "$first": {
-                        "$map": {
-                          "from": {
-                            "$filter": {
-                              "from": {
-                                "$sortByOrder": {
-                                  "$ref": "request.images"
-                                }
-                              },
-                              "as": "media",
-                              "where": {
-                                "$in": [
-                                  {
-                                    "$ref": "media.role"
-                                  },
-                                  [
-                                    "edit_source",
-                                    "reference_image",
-                                    ""
-                                  ]
-                                ]
+                              "$sortByOrder": {
+                                "$ref": "request.images"
                               }
-                            }
-                          },
-                          "as": "media",
-                          "in": {
-                            "$ref": "media.value"
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "else": null
-                }
-              }
-            },
-            "images": {
-              "$omitEmpty": {
-                "$if": {
-                  "condition": {
-                    "$gt": [
-                      {
-                        "$len": {
-                          "$filter": {
-                            "from": {
-                              "$ref": "request.images"
                             },
                             "as": "media",
                             "where": {
@@ -380,45 +289,16 @@ Web 文生图 `grok-imagine-image-2.0` 与 Web 编辑模型 `grok-imagine-image-
                               ]
                             }
                           }
-                        }
-                      },
-                      1
-                    ]
-                  },
-                  "then": {
-                    "$map": {
-                      "from": {
-                        "$filter": {
-                          "from": {
-                            "$sortByOrder": {
-                              "$ref": "request.images"
-                            }
-                          },
-                          "as": "media",
-                          "where": {
-                            "$in": [
-                              {
-                                "$ref": "media.role"
-                              },
-                              [
-                                "edit_source",
-                                "reference_image",
-                                ""
-                              ]
-                            ]
-                          }
-                        }
-                      },
-                      "as": "media",
-                      "in": {
-                        "url": {
+                        },
+                        "as": "media",
+                        "in": {
                           "$ref": "media.value"
                         }
                       }
                     }
-                  },
-                  "else": null
-                }
+                  }
+                },
+                "else": null
               }
             },
             "n": {
@@ -2286,16 +2166,7 @@ Web 文生图 `grok-imagine-image-2.0` 与 Web 编辑模型 `grok-imagine-image-
                     },
                     "then": {
                       "$concat": [
-                        "data:",
-                        {
-                          "$coalesce": [
-                            {
-                              "$ref": "item.mime_type"
-                            },
-                            "image/png"
-                          ]
-                        },
-                        ";base64,",
+                        "data:image/png;base64,",
                         {
                           "$ref": "item.b64_json"
                         }
