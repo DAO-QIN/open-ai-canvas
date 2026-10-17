@@ -28,7 +28,7 @@
 
 Web 文生图 `grok-imagine-image-2.0` 与 Web 编辑模型 `grok-imagine-image-edit` 为不同路由。Web-only 密钥应配置 `editModel=grok-imagine-image-edit`。Console 的同名 Image 2.0 编辑要求 Console 账号池权限，插件不会替用户扩大密钥范围或静默切到 Console。
 
-当前 Grok2API 编辑入口最多接受 8 张输入图，须在渠道能力配置中限制；其他供应商依其文档配置。Web 路由忽略 resolution/quality，选择 2K 不代表实测输出达到 2K。
+当前 Grok2API 编辑入口最多接受 8 张输入图；Web 编辑仅支持 n=1、resolution=1k，须在渠道能力配置中限制。其他供应商依其文档配置。Web 生成路由忽略 resolution/quality，选择 2K 不代表实测输出达到 2K。editModel 仅允许插件声明的值，渠道可进一步收窄，不能用来任意替换计价模型。
 
 ## 响应
 
@@ -94,6 +94,10 @@ Web 文生图 `grok-imagine-image-2.0` 与 Web 编辑模型 `grok-imagine-image-
             "label": "参考图编辑模型",
             "type": "string",
             "binding": "providerOptions.grok-image.edit_model",
+            "values": [
+              "",
+              "grok-imagine-image-edit"
+            ],
             "default": "",
             "userVisible": false,
             "description": "仅参考图请求使用；留空沿用当前模型。Grok2API Web 账号池使用 grok-imagine-image-edit。"

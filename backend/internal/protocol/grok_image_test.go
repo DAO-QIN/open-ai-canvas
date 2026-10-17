@@ -69,3 +69,11 @@ func TestGrokImageResponsePreservesMIME(t *testing.T) {
 		}
 	}
 }
+
+func TestGrokImageEditModelRejectsUndeclaredOverride(t *testing.T) {
+	adapter := officialPackageAdapter(t, "xai-grok-images.yingce-plugin", "grok-image")
+	_, err := adapter.BuildCreate(context.Background(), RequestContext{Request: GenerationRequest{Capability: CapabilityImage, Model: "grok-imagine-image-2.0", Prompt: "edit", Images: []MediaReference{{URL: "https://example.com/cat.jpg"}}, ImageParameters: map[string]any{"editModel": "arbitrary-expensive-model"}}})
+	if err == nil {
+		t.Fatal("undeclared edit model override was accepted")
+	}
+}
