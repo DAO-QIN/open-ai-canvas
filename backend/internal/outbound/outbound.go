@@ -322,7 +322,7 @@ func newOutboundTransport(resolveHost func(context.Context, string) ([]net.IP, e
 			if err != nil {
 				return nil, err
 			}
-			return dialer.DialContext(ctx, network, net.JoinHostPort(addresses[0].String(), port))
+			return dialResolvedAddresses(ctx, network, port, addresses, 300*time.Millisecond, dialer.DialContext)
 		},
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
@@ -331,6 +331,62 @@ func newOutboundTransport(resolveHost func(context.Context, string) ([]net.IP, e
 		TLSHandshakeTimeout:   15 * time.Second,
 		ExpectContinueTimeout: time.Second,
 	}
+}
+
+// 只连接已经完整通过出口策略检查的 DNS 结果。慢地址不会阻塞其它地址；
+// 竞争只发生在 TCP 建连阶段，HTTP 请求仍只发送一次。
+func dialResolvedAddresses(ctx context.Context, network, port string, addresses []net.IP, fallbackDelay time.Duration, dial func(context.Context, string, string) (net.Conn, error)) (net.Conn, error) {
+	if len(addresses) == 0 {
+		return nil, errors.New("外部服务没有可用地址")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	type result struct {
+		conn net.Conn
+		err  error
+	}
+	results := make(chan result)
+	next, pending := 0, 0
+	start := func() {
+		address := net.JoinHostPort(addresses[next].String(), port)
+		next++
+		pending++
+		go func() {
+			conn, err := dial(ctx, network, address)
+			select {
+			case results <- result{conn, err}:
+			case <-ctx.Done():
+				if conn != nil {
+					_ = conn.Close()
+				}
+			}
+		}()
+	}
+	start()
+	timer := time.NewTimer(fallbackDelay)
+	defer timer.Stop()
+	var failures []error
+	for pending > 0 {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case completed := <-results:
+			pending--
+			if completed.err == nil {
+				return completed.conn, nil
+			}
+			failures = append(failures, completed.err)
+			if next < len(addresses) {
+				start()
+			}
+		case <-timer.C:
+			if next < len(addresses) {
+				start()
+				timer.Reset(fallbackDelay)
+			}
+		}
+	}
+	return nil, errors.Join(failures...)
 }
 
 func outboundProxyFromEnvironment(req *http.Request) (*url.URL, error) {
