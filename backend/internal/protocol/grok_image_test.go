@@ -54,6 +54,17 @@ func TestGrokImageEditModelAndReferences(t *testing.T) {
 	}
 }
 
+func TestGrokImageExplicitWebGeneration(t *testing.T) {
+	adapter := officialPackageAdapter(t, "xai-grok-images.yingce-plugin", "grok-image")
+	spec, err := adapter.BuildCreate(context.Background(), RequestContext{Request: GenerationRequest{Capability: CapabilityImage, Model: "Web/grok-imagine-image-2.0", Prompt: "cat", ImageCount: 1, ImageParameters: map[string]any{"editModel": "grok-imagine-image-edit"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Path != "/v1/images/generations" || manifestTestBody(t, spec)["model"] != "Web/grok-imagine-image-2.0" {
+		t.Fatalf("Web generation route changed: %#v", spec)
+	}
+}
+
 func TestGrokImageResponsePreservesMIME(t *testing.T) {
 	adapter := officialPackageAdapter(t, "xai-grok-images.yingce-plugin", "grok-image")
 	for _, tc := range []struct{ body, prefix string }{

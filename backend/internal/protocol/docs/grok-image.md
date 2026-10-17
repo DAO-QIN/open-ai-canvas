@@ -16,9 +16,9 @@
 
 ## Grok2API Web 账号池
 
-模型名称相同不代表文生图和编辑具有相同路由。Grok2API 的 Web `grok-imagine-image-2.0` 提供生成，Web 编辑使用 `grok-imagine-image-edit`。仅允许 Web 账号池的密钥，应为该渠道模型设置 `editModel=grok-imagine-image-edit`；同名 Console Image 2.0 编辑需要 Console 账号池权限，插件不自动扩大密钥范围。
+模型名称相同不代表文生图和编辑具有相同路由。Grok2API 的 Web `grok-imagine-image-2.0` 提供生成，Web 编辑路由为 `grok-imagine-image-edit`，对应隐藏参数 `editModel`。实测 Web 编辑接收到正确图片但返回无关风景，不能仅凭 HTTP 200 确认效果。Console 编辑需要权限及有图片额度的账号；本渠道 Console 图片额度全部为零。用户选择不再推进 Console、Web 不可用则停止参考图。影绘因此仅保留文生图，上游模型固定为 `Web/grok-imagine-image-2.0`，参考图上限设为 0；逻辑模型身份与销售单价保持不变。此结论针对当前部署与账号池，不代表 Web 永久不支持编辑。
 
-当前 Grok2API 编辑入口校验 1–8 张输入图，Web 编辑仅支持 n=1、resolution=1k。渠道应相应限制为参考图上限 8、1K、1 张输出。Web 生成路由忽略 resolution/quality；不能把选中的 2K 参数等同于上游保证返回 2K。editModel 仅允许插件声明的值，渠道可进一步收窄，不能用于任意切换计价模型。
+当前 Grok2API 编辑入口最多接受 8 张输入图，Console Image 2.0 最多 3 张；这只是接口限制，不等于效果通过。Web 编辑仅支持 n=1、resolution=1k。Web 生成路由忽略 resolution/quality；不能把选中的 2K 参数等同于上游保证返回 2K。editModel 仅允许插件声明的值，渠道可进一步收窄，不能用于任意切换计价模型。重新开放本渠道参考图前，需要重新验证真实主体保留效果。
 
 ## 响应与错误
 
