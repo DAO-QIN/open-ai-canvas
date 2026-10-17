@@ -2,6 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { CONTENT_MODERATION_MESSAGE, generationErrorMessage, generationFailureMetadata } from "../src/lib/generation-error";
 
 describe("safe upstream error details", () => {
+    test("old plugin failures hide channel names in restored canvas nodes", () => {
+        for (const message of ["爱困视频协议仅适用于 omni-flash", "沧元 Midjourney 模型名与线路不匹配", "接口类型 secret-video 未安装声明式适配器", "CHANNEL_000037 模型暂不可用"]) {
+            expect(generationErrorMessage(message)).toBe("当前模型配置暂不可用，请换用其他模型或联系管理员。");
+        }
+    });
     const detail = "非常抱歉，生成的图片可能违反了关于裸露、色情或情色内容的防护限制。请重试或修改提示语。";
     test("drops upstream detail from the card", () => {
         const message = `模型服务拒绝了请求，请检查模型和参数；上游：${detail}`;

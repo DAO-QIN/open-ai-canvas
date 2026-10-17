@@ -14,6 +14,8 @@ const NETWORK_ERROR_MESSAGE = "网络异常。";
 const MODEL_CAPABILITY_ERROR_MESSAGE = "所选模型不支持当前生成方式或输入，请切换模型或调整输入后重试。";
 const MODEL_PARAMETER_ERROR_MESSAGE = "当前模型不支持这组参数或参考素材，请调整输入或切换模型后重试。";
 const MODEL_SERVICE_ERROR_MESSAGE = "模型服务处理失败，请稍后重试或换用其他模型。";
+const MODEL_CONFIGURATION_ERROR_MESSAGE = "当前模型配置暂不可用，请换用其他模型或联系管理员。";
+const MODEL_CONFIGURATION_ERROR_PATTERN = /协议.{0,40}(?:仅适用|只支持|仅支持)|模型名.{0,30}不匹配|接口类型.{0,80}未安装|\b(?:CHANNEL|MODEL)_\d+|protocol\s+\S+\s+(?:not found|not installed)/i;
 
 const REASON_MESSAGES: Record<string, string> = {
     model_price_not_configured: "当前模型暂未配置价格，请换用其他模型或联系管理员。",
@@ -84,6 +86,7 @@ export function generationErrorMessage(error: unknown) {
     const providerMessage = extractStructuredProviderMessage(raw) || extractWrappedProviderMessage(raw);
     const displayMessage = providerMessage || raw;
     if (isContentModerationError(displayMessage)) return contentModerationMessage(displayMessage);
+    if (MODEL_CONFIGURATION_ERROR_PATTERN.test(displayMessage)) return MODEL_CONFIGURATION_ERROR_MESSAGE;
     const resourceStorageMessage = resourceStorageFailureMessage(raw) || resourceStorageFailureMessage(displayMessage);
     if (resourceStorageMessage) return resourceStorageMessage;
     if (isNetworkFailure(displayMessage)) return NETWORK_ERROR_MESSAGE;
@@ -113,6 +116,7 @@ function sanitizeUserVisibleError(value: string) {
     const detail = index >= 0 ? redacted.slice(index + marker.length) : "";
     const actionable = actionableUpstreamReason(detail);
     const result = actionable ? `${prefix}${prefix ? "；" : ""}${actionable}` : prefix;
+    if (MODEL_CONFIGURATION_ERROR_PATTERN.test(result)) return MODEL_CONFIGURATION_ERROR_MESSAGE;
     return result.replace(USER_VISIBLE_TASK_ID_PATTERN, "[任务标识已隐藏]");
 }
 

@@ -29,14 +29,14 @@ ordinary_roles = ["", "reference_image", "style_reference", "subject_reference",
 first, last = selected("images", ["first_frame"]), selected("images", ["last_frame"])
 frames = selected("images", ["first_frame", "last_frame"])
 ordinary = selected("images", ordinary_roles)
-duration = fallback(ref("request.output.duration"), 8)
+duration = fallback(ref("request.output.duration"), 10)
 ratio = fallback(ref("request.output.aspectRatio"), "16:9")
 resolution = {"$lower": fallback(ref("request.output.resolution"), "720p")}
 checks = [
-    ({"$eq": [ref("request.model"), "omni-flash"]}, "爱困视频协议仅适用于 omni-flash"),
+    ({"$in": [ref("request.model"), ["gemini-omni-1.1-flash", "gemini-omni-1.1-flash-10s"]]}, "模型配置已更新，请重新选择模型后再试"),
     ({"$gt": [{"$len": {"$trim": ref("request.prompt")}}, 0]}, "视频提示词不能为空"),
-    ({"$eq": [duration, 8]}, "当前协议开放文档示例的 8 秒规格"),
-    ({"$eq": [ratio, "16:9"]}, "当前协议开放文档示例的 16:9 比例"),
+    ({"$eq": [duration, 10]}, "当前模型支持 10 秒视频，请调整时长后重试"),
+    ({"$in": [ratio, ["16:9", "9:16"]]}, "当前模型支持 16:9 或 9:16，请调整比例后重试"),
     ({"$eq": [resolution, "720p"]}, "当前协议开放文档示例的 720p 分辨率"),
     ({"$lte": [fallback(ref("request.output.count"), 1), 1]}, "每次任务仅生成一个视频"),
     ({"$eq": [fallback(ref("request.output.generateAudio"), False), False]}, "供应商未公布音轨控制参数"),
@@ -66,11 +66,11 @@ def urls(kind):
 
 
 parameters = [
-    ("model", "string", True, "model", "精确模型 ID：omni-flash。"),
+    ("model", "string", True, "model", "使用当前 Key 清单中的 gemini-omni-1.1-flash 或 gemini-omni-1.1-flash-10s；不发送旧别名 omni-flash。"),
     ("prompt", "string", True, "prompt", "视频描述；宿主默认 8000 字符是平台限制。"),
-    ("duration", "integer", False, "duration", "当前默认及开放 8 秒，采用文档示例；不是供应商上限。"),
+    ("duration", "integer", False, "duration", "当前默认及开放 10 秒。"),
     ("resolution", "string", False, "resolution", "当前默认及开放 720p。"),
-    ("aspectRatio", "string", False, "aspect_ratio", "当前默认及开放 16:9。"),
+    ("aspectRatio", "string", False, "aspect_ratio", "支持 16:9、9:16，默认 16:9。"),
     ("images", "media[]", False, "reference_images", "保序对象数组；首尾帧保留 first_frame/last_frame，普通图 role=reference。支持媒体 data URL 与 HTTP(S)。"),
     ("videos", "media[]", False, "reference_videos", "保序视频数组，默认平台上限 1 项，可由管理员调整。"),
     ("audios", "media[]", False, "reference_audios", "保序音频数组，默认平台上限 1 项，可由管理员调整。"),
@@ -83,7 +83,7 @@ status = choose(ref("response.error"), "failed", choose(
     {"$in": [ref("response.status"), ["queued", "in_progress", "processing", "completed", "failed"]]}, ref("response.status"), "failed"))
 provider = {
     "id": "yunfei-omni-flash-video", "label": "爱困 Gemini 视频 · omni-flash",
-    "description": "img.yunfei.best 原生异步 JSON；默认 8秒/720p/16:9，首尾帧或图/视/音参考。",
+    "description": "img.yunfei.best 原生异步 JSON；10秒/720p，支持横竖屏、首尾帧或图/视/音参考。",
     "capabilities": ["video"], "scopes": ["admin.system-channel", "user.custom-channel", "canvas", "creation", "agent"],
     "baseUrl": "https://img.yunfei.best", "auth": {"type": "bearer", "field": "apiKey"},
     "parameters": [{"name": n, "type": t, "required": r, "mapping": m, "description": d} for n, t, r, m, d in parameters],
@@ -101,7 +101,7 @@ provider = {
                  "errorPaths": ["error.code", "code"], "videos": choose({"$and": [completed, {"$not": ref("response.error")}]}, output_url), "resultEphemeral": True},
 }
 manifest = {"apiVersion": "yingce.plugin/v2", "id": "yunfei-omni-video", "name": "爱困 Gemini 视频 · omni-flash",
-            "version": "1.0.0", "author": "影策", "description": "独立适配 img.yunfei.best 的 omni-flash JSON 视频任务接口。",
+            "version": "1.1.0", "author": "影策", "description": "独立适配 img.yunfei.best 的 Gemini Omni 1.1 Flash JSON 视频任务接口。",
             "permissions": ["generation.run", "media.read"],
             "configuration": {"fields": [{"name": "apiKey", "type": "secret", "label": "API Key", "required": True}]},
             "contributes": {"providers": [provider]}}
@@ -109,7 +109,7 @@ readme = """# 爱困 Gemini 视频 · omni-flash
 
 标准 `yingce.plugin/v2` 声明式插件，无可执行代码和内置密钥。渠道 Bearer 凭据由宿主读取，网络、任务恢复及媒体持久化沿用宿主实现。
 
-协议 `yunfei-omni-flash-video`，精确模型 `omni-flash`，站点 `https://img.yunfei.best`。后台选中协议即填入 8 秒、720p、16:9、单条输出、默认文生视频。该规格来自供应商通用示例，不代表 omni-flash 的全部能力或上限。
+协议 `yunfei-omni-flash-video` 保留为稳定绑定 ID，使用 Key 可用清单中的 `gemini-omni-1.1-flash` 或 `gemini-omni-1.1-flash-10s`，站点 `https://img.yunfei.best`。后台选中协议即填入 10 秒、720p、16:9，另支持 9:16、单条输出、默认文生视频。旧名 `omni-flash` 不再作为上游模型发送。延长模型 `-extend` 需要独立操作合同，不套用普通生成。
 
 按用户确认，平台默认普通参考图 1 张、首帧与尾帧各 1 张（图片总数最多 3），视频和音频各 1 项；后台可调整数量。依文档，首尾帧模式与普通参考素材模式分开使用。未知素材大小和时长上限为 0，仍受宿主资源策略约束。音轨和水印控制未公开，不提供可控开关。
 
@@ -125,7 +125,7 @@ interface = """# omni-flash 视频接口合同
 - 顶层 JSON 仅发送 `model/prompt/duration/resolution/aspect_ratio` 及实际使用的素材数组。时长为整数；不发送兼容字段 seconds、size、images、音轨控制、随机种子、n 或未公布参数。
 - 图片按用户顺序映射为 `reference_images` 对象数组，普通参考使用 `role=reference`，首尾帧分别使用 `first_frame/last_frame`。首尾帧各最多一张；拒绝与普通图、参考音频或视频同时使用。
 - 音频与视频按用户顺序映射到 `reference_audios/reference_videos`。空数组省略，避免覆盖上游兼容字段优先级。HTTP(S) 与 data URL 的实际安全和媒体校验由宿主执行，插件不放宽出站限制。
-- 文档未列 omni-flash 专属规格上限；仅默认开放通用示例 8秒/720p/16:9。默认引用数量由用户选定，属于平台限制。后台可调整引用数量；提示词 8000 字符及宿主媒体策略继续生效。
+- 当前普通生成开放 10秒/720p/16:9 或 9:16；模型精确名称按 Key 实际可用清单。默认引用数量属于平台限制，后台可调整；提示词 8000 字符及宿主媒体策略继续生效。其他分辨率、时长或延长操作未经验证，不自动放开。
 
 ## 任务状态、响应和成片
 

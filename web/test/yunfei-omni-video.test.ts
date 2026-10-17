@@ -28,8 +28,8 @@ describe("Yunfei omni-flash video defaults", () => {
         const changed = changeChannelModelProtocol(roll, "yunfei-omni-flash-video", definitions);
         replaceChannelModelFormValues(form, changed);
         const profile = form.getFieldValue("capabilityConfig").video;
-        expect(profile.duration).toEqual({ selection: "enum", values: [8], default: 8 });
-        expect(profile.ratios).toEqual(["16:9"]);
+        expect(profile.duration).toEqual({ selection: "enum", values: [10], default: 10 });
+        expect(profile.ratios).toEqual(["16:9", "9:16"]);
         expect(profile.resolutions).toEqual(["720p"]);
         expect(profile.references).toMatchObject({ maxImages: 3, maxReferenceImages: 1, maxVideos: 1, maxAudios: 1 });
         expect(profile.generateAudio).toEqual({ supported: false, default: false });
@@ -49,6 +49,6 @@ describe("Yunfei omni-flash video defaults", () => {
         const saved = channelModelCapabilityConfigForSave(values)!;
         const reopened = initialChannelModelValues({ ...values, capabilityConfig: JSON.parse(JSON.stringify(saved)) } as any, definitions);
         expect(reopened.capabilityConfig!.video).toEqual(saved.video);
-        expect(videoDurationOptions(defaultModelCapabilityConfig("yunfei-omni-flash-video").video!)).toEqual([8]);
+        expect(videoDurationOptions(defaultModelCapabilityConfig("yunfei-omni-flash-video").video!)).toEqual([10]);
     });
 });

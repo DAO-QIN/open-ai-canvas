@@ -291,7 +291,10 @@ func (s *Service) Task(userID string, id string) (*model.Task, error) {
 		return nil, err
 	}
 	s.hydrateTaskProviderRequestID(task)
-	return taskForOutput(*task), nil
+	output := taskForOutput(*task)
+	output.Error = s.consumerModelError(output.Error)
+	output.ProviderCancelError = s.consumerModelError(output.ProviderCancelError)
+	return output, nil
 }
 
 func (s *Service) hydrateTaskProviderRequestID(task *model.Task) {

@@ -6,7 +6,7 @@
 - 顶层 JSON 仅发送 `model/prompt/duration/resolution/aspect_ratio` 及实际使用的素材数组。时长为整数；不发送兼容字段 seconds、size、images、音轨控制、随机种子、n 或未公布参数。
 - 图片按用户顺序映射为 `reference_images` 对象数组，普通参考使用 `role=reference`，首尾帧分别使用 `first_frame/last_frame`。首尾帧各最多一张；拒绝与普通图、参考音频或视频同时使用。
 - 音频与视频按用户顺序映射到 `reference_audios/reference_videos`。空数组省略，避免覆盖上游兼容字段优先级。HTTP(S) 与 data URL 的实际安全和媒体校验由宿主执行，插件不放宽出站限制。
-- 文档未列 omni-flash 专属规格上限；仅默认开放通用示例 8秒/720p/16:9。默认引用数量由用户选定，属于平台限制。后台可调整引用数量；提示词 8000 字符及宿主媒体策略继续生效。
+- 当前普通生成开放 10秒/720p/16:9 或 9:16；模型精确名称按 Key 实际可用清单。默认引用数量属于平台限制，后台可调整；提示词 8000 字符及宿主媒体策略继续生效。其他分辨率、时长或延长操作未经验证，不自动放开。
 
 ## 任务状态、响应和成片
 
@@ -19,11 +19,11 @@
 
 | 统一字段 | 类型 | 上游字段 | 说明 |
 | --- | --- | --- | --- |
-| `model` | string | `model` | 精确模型 ID：omni-flash。 |
+| `model` | string | `model` | 使用当前 Key 清单中的 gemini-omni-1.1-flash 或 gemini-omni-1.1-flash-10s；不发送旧别名 omni-flash。 |
 | `prompt` | string | `prompt` | 视频描述；宿主默认 8000 字符是平台限制。 |
-| `duration` | integer | `duration` | 当前默认及开放 8 秒，采用文档示例；不是供应商上限。 |
+| `duration` | integer | `duration` | 当前默认及开放 10 秒。 |
 | `resolution` | string | `resolution` | 当前默认及开放 720p。 |
-| `aspectRatio` | string | `aspect_ratio` | 当前默认及开放 16:9。 |
+| `aspectRatio` | string | `aspect_ratio` | 支持 16:9、9:16，默认 16:9。 |
 | `images` | media[] | `reference_images` | 保序对象数组；首尾帧保留 first_frame/last_frame，普通图 role=reference。支持媒体 data URL 与 HTTP(S)。 |
 | `videos` | media[] | `reference_videos` | 保序视频数组，默认平台上限 1 项，可由管理员调整。 |
 | `audios` | media[] | `reference_audios` | 保序音频数组，默认平台上限 1 项，可由管理员调整。 |
@@ -36,9 +36,9 @@
   "apiVersion": "yingce.plugin/v2",
   "id": "yunfei-omni-video",
   "name": "爱困 Gemini 视频 · omni-flash",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "影策",
-  "description": "独立适配 img.yunfei.best 的 omni-flash JSON 视频任务接口。",
+  "description": "独立适配 img.yunfei.best 的 Gemini Omni 1.1 Flash JSON 视频任务接口。",
   "permissions": [
     "generation.run",
     "media.read"
@@ -58,7 +58,7 @@
       {
         "id": "yunfei-omni-flash-video",
         "label": "爱困 Gemini 视频 · omni-flash",
-        "description": "img.yunfei.best 原生异步 JSON；默认 8秒/720p/16:9，首尾帧或图/视/音参考。",
+        "description": "img.yunfei.best 原生异步 JSON；10秒/720p，支持横竖屏、首尾帧或图/视/音参考。",
         "capabilities": [
           "video"
         ],
@@ -80,7 +80,7 @@
             "type": "string",
             "required": true,
             "mapping": "model",
-            "description": "精确模型 ID：omni-flash。"
+            "description": "使用当前 Key 清单中的 gemini-omni-1.1-flash 或 gemini-omni-1.1-flash-10s；不发送旧别名 omni-flash。"
           },
           {
             "name": "prompt",
@@ -94,7 +94,7 @@
             "type": "integer",
             "required": false,
             "mapping": "duration",
-            "description": "当前默认及开放 8 秒，采用文档示例；不是供应商上限。"
+            "description": "当前默认及开放 10 秒。"
           },
           {
             "name": "resolution",
@@ -108,7 +108,7 @@
             "type": "string",
             "required": false,
             "mapping": "aspect_ratio",
-            "description": "当前默认及开放 16:9。"
+            "description": "支持 16:9、9:16，默认 16:9。"
           },
           {
             "name": "images",
@@ -135,14 +135,17 @@
         "validations": [
           {
             "assert": {
-              "$eq": [
+              "$in": [
                 {
                   "$ref": "request.model"
                 },
-                "omni-flash"
+                [
+                  "gemini-omni-1.1-flash",
+                  "gemini-omni-1.1-flash-10s"
+                ]
               ]
             },
-            "message": "爱困视频协议仅适用于 omni-flash"
+            "message": "模型配置已更新，请重新选择模型后再试"
           },
           {
             "assert": {
@@ -167,17 +170,17 @@
                     {
                       "$ref": "request.output.duration"
                     },
-                    8
+                    10
                   ]
                 },
-                8
+                10
               ]
             },
-            "message": "当前协议开放文档示例的 8 秒规格"
+            "message": "当前模型支持 10 秒视频，请调整时长后重试"
           },
           {
             "assert": {
-              "$eq": [
+              "$in": [
                 {
                   "$coalesce": [
                     {
@@ -186,10 +189,13 @@
                     "16:9"
                   ]
                 },
-                "16:9"
+                [
+                  "16:9",
+                  "9:16"
+                ]
               ]
             },
-            "message": "当前协议开放文档示例的 16:9 比例"
+            "message": "当前模型支持 16:9 或 9:16，请调整比例后重试"
           },
           {
             "assert": {
@@ -641,7 +647,7 @@
                 {
                   "$ref": "request.output.duration"
                 },
-                8
+                10
               ]
             },
             "resolution": {

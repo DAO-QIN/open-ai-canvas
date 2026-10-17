@@ -9,7 +9,7 @@ import (
 
 func TestYunfeiOmniDocumentedJSONAndReferences(t *testing.T) {
 	a := officialPackageAdapter(t, "yunfei-omni-video.yingce-plugin", "yunfei-omni-flash-video")
-	r := GenerationRequest{Model: "omni-flash", Prompt: "参考角色奔跑", Duration: 8, Resolution: "720P", AspectRatio: "16:9",
+	r := GenerationRequest{Model: "gemini-omni-1.1-flash", Prompt: "参考角色奔跑", Duration: 10, Resolution: "720P", AspectRatio: "9:16",
 		Images:          []MediaReference{{URL: "https://cdn.example/ref.png", Role: "subject_reference"}},
 		Videos:          []MediaReference{{URL: "https://cdn.example/2.mp4", Order: 2}, {URL: "https://cdn.example/1.mp4", Order: 1}},
 		Audios:          []MediaReference{{DataURL: "data:audio/mpeg;base64,AA==", Role: "reference_audio"}},
@@ -21,7 +21,7 @@ func TestYunfeiOmniDocumentedJSONAndReferences(t *testing.T) {
 	if spec.Method != "POST" || spec.Path != "/v1/videos" || !spec.OriginPath || spec.Auth.Type != "bearer" || spec.ContentType != "application/json" {
 		t.Fatalf("create=%#v", spec)
 	}
-	want := map[string]any{"model": "omni-flash", "prompt": r.Prompt, "duration": float64(8), "resolution": "720p", "aspect_ratio": "16:9",
+	want := map[string]any{"model": r.Model, "prompt": r.Prompt, "duration": float64(10), "resolution": "720p", "aspect_ratio": "9:16",
 		"reference_images": []any{map[string]any{"url": "https://cdn.example/ref.png", "role": "reference"}},
 		"reference_videos": []any{"https://cdn.example/1.mp4", "https://cdn.example/2.mp4"},
 		"reference_audios": []any{"data:audio/mpeg;base64,AA=="}}
@@ -42,24 +42,35 @@ func TestYunfeiOmniDocumentedJSONAndReferences(t *testing.T) {
 
 func TestYunfeiOmniDefaultsOmitUndocumentedFieldsAndRejectInvalidRequests(t *testing.T) {
 	a := officialPackageAdapter(t, "yunfei-omni-video.yingce-plugin", "yunfei-omni-flash-video")
-	r := GenerationRequest{Model: "omni-flash", Prompt: "小猫在房间里奔跑"}
+	r := GenerationRequest{Model: "gemini-omni-1.1-flash", Prompt: "小猫在房间里奔跑"}
 	spec, err := a.BuildCreate(context.Background(), RequestContext{Request: r})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]any{"model": r.Model, "prompt": r.Prompt, "duration": float64(8), "resolution": "720p", "aspect_ratio": "16:9"}
+	want := map[string]any{"model": r.Model, "prompt": r.Prompt, "duration": float64(10), "resolution": "720p", "aspect_ratio": "16:9"}
 	if got := manifestTestBody(t, spec); !reflect.DeepEqual(got, want) {
 		t.Fatalf("defaults=%#v", got)
 	}
+	for _, model := range []string{"gemini-omni-1.1-flash", "gemini-omni-1.1-flash-10s"} {
+		for _, ratio := range []string{"16:9", "9:16"} {
+			next := r
+			next.Model, next.AspectRatio = model, ratio
+			created, err := a.BuildCreate(context.Background(), RequestContext{Request: next})
+			if err != nil || manifestTestBody(t, created)["model"] != model || manifestTestBody(t, created)["aspect_ratio"] != ratio {
+				t.Fatalf("model=%s ratio=%s: %v", model, ratio, err)
+			}
+		}
+	}
 	for name, mutate := range map[string]func(*GenerationRequest){
-		"other-station-model": func(r *GenerationRequest) { r.Model = "gemini-omni-1.1-flash" },
-		"empty-prompt":        func(r *GenerationRequest) { r.Prompt = " \n " },
-		"duration":            func(r *GenerationRequest) { r.Duration = 4 },
-		"ratio":               func(r *GenerationRequest) { r.AspectRatio = "9:16" },
-		"resolution":          func(r *GenerationRequest) { r.Resolution = "1080p" },
-		"multiple-output":     func(r *GenerationRequest) { r.ImageCount = 2 },
-		"audio-control":       func(r *GenerationRequest) { r.GenerateAudio = true },
-		"watermark":           func(r *GenerationRequest) { r.Watermark = true },
+		"old-alias":        func(r *GenerationRequest) { r.Model = "omni-flash" },
+		"extend-operation": func(r *GenerationRequest) { r.Model = "gemini-omni-1.1-flash-extend" },
+		"empty-prompt":     func(r *GenerationRequest) { r.Prompt = " \n " },
+		"duration":         func(r *GenerationRequest) { r.Duration = 4 },
+		"ratio":            func(r *GenerationRequest) { r.AspectRatio = "1:1" },
+		"resolution":       func(r *GenerationRequest) { r.Resolution = "1080p" },
+		"multiple-output":  func(r *GenerationRequest) { r.ImageCount = 2 },
+		"audio-control":    func(r *GenerationRequest) { r.GenerateAudio = true },
+		"watermark":        func(r *GenerationRequest) { r.Watermark = true },
 		"unknown-role": func(r *GenerationRequest) {
 			r.Images = []MediaReference{{URL: "https://cdn.example/a.png", Role: "mask"}}
 		},

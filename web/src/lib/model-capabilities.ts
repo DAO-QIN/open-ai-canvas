@@ -634,8 +634,8 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
             maxAudioBytes: 0,
             maxAudioDurationSeconds: 0,
         };
-        video.duration = { selection: "enum", values: [8], default: 8 };
-        video.ratios = ["16:9"];
+        video.duration = { selection: "enum", values: [10], default: 10 };
+        video.ratios = ["16:9", "9:16"];
         video.defaultRatio = "16:9";
         video.resolutions = ["720p"];
         video.defaultResolution = "720p";

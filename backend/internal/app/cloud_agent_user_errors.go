@@ -61,6 +61,9 @@ func classifyUserFacingTaskError(raw string) string {
 	if taskErrorIsModeration(raw) {
 		return taskErrorModerationText(raw)
 	}
+	if taskErrorModelConfigurationPattern.MatchString(raw) {
+		return taskErrorModelConfigurationMessage
+	}
 	providerMessage := taskErrorStructuredProviderMessage(raw)
 	if providerMessage == "" {
 		providerMessage = taskErrorWrappedProviderMessage(raw)

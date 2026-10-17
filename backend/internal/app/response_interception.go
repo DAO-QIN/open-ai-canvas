@@ -89,7 +89,7 @@ func (s *Service) InterceptResponseText(raw string) string {
 
 // UserFacingErrorMessage 只投影用户可见错误，不修改上游响应或请求明细中的原始内容。
 func (s *Service) UserFacingErrorMessage(err error) string {
-	return s.InterceptResponseText(taskFailureMessage(err))
+	return s.consumerModelError(s.InterceptResponseText(taskFailureMessage(err)))
 }
 
 func interceptResponseMessage(setting ResponseInterceptionSetting, raw string) string {
