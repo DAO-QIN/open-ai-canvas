@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { ImageParameterFields, ImageParameterSchemaEditor } from "../src/components/image-parameter-fields";
+import { ImageParameterFields, ImageParameterSchemaEditor, ImageParameterSizeEditor } from "../src/components/image-parameter-fields";
 import manifest from "../../plugin-packages/choosec-qwen-image/manifest.json";
 import { defaultImageCapabilityConfig } from "../src/lib/model-capabilities";
 import { imageTierAvailable } from "../src/lib/image-size-presets";
@@ -68,6 +68,9 @@ describe("ChooseC Qwen image protocol", () => {
         expect(admin).toContain("前台展示画风");
         expect(admin).toContain("前台展示响应格式");
         expect(admin).toContain("vivid");
+        const sizeEditor = renderToStaticMarkup(createElement(ImageParameterSizeEditor, { profile: image, definition: parameters.find((field) => field.name === "size")!, onChange: () => {} }));
+        expect(sizeEditor).toMatch(/aria-pressed="true" title="1024x1024" aria-label="默认输出 1K · 1:1 1024x1024"/);
+        expect(image.size.values).toEqual([]);
         expect(imageParameterRequest(image, {}, true)?.style).toBe("vivid");
     });
 
