@@ -18,7 +18,7 @@ func (s *Service) consumerModelError(raw string) string {
 	}
 	identities := []string{}
 	if s.repo != nil {
-		if channels, err := s.repo.SystemChannels(true); err == nil {
+		if channels, err := s.repo.HistoricalSystemChannelReferences(); err == nil {
 			for _, channel := range channels {
 				identities = append(identities, channel.Name)
 			}
@@ -47,7 +47,7 @@ func redactModelServiceIdentities(raw string, identities []string) string {
 	sort.Slice(identities, func(i, j int) bool { return len(identities[i]) > len(identities[j]) })
 	for _, identity := range identities {
 		identity = strings.TrimSpace(identity)
-		if utf8.RuneCountInString(identity) < 2 || identity == "模型服务" {
+		if utf8.RuneCountInString(identity) < 2 || identity == "模型服务" || !strings.Contains(strings.ToLower(raw), strings.ToLower(identity)) {
 			continue
 		}
 		pattern := regexp.QuoteMeta(identity)
@@ -57,7 +57,7 @@ func redactModelServiceIdentities(raw string, identities []string) string {
 		if isIdentityWordByte(identity[len(identity)-1]) {
 			pattern += `\b`
 		}
-		raw = regexp.MustCompile(`(?i)` + pattern).ReplaceAllString(raw, "模型服务")
+		raw = regexp.MustCompile(`(?i)`+pattern).ReplaceAllString(raw, "模型服务")
 	}
 	return sanitizeUserVisibleError(raw)
 }

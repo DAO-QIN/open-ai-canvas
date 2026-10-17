@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"yingce/backend/internal/model"
 )
 
 func TestConsumerModelErrorsHideProtocolAndConfiguredChannelIdentities(t *testing.T) {
@@ -27,6 +29,20 @@ func TestConsumerModelErrorsHideProtocolAndConfiguredChannelIdentities(t *testin
 	}
 	if got := redactModelServiceIdentities("FAL request failed: 图片格式不支持", []string{"fal"}); got != "模型服务 request failed: 图片格式不支持" {
 		t.Fatalf("provider name matched inside an ordinary word: %q", got)
+	}
+}
+
+func TestConsumerModelErrorsUseConfiguredChannelWithoutChangingAdminDiagnostic(t *testing.T) {
+	svc, db := newModelCatalogTestService(t)
+	if err := db.Create(&model.ModelChannel{ID: "channel-private", Scope: model.ChannelScopeSystem, Name: "用户自定义专线甲"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	raw := errors.New("用户自定义专线甲：参考图格式不支持")
+	if got := svc.UserFacingErrorMessage(raw); got != "模型服务：参考图格式不支持" {
+		t.Fatalf("configured channel leaked: %q", got)
+	}
+	if raw.Error() != "用户自定义专线甲：参考图格式不支持" {
+		t.Fatal("admin diagnostic was changed")
 	}
 }
 

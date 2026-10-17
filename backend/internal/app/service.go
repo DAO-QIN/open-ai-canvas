@@ -294,6 +294,10 @@ func (s *Service) Task(userID string, id string) (*model.Task, error) {
 	output := taskForOutput(*task)
 	output.Error = s.consumerModelError(output.Error)
 	output.ProviderCancelError = s.consumerModelError(output.ProviderCancelError)
+	if output.Diagnostic != nil {
+		output.Diagnostic.SafeMessage = s.consumerModelError(output.Diagnostic.SafeMessage)
+		output.Diagnostic.WritebackMessage = s.consumerModelError(output.Diagnostic.WritebackMessage)
+	}
 	return output, nil
 }
 
