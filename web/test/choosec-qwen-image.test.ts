@@ -23,13 +23,13 @@ describe("ChooseC Qwen image protocol", () => {
             references: { maxImages: 10, maxImageBytes: 10 * 1024 * 1024, maskSupported: false },
             size: { default: "1024x1024", values: [], allowCustom: true },
             quality: { default: "standard" },
-            resolution: { supported: true, values: ["1k", "2k"], default: "1k" },
+            resolution: { supported: true, values: ["1k"], default: "1k" },
             transparentBackground: { supported: false },
             outputFormat: { supported: false },
             maxOutputs: 10,
         });
         expect(imageParameterDefaults(image.parameters)).toEqual({ size: "1024x1024", imageResolution: "1k", quality: "standard", count: 1, style: "vivid", responseFormat: "url" });
-        expect(image.size.presets?.every((preset) => preset.tier !== "4k" && (preset.tier !== "2k" || preset.width * preset.height <= 2048 ** 2))).toBe(true);
+        expect(image.size.presets?.every((preset) => preset.tier === "1k")).toBe(true);
     });
 
     test("selecting the protocol replaces incompatible settings and preserves price and availability", () => {
@@ -42,6 +42,7 @@ describe("ChooseC Qwen image protocol", () => {
         expect(imageParameterDefaults(next.capabilityConfig?.image?.parameters)).toEqual({ size: "1024x1024", imageResolution: "1k", quality: "standard", count: 1, style: "vivid", responseFormat: "url" });
         expect(next.capabilityConfig?.image?.references.maxImages).toBe(10);
         expect(next.capabilityConfig?.image?.size.allowCustom).toBe(true);
+        expect(next.capabilityConfig?.image?.resolution.values).toEqual(["1k"]);
         expect(next.capabilityConfig?.image?.size.presets?.some((preset) => preset.ratio === "9:16")).toBe(true);
         expect(next.priceTiers[0].unitPrice).toBe(19);
         expect(next.enabled).toBe(false);
@@ -53,16 +54,17 @@ describe("ChooseC Qwen image protocol", () => {
         expect(imageParameterRequest(image, {}, true)).toEqual({ size: "1024x1024", imageResolution: "1k", quality: "standard", count: 1, style: "vivid", responseFormat: "url" });
         expect(() => imageParameterRequest(image, { count: "11" }, true)).toThrow();
         expect(imageParameterRequest(image, { size: "2048x2048", imageParameters: JSON.stringify({ style: "natural" }) }, true)).toMatchObject({ size: "2048x2048", style: "natural" });
-        expect(imageTierAvailable(image, "2k")).toBe(true);
+        expect(imageTierAvailable(image, "2k")).toBe(false);
         expect(imageTierAvailable(image, "4k")).toBe(false);
     });
 
     test("consumer panel hides technical fields while admin and defaults retain them", () => {
         const image = resolveImageParameters(defaultImageCapabilityConfig(definition.value), parameters, "qwen-image-2.1-turbo");
-        const html = renderToStaticMarkup(createElement(ImageParameterFields, { profile: image, config: { ...defaultConfig, size: "2048x2048", imageResolution: "2k" }, onChange: () => {} }));
+        const html = renderToStaticMarkup(createElement(ImageParameterFields, { profile: image, config: { ...defaultConfig, size: "1024x1024", imageResolution: "1k" }, onChange: () => {} }));
         expect(html).toContain("清晰度");
-        expect(html).toContain("2K");
-        expect(html).toContain("2048 × 2048");
+        expect(html).toContain("1K");
+        expect(html).not.toContain("2K");
+        expect(html).toContain("1024 × 1024");
         for (const label of ["画风", "响应格式", "图片质量", "vivid", "standard", "4K"]) expect(html).not.toContain(label);
         const admin = renderToStaticMarkup(createElement(ImageParameterSchemaEditor, { definitions: parameters, parameters: image.parameters!, onChange: () => {} }));
         expect(admin).toContain("前台展示画风");
@@ -90,7 +92,7 @@ describe("ChooseC Qwen image protocol", () => {
         const merged = mergeCapabilitySpecs("image", [spec, spec]);
         const projected = projectLogicalCapability(merged, imageParameterDefaults(image.parameters)).image!;
         expect(projected.references.maxImages).toBe(10);
-        expect(projected.resolution.values).toEqual(["1k", "2k"]);
+        expect(projected.resolution.values).toEqual(["1k"]);
         expect(projected.parameters?.find((field) => field.name === "style")?.userVisible).toBe(false);
         expect(imageParameterRequest(projected, {}, true)?.style).toBe("vivid");
         expect(projected.size.allowCustom).toBe(true);
@@ -102,10 +104,10 @@ describe("ChooseC Qwen image protocol", () => {
     test("grouped size controls follow visibility without altering request defaults", () => {
         const image = resolveImageParameters(defaultImageCapabilityConfig(definition.value), parameters, "qwen-image-2.1-turbo");
         const noResolution = { ...image, parameters: image.parameters!.map((field) => (field.name === "imageResolution" ? { ...field, userVisible: false } : field)) };
-        const config = { ...defaultConfig, size: "2048x2048", imageResolution: "2k" };
+        const config = { ...defaultConfig, size: "1024x1024", imageResolution: "1k" };
         const ratios = renderToStaticMarkup(createElement(ImageParameterFields, { profile: noResolution, config, onChange: () => {} }));
         expect(ratios).not.toContain("清晰度");
-        expect(ratios).toContain("2048 × 2048");
+        expect(ratios).toContain("1024 × 1024");
         const noSize = { ...image, parameters: image.parameters!.map((field) => (field.name === "size" ? { ...field, userVisible: false } : field)) };
         const resolution = renderToStaticMarkup(createElement(ImageParameterFields, { profile: noSize, config, onChange: () => {} }));
         expect(resolution).toContain("清晰度");

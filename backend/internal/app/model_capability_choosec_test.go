@@ -13,6 +13,9 @@ func TestChooseCQwenCapabilityDefaultsAndPluginContract(t *testing.T) {
 	if image.Size.Default != "1024x1024" || !image.Size.AllowCustom || image.MaxOutputs != 10 || image.References.MaxImages != 10 || image.References.MaxImageBytes != 10*1024*1024 || image.References.MaskSupported || !image.Resolution.Supported || image.Resolution.Default != "1k" || image.TransparentBackground.Supported || image.OutputFormat.Supported || image.Quality.Default != "standard" {
 		t.Fatalf("unexpected defaults: %#v", image)
 	}
+	if len(image.Resolution.Values) != 1 || image.Resolution.Values[0] != "1k" {
+		t.Fatalf("unexpected initial resolution choices: %#v", image.Resolution.Values)
+	}
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "plugin-packages", "choosec-qwen-image.yingce-plugin"))
 	if err != nil {
 		t.Fatal(err)
@@ -60,7 +63,7 @@ func TestChooseCQwenCapabilityDefaultsAndPluginContract(t *testing.T) {
 		t.Fatalf("pixel encoding lost: %#v", config.ImageParameters)
 	}
 	for _, preset := range image.Size.Presets {
-		if preset.Tier == "4k" || (preset.Tier == "2k" && preset.Width*preset.Height > 2048*2048) {
+		if preset.Tier != "1k" {
 			t.Fatalf("unverified preset exposed: %#v", preset)
 		}
 	}

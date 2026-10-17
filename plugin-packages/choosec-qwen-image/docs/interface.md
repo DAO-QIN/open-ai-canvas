@@ -2,7 +2,7 @@
 
 ## 协议身份
 
-- 插件和 Provider ID：`choosec-qwen-image`，版本 `1.1.2`。
+- 插件和 Provider ID：`choosec-qwen-image`，版本 `1.1.3`。
 - 能力：`image`；模型：`qwen-image-2.1-turbo`。
 - Base URL：`https://api.choosec.cn`；现有渠道的 `https://api.choosec.cn/v1` 同样由宿主 URL 拼接规则处理。
 - 文生图：`POST /v1/images/generations`，JSON；参考图：`POST /v1/images/edits`，multipart。均在当前请求中返回图片结果。
@@ -16,7 +16,7 @@
 | `model` | `model` | 固定 `qwen-image-2.1-turbo` |
 | `prompt` | `prompt` | 必填文字描述 |
 | `aspectRatio` | `size` | 默认 `1024x1024`，允许自定义像素与可编辑比例预设 |
-| `imageResolution` | 宿主换算 `size` | 默认 `1k`，初始渠道档位为 `1k/2k`；不发送独立 resolution |
+| `imageResolution` | 宿主换算 `size` | 默认 `1k`，初始仅开启 `1k`；不发送独立 resolution |
 | `images` | `image[]` 文件 | 0–10 张，有图时切换编辑接口，宿主读取 URL / data URL 后按顺序上传；无图时无文件 |
 | `quality` | `quality` | `standard` |
 | `imageCount` | `n` | 整数 1–10，默认 1 |
@@ -25,7 +25,7 @@
 
 `imageParameters` 是后台「能力与参数」及生成面板共同使用的动态参数合同。选择此协议即填入上述默认值，初始参考图上限 10 张、单图 10MB，关闭独立蒙版、透明背景参数、输出编码及压缩控件。画风、响应格式及原始质量默认 `userVisible:false`，只在后台配置；隐藏不等于禁用，仍保留默认值和请求绑定。其他插件未声明展示设置时沿用现有显示行为。
 
-页面中的尺寸、质量、画风和响应格式是默认值，不能当成唯一合法值。管理员可以配置比例、精确像素及其他参数，用户可输入自定义尺寸。初始像素预设提供 1K/2K，2K 面积不超过 2048×2048；4K 不在默认可用档位，管理员可在实际验证后配置。提示词沿用影绘现有 32000 字符平台限制，不将它描述为供应商极限。
+页面中的尺寸、质量、画风和响应格式是默认值，不能当成唯一合法值。管理员可以配置比例、精确像素及其他参数，用户可输入自定义尺寸。初始支持值和像素预设仅开启 1K；其他档位由管理员在实际验证后配置。提示词沿用影绘现有 32000 字符平台限制，不将它描述为供应商极限。
 
 官方 [Turbo 模型卡](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) 支持图片编辑与 2K，但模型能力不代表中转协议相同。ChooseC 的真实错误响应明确要求输入图片改走 `/v1/images/edits`，因此本插件使用其 OpenAI Images 编辑入口和 [New API 文档](https://docs.newapi.pro/zh/docs/plugins/usage) 的 multipart `image[]` 文件合同，不再向生成入口发送官方托管 API 的 JSON `image`。生成数量保留 ChooseC 页面已有 1–10 配置，以实际渠道限制为准。
 
@@ -55,7 +55,7 @@
   "apiVersion": "yingce.plugin/v2",
   "id": "choosec-qwen-image",
   "name": "ChooseC 千问 2.1 图片",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "author": "影绘",
   "description": "ChooseC 千问 2.1 图片适配：文生图使用 JSON，参考图通过 edits 文件上传；默认 1K，可编辑尺寸与前台展示。",
   "permissions": [
@@ -111,7 +111,7 @@
             "binding": "resolution",
             "default": "1k",
             "pricing": true,
-            "description": "宿主按档位换算 size，不发送独立 resolution。默认 1K/2K，4K 由管理员验证后配置。"
+            "description": "宿主按档位换算 size，不发送独立 resolution。初始仅开启 1K，其他档位由管理员验证后配置。"
           },
           {
             "name": "quality",
