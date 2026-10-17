@@ -2,7 +2,7 @@
 
 ## 协议身份
 
-- 插件和 Provider ID：`choosec-qwen-image`，版本 `1.1.1`。
+- 插件和 Provider ID：`choosec-qwen-image`，版本 `1.1.2`。
 - 能力：`image`；模型：`qwen-image-2.1-turbo`。
 - Base URL：`https://api.choosec.cn`；现有渠道的 `https://api.choosec.cn/v1` 同样由宿主 URL 拼接规则处理。
 - 文生图：`POST /v1/images/generations`，JSON；参考图：`POST /v1/images/edits`，multipart。均在当前请求中返回图片结果。
@@ -15,8 +15,8 @@
 | --- | --- | --- |
 | `model` | `model` | 固定 `qwen-image-2.1-turbo` |
 | `prompt` | `prompt` | 必填文字描述 |
-| `aspectRatio` | `size` | 默认 `2048x2048`，允许自定义像素与可编辑比例预设 |
-| `imageResolution` | 宿主换算 `size` | 默认 `2k`，初始渠道档位为 `1k/2k`；不发送独立 resolution |
+| `aspectRatio` | `size` | 默认 `1024x1024`，允许自定义像素与可编辑比例预设 |
+| `imageResolution` | 宿主换算 `size` | 默认 `1k`，初始渠道档位为 `1k/2k`；不发送独立 resolution |
 | `images` | `image[]` 文件 | 0–10 张，有图时切换编辑接口，宿主读取 URL / data URL 后按顺序上传；无图时无文件 |
 | `quality` | `quality` | `standard` |
 | `imageCount` | `n` | 整数 1–10，默认 1 |
@@ -32,7 +32,7 @@
 ## 请求
 
 ```json
-{"model":"qwen-image-2.1-turbo","prompt":"中文海报","size":"2048x2048","n":1}
+{"model":"qwen-image-2.1-turbo","prompt":"中文海报","size":"1024x1024","n":1}
 ```
 
 默认文生图只含 `model/prompt/size/n`；`standard/vivid/url` 采用上游缺省行为，不重复发送可选字段。管理员配置其他质量、画风或响应格式时，发送对应字段。有参考图时这四项改为 multipart 普通字段，参考图按顺序放入重复的 `image[]` 文件部分。宿主读取真实图片字节并生成 boundary，不把 base64 当普通表单文字，不要求上游访问私有素材地址。两种请求都不发送 JSON `image/images`、独立 `resolution`、`output_format`、`background` 或 mask。比例和清晰度由宿主的可编辑预设换成像素后发送 `size`，精确像素原样发送。模型 ID、空提示词、参考图数量/缺少地址、独立蒙版、非法像素和数量范围在发送前校验。
@@ -55,9 +55,9 @@
   "apiVersion": "yingce.plugin/v2",
   "id": "choosec-qwen-image",
   "name": "ChooseC 千问 2.1 图片",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "author": "影绘",
-  "description": "ChooseC 千问 2.1 图片适配：文生图使用 JSON，参考图通过 edits 文件上传；默认 2K，可编辑尺寸与前台展示。",
+  "description": "ChooseC 千问 2.1 图片适配：文生图使用 JSON，参考图通过 edits 文件上传；默认 1K，可编辑尺寸与前台展示。",
   "permissions": [
     "generation.run",
     "media.read"
@@ -100,16 +100,16 @@
             "type": "string",
             "binding": "aspectRatio",
             "encoding": "pixels",
-            "default": "2048x2048",
+            "default": "1024x1024",
             "pricing": true,
-            "description": "WIDTHxHEIGHT；默认 2K，可编辑比例预设与自定义像素，不将示例写成白名单。"
+            "description": "WIDTHxHEIGHT；默认 1K，可编辑比例预设与自定义像素，不将示例写成白名单。"
           },
           {
             "name": "imageResolution",
             "label": "清晰度",
             "type": "string",
             "binding": "resolution",
-            "default": "2k",
+            "default": "1k",
             "pricing": true,
             "description": "宿主按档位换算 size，不发送独立 resolution。默认 1K/2K，4K 由管理员验证后配置。"
           },
@@ -168,7 +168,7 @@
             "name": "aspectRatio",
             "type": "string",
             "mapping": "size",
-            "description": "WIDTHxHEIGHT，默认 2048x2048；比例由宿主按可编辑预设换算成像素。"
+            "description": "WIDTHxHEIGHT，默认 1024x1024；比例由宿主按可编辑预设换算成像素。"
           },
           {
             "name": "images",
@@ -487,7 +487,7 @@
                 {
                   "$ref": "request.aspectRatio"
                 },
-                "2048x2048"
+                "1024x1024"
               ]
             },
             "quality": {

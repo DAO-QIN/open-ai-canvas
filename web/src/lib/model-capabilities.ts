@@ -293,8 +293,8 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
     };
     if (protocol === "choosec-qwen-image") {
         image.references = { ...image.references, maxImages: 10, maxImageBytes: 10 * 1024 * 1024, maskSupported: false };
-        image.size = { parameter: "size", values: [], default: "2048x2048", allowCustom: true, defaultTier: "2k", presets: chooseCQwenImageSizePresets() };
-        image.resolution = { supported: true, values: ["1k", "2k"], default: "2k" };
+        image.size = { parameter: "size", values: [], default: "1024x1024", allowCustom: true, defaultTier: "1k", presets: chooseCQwenImageSizePresets() };
+        image.resolution = { supported: true, values: ["1k", "2k"], default: "1k" };
         image.quality = { supported: true, values: [], default: "standard" };
         image.transparentBackground = { supported: false, default: false };
         image.outputFormat = { supported: false };

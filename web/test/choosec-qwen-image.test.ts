@@ -17,18 +17,18 @@ const parameters = manifest.contributes.providers[0].imageParameters as ImagePar
 const definition: ModelProtocolDefinition = { value: "choosec-qwen-image", label: manifest.name, capability: "image", create: "POST /v1/images/generations", contentType: "application/json", media: "url", enabled: true, imageParameters: parameters };
 
 describe("ChooseC Qwen image protocol", () => {
-    test("uses reference and 2K defaults without unverified 4K or mask controls", () => {
+    test("uses reference and 1K defaults without unverified 4K or mask controls", () => {
         const image = resolveImageParameters(defaultImageCapabilityConfig(definition.value), parameters, "qwen-image-2.1-turbo");
         expect(image).toMatchObject({
             references: { maxImages: 10, maxImageBytes: 10 * 1024 * 1024, maskSupported: false },
-            size: { default: "2048x2048", values: [], allowCustom: true },
+            size: { default: "1024x1024", values: [], allowCustom: true },
             quality: { default: "standard" },
-            resolution: { supported: true, values: ["1k", "2k"], default: "2k" },
+            resolution: { supported: true, values: ["1k", "2k"], default: "1k" },
             transparentBackground: { supported: false },
             outputFormat: { supported: false },
             maxOutputs: 10,
         });
-        expect(imageParameterDefaults(image.parameters)).toEqual({ size: "2048x2048", imageResolution: "2k", quality: "standard", count: 1, style: "vivid", responseFormat: "url" });
+        expect(imageParameterDefaults(image.parameters)).toEqual({ size: "1024x1024", imageResolution: "1k", quality: "standard", count: 1, style: "vivid", responseFormat: "url" });
         expect(image.size.presets?.every((preset) => preset.tier !== "4k" && (preset.tier !== "2k" || preset.width * preset.height <= 2048 ** 2))).toBe(true);
     });
 
@@ -39,7 +39,7 @@ describe("ChooseC Qwen image protocol", () => {
         draft.enabled = false;
         draft.priceTiers[0].unitPrice = 19;
         const next = changeChannelModelProtocol(draft, definition.value, [definition]);
-        expect(imageParameterDefaults(next.capabilityConfig?.image?.parameters)).toEqual({ size: "2048x2048", imageResolution: "2k", quality: "standard", count: 1, style: "vivid", responseFormat: "url" });
+        expect(imageParameterDefaults(next.capabilityConfig?.image?.parameters)).toEqual({ size: "1024x1024", imageResolution: "1k", quality: "standard", count: 1, style: "vivid", responseFormat: "url" });
         expect(next.capabilityConfig?.image?.references.maxImages).toBe(10);
         expect(next.capabilityConfig?.image?.size.allowCustom).toBe(true);
         expect(next.capabilityConfig?.image?.size.presets?.some((preset) => preset.ratio === "9:16")).toBe(true);
@@ -50,7 +50,7 @@ describe("ChooseC Qwen image protocol", () => {
 
     test("generation forwards defaults and rejects values outside the plugin contract", () => {
         const image = resolveImageParameters(defaultImageCapabilityConfig(definition.value), parameters, "qwen-image-2.1-turbo");
-        expect(imageParameterRequest(image, {}, true)).toEqual({ size: "2048x2048", imageResolution: "2k", quality: "standard", count: 1, style: "vivid", responseFormat: "url" });
+        expect(imageParameterRequest(image, {}, true)).toEqual({ size: "1024x1024", imageResolution: "1k", quality: "standard", count: 1, style: "vivid", responseFormat: "url" });
         expect(() => imageParameterRequest(image, { count: "11" }, true)).toThrow();
         expect(imageParameterRequest(image, { size: "2048x2048", imageParameters: JSON.stringify({ style: "natural" }) }, true)).toMatchObject({ size: "2048x2048", style: "natural" });
         expect(imageTierAvailable(image, "2k")).toBe(true);
@@ -107,6 +107,6 @@ describe("ChooseC Qwen image protocol", () => {
         const resolution = renderToStaticMarkup(createElement(ImageParameterFields, { profile: noSize, config, onChange: () => {} }));
         expect(resolution).toContain("清晰度");
         expect(resolution).not.toContain("宽高比");
-        expect(imageParameterRequest(noResolution, {}, true)?.imageResolution).toBe("2k");
+        expect(imageParameterRequest(noResolution, {}, true)?.imageResolution).toBe("1k");
     });
 });

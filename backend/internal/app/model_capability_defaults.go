@@ -33,8 +33,8 @@ func DefaultImageCapabilityConfig(protocol string, modelName string) *ImageCapab
 		image.References.MaxImages = 10
 		image.References.MaxImageBytes = 10 * 1024 * 1024
 		image.References.MaskSupported = false
-		image.Size = ImageSizeConfig{Parameter: "size", Values: []string{}, Default: "2048x2048", AllowCustom: true, DefaultTier: "2k", Presets: chooseCQwenImageSizePresets()}
-		image.Resolution = ImageResolutionConfig{Supported: true, Values: []string{"1k", "2k"}, Default: "2k"}
+		image.Size = ImageSizeConfig{Parameter: "size", Values: []string{}, Default: "1024x1024", AllowCustom: true, DefaultTier: "1k", Presets: chooseCQwenImageSizePresets()}
+		image.Resolution = ImageResolutionConfig{Supported: true, Values: []string{"1k", "2k"}, Default: "1k"}
 		image.Quality = ImageQualityConfig{Supported: true, Values: []string{}, Default: "standard"}
 		image.TransparentBackground = VideoBooleanConfig{Supported: false, Default: false}
 		image.OutputFormat = ParameterSupport{Supported: false}

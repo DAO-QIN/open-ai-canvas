@@ -12,7 +12,7 @@ func TestChooseCQwenImageUsesDocumentedDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := manifestTestBody(t, spec)
-	if spec.Method != "POST" || spec.Path != "/v1/images/generations" || spec.ContentType != "application/json" || len(spec.Files) != 0 || spec.Auth.Type != "bearer" || len(body) != 4 || body["size"] != "2048x2048" || body["n"] != float64(1) {
+	if spec.Method != "POST" || spec.Path != "/v1/images/generations" || spec.ContentType != "application/json" || len(spec.Files) != 0 || spec.Auth.Type != "bearer" || len(body) != 4 || body["size"] != "1024x1024" || body["n"] != float64(1) {
 		t.Fatalf("unexpected request: %#v, body=%#v", spec, body)
 	}
 	request := GenerationRequest{Capability: CapabilityImage, Model: "qwen-image-2.1-turbo", Prompt: "中文海报", ImageParameters: map[string]any{"size": "1024x1024", "quality": "standard", "count": 10, "style": "vivid", "responseFormat": "url"}}
@@ -67,7 +67,7 @@ func TestChooseCQwenImageReferenceEditsPreservesOrderAndEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := manifestTestBody(t, spec)
-	if spec.Path != "/v1/images/edits" || spec.ContentType != "multipart/form-data" || len(spec.Files) != 2 || spec.Files[0].Name != "image[]" || spec.Files[1].Name != "image[]" || spec.Files[0].Reference.DataURL != request.Images[1].DataURL || spec.Files[1].Reference.URL != request.Images[0].URL || body["size"] != "2048x2048" {
+	if spec.Path != "/v1/images/edits" || spec.ContentType != "multipart/form-data" || len(spec.Files) != 2 || spec.Files[0].Name != "image[]" || spec.Files[1].Name != "image[]" || spec.Files[0].Reference.DataURL != request.Images[1].DataURL || spec.Files[1].Reference.URL != request.Images[0].URL || body["size"] != "1024x1024" {
 		t.Fatalf("reference edit mapping lost: %#v", spec)
 	}
 	for _, field := range []string{"image", "images", "resolution"} {
