@@ -18,7 +18,7 @@ func TestImageParametersPluginRequestPreservesValuesAndModelScope(t *testing.T) 
 		t.Fatal(err)
 	}
 	body := manifestTestBody(t, spec)
-	for name, expected := range map[string]any{"size": "1:1", "seed": float64(0), "raw": false, "chaos": float64(0), "stylize": float64(450), "quality": 0.5} {
+	for name, expected := range map[string]any{"size": "1:1", "seed": float64(0), "raw": false, "chaos": float64(0), "stylize": float64(450), "quality": "0.5"} {
 		if body[name] != expected {
 			t.Fatalf("%s = %#v, want %#v", name, body[name], expected)
 		}

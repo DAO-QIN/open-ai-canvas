@@ -21,10 +21,10 @@
 | `model` | `model`，严格校验当前协议公开模型列表。 |
 | `prompt` | 原样传递，不能为空；不自动翻译或追加 Midjourney 提示词参数。 |
 | `aspectRatio` | `size`；V6/V8 特惠默认 16:9，允许 1:1、3:2、2:3、4:3、3:4、5:4、4:5、16:9、9:16、21:9。V7 特惠增加 auto、9:21；稳定/高速同样增加这两个值，默认 9:16。 |
-| `images` | 以显式顺序生成 `images` URL 数组；特惠最多 1 张，稳定/高速最多 5 张。宿主将本地资源转换为短期公网 URL。拒绝 mask。 |
+| `images` | 以显式顺序生成 `images` URL 数组；特惠最多 1 张，稳定/高速最多 5 张。宿主将本地资源转换为短期公网 URL。当前网关拒绝内联 Base64；拒绝 mask。 |
 | `imageCount` | 未设置或 1；上游固定 `n=1`，不是返回图片的截断数量。 |
 | `providerOptions.kacang-midjourney.raw` | 稳定/高速 `raw`，默认 false。 |
-| `providerOptions.kacang-midjourney.quality` | 仅稳定 `mj-*`，数值 0.25、0.5、1、2，默认 1。不使用宿主 `quality` 的 1K/2K/4K 值。 |
+| `providerOptions.kacang-midjourney.quality` | 仅稳定 `mj-*`，界面数值 0.25、0.5、1、2，默认 1；请求转换为数值字符串（如 `"1"`、`"0.5"`），避免当前网关将 JSON 数值误报为 `image_field_format`。不使用宿主 `quality` 的 1K/2K/4K 值。 |
 | `providerOptions.kacang-midjourney.stylize/chaos/weird` | 仅稳定 `mj-*`，默认 100/0/0，范围分别 0–1000、0–100、0–3000。 |
 | `providerOptions.kacang-midjourney.iw/cw/sw/dw` | 仅稳定 `mj-*`；可选，范围 0–3、0–100、0–1000、0–100。 |
 | `providerOptions.kacang-midjourney.seed/negative_prompt/tile/cref/sref/dref` | 仅稳定 `mj-*`；调用方明确指定时才发送，不设未声明的默认值。 |
@@ -61,7 +61,7 @@
   "apiVersion": "yingce.plugin/v2",
   "id": "kacang-midjourney",
   "name": "卡藏 Midjourney",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "影绘",
   "description": "适配卡藏特惠、V7特惠与稳定/高速生图，按公开模型合同映射请求并查询、保存全部结果。",
   "enabled": true,
@@ -357,20 +357,24 @@
         },
         "response": {
           "taskIdPaths": [
+            "data.0.task_id",
             "data.task_id",
             "task_id",
             "id"
           ],
           "statusPaths": [
+            "data.0.status",
             "data.status",
             "status"
           ],
           "errorPaths": [
+            "data.0.error_code",
             "data.error_code",
             "error_code",
             "error.code"
           ],
           "messagePaths": [
+            "data.0.error_message",
             "data.error_message",
             "error_message",
             "error.message",
@@ -677,20 +681,24 @@
         },
         "response": {
           "taskIdPaths": [
+            "data.0.task_id",
             "data.task_id",
             "task_id",
             "id"
           ],
           "statusPaths": [
+            "data.0.status",
             "data.status",
             "status"
           ],
           "errorPaths": [
+            "data.0.error_code",
             "data.error_code",
             "error_code",
             "error.code"
           ],
           "messagePaths": [
+            "data.0.error_message",
             "data.error_message",
             "error_message",
             "error.message",
@@ -1811,13 +1819,15 @@
                 },
                 "then": null,
                 "else": {
-                  "$toFloat": {
-                    "$coalesce": [
-                      {
-                        "$ref": "request.providerOptions.kacang-midjourney.quality"
-                      },
-                      1
-                    ]
+                  "$toString": {
+                    "$toFloat": {
+                      "$coalesce": [
+                        {
+                          "$ref": "request.providerOptions.kacang-midjourney.quality"
+                        },
+                        1
+                      ]
+                    }
                   }
                 }
               }
@@ -1925,20 +1935,24 @@
         },
         "response": {
           "taskIdPaths": [
+            "data.0.task_id",
             "data.task_id",
             "task_id",
             "id"
           ],
           "statusPaths": [
+            "data.0.status",
             "data.status",
             "status"
           ],
           "errorPaths": [
+            "data.0.error_code",
             "data.error_code",
             "error_code",
             "error.code"
           ],
           "messagePaths": [
+            "data.0.error_message",
             "data.error_message",
             "error_message",
             "error.message",

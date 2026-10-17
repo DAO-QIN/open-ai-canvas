@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"strconv"
 	"testing"
 )
 
@@ -33,7 +34,7 @@ func TestKacangMidjourneyRouteDefaultsAndReferenceOrder(t *testing.T) {
 			}
 		}
 		if tc.model == "mj-v8.2" {
-			if body["quality"] != float64(1) || body["stylize"] != float64(100) || body["chaos"] != float64(0) || body["raw"] != false || body["hd"] != false {
+			if body["quality"] != "1" || body["stylize"] != float64(100) || body["chaos"] != float64(0) || body["raw"] != false || body["hd"] != false {
 				t.Fatalf("stable defaults = %#v", body)
 			}
 		} else if _, exists := body["quality"]; exists {
@@ -113,5 +114,27 @@ func TestKacangMidjourneyPendingFailureAndAllPictures(t *testing.T) {
 	special, err := kacangAdapter(t, "kacang-midjourney-special").ParseCreate(context.Background(), []byte(`{"data":[{"url":"https://example.com/1.png"}]}`))
 	if err != nil || special.Status != StatusSucceeded || special.Result == nil || len(special.Result.Images) != 1 {
 		t.Fatalf("special = %#v, %v", special, err)
+	}
+}
+
+func TestKacangMidjourneyCurrentGatewayEnvelopeAndQuality(t *testing.T) {
+	for _, provider := range []string{"kacang-midjourney", "kacang-midjourney-special", "kacang-midjourney-v7"} {
+		adapter := kacangAdapter(t, provider)
+		pending, err := adapter.ParseCreate(context.Background(), []byte(`{"code":200,"data":[{"status":"submitted","task_id":"task-current"}]}`))
+		if err != nil || pending.TaskID != "task-current" || pending.Status != StatusPending || pending.Result != nil {
+			t.Fatalf("%s current submission = %#v, %v", provider, pending, err)
+		}
+	}
+	adapter := kacangAdapter(t, "kacang-midjourney")
+	for _, quality := range []float64{0.25, 0.5, 1, 2} {
+		request := GenerationRequest{Model: "mj-v8.2", Prompt: "cat", ProviderOptions: map[string]map[string]any{"kacang-midjourney": {"quality": quality}}}
+		spec, err := adapter.BuildCreate(context.Background(), RequestContext{Request: request})
+		if err != nil {
+			t.Fatal(err)
+		}
+		value, ok := manifestTestBody(t, spec)["quality"].(string)
+		if !ok || value != strconv.FormatFloat(quality, 'f', -1, 64) {
+			t.Fatalf("gateway quality must preserve the numeric string: %#v", manifestTestBody(t, spec))
+		}
 	}
 }
