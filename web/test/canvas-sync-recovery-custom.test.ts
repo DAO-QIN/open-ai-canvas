@@ -40,16 +40,25 @@ test("already converged content is adopted without submitting another mutation",
     expect(result.journal).toBeUndefined();
 });
 
-for (const name of ["conflict", "deleted"])
-    test(`${name} retains a durable draft and does not block new canvases, including after reload`, async () => {
-        const result = await scenario(name);
-        expect(result.firstFailed).toBe(true);
-        expect(result.oldRequests).toBe(1);
-        expect(result.drafts).toHaveLength(1);
-        expect(JSON.parse(result.journal)[0].blocked).toBe(name === "deleted" ? "unavailable" : "conflict");
-        expect(result.cloud.length).toBe(name === "deleted" ? 1 : 2);
-        if (name === "conflict") expect(result.local.nodes[0].metadata.content).toBe("local");
-    });
+test("concurrent text is automatically merged without blocking another canvas", async () => {
+    const result = await scenario("conflict");
+    expect(result.firstFailed).toBe(false);
+    expect(result.oldRequests).toBe(2);
+    expect(result.local.nodes[0].metadata.content).toBe("remotelocal");
+    expect(result.journal).toBeUndefined();
+    expect(result.cloud).toHaveLength(2);
+});
+
+test("a deleted canvas retains its exact journal while new canvases remain writable", async () => {
+    const result = await scenario("deleted");
+    expect(result.firstFailed).toBe(true);
+    expect(result.cloud).toHaveLength(1);
+    const posts = result.requests.filter((item: any) => item.method === "patch" && item.url === "/canvas-projects/old/operations");
+    expect(posts).toHaveLength(2);
+    expect(posts[1].body).toEqual(posts[0].body);
+    expect(JSON.parse(result.journal)[0].request).toEqual(posts[0].body);
+    expect(result.local.nodes[0].title).toBe("local title");
+});
 
 test("ambiguous server failure retries the exact mutation ID and body without fetching a new baseline", async () => {
     const result = await scenario("unknown");
@@ -130,12 +139,14 @@ test("another page reloads the journal under the browser lock before saving, pre
     expect(result.lockNames.some((name: string) => name.startsWith("yingce:remote-user-data-sync:"))).toBe(true);
 });
 
-test("a stale cache without an edit baseline is preserved before any overwrite attempt", async () => {
+test("a stale cache without an edit baseline keeps local edits and existing cloud media", async () => {
     const result = await scenario("cache-stale");
-    expect(result.firstFailed).toBe(true);
-    expect(result.oldRequests).toBe(0);
-    expect(result.drafts).toHaveLength(1);
+    expect(result.firstFailed).toBe(false);
+    expect(result.oldRequests).toBe(2);
+    expect(result.journal).toBeUndefined();
     expect(result.local.title).toBe("unconfirmed local edit");
+    expect(result.local.nodes).toHaveLength(1);
+    expect(result.local.nodes[0].metadata.assetId).toBe("generated-one");
     expect(result.cloud.length).toBe(2);
 });
 

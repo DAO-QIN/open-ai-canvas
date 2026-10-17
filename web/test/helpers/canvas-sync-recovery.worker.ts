@@ -129,6 +129,7 @@ async function run(scenario: string) {
                 if (scenario === "deleted") return respond({}, 404, "not_found");
                 if (oldRequests === 1 && scenario !== "cached-create") return respond({}, 409, "canvas_field_conflict");
             }
+            if (cloud.has(id) && body.operations.some((op: any) => op.type === "create_canvas")) return respond({}, 409, "canvas_field_conflict");
             let project = structuredClone(cloud.get(id) || { ...canvas(id), nodes: [], revision: 0 });
             for (const op of body.operations) {
                 if (op.type === "create_canvas") project = { ...project, ...op.patch, id };
@@ -159,6 +160,7 @@ async function run(scenario: string) {
             }
             return cloud.has(project[1]) ? respond({ project: cloud.get(project[1]) }) : respond({}, 404, "not_found");
         }
+        if (config.url === "/assets/batch" && config.method === "post") return respond({ assets: body.ids.map((id: string) => remoteAssets.get(id)).filter(Boolean) });
         const asset = /^\/assets\/([^/]+)$/.exec(config.url || "");
         if (asset && config.method === "put") {
             remoteAssets.set(asset[1], body.asset);
@@ -248,6 +250,17 @@ async function run(scenario: string) {
         Reflect.deleteProperty(remote.nodes[0].metadata, "storageKey");
         Reflect.deleteProperty(remote.nodes[0].metadata, "assetId");
     }
+    remoteAssets.set("generated-one", {
+        id: "generated-one",
+        kind: "image",
+        title: "completed",
+        coverUrl: "/api/resources/one/file",
+        tags: [],
+        metadata: {},
+        data: { dataUrl: "/api/resources/one/file", storageKey: "resource:one", bytes: 1, width: 100, height: 100, mimeType: "image/png" },
+        createdAt: "2026-10-01T00:00:00Z",
+        updatedAt: "2026-10-01T00:00:00Z",
+    });
     cloud.set("old", remote);
     if (scenario === "deleted") cloud.delete("old");
     if (scenario === "cached-create") {
@@ -255,7 +268,7 @@ async function run(scenario: string) {
         local.revision = 0;
     }
     const request = { mutationId: "original-request", baseRevision: 1, operations: sync.buildCanvasOperations(baseline as never, local as never) };
-    if (!["journal-lock", "cache-stale", "cached-create"].includes(scenario)) harness.app.set("yingce:canvas-mutation-journal:user:test-user", JSON.stringify([{ projectId: "old", request, baseline, prepared: local, createdAt: "" }]));
+    if (!["journal-lock", "cache-stale", "cached-create", "load"].includes(scenario)) harness.app.set("yingce:canvas-mutation-journal:user:test-user", JSON.stringify([{ projectId: "old", request, baseline, prepared: local, createdAt: "" }]));
     useCanvasStore.setState({ projects: [local] as never });
     await flushCanvasStorePersistence();
     await sync.initializeRemoteUserDataSession("test-user");
@@ -294,6 +307,7 @@ async function run(scenario: string) {
         return { result, links: requests.filter((item) => item.url === "/projects/project/assets").length, canvasWrites: requests.filter((item) => item.url?.endsWith("/operations")).length };
     }
     let firstFailed = false;
+    let firstError = "";
     if (scenario === "scope" || scenario === "load") {
         const globalSave = (scenario === "load" ? sync.loadCanvasProjectForEditing("old") : sync.saveRemoteUserDataNow()).catch(() => {
             firstFailed = true;
@@ -307,7 +321,8 @@ async function run(scenario: string) {
     }
     try {
         await sync.saveRemoteUserDataNow("old");
-    } catch {
+    } catch (error) {
+        firstError = String(error);
         firstFailed = true;
     }
     if (scenario === "unknown" || scenario === "id-reused") {
@@ -321,10 +336,20 @@ async function run(scenario: string) {
         const id = useCanvasStore.getState().createProject("new");
         await sync.saveRemoteUserDataNow(id);
         await sync.initializeRemoteUserDataSession("test-user");
-        await sync.saveRemoteUserDataNow();
+        await sync.saveRemoteUserDataNow().catch(() => undefined);
     } else if (!firstFailed) await sync.saveRemoteUserDataNow("old");
     const { readAllCanvasSyncDrafts } = await import("../../src/services/canvas-sync-drafts");
-    return { firstFailed, oldRequests, requests, local: useCanvasStore.getState().openProject("old"), journal: harness.app.get("yingce:canvas-mutation-journal:user:test-user"), drafts: await readAllCanvasSyncDrafts(), cloud: [...cloud.keys()] };
+    return {
+        firstFailed,
+        firstError,
+        oldRequests,
+        requests,
+        cloudProjects: [...cloud.values()],
+        local: useCanvasStore.getState().openProject("old"),
+        journal: harness.app.get("yingce:canvas-mutation-journal:user:test-user"),
+        drafts: await readAllCanvasSyncDrafts(),
+        cloud: [...cloud.keys()],
+    };
 }
 
 self.onmessage = async (event: MessageEvent<string>) => {

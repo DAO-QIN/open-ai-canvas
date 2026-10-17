@@ -69,11 +69,11 @@ export type GenerationTask = {
         batchCount?: number;
         domainProjectId?: string;
         chapterId?: string;
-		chapterOperation?: "characters" | "storyboard";
-		shotId?: string;
-		workflowStepId?: string;
-		artifactType?: string;
-	};
+        chapterOperation?: "characters" | "storyboard";
+        shotId?: string;
+        workflowStepId?: string;
+        artifactType?: string;
+    };
     created_at?: string;
     updated_at?: string;
 };
@@ -124,7 +124,7 @@ export type CreateTaskInput = {
     prompt: string;
     provider?: string;
     model?: string;
-	logicalModelId?: string;
+    logicalModelId?: string;
     input?: Record<string, unknown>;
 };
 export function createGenerationTask(input: CreateTaskInput) {
@@ -154,9 +154,9 @@ type GenerationTaskListDependencies = {
 const defaultGenerationTaskListDependencies: GenerationTaskListDependencies = {
     listBackendPage: async (page, signal) => ({
         tasks: await http.get<GenerationTask[]>("/tasks", {
-                params: { pageSize: Math.min(page.limit, 100), projectId: page.projectId, activeOnly: page.activeOnly || undefined },
-                signal,
-            }),
+            params: { pageSize: Math.min(page.limit, 100), projectId: page.projectId, activeOnly: page.activeOnly || undefined },
+            signal,
+        }),
     }),
 };
 
@@ -247,19 +247,24 @@ export function createGenerationTaskSubscriptionService(dependencies: Generation
             const terminal = await dependencies.waitTask(id, {
                 initialTask: initial,
                 signal: controller.signal,
-                onTaskUpdate: (task) => { entry.failures = 0; publish(entry, task); },
+                onTaskUpdate: (task) => {
+                    entry.failures = 0;
+                    publish(entry, task);
+                },
             });
             publish(entry, terminal);
-        })().catch((error) => {
-            if (controller.signal.aborted) return;
-            console.warn("生成任务观察中断，将重连原任务", { taskId: id, error });
-        }).finally(() => {
-            entry.observation = undefined;
-            if (controller.signal.aborted || !entry.listeners.size || entry.scope !== getActiveUserScope()) return;
-            if (entry.latest && ["succeeded", "failed", "cancelled"].includes(entry.latest.status)) return;
-            const delayMs = Math.min(30_000, (dependencies.reconnectDelayMs ?? 2_000) * 2 ** Math.min(entry.failures++, 4));
-            entry.retry = setTimeout(() => observe(id, entry), delayMs);
-        });
+        })()
+            .catch((error) => {
+                if (controller.signal.aborted) return;
+                console.warn("生成任务观察中断，将重连原任务", { taskId: id, error });
+            })
+            .finally(() => {
+                entry.observation = undefined;
+                if (controller.signal.aborted || !entry.listeners.size || entry.scope !== getActiveUserScope()) return;
+                if (entry.latest && ["succeeded", "failed", "cancelled"].includes(entry.latest.status)) return;
+                const delayMs = Math.min(30_000, (dependencies.reconnectDelayMs ?? 2_000) * 2 ** Math.min(entry.failures++, 4));
+                entry.retry = setTimeout(() => observe(id, entry), delayMs);
+            });
     };
     const reconnect = () => {
         for (const [id, entry] of entries) observe(id, entry);
@@ -397,7 +402,7 @@ function safeTaskLogErrorCode(value: unknown) {
 }
 
 export type WaitForGenerationTaskOptions = {
-	textEventsSource?: "task" | "agent";
+    textEventsSource?: "task" | "agent";
     signal?: AbortSignal;
     intervalMs?: number;
     timeoutMs?: number;
@@ -553,7 +558,7 @@ async function waitForGenerationTaskTextEvents(id: string, options: WaitForGener
 }
 
 function asTaskTextStreamRecord(value: unknown): Record<string, unknown> {
-    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function numberValue(value: unknown) {
@@ -573,7 +578,7 @@ class TaskTextStreamFatalError extends Error {
 
 async function taskTextStreamHTTPError(response: Response) {
     try {
-        const payload = await response.json() as { msg?: unknown };
+        const payload = (await response.json()) as { msg?: unknown };
         if (typeof payload.msg === "string" && payload.msg.trim()) return payload.msg;
     } catch {
         // SSE 错误响应可能是空正文或网关 HTML，只返回状态码，避免泄露正文。
@@ -594,9 +599,18 @@ function taskWaitTimeoutMs(task?: GenerationTask) {
 
 function delay(ms: number, signal?: AbortSignal) {
     return new Promise<void>((resolve, reject) => {
-        if (signal?.aborted) { reject(new DOMException("Aborted", "AbortError")); return; }
-        const abort = () => { window.clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); };
-        const timer = window.setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, ms);
+        if (signal?.aborted) {
+            reject(new DOMException("Aborted", "AbortError"));
+            return;
+        }
+        const abort = () => {
+            window.clearTimeout(timer);
+            reject(new DOMException("Aborted", "AbortError"));
+        };
+        const timer = window.setTimeout(() => {
+            signal?.removeEventListener("abort", abort);
+            resolve();
+        }, ms);
         signal?.addEventListener("abort", abort, { once: true });
     });
 }

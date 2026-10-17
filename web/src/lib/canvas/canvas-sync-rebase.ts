@@ -45,7 +45,7 @@ function rebaseValue(before: unknown, remote: unknown, local: unknown, verified:
 }
 
 export function rebaseCanvasLocalEdits(baseline: CanvasProject | undefined, remote: CanvasProject, local: CanvasProject): CanvasProject {
-    const merged = { ...rebaseValue(baseline, remote, local, Boolean(baseline)) as CanvasProject };
+    const merged = { ...(rebaseValue(baseline, remote, local, Boolean(baseline)) as CanvasProject) };
     const oldNodes = new Map(baseline?.nodes.map((node) => [node.id, node]));
     const remoteNodes = new Map(remote.nodes.map((node) => [node.id, node]));
     const localNodes = new Map(local.nodes.map((node) => [node.id, node]));
@@ -55,7 +55,7 @@ export function rebaseCanvasLocalEdits(baseline: CanvasProject | undefined, remo
         if (!incoming) return node;
         const edited = localNodes.get(node.id);
         if (baseline && edited) {
-            const text = (before: unknown, other: unknown, current: unknown) => typeof other === "string" && typeof current === "string" && (before === undefined || typeof before === "string") ? mergeCanvasText(before || "", other, current) : current;
+            const text = (before: unknown, other: unknown, current: unknown) => (typeof other === "string" && typeof current === "string" && (before === undefined || typeof before === "string") ? mergeCanvasText(before || "", other, current) : current);
             const metadata = { ...node.metadata };
             for (const field of ["prompt", "composerContent", ...(["text", "script", "markdown"].includes(node.type) ? ["content"] : [])] as const) {
                 const key = field as "prompt" | "composerContent" | "content";
@@ -75,7 +75,18 @@ export function rebaseCanvasLocalEdits(baseline: CanvasProject | undefined, remo
         const remoteTask = incoming.metadata?.taskId;
         const remoteTime = Date.parse(incoming.metadata?.taskUpdatedAt || "");
         const localTime = Date.parse(node.metadata?.taskUpdatedAt || "");
-        if (remoteTask === oldTask && !(remoteTask && remoteTask === node.metadata?.taskId && Number.isFinite(remoteTime) && (!Number.isFinite(localTime) || remoteTime > localTime))) return node;
+        const legacyCompletion =
+            remoteTask &&
+            remoteTask === oldTask &&
+            remoteTask === node.metadata?.taskId &&
+            !Number.isFinite(remoteTime) &&
+            !Number.isFinite(localTime) &&
+            ["succeeded", "failed", "cancelled"].includes(String(incoming.metadata?.taskStatus)) &&
+            !["succeeded", "failed", "cancelled"].includes(String(node.metadata?.taskStatus)) &&
+            equal(old?.metadata?.generationOutputIndex, incoming.metadata?.generationOutputIndex) &&
+            equal(old?.metadata?.generationOutputIndex, edited?.metadata?.generationOutputIndex) &&
+            ["content", "storageKey", "assetId"].every((key) => equal(edited?.metadata?.[key], old?.metadata?.[key]) || equal(edited?.metadata?.[key], incoming.metadata?.[key]));
+        if (remoteTask === oldTask && !legacyCompletion && !(remoteTask && remoteTask === node.metadata?.taskId && Number.isFinite(remoteTime) && (!Number.isFinite(localTime) || remoteTime > localTime))) return node;
         // Task bindings/results follow the server; authored title, prompt and
         // geometry still survive a task replacement or newer terminal result.
         const metadata = { ...node.metadata };
@@ -89,5 +100,13 @@ export function rebaseCanvasLocalEdits(baseline: CanvasProject | undefined, remo
         return { ...node, metadata };
     });
     const ids = new Set(merged.nodes.map((node) => node.id));
-    return { ...merged, id: remote.id, revision: remote.revision, updatedAt: remote.updatedAt, remoteContentHash: remote.remoteContentHash, viewport: local.viewport, connections: merged.connections.filter((connection) => ids.has(connection.fromNodeId) && ids.has(connection.toNodeId)) };
+    return {
+        ...merged,
+        id: remote.id,
+        revision: remote.revision,
+        updatedAt: remote.updatedAt,
+        remoteContentHash: remote.remoteContentHash,
+        viewport: local.viewport,
+        connections: merged.connections.filter((connection) => ids.has(connection.fromNodeId) && ids.has(connection.toNodeId)),
+    };
 }
