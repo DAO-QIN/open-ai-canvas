@@ -10,7 +10,7 @@ import (
 
 func TestChooseCQwenCapabilityDefaultsAndPluginContract(t *testing.T) {
 	image := DefaultImageCapabilityConfig("choosec-qwen-image", "qwen-image-2.1-turbo")
-	if image.Size.Default != "1024x1024" || !image.Size.AllowCustom || image.MaxOutputs != 10 || image.References.MaxImages != 0 || image.References.MaskSupported || image.Resolution.Supported || image.TransparentBackground.Supported || image.OutputFormat.Supported || image.Quality.Default != "standard" {
+	if image.Size.Default != "2048x2048" || !image.Size.AllowCustom || image.MaxOutputs != 10 || image.References.MaxImages != 10 || image.References.MaxImageBytes != 10*1024*1024 || image.References.MaskSupported || !image.Resolution.Supported || image.Resolution.Default != "2k" || image.TransparentBackground.Supported || image.OutputFormat.Supported || image.Quality.Default != "standard" {
 		t.Fatalf("unexpected defaults: %#v", image)
 	}
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "plugin-packages", "choosec-qwen-image.yingce-plugin"))
@@ -32,7 +32,7 @@ func TestChooseCQwenCapabilityDefaultsAndPluginContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defaults := imageParameterDefaults(image.Parameters)
-	if defaults["style"] != "vivid" || defaults["responseFormat"] != "url" || defaults["size"] != "1024x1024" || image.MaxOutputs != 10 {
+	if defaults["style"] != "vivid" || defaults["responseFormat"] != "url" || defaults["size"] != "2048x2048" || defaults["imageResolution"] != "2k" || image.MaxOutputs != 10 {
 		t.Fatalf("plugin defaults not projected: %#v", defaults)
 	}
 	for name, mutate := range map[string]func(*canvasGenerationInput){
@@ -56,7 +56,31 @@ func TestChooseCQwenCapabilityDefaultsAndPluginContract(t *testing.T) {
 	if err := applyImageParameterValues(&config, image); err != nil {
 		t.Fatal(err)
 	}
-	if config.Size != "1024x1360" || config.ImageParameters["size"] != config.Size {
+	if config.Size != "1728x2304" || config.ImageResolution != "2k" || config.ImageParameters["size"] != config.Size {
 		t.Fatalf("pixel encoding lost: %#v", config.ImageParameters)
 	}
+	for _, preset := range image.Size.Presets {
+		if preset.Tier == "4k" || (preset.Tier == "2k" && preset.Width*preset.Height > 2048*2048) {
+			t.Fatalf("unverified preset exposed: %#v", preset)
+		}
+	}
+	for _, field := range publicImageParameters(image.Parameters) {
+		if field.Name == "quality" || field.Name == "style" || field.Name == "responseFormat" {
+			if field.UserVisible == nil || *field.UserVisible || !field.IsEnabled() {
+				t.Fatalf("hidden metadata lost: %#v", field)
+			}
+		}
+	}
+}
+
+func TestChooseCImageParameterVisibilityInRouteProjection(t *testing.T) {
+	hidden, visible := false, true
+	field := protocol.ImageParameter{Name: "style", Label: "画风", Type: "string", Default: "vivid", UserVisible: &hidden}
+	route := CapabilitySpec{Capability: "image", ImageParameters: []protocol.ImageParameter{field}}
+	spec := CapabilitySpec{Capability: "image", Options: map[string]OptionConstraint{"style": {Values: []any{"*"}}}}
+	projected := effectiveImageParameterSpec(spec, []CapabilitySpec{route, route})
+	if len(projected.ImageParameters) != 1 || projected.ImageParameters[0].UserVisible == nil || *projected.ImageParameters[0].UserVisible { t.Fatalf("hidden metadata lost: %#v", projected.ImageParameters) }
+	route.ImageParameters = []protocol.ImageParameter{{Name: "style", Label: "画风", Type: "string", Default: "vivid", UserVisible: &visible}}
+	projected = effectiveImageParameterSpec(spec, []CapabilitySpec{{Capability: "image", ImageParameters: []protocol.ImageParameter{field}}, route})
+	if projected.ImageParameters[0].UserVisible != nil && !*projected.ImageParameters[0].UserVisible { t.Fatal("visible source lost during merge") }
 }

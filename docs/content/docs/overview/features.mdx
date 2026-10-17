@@ -7,7 +7,7 @@ description: 当前项目已实现的核心工作台能力与使用入口
 
 ## ChooseC 千问 2.1 图片
 
-独立声明式插件 `choosec-qwen-image` 适配 `qwen-image-2.1-turbo` 的 OpenAI 形式文生图端点。选择协议自动填入 `1024x1024`、`standard`、`vivid`、`url` 和单张生成，可选 1–10 张。示例值仅作默认值，尺寸及比例预设可编辑，允许自定义像素；质量、画风和响应格式可由渠道配置并透传。参考编辑、蒙版和独立分辨率参数暂不开放；不改变售价或启用状态。接口依据见 [ChooseC 模型广场](https://api.choosec.cn/pricing)。
+独立声明式插件 `choosec-qwen-image` 适配 `qwen-image-2.1-turbo` 的 OpenAI 形式生成端点，参考图按官方 JSON `image` 字段传递，ChooseC 兼容性待使用者实测。选择协议默认 2K、2048×2048、单张生成，提供可编辑的 1K/2K 像素预设和自定义尺寸；参考图上限 10 张、单图 10MB，默认不开放 4K 和独立蒙版。C 端隐藏画风、响应格式及原始质量，后台保留默认值与独立“前台展示”设置；隐藏不等于禁用参数。不改变售价或启用状态。依据见 [ChooseC](https://api.choosec.cn/pricing) 与 [千问官方兼容接口](https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference)。
 
 ## 爱困 Gemini 视频 · omni-flash
 

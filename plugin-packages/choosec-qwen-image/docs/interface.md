@@ -2,7 +2,7 @@
 
 ## 协议身份
 
-- 插件和 Provider ID：`choosec-qwen-image`，版本 `1.0.0`。
+- 插件和 Provider ID：`choosec-qwen-image`，版本 `1.1.0`。
 - 能力：`image`；模型：`qwen-image-2.1-turbo`。
 - Base URL：`https://api.choosec.cn`；现有渠道的 `https://api.choosec.cn/v1` 同样由宿主 URL 拼接规则处理。
 - 创建：`POST /v1/images/generations`，JSON 同步图片响应。
@@ -15,23 +15,27 @@
 | --- | --- | --- |
 | `model` | `model` | 固定 `qwen-image-2.1-turbo` |
 | `prompt` | `prompt` | 必填文字描述 |
-| `aspectRatio` | `size` | 默认 `1024x1024`，允许自定义像素与可编辑比例预设 |
+| `aspectRatio` | `size` | 默认 `2048x2048`，允许自定义像素与可编辑比例预设 |
+| `imageResolution` | 宿主换算 `size` | 默认 `2k`，初始渠道档位为 `1k/2k`；不发送独立 resolution |
+| `images` | `image` | 0–10 张，按顺序映射 URL / data URL 数组；无图时省略 |
 | `quality` | `quality` | `standard` |
 | `imageCount` | `n` | 整数 1–10，默认 1 |
 | `providerOptions.choosec-qwen-image.style` | `style` | `vivid` |
 | `providerOptions.choosec-qwen-image.response_format` | `response_format` | `url` |
 
-`imageParameters` 是后台「能力与参数」及生成面板共同使用的动态参数合同。选择此协议即填入上述默认值，关闭独立分辨率、透明背景、输出编码及压缩控件。默认参考图数量为 0，蒙版关闭；当前插件范围为已公布的文生图调用。
+`imageParameters` 是后台「能力与参数」及生成面板共同使用的动态参数合同。选择此协议即填入上述默认值，初始参考图上限 10 张、单图 10MB，关闭独立蒙版、透明背景参数、输出编码及压缩控件。画风、响应格式及原始质量默认 `userVisible:false`，只在后台配置；隐藏不等于禁用，仍保留默认值和请求绑定。其他插件未声明展示设置时沿用现有显示行为。
 
-页面中的尺寸、质量、画风和响应格式是示例默认值，不能当成唯一合法值。插件不把这些默认值写成枚举白名单：管理员可以配置比例、精确像素及其他参数，用户可以输入自定义尺寸；供应商对取值的实际限制由其 API 校验。初始比例使用宿主 1K 像素换算预设，可在后台编辑，不代表供应商尺寸上限。参考编辑及蒙版尚无该站明确调用说明，当前插件仍聚焦文生图。提示词沿用影绘现有 32000 字符平台限制，不将它描述为供应商极限。未声明的媒体字节限制为 0。
+页面中的尺寸、质量、画风和响应格式是默认值，不能当成唯一合法值。管理员可以配置比例、精确像素及其他参数，用户可输入自定义尺寸。初始像素预设提供 1K/2K，2K 面积不超过 2048×2048；4K 不在默认可用档位，管理员可在实际验证后配置。提示词沿用影绘现有 32000 字符平台限制，不将它描述为供应商极限。
+
+官方 [Turbo 模型卡](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) 明确支持图片编辑与 2K。[官方兼容 API](https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference) 在同一 images/generations 端点通过顶层 `image` 传图，不使用 edits 或 multipart。ChooseC 的参考图透传与更高分辨率尚未付费实调；这是使用者确认的待测适配方向，不将官方模型能力等同于中转站已经验证的能力。生成数量保留 ChooseC 页面已有 1–10 配置，区别于官方托管 API 的 1–6，以实际渠道限制为准。
 
 ## 请求
 
 ```json
-{"model":"qwen-image-2.1-turbo","prompt":"中文海报","size":"1024x1024","n":1}
+{"model":"qwen-image-2.1-turbo","prompt":"中文海报","size":"2048x2048","n":1}
 ```
 
-默认请求与站点示例一致，仅含 `model/prompt/size/n`；`standard/vivid/url` 是页面标注的默认值，采用上游缺省行为，不重复发送可选字段。用户或管理员明确配置其他质量、画风或响应格式时，原样发送对应字段。不发送独立 `resolution`、`output_format`、`background`、参考图或蒙版字段，不推测 edits、任务查询和取消端点。比例由宿主的可编辑预设换成像素后发送 `size`，精确像素原样发送。模型 ID、空提示词、引用、非正整数像素和数量范围在发送请求前校验；动态参数保留渠道配置值，不用示例覆盖。
+默认文生图只含 `model/prompt/size/n`；`standard/vivid/url` 采用上游缺省行为，不重复发送可选字段。管理员配置其他质量、画风或响应格式时，发送对应字段。有参考图则增加 `image:["URL 或 data URL", ...]`，无图省略该字段，不传 null 或空数组。不发送独立 `resolution`、`output_format`、`background` 或 mask，不推测 edits、任务查询和取消端点。比例和清晰度由宿主的可编辑预设换成像素后发送 `size`，精确像素原样发送。模型 ID、空提示词、参考图数量/缺少地址、独立蒙版、非法像素和数量范围在发送前校验。
 
 ## 响应映射与错误
 
@@ -44,16 +48,14 @@
 <!-- YINGCE_MANIFEST_CONTRACT_START -->
 ## Manifest 完整接口定义
 
-以下 JSON 与插件包内实际 `manifest.json` 逐字段一致，覆盖插件身份、权限、配置、鉴权、参数、校验、创建、Agent、查询、取消、结果下载、响应和 Agent 响应映射。`documentation` 字段的值就是当前完整文档；为避免文档在自身内部无限递归，JSON 中仅用等义占位文本表示正文。
-
 ```json
 {
   "apiVersion": "yingce.plugin/v2",
   "id": "choosec-qwen-image",
   "name": "ChooseC 千问 2.1 图片",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "影绘",
-  "description": "ChooseC qwen-image-2.1-turbo 文生图协议与可配置参数默认值。",
+  "description": "ChooseC 千问 2.1 文生图与参考图适配，默认 2K，可编辑尺寸与前台展示。参考图中转兼容性待使用者实测。",
   "permissions": [
     "generation.run",
     "media.read"
@@ -96,9 +98,18 @@
             "type": "string",
             "binding": "aspectRatio",
             "encoding": "pixels",
-            "default": "1024x1024",
+            "default": "2048x2048",
             "pricing": true,
-            "description": "WIDTHxHEIGHT；1024x1024 是示例默认值，可编辑比例、像素预设与自定义尺寸。"
+            "description": "WIDTHxHEIGHT；默认 2K，可编辑比例预设与自定义像素，不将示例写成白名单。"
+          },
+          {
+            "name": "imageResolution",
+            "label": "清晰度",
+            "type": "string",
+            "binding": "resolution",
+            "default": "2k",
+            "pricing": true,
+            "description": "宿主按档位换算 size，不发送独立 resolution。默认 1K/2K，4K 由管理员验证后配置。"
           },
           {
             "name": "quality",
@@ -106,7 +117,8 @@
             "type": "string",
             "binding": "quality",
             "default": "standard",
-            "pricing": true
+            "pricing": true,
+            "userVisible": false
           },
           {
             "name": "count",
@@ -123,14 +135,16 @@
             "label": "画风",
             "type": "string",
             "binding": "providerOptions.choosec-qwen-image.style",
-            "default": "vivid"
+            "default": "vivid",
+            "userVisible": false
           },
           {
             "name": "responseFormat",
             "label": "响应格式",
             "type": "string",
             "binding": "providerOptions.choosec-qwen-image.response_format",
-            "default": "url"
+            "default": "url",
+            "userVisible": false
           }
         ],
         "parameters": [
@@ -152,7 +166,13 @@
             "name": "aspectRatio",
             "type": "string",
             "mapping": "size",
-            "description": "WIDTHxHEIGHT，默认 1024x1024；比例由宿主按可编辑预设换算成像素。"
+            "description": "WIDTHxHEIGHT，默认 2048x2048；比例由宿主按可编辑预设换算成像素。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "mapping": "image",
+            "description": "0–10 张参考图，按顺序映射为 URL 或 data URL 数组；无图时省略 image。ChooseC 兼容性待实测。"
           },
           {
             "name": "quality",
@@ -302,16 +322,83 @@
           },
           {
             "assert": {
-              "$eq": [
+              "$lte": [
                 {
                   "$len": {
                     "$ref": "request.images"
                   }
                 },
+                10
+              ]
+            },
+            "message": "千问参考图最多 10 张"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$filter": {
+                      "from": {
+                        "$ref": "request.images"
+                      },
+                      "as": "media",
+                      "where": {
+                        "$gt": [
+                          {
+                            "$len": {
+                              "$trim": {
+                                "$coalesce": [
+                                  {
+                                    "$ref": "media.dataUrl"
+                                  },
+                                  {
+                                    "$ref": "media.url"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          0
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                }
+              ]
+            },
+            "message": "参考图缺少可用的 URL 或 data URL"
+          },
+          {
+            "assert": {
+              "$eq": [
+                {
+                  "$len": {
+                    "$filter": {
+                      "from": {
+                        "$ref": "request.images"
+                      },
+                      "as": "media",
+                      "where": {
+                        "$eq": [
+                          {
+                            "$ref": "media.role"
+                          },
+                          "mask"
+                        ]
+                      }
+                    }
+                  }
+                },
                 0
               ]
             },
-            "message": "当前 ChooseC 插件的文生图接口不接受参考图或蒙版"
+            "message": "此兼容接口不接受独立蒙版参数，请使用普通参考图"
           },
           {
             "assert": {
@@ -351,12 +438,34 @@
             "prompt": {
               "$ref": "request.prompt"
             },
+            "image": {
+              "$omitEmpty": {
+                "$map": {
+                  "from": {
+                    "$sortByOrder": {
+                      "$ref": "request.images"
+                    }
+                  },
+                  "as": "media",
+                  "in": {
+                    "$coalesce": [
+                      {
+                        "$ref": "media.dataUrl"
+                      },
+                      {
+                        "$ref": "media.url"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
             "size": {
               "$coalesce": [
                 {
                   "$ref": "request.aspectRatio"
                 },
-                "1024x1024"
+                "2048x2048"
               ]
             },
             "quality": {

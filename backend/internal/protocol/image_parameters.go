@@ -29,6 +29,7 @@ type ImageParameter struct {
 	Encoding    string   `json:"encoding,omitempty"`
 	Models      []string `json:"models,omitempty"`
 	Enabled     *bool    `json:"enabled,omitempty"`
+	UserVisible *bool    `json:"userVisible,omitempty"`
 }
 
 func (p ImageParameter) IsEnabled() bool { return p.Enabled == nil || *p.Enabled }
@@ -184,6 +185,9 @@ func ResolveImageParameters(definitions, configured []ImageParameter, model stri
 		p := definition
 		if setting, ok := settings[p.Name]; ok {
 			p.Enabled = setting.Enabled
+			if setting.UserVisible != nil {
+				p.UserVisible = setting.UserVisible
+			}
 			if !p.IsEnabled() && p.Required {
 				return nil, fmt.Errorf("%s is required", p.Label)
 			}

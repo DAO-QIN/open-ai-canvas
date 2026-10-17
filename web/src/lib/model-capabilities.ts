@@ -1,7 +1,7 @@
 import type { ModelProtocol, ModelProtocolWorkflow } from "@/lib/model-protocols";
 import { projectImageParameters, normalizeImageParameters, imageParameterRequest } from "./image-parameters";
 import type { ImageResolutionOption, ImageResolutionTier } from "@/lib/image-resolution-tiers";
-import { IMAGE_RATIOS, IMAGE_RESOLUTIONS, imagePresetForRatio } from "@/lib/image-size-presets";
+import { IMAGE_RATIOS, IMAGE_RESOLUTIONS, imagePresetForRatio, chooseCQwenImageSizePresets } from "@/lib/image-size-presets";
 import { kemeiSeedreamPresets } from "./kemei-image-presets";
 import { type WorkflowVideoFieldLike, workflowImageCapabilityConfig, workflowVideoCapabilityConfig } from "./model-capabilities-workflow";
 import { resolveWorkflowVideoScreenSpec } from "./video-screen-specs";
@@ -292,8 +292,9 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
         maxOutputs: 15,
     };
     if (protocol === "choosec-qwen-image") {
-        image.references = { ...image.references, maxImages: 0, maxImageBytes: 0, maskSupported: false };
-        image.size = { parameter: "size", values: [], default: "1024x1024", allowCustom: true, defaultTier: "1k", presets: IMAGE_RATIOS.map((ratio) => imagePresetForRatio("1k", ratio)) };
+        image.references = { ...image.references, maxImages: 10, maxImageBytes: 10 * 1024 * 1024, maskSupported: false };
+        image.size = { parameter: "size", values: [], default: "2048x2048", allowCustom: true, defaultTier: "2k", presets: chooseCQwenImageSizePresets() };
+        image.resolution = { supported: true, values: ["1k", "2k"], default: "2k" };
         image.quality = { supported: true, values: [], default: "standard" };
         image.transparentBackground = { supported: false, default: false };
         image.outputFormat = { supported: false };

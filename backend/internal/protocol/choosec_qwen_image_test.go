@@ -12,7 +12,7 @@ func TestChooseCQwenImageUsesDocumentedDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := manifestTestBody(t, spec)
-	if spec.Method != "POST" || spec.Path != "/v1/images/generations" || spec.Auth.Type != "bearer" || len(body) != 4 || body["size"] != "1024x1024" || body["n"] != float64(1) {
+	if spec.Method != "POST" || spec.Path != "/v1/images/generations" || spec.Auth.Type != "bearer" || len(body) != 4 || body["size"] != "2048x2048" || body["n"] != float64(1) {
 		t.Fatalf("unexpected request: %#v, body=%#v", spec, body)
 	}
 	request := GenerationRequest{Capability: CapabilityImage, Model: "qwen-image-2.1-turbo", Prompt: "中文海报", ImageParameters: map[string]any{"size": "1024x1024", "quality": "standard", "count": 10, "style": "vivid", "responseFormat": "url"}}
@@ -25,13 +25,14 @@ func TestChooseCQwenImageUsesDocumentedDefaults(t *testing.T) {
 func TestChooseCQwenImageRejectsInvalidInputs(t *testing.T) {
 	adapter := officialPackageAdapter(t, "choosec-qwen-image.yingce-plugin", "choosec-qwen-image")
 	cases := map[string]func(*GenerationRequest){
-		"wrong model":     func(r *GenerationRequest) { r.Model = "qwen-image-plus" },
-		"empty prompt":    func(r *GenerationRequest) { r.Prompt = "  " },
-		"invalid size":    func(r *GenerationRequest) { r.AspectRatio = "1024x0" },
-		"unencoded ratio": func(r *GenerationRequest) { r.AspectRatio = "16:9" },
-		"too many":        func(r *GenerationRequest) { r.ImageCount = 11 },
-		"negative count":  func(r *GenerationRequest) { r.ImageCount = -1 },
-		"reference":       func(r *GenerationRequest) { r.Images = []MediaReference{{URL: "https://example.com/ref.png"}} },
+		"wrong model":         func(r *GenerationRequest) { r.Model = "qwen-image-plus" },
+		"empty prompt":        func(r *GenerationRequest) { r.Prompt = "  " },
+		"invalid size":        func(r *GenerationRequest) { r.AspectRatio = "1024x0" },
+		"unencoded ratio":     func(r *GenerationRequest) { r.AspectRatio = "16:9" },
+		"too many":            func(r *GenerationRequest) { r.ImageCount = 11 },
+		"negative count":      func(r *GenerationRequest) { r.ImageCount = -1 },
+		"too many references": func(r *GenerationRequest) { r.Images = make([]MediaReference, 11) },
+		"empty reference":     func(r *GenerationRequest) { r.Images = []MediaReference{{}} },
 		"mask": func(r *GenerationRequest) {
 			r.Images = []MediaReference{{URL: "https://example.com/mask.png", Role: "mask"}}
 		},
@@ -52,6 +53,39 @@ func TestChooseCQwenImageRejectsInvalidInputs(t *testing.T) {
 				t.Fatal("unexpected acceptance")
 			}
 		})
+	}
+}
+
+func TestChooseCQwenImageReferenceJSONPreservesOrderAndEncoding(t *testing.T) {
+	adapter := officialPackageAdapter(t, "choosec-qwen-image.yingce-plugin", "choosec-qwen-image")
+	request := GenerationRequest{Capability: CapabilityImage, Model: "qwen-image-2.1-turbo", Prompt: "保留参考图的商品", Images: []MediaReference{
+		{URL: "https://example.com/second.png", Order: 2},
+		{URL: "https://example.com/first.png", DataURL: "data:image/png;base64,aGVsbG8=", Order: 1},
+	}}
+	spec, err := adapter.BuildCreate(context.Background(), RequestContext{Request: request})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := manifestTestBody(t, spec)
+	images := body["image"].([]any)
+	if len(images) != 2 || images[0] != request.Images[1].DataURL || images[1] != request.Images[0].URL || body["size"] != "2048x2048" {
+		t.Fatalf("reference mapping lost: %#v", body)
+	}
+	if _, exists := body["resolution"]; exists {
+		t.Fatal("host resolution leaked upstream")
+	}
+	request.Images = request.Images[:1]
+	spec, err = adapter.BuildCreate(context.Background(), RequestContext{Request: request})
+	if err != nil || len(manifestTestBody(t, spec)["image"].([]any)) != 1 {
+		t.Fatalf("single reference: %v", err)
+	}
+	request.Images = nil
+	spec, err = adapter.BuildCreate(context.Background(), RequestContext{Request: request})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := manifestTestBody(t, spec)["image"]; exists {
+		t.Fatal("empty reference field sent")
 	}
 }
 

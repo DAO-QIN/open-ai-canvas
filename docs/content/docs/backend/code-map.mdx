@@ -7,7 +7,8 @@ description: 从产品功能快速定位主要代码入口
 
 ## ChooseC 千问图片协议
 
-- `plugin-packages/choosec-qwen-image/`：独立声明式协议、动态参数及完整接口文档；同名 `.yingce-plugin` 为安装制品。
+- `plugin-packages/choosec-qwen-image/`：独立声明式文生图/参考图协议，JSON `image` 有序映射及完整接口文档；`build.py` 同步文档并生成同名安装包。
+- `protocol/image_parameters.go`、`app/image_parameters.go`、`web/src/lib/image-parameters.ts`：`userVisible` 展示设置与请求启用独立，保留渠道覆盖及线路合并投影；C 端共用参数组件过滤隐藏项。
 - `web/src/lib/model-capabilities.ts` 与 `backend/internal/app/model_capability_defaults.go`：协议选择的默认引用范围与能力；尺寸、质量、数量、画风及响应格式由插件参数合同提供。
 - `web/test/choosec-qwen-image.test.ts`、`backend/internal/protocol/choosec_qwen_image_test.go` 与 `backend/internal/app/model_capability_choosec_test.go`：切换默认值、参数边界、响应及宿主校验。
 

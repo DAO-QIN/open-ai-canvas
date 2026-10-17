@@ -53,6 +53,26 @@ func TestImageParametersCannotExpandPluginConstraintsOrBindings(t *testing.T) {
 	}
 }
 
+func TestImageParameterVisibilityDoesNotDisableExecution(t *testing.T) {
+	hidden, visible := false, true
+	definitions := []ImageParameter{{Name: "style", Label: "画风", Type: "string", Default: "vivid", UserVisible: &hidden, Binding: "providerOptions.example.style"}}
+	resolved, err := ResolveImageParameters(definitions, []ImageParameter{{Name: "style", Default: "natural"}}, "model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resolved[0].IsEnabled() || resolved[0].UserVisible == nil || *resolved[0].UserVisible {
+		t.Fatalf("visibility lost: %#v", resolved)
+	}
+	request, err := ApplyImageParameters(GenerationRequest{Capability: CapabilityImage, ImageParameters: map[string]any{"style": resolved[0].Default}}, resolved)
+	if err != nil || request.ProviderOptions["example"]["style"] != "natural" {
+		t.Fatalf("hidden default not bound: %#v, %v", request, err)
+	}
+	resolved, err = ResolveImageParameters(definitions, []ImageParameter{{Name: "style", Default: "vivid", UserVisible: &visible}}, "model")
+	if err != nil || resolved[0].UserVisible == nil || !*resolved[0].UserVisible {
+		t.Fatalf("channel cannot show parameter: %v", err)
+	}
+}
+
 func TestImageParametersGeminiResolutionIsIndependentFromStaleQuality(t *testing.T) {
 	adapter := officialPackageAdapter(t, "google-gemini-image.yingce-plugin", "gemini-image")
 	request := GenerationRequest{Capability: CapabilityImage, Model: "image-model", Prompt: "portrait", ImageParameters: map[string]any{"imageResolution": "2k", "seed": 0}}

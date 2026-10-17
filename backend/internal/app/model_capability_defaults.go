@@ -3,6 +3,7 @@
 package app
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -29,15 +30,11 @@ func DefaultImageCapabilityConfig(protocol string, modelName string) *ImageCapab
 	}
 	switch model.ChannelInterfaceType(protocol) {
 	case "choosec-qwen-image":
-		image.References.MaxImages = 0
-		image.References.MaxImageBytes = 0
+		image.References.MaxImages = 10
+		image.References.MaxImageBytes = 10 * 1024 * 1024
 		image.References.MaskSupported = false
-		image.Size = ImageSizeConfig{Parameter: "size", Values: []string{}, Default: "1024x1024", AllowCustom: true, DefaultTier: "1k"}
-		for _, preset := range openAIImageDefaultSizePresets() {
-			if preset.Tier == "1k" {
-				image.Size.Presets = append(image.Size.Presets, preset)
-			}
-		}
+		image.Size = ImageSizeConfig{Parameter: "size", Values: []string{}, Default: "2048x2048", AllowCustom: true, DefaultTier: "2k", Presets: chooseCQwenImageSizePresets()}
+		image.Resolution = ImageResolutionConfig{Supported: true, Values: []string{"1k", "2k"}, Default: "2k"}
 		image.Quality = ImageQualityConfig{Supported: true, Values: []string{}, Default: "standard"}
 		image.TransparentBackground = VideoBooleanConfig{Supported: false, Default: false}
 		image.OutputFormat = ParameterSupport{Supported: false}
@@ -153,6 +150,29 @@ func openAIImageDefaultSizePresets() []ImageSizePreset {
 			}
 			presets = append(presets, ImageSizePreset{Tier: tier, Ratio: entry.ratio, Size: size, Width: width, Height: height})
 		}
+	}
+	return presets
+}
+
+func chooseCQwenImageSizePresets() []ImageSizePreset {
+	presets := make([]ImageSizePreset, 0, 20)
+	for _, preset := range openAIImageDefaultSizePresets() {
+		if preset.Tier != "1k" && preset.Tier != "2k" {
+			continue
+		}
+		// Keep initial 2K presets within the documented 2048² output area.
+		if preset.Tier == "2k" {
+			switch preset.Ratio {
+			case "16:9":
+				preset.Width, preset.Height = 2560, 1440
+			case "9:16":
+				preset.Width, preset.Height = 1440, 2560
+			case "21:9":
+				preset.Width, preset.Height = 3024, 1296
+			}
+			preset.Size = fmt.Sprintf("%dx%d", preset.Width, preset.Height)
+		}
+		presets = append(presets, preset)
 	}
 	return presets
 }

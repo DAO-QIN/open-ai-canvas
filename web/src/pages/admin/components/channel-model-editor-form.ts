@@ -87,7 +87,7 @@ export function changeChannelModelCapability(values: ChannelModelFormValues, pro
     const capabilityConfig = capability === "audio" ? audioChannelCapabilityConfig(protocol) : defaultModelCapabilityConfig(protocol, values.providerModelKey?.trim() || values.modelKey.trim());
     if (capabilityConfig?.image && protocols.find((p) => p.value === protocol)?.imageParameters) {
         capabilityConfig.image.parameters = [];
-        capabilityConfig.image.size.presets = undefined;
+        if (!capabilityConfig.image.resolution.supported || !protocols.find((p) => p.value === protocol)?.imageParameters?.some((p) => p.name === "size" && p.encoding === "pixels" && !p.values?.length)) capabilityConfig.image.size.presets = undefined;
     }
     return updateChannelModelUpstreamCapabilities(
         {
@@ -115,7 +115,7 @@ export function changeChannelModelProtocol(values: ChannelModelFormValues, proto
     const capabilityConfig = values.capability === "audio" ? audioChannelCapabilityConfig(protocol) : defaultModelCapabilityConfig(protocol, values.providerModelKey?.trim() || values.modelKey.trim());
     if (capabilityConfig?.image && protocols.find((p) => p.value === protocol)?.imageParameters) {
         capabilityConfig.image.parameters = [];
-        capabilityConfig.image.size.presets = undefined;
+        if (!capabilityConfig.image.resolution.supported || !protocols.find((p) => p.value === protocol)?.imageParameters?.some((p) => p.name === "size" && p.encoding === "pixels" && !p.values?.length)) capabilityConfig.image.size.presets = undefined;
     }
     const next: ChannelModelFormValues = {
         ...values,

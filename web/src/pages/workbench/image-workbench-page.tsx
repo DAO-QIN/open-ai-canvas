@@ -827,7 +827,7 @@ export function WorkbenchPage({ kind }: { kind: WorkbenchKind }) {
         kind === "image" && imageProfile ? (
             <div className="workbench-settings-content">
                 <ImageSizePicker profile={imageProfile} size={ratio} quality={quality} imageResolution={imageResolution} onChange={updateImageSettings} />
-                {imageProfile.quality.supported && !imageResolutionUsesQuality(imageProfile) ? (
+                {imageProfile.quality.supported && imageProfile.parameters?.find((field) => field.name === "quality")?.userVisible !== false && !imageResolutionUsesQuality(imageProfile) ? (
                     <label className="workbench-setting-row">
                         <span>图片质量</span>
                         <Select
@@ -840,14 +840,16 @@ export function WorkbenchPage({ kind }: { kind: WorkbenchKind }) {
                         />
                     </label>
                 ) : null}
-                <CountPicker
-                    value={count}
-                    max={imageProfile.maxOutputs}
-                    onChange={(value) => {
-                        setCount(value);
-                        rememberImageSettings({ count: value });
-                    }}
-                />
+                {imageProfile.parameters?.find((field) => field.name === "count")?.userVisible !== false ? (
+                    <CountPicker
+                        value={count}
+                        max={imageProfile.maxOutputs}
+                        onChange={(value) => {
+                            setCount(value);
+                            rememberImageSettings({ count: value });
+                        }}
+                    />
+                ) : null}
             </div>
         ) : videoProfile ? (
             <div className="workbench-settings-content">

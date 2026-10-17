@@ -78,6 +78,19 @@ export function imageQualityForTier(profile: ImageCapabilityConfig, tier: ImageR
     return profile.quality.supported ? profile.quality.values.find((value) => aliases[tier]?.includes(value.toLowerCase())) : undefined;
 }
 
+export function chooseCQwenImageSizePresets(): ImageResolutionOption[] {
+    const adjusted: Record<string, [number, number]> = { "16:9": [2560, 1440], "9:16": [1440, 2560], "21:9": [3024, 1296] };
+    return (["1k", "2k"] as const).flatMap((tier) =>
+        IMAGE_RATIOS.map((ratio) => {
+            const preset = imagePresetForRatio(tier, ratio);
+            const dimensions = tier === "2k" ? adjusted[ratio] : undefined;
+            if (!dimensions) return preset;
+            const [width, height] = dimensions;
+            return { ...preset, width, height, size: `${width}x${height}` };
+        }),
+    );
+}
+
 export function imageResolutionUsesQuality(profile: ImageCapabilityConfig) {
     if (profile.parameters) return false;
     return (

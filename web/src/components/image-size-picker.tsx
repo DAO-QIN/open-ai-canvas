@@ -22,6 +22,9 @@ export function ImageSizePicker({
     canSelectResolution?: (resolution: string) => boolean;
     onChange: (size: string, quality?: string, resolution?: string) => void;
 }) {
+    const resolutionLabel = profile.parameters?.find((field) => field.name === "imageResolution")?.label || "分辨率";
+    const showResolution = profile.parameters?.find((field) => field.name === "imageResolution")?.userVisible !== false;
+    const showSize = profile.parameters?.find((field) => field.name === "size")?.userVisible !== false;
     const ungrouped = Boolean(profile.parameters && !profile.resolution.supported);
     const IMAGE_RESOLUTIONS = ungrouped ? [...new Set(imageSizePresets(profile).map((p) => p.tier))] : imageResolutionTiers(profile);
     const presets = imageSizePresets(profile).filter((preset) => imageTierAvailable(profile, preset.tier));
@@ -141,10 +144,10 @@ export function ImageSizePicker({
             setError(reason instanceof Error ? reason.message : "尺寸格式无效");
         }
     };
-    if (profile.size.parameter === "none")
-        return profile.resolution.supported ? (
+    if (profile.size.parameter === "none" || !showSize)
+        return profile.resolution.supported && showResolution ? (
             <div className="image-size-picker">
-                <div className="image-size-label">分辨率</div>
+                <div className="image-size-label">{resolutionLabel}</div>
                 <div className="image-size-tiers">
                     {profile.resolution.values.map((value) => (
                         <button type="button" key={value} aria-pressed={value === imageResolution} disabled={Boolean(canSelectResolution && !canSelectResolution(value))} onClick={() => onChange(size, undefined, value)}>
@@ -156,9 +159,9 @@ export function ImageSizePicker({
         ) : null;
     return (
         <div className="image-size-picker">
-            {profile.resolution.supported ? (
+            {profile.resolution.supported && showResolution ? (
                 <>
-                    <div className="image-size-label">分辨率</div>
+                    <div className="image-size-label">{resolutionLabel}</div>
                     <div className="image-size-tiers">
                         {profile.resolution.values.map((value) => (
                             <button
@@ -177,9 +180,9 @@ export function ImageSizePicker({
                         ))}
                     </div>
                 </>
-            ) : !ungrouped && visibleTiers.length && (profile.size.parameter === "size" || !profile.quality.supported || imageResolutionUsesQuality(profile)) ? (
+            ) : showResolution && !ungrouped && visibleTiers.length && (profile.size.parameter === "size" || !profile.quality.supported || imageResolutionUsesQuality(profile)) ? (
                 <>
-                    <div className="image-size-label">分辨率</div>
+                    <div className="image-size-label">{resolutionLabel}</div>
                     <div className="image-size-tiers">
                         {visibleTiers.map((value) => (
                             <button type="button" key={value} aria-pressed={size !== "auto" && active?.tier === value} onClick={() => changeTier(value)}>

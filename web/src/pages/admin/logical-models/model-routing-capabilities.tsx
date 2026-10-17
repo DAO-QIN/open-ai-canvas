@@ -157,6 +157,7 @@ export function mergeCapabilitySpecs(capability: CapabilityKind, specs: Capabili
     const matching = specs.filter((item) => item.capability === capability);
     if (matching.length === 0) return emptyCapabilitySpec(capability);
     const result = emptyCapabilitySpec(capability);
+    const dynamicSize = capability === "image" && matching.some((spec) => spec.imageParameters?.some((field) => field.name === "size"));
     result.operations = Array.from(new Set(matching.flatMap((item) => item.operations || [])));
     for (const definition of inputDefinitions[capability]) {
         const declared = matching.some((item) => item.inputs?.[definition.name]);
@@ -170,12 +171,12 @@ export function mergeCapabilitySpecs(capability: CapabilityKind, specs: Capabili
         if (constraints.length === 0) continue;
         if (constraints.some(isWildcardConstraint)) {
             const values = uniqueScalars(constraints.flatMap((item) => item.values || []));
-            result.options![definition.name] = { values: definition.name === "size" ? imageSizeOptionValues(values.map(String), true) : values };
+            result.options![definition.name] = { values: definition.name === "size" && !dynamicSize ? imageSizeOptionValues(values.map(String), true) : values };
             continue;
         }
         if (constraints.every((item) => item.values)) {
             const values = uniqueScalars(constraints.flatMap((item) => item.values || []));
-            result.options![definition.name] = { values: definition.name === "size" ? imageSizeOptionValues(values.map(String), values.includes("*")) : values };
+            result.options![definition.name] = { values: definition.name === "size" && !dynamicSize ? imageSizeOptionValues(values.map(String), values.includes("*")) : values };
             continue;
         }
         const minimums = constraints.map((item) => item.min).filter((value): value is number => typeof value === "number");
@@ -202,7 +203,9 @@ export function mergeCapabilitySpecs(capability: CapabilityKind, specs: Capabili
         for (const field of matching.flatMap((spec) => spec.imageParameters || []).filter((p) => p.enabled !== false)) {
             const previous = fields.get(field.name);
             if (previous && previous.type !== field.type) conflicts.add(field.name);
-            fields.set(field.name, previous ? { ...previous, pricing: Boolean(previous.pricing && field.pricing) } : field);
+            const merged = previous ? { ...previous, pricing: Boolean(previous.pricing && field.pricing) } : { ...field };
+            if (previous && (previous.userVisible !== false || field.userVisible !== false)) delete merged.userVisible;
+            fields.set(field.name, merged);
         }
         for (const name of conflicts) {
             fields.delete(name);

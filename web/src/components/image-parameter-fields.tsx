@@ -131,11 +131,14 @@ export function ImageParameterFields({
 }) {
     const values = imageParameterRequest(profile, config) || {};
     const sizeField = profile.parameters?.find((p) => p.name === "size");
+    const sizeVisible = showSize && sizeField?.userVisible !== false;
+    const resolutionVisible = profile.parameters?.find((p) => p.name === "imageResolution")?.userVisible !== false;
     const usesSizePresets = profile.resolution.supported || profile.size.parameter === "size" || sizeField?.encoding === "pixels" || profile.parameters?.some((p) => p.name === "imageResolution");
-    const groupedSize = showSize && profile.size.parameter !== "none" && usesSizePresets && imageSizePresets(profile).length > 0;
+    const groupedSize = showSize && (sizeVisible || (profile.resolution.supported && resolutionVisible)) && profile.size.parameter !== "none" && usesSizePresets && imageSizePresets(profile).length > 0;
     const fields = (profile.parameters || []).filter(
         (p) =>
             p.enabled !== false &&
+            p.userVisible !== false &&
             (!groupedSize || (p.name !== "size" && p.name !== "imageResolution")) &&
             (p.name !== "count" || (showCount && (p.max ?? 1) > 1)) &&
             (p.name !== "size" || showSize) &&
@@ -186,7 +189,7 @@ export function ImageParameterSchemaEditor({ definitions, parameters, disabled, 
     if (!parameters.length) return null;
     return (
         <div className="space-y-3">
-            <p className="text-xs leading-relaxed text-foreground/55">选择此模型支持的参数和范围。生成界面同步显示启用项，标记“可计价”的参数可用于规格价格。</p>
+            <p className="text-xs leading-relaxed text-foreground/55">配置参数范围和默认值。前台隐藏项仍使用默认配置，标记“可计价”的参数可用于规格价格。</p>
             {parameters.map((field) => {
                 const definition = definitions.find((p) => p.name === field.name) || field;
                 const isResolution = field.name === "imageResolution" && field.type === "string";
@@ -213,7 +216,13 @@ export function ImageParameterSchemaEditor({ definitions, parameters, disabled, 
                                 <span className="text-sm font-medium">{field.label}</span>
                                 {definition.pricing ? <span className="ml-2 text-xs text-foreground/50">可计价</span> : null}
                             </div>
-                            <Switch aria-label={`启用${field.label}`} checked={field.enabled !== false} disabled={disabled || definition.required} onChange={(enabled) => update(field.name, { enabled })} />
+                            <div className="flex items-center gap-4">
+                                <label className="flex items-center gap-2 text-xs text-foreground/55">
+                                    前台展示
+                                    <Switch aria-label={`前台展示${field.label}`} checked={field.userVisible !== false} disabled={disabled} onChange={(userVisible) => update(field.name, { userVisible })} />
+                                </label>
+                                <Switch aria-label={`启用${field.label}`} checked={field.enabled !== false} disabled={disabled || definition.required} onChange={(enabled) => update(field.name, { enabled })} />
+                            </div>
                         </div>
                         {field.description ? <p className="text-xs text-foreground/55">{field.description}</p> : null}
                         {field.enabled !== false ? (
@@ -349,7 +358,13 @@ export function ImageParameterSizeEditor({ profile, definition, disabled, onChan
                     <h3 className="text-sm font-medium">尺寸参数</h3>
                     <p className="text-xs text-foreground/55">{grouped ? "按分辨率配置可用画幅，直接点选或输入比例" : "直接点选支持的比例"}</p>
                 </div>
-                <Switch aria-label={`启用${field.label}`} disabled={disabled || definition.required} checked={field.enabled !== false} onChange={(enabled) => updateField({ enabled })} />
+                <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 text-xs text-foreground/55">
+                        前台展示
+                        <Switch aria-label={`前台展示${field.label}`} checked={field.userVisible !== false} disabled={disabled} onChange={(userVisible) => updateField({ userVisible })} />
+                    </label>
+                    <Switch aria-label={`启用${field.label}`} disabled={disabled || definition.required} checked={field.enabled !== false} onChange={(enabled) => updateField({ enabled })} />
+                </div>
             </div>
             {!grouped && pixelSize && singleTier === undefined && (profile.size.presets?.length ?? 0) > 0 ? (
                 <p role="alert" className="image-size-error">

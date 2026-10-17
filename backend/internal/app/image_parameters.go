@@ -484,6 +484,9 @@ func effectiveImageParameterSpec(spec CapabilitySpec, routes []CapabilitySpec) C
 				continue
 			}
 			previous.Pricing = previous.Pricing && p.Pricing
+			if p.UserVisible == nil || *p.UserVisible {
+				previous.UserVisible = p.UserVisible
+			}
 			if len(previous.Values) > 0 && len(p.Values) > 0 {
 				for _, candidate := range p.Values {
 					found := false
