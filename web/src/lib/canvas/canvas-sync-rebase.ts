@@ -85,7 +85,7 @@ export function rebaseCanvasLocalEdits(baseline: CanvasProject | undefined, remo
             !["succeeded", "failed", "cancelled"].includes(String(node.metadata?.taskStatus)) &&
             equal(old?.metadata?.generationOutputIndex, incoming.metadata?.generationOutputIndex) &&
             equal(old?.metadata?.generationOutputIndex, edited?.metadata?.generationOutputIndex) &&
-            ["content", "storageKey", "assetId"].every((key) => equal(edited?.metadata?.[key], old?.metadata?.[key]) || equal(edited?.metadata?.[key], incoming.metadata?.[key]));
+            (["content", "storageKey", "assetId"] as const).every((key) => equal(edited?.metadata?.[key], old?.metadata?.[key]) || equal(edited?.metadata?.[key], incoming.metadata?.[key]));
         if (remoteTask === oldTask && !legacyCompletion && !(remoteTask && remoteTask === node.metadata?.taskId && Number.isFinite(remoteTime) && (!Number.isFinite(localTime) || remoteTime > localTime))) return node;
         // Task bindings/results follow the server; authored title, prompt and
         // geometry still survive a task replacement or newer terminal result.

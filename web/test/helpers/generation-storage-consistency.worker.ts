@@ -596,7 +596,7 @@ async function runCanvasCopyGeneration() {
         await flushCanvasStorePersistence();
         // Force a real same-field race: the generation snapshot also changed the
         // title while the latest ordinary save already persisted a user rename.
-        useCanvasStore.getState().updateProject(projectId, { nodes: pendingNodes.map((node) => node.id === "copy" ? { ...node, title: "Latest user title", position: { x: 700, y: 500 } } : node) });
+        useCanvasStore.getState().updateProject(projectId, { nodes: pendingNodes.map((node) => (node.id === "copy" ? { ...node, title: "Latest user title", position: { x: 700, y: 500 } } : node)) });
         await flushCanvasStorePersistence();
         const copyEffect = "attach-node:new-task:copy:0";
         await persistCanvasGenerationEffect({
