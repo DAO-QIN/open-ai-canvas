@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { DEFAULT_CREATION_TITLE, DEFAULT_CREATION_DESCRIPTION } from "@/lib/creation-copy";
 import { DEFAULT_CANVAS_APPEARANCE } from "@/lib/canvas/agent-appearance";
 import { DEFAULT_UPDATE_ANNOUNCEMENT, normalizeUpdateAnnouncement } from "@/lib/update-announcement";
 
@@ -14,6 +15,8 @@ export const DEFAULT_PUBLIC_APPEARANCE: PublicAppearance = {
     brandSlug: "open-ai-canvas",
     authHeroTitle: "让一个故事，\n从文字走向银幕。",
     authHeroDescription: "",
+    creationTitle: DEFAULT_CREATION_TITLE,
+    creationDescription: DEFAULT_CREATION_DESCRIPTION,
     logoUrl: "/logo.svg",
     darkLogoUrl: "/logo.svg",
     logoFrameEnabled: true,
@@ -76,6 +79,8 @@ export function normalizePublicAppearance(value?: Partial<PublicAppearance> | nu
         brandSlug,
         authHeroTitle,
         authHeroDescription,
+        creationTitle: normalizeAppearanceCopy(value?.creationTitle, DEFAULT_CREATION_TITLE),
+        creationDescription: normalizeAppearanceCopy(value?.creationDescription, DEFAULT_CREATION_DESCRIPTION, true),
         logoUrl,
         darkLogoUrl,
         logoFrameEnabled: value?.logoFrameEnabled !== false,

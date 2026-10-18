@@ -12,6 +12,8 @@ export type PublicAppearance = {
     brandSlug: string;
     authHeroTitle: string;
     authHeroDescription: string;
+    creationTitle: string;
+    creationDescription: string;
     logoUrl: string;
     darkLogoUrl: string;
     logoFrameEnabled: boolean;
@@ -44,6 +46,8 @@ export type AdminAppearance = {
     brandSlug: string;
     authHeroTitle: string;
     authHeroDescription: string;
+    creationTitle: string;
+    creationDescription: string;
     logoResourceId: string;
     darkLogoResourceId: string;
     logoFrameEnabled: boolean;
@@ -95,6 +99,8 @@ export async function updateAdminAppearance(
         | "brandSlug"
         | "authHeroTitle"
         | "authHeroDescription"
+        | "creationTitle"
+        | "creationDescription"
         | "logoResourceId"
         | "darkLogoResourceId"
         | "logoFrameEnabled"

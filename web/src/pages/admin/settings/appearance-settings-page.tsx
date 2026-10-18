@@ -1,4 +1,5 @@
 import { commitPublicAppearance, DEFAULT_PUBLIC_APPEARANCE } from "@/stores/use-appearance-store";
+import { DEFAULT_CREATION_TITLE, DEFAULT_CREATION_DESCRIPTION, resolveCreationCopy } from "@/lib/creation-copy";
 import { deleteAdminResources } from "@/services/api/admin-storage";
 import { AdminStatusBadge, SettingsSectionCard } from "@/pages/admin/components/admin-ui";
 import { AdminPageFrame } from "@/pages/admin/components/admin-shell";
@@ -35,6 +36,8 @@ export default function AppearanceSettingsPage() {
     const [brandSlug, setBrandSlug] = useState("");
     const [authHeroTitle, setAuthHeroTitle] = useState("");
     const [authHeroDescription, setAuthHeroDescription] = useState("");
+    const [creationTitle, setCreationTitle] = useState("");
+    const [creationDescription, setCreationDescription] = useState("");
     const [authVideoAutoplay, setAuthVideoAutoplay] = useState(true);
     const [logoFrameEnabled, setLogoFrameEnabled] = useState(true);
     const [skinId, setSkinId] = useState("classic");
@@ -70,6 +73,8 @@ export default function AppearanceSettingsPage() {
             brandSlug.trim().toLocaleLowerCase() !== setting?.brandSlug ||
             normalizeDraftCopy(authHeroTitle) !== setting?.authHeroTitle ||
             normalizeDraftCopy(authHeroDescription) !== setting?.authHeroDescription ||
+            normalizeDraftCopy(creationTitle) !== setting?.creationTitle ||
+            normalizeDraftCopy(creationDescription) !== setting?.creationDescription ||
             authVideoAutoplay !== setting?.authVideoAutoplay ||
             logoFrameEnabled !== setting?.logoFrameEnabled ||
             skinId !== setting?.skinId ||
@@ -95,6 +100,8 @@ export default function AppearanceSettingsPage() {
         setBrandSlug(value.brandSlug);
         setAuthHeroTitle(value.authHeroTitle);
         setAuthHeroDescription(value.authHeroDescription);
+        setCreationTitle(value.creationTitle);
+        setCreationDescription(value.creationDescription);
         setAuthVideoAutoplay(value.authVideoAutoplay);
         setLogoFrameEnabled(value.logoFrameEnabled);
         setSkinThemes(themes);
@@ -207,6 +214,8 @@ export default function AppearanceSettingsPage() {
         setBrandSlug(setting.brandSlug);
         setAuthHeroTitle(setting.authHeroTitle);
         setAuthHeroDescription(setting.authHeroDescription);
+        setCreationTitle(setting.creationTitle);
+        setCreationDescription(setting.creationDescription);
         setAuthVideoAutoplay(setting.authVideoAutoplay);
         setLogoFrameEnabled(setting.logoFrameEnabled);
         setSkinId(setting.skinId);
@@ -288,6 +297,8 @@ export default function AppearanceSettingsPage() {
         const nextBrandSlug = brandSlug.trim().toLocaleLowerCase();
         const nextAuthHeroTitle = normalizeDraftCopy(authHeroTitle);
         const nextAuthHeroDescription = normalizeDraftCopy(authHeroDescription);
+        const nextCreationTitle = normalizeDraftCopy(creationTitle) || DEFAULT_CREATION_TITLE;
+        const nextCreationDescription = normalizeDraftCopy(creationDescription);
         const nextSeoTitle = normalizeSingleLine(seoTitle);
         const nextSeoDescription = normalizeDraftCopy(seoDescription);
         const nextSeoKeywords = normalizeSingleLine(seoKeywords);
@@ -315,6 +326,8 @@ export default function AppearanceSettingsPage() {
             return;
         }
         for (const [value, label, max, tab] of [
+            [nextCreationTitle, "创作首页标题", 80, "creation"],
+            [nextCreationDescription, "创作首页副标题", 160, "creation"],
             [nextSeoTitle, "SEO 标题", 70, "seo"],
             [nextSeoDescription, "SEO 描述", 200, "seo"],
             [nextSeoKeywords, "SEO 关键词", 300, "seo"],
@@ -371,6 +384,8 @@ export default function AppearanceSettingsPage() {
                 brandSlug: nextBrandSlug,
                 authHeroTitle: nextAuthHeroTitle,
                 authHeroDescription: nextAuthHeroDescription,
+                creationTitle: nextCreationTitle,
+                creationDescription: nextCreationDescription,
                 logoResourceId: ids.logo,
                 darkLogoResourceId: ids["logo-dark"],
                 logoFrameEnabled,
@@ -414,6 +429,7 @@ export default function AppearanceSettingsPage() {
     const status = setting?.configured ? <AdminStatusBadge label="已自定义" tone="success" /> : <AdminStatusBadge label="使用原始外观" tone="neutral" />;
     const copyCustomized = normalizeDraftCopy(authHeroTitle) !== DEFAULT_PUBLIC_APPEARANCE.authHeroTitle || normalizeDraftCopy(authHeroDescription) !== DEFAULT_PUBLIC_APPEARANCE.authHeroDescription;
     const draftBrandName = brandName.trim() || "站点名称";
+    const creationPreview = resolveCreationCopy(draftBrandName, creationTitle, creationDescription);
     const selectedSkin = skinThemes.find((skin) => skin.id === skinId) || skinThemes[0] || DEFAULT_CLASSIC_SKIN;
 
     const changeSkin = (next: SkinDefinition) => {
@@ -449,7 +465,7 @@ export default function AppearanceSettingsPage() {
     };
 
     return (
-        <AdminPageFrame title="站点及外观" description="统一管理品牌身份、登录页、搜索信息、备案展示与全站皮肤主题" scroll>
+        <AdminPageFrame title="站点及外观" description="统一管理品牌身份、创作首页、登录页、搜索信息、备案展示与全站皮肤主题" scroll>
             {loading ? (
                 <AppearanceSkeleton />
             ) : loadError || !setting ? (
@@ -476,7 +492,7 @@ export default function AppearanceSettingsPage() {
                                     <strong>{dirty ? "站点配置有调整待保存" : "站点及外观已与服务端同步"}</strong>
                                     <AdminStatusBadge label={dirty ? "尚未生效" : "服务端当前值"} tone={dirty ? "warning" : "neutral"} />
                                 </div>
-                                <p>{dirty ? "切换分类保留草稿；保存修改会一次应用品牌、登录页、更新公告、SEO、备案和皮肤调整。" : "按分类管理站点配置；欢迎页开关独立即时保存，其余修改统一保存。"}</p>
+                                <p>{dirty ? "切换分类保留草稿；保存修改会一次应用品牌、创作首页、登录页、更新公告、SEO、备案和皮肤调整。" : "按分类管理站点配置；欢迎页开关独立即时保存，其余修改统一保存。"}</p>
                             </div>
                         </div>
                         <div className="admin-appearance-command-actions">
@@ -675,6 +691,29 @@ export default function AppearanceSettingsPage() {
                                                     </span>
                                                 </div>
                                                 <p>预览与正式登录页使用同一文案和媒体。正式页面会先解析公开配置，再渲染品牌内容。</p>
+                                            </div>
+                                        </div>
+                                    </SettingsSectionCard>
+                                ),
+                            },
+                            {
+                                key: "creation",
+                                label: "创作首页",
+                                children: (
+                                    <SettingsSectionCard className="admin-appearance-section" icon={<Type className="size-4" aria-hidden="true" />} title="创作首页文案" description="编辑创作输入框上方的标题与副标题；保存后生效，保持居中布局。">
+                                        <div className="admin-appearance-section-form">
+                                            <Form layout="vertical">
+                                                <Form.Item label="创作首页标题" htmlFor="creation-home-title" extra="最多 80 字，可换行；{brandName} 自动替换为品牌名称。留空使用默认标题。">
+                                                    <Input.TextArea id="creation-home-title" value={creationTitle} maxLength={80} showCount autoSize={{ minRows: 2, maxRows: 4 }} onChange={(event) => setCreationTitle(event.target.value)} />
+                                                </Form.Item>
+                                                <Form.Item label="创作首页副标题" htmlFor="creation-home-description" extra="最多 160 字，可换行；支持 {brandName}，留空隐藏副标题。">
+                                                    <Input.TextArea id="creation-home-description" value={creationDescription} maxLength={160} showCount autoSize={{ minRows: 2, maxRows: 5 }} onChange={(event) => setCreationDescription(event.target.value)} />
+                                                </Form.Item>
+                                            </Form>
+                                            <Button disabled={saving || refreshing || restoring} onClick={() => { setCreationTitle(DEFAULT_CREATION_TITLE); setCreationDescription(DEFAULT_CREATION_DESCRIPTION); }}>恢复默认文案</Button>
+                                            <div className="rounded-lg border border-border bg-background p-6 text-center text-foreground" role="region" aria-label="创作首页文案预览">
+                                                <div className="whitespace-pre-line break-words text-xl font-semibold">{creationPreview.title}</div>
+                                                {creationPreview.description ? <p className="mt-2 whitespace-pre-line break-words text-muted-foreground">{creationPreview.description}</p> : null}
                                             </div>
                                         </div>
                                     </SettingsSectionCard>

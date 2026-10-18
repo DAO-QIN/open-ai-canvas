@@ -23,6 +23,7 @@ import { useCreationPreferencesStore } from "@/stores/use-creation-preferences-s
 import { useAssetStore, type Asset } from "@/stores/use-asset-store";
 import { loadAssetsForUse, saveRemoteUserDataNow } from "@/services/user-data-sync";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
+import { resolveCreationCopy } from "@/lib/creation-copy";
 import { cn } from "@/lib/utils";
 import { useUserStore } from "@/stores/use-user-store";
 import type { PromptOptimizerProvider } from "@/lib/plugins/plugin-types";
@@ -73,7 +74,8 @@ export default function CreatePage() {
     const navigate = useNavigate();
     const [openingCanvas, setOpeningCanvas] = useState(false);
     const openingCanvasRef = useRef(false);
-    const brandName = useAppearanceStore((state) => state.appearance.brandName);
+    const appearance = useAppearanceStore((state) => state.appearance);
+    const creationCopy = resolveCreationCopy(appearance.brandName, appearance.creationTitle, appearance.creationDescription);
     const config = useEffectiveConfig();
     const composerPreferencesHydrated = useCreationPreferencesStore((state) => state.hydrated);
     const rememberMode = useCreationPreferencesStore((state) => state.rememberMode);
@@ -1076,8 +1078,8 @@ export default function CreatePage() {
                 <section ref={launchpadRef} className="creation-launchpad" aria-label="开始创作">
                     <header className="creation-start-heading">
                         <div className="creation-start-copy">
-                            <h1>和{brandName}聊聊创作想法</h1>
-                            <p>从一个画面、一个角色或一句话开始。</p>
+                            <h1>{creationCopy.title}</h1>
+                            {creationCopy.description ? <p>{creationCopy.description}</p> : null}
                         </div>
                         <button type="button" className="creation-history-entry" aria-label="查看历史对话" aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)}><History aria-hidden="true" /><span>历史对话</span></button>
                     </header>

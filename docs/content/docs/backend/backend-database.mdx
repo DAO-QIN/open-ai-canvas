@@ -44,6 +44,8 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 ## 更新公告配置
 
+外观设置 `appearance` 的 JSON 新增 `creationTitle`、`creationDescription`，保存创作首页标题模板和副标题文本，继续使用合同版本 10。缺失字段在内存读取时采用原首页文案；管理员保存时写回，不新增表或结构迁移。标题空白回退默认，副标题空白表示隐藏；局部恢复文案不删除外观设置或影响其他配置。
+
 外观 JSON 合同版本 10 新增 `updates`：`enabled`、`currentVersion`、`releases`。每个版本保存 `id/version/title/date/blocks`，内容块保存 `id/type/text/resourceId/caption/layout`；公共媒体 URL 由服务端按当前引用生成，不保存客户端 URL。关闭开关保留公告和资源引用，只关闭公共展示。不增加数据库表或 schema 迁移。
 
 ## 画布 Agent 外观配置

@@ -214,6 +214,8 @@ CANVAS_BACKEND_DATA_DIR=/明确的数据目录 ./migrate-schema repair-canvas-re
 
 ### 画布配置、更新公告与 Live2D（外观合同版本 10）
 
+创作首页文案复用外观设置：管理员通过 `PATCH /admin/settings/appearance` 保存 `creationTitle`（最多 80 字，空白回退默认标题）与 `creationDescription`（最多 160 字，空白隐藏副标题）；管理员及公共外观接口返回这两个字段。两段支持换行及 `{brandName}` 占位符，前端以纯文本显示并替换当前品牌名。缺失字段使用原首页文案；不增加数据库迁移。后台“创作首页”支持预览和局部恢复默认，恢复按钮只修改草稿，点击“保存修改”后生效。
+
 外观设置新增 `updates: { enabled, currentVersion, releases }`，由管理员通过 `PATCH /admin/settings/appearance` 保存；关闭开关保留草稿，但 `GET /public/appearance` 返回关闭状态与空公告列表，前端恢复内置更新日志。开启时公开版本与内容块，当前版本须对应公告版本。媒体上传、管理员预览、公开引用读取及限制详见 [自定义更新公告](/docs/backend/update-announcements)。JSON 请求上限为 512KB；无数据表迁移。
 
 `GET /public/appearance` 和管理员 `GET /admin/settings/appearance` 返回 `canvas`；管理员通过 `PATCH /admin/settings/appearance` 随外观配置统一保存。字段为 `agentName`（1–24 字）、`launcherLabel`（0–24 字）、`panelTitle`（1–40 字）、`welcomeTitle`（1–100 字）、`welcomeDescription`（0–200 字）、`inputPlaceholder`（1–160 字）、`avatarType`（`orb|live2d`）、`avatarHeight`（120–360 整数）、`live2dResourceId`、`live2dEntry`。入口由服务端核验覆盖；Live2D 无有效资源时拒绝启用。名称以数据形式投影到每轮 Agent 执行上下文，不提供自由系统提示词配置，也不改变工具权限。

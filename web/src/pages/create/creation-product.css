@@ -3,7 +3,7 @@
 .creation-home-scroll > * { width: 100%; max-width: 1280px; margin-inline: auto; }
 .creation-home-scroll > .creation-launchpad { width: min(960px, 100%); margin-inline: auto; }
 .creation-start-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr); align-items: center; gap: var(--space-4); margin-bottom: var(--space-5); }
-.creation-start-copy { grid-column: 2; min-width: 0; text-align: center; overflow-wrap: anywhere; }
+.creation-start-copy { grid-column: 2; min-width: 0; text-align: center; overflow-wrap: anywhere; white-space: pre-line; }
 .creation-start-heading h1 { margin: 0; color: var(--user-ink); font-size: var(--typ-display-sm); font-weight: 650; letter-spacing: -.025em; line-height: 1.3; }
 .creation-start-heading p { margin: var(--space-1) 0 0; color: var(--user-ink-muted); font-size: var(--fs-caption); line-height: 1.6; }
 .creation-history-entry { display: inline-flex; grid-column: 3; justify-self: end; align-items: center; gap: var(--space-2); min-height: var(--user-control-height); border: 0; border-radius: var(--user-radius-control); padding: var(--space-2) var(--space-3); background: var(--user-surface-muted); color: var(--user-ink-muted); font-size: var(--fs-caption); cursor: pointer; }

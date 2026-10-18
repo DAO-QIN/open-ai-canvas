@@ -48,6 +48,8 @@ const (
 	defaultAppearanceVideoURL  = "https://boss-shjd.biliapi.net/updream/aniforge/video/video_bbcb00bd-650d-4249-9346-5cd21fd2484c_m1hc-u0-1pu13x-3v1s.mp4"
 	defaultAppearancePosterURL = "https://i0.hdslb.com/bfs/aitool/aniforge/image/02933f26-5f1b-49ff-a811-b7f95ee5e5b8_m1hc-u0-sau.jpg"
 	defaultAppearanceHeroTitle = "让一个故事，\n从文字走向银幕。"
+	defaultCreationTitle       = "和{brandName}聊聊创作想法"
+	defaultCreationDescription = "从一个画面、一个角色或一句话开始。"
 	defaultRedeemPurchaseURL   = "" // 默认不配置购买链接，前端为空时不展示入口
 )
 
@@ -59,6 +61,8 @@ type AppearanceSetting struct {
 	BrandSlug                 string                `json:"brandSlug"`
 	AuthHeroTitle             string                `json:"authHeroTitle"`
 	AuthHeroDescription       string                `json:"authHeroDescription"`
+	CreationTitle             string                `json:"creationTitle"`
+	CreationDescription       string                `json:"creationDescription"`
 	LogoResourceID            string                `json:"logoResourceId"`
 	DarkLogoResourceID        string                `json:"darkLogoResourceId"`
 	LogoFrameEnabled          bool                  `json:"logoFrameEnabled"`
@@ -84,6 +88,8 @@ type PublicAppearanceSetting struct {
 	BrandSlug                 string              `json:"brandSlug"`
 	AuthHeroTitle             string              `json:"authHeroTitle"`
 	AuthHeroDescription       string              `json:"authHeroDescription"`
+	CreationTitle             string              `json:"creationTitle"`
+	CreationDescription       string              `json:"creationDescription"`
 	LogoURL                   string              `json:"logoUrl"`
 	DarkLogoURL               string              `json:"darkLogoUrl"`
 	LogoFrameEnabled          bool                `json:"logoFrameEnabled"`
@@ -119,16 +125,18 @@ type AdminAppearanceSetting struct {
 
 func defaultAppearanceSetting() AppearanceSetting {
 	return AppearanceSetting{
-		Canvas:            defaultCanvasAppearance(),
-		SchemaVersion:     appearanceSchemaVersion,
-		BrandName:         defaultAppearanceBrandName,
-		BrandSlug:         defaultAppearanceBrandSlug,
-		AuthHeroTitle:     defaultAppearanceHeroTitle,
-		AuthVideoAutoplay: true,
-		LogoFrameEnabled:  true,
-		SkinID:            defaultAppearanceSkinID,
-		SkinThemes:        defaultAppearanceSkinThemes(),
-		RedeemPurchaseURL: defaultRedeemPurchaseURL,
+		Canvas:              defaultCanvasAppearance(),
+		SchemaVersion:       appearanceSchemaVersion,
+		BrandName:           defaultAppearanceBrandName,
+		BrandSlug:           defaultAppearanceBrandSlug,
+		AuthHeroTitle:       defaultAppearanceHeroTitle,
+		CreationTitle:       defaultCreationTitle,
+		CreationDescription: defaultCreationDescription,
+		AuthVideoAutoplay:   true,
+		LogoFrameEnabled:    true,
+		SkinID:              defaultAppearanceSkinID,
+		SkinThemes:          defaultAppearanceSkinThemes(),
+		RedeemPurchaseURL:   defaultRedeemPurchaseURL,
 	}
 }
 
@@ -195,6 +203,11 @@ func (s *Service) UpdateAppearance(actor *model.User, value AppearanceSetting) (
 	value.BrandSlug = strings.ToLower(strings.TrimSpace(value.BrandSlug))
 	value.AuthHeroTitle = normalizeAppearanceCopy(value.AuthHeroTitle)
 	value.AuthHeroDescription = normalizeAppearanceCopy(value.AuthHeroDescription)
+	value.CreationTitle = normalizeAppearanceCopy(value.CreationTitle)
+	if value.CreationTitle == "" {
+		value.CreationTitle = defaultCreationTitle
+	}
+	value.CreationDescription = normalizeAppearanceCopy(value.CreationDescription)
 	value.LogoResourceID = strings.TrimSpace(value.LogoResourceID)
 	value.DarkLogoResourceID = strings.TrimSpace(value.DarkLogoResourceID)
 	value.AuthVideoResourceID = strings.TrimSpace(value.AuthVideoResourceID)
@@ -435,6 +448,11 @@ func (s *Service) readAppearance() (*model.SystemSetting, AppearanceSetting, err
 		value.AuthHeroTitle = defaultAppearanceHeroTitle
 	}
 	value.AuthHeroDescription = normalizeAppearanceCopy(value.AuthHeroDescription)
+	value.CreationTitle = normalizeAppearanceCopy(value.CreationTitle)
+	if value.CreationTitle == "" {
+		value.CreationTitle = defaultCreationTitle
+	}
+	value.CreationDescription = normalizeAppearanceCopy(value.CreationDescription)
 	value.SkinID = strings.TrimSpace(value.SkinID)
 	if value.SkinID == "" {
 		value.SkinID = defaultAppearanceSkinID
@@ -504,6 +522,12 @@ func validateAppearanceSetting(value AppearanceSetting) error {
 		return err
 	}
 	if err := validateAppearanceCopy(value.AuthHeroDescription, "登录页说明文案", 160, false); err != nil {
+		return err
+	}
+	if err := validateAppearanceCopy(value.CreationTitle, "创作首页标题", 80, true); err != nil {
+		return err
+	}
+	if err := validateAppearanceCopy(value.CreationDescription, "创作首页副标题", 160, false); err != nil {
 		return err
 	}
 	if err := validateAppearanceSkinThemes(value.SkinThemes, value.SkinID); err != nil {
@@ -702,6 +726,8 @@ func publicAppearanceSetting(setting *model.SystemSetting, value AppearanceSetti
 		BrandSlug:           value.BrandSlug,
 		AuthHeroTitle:       value.AuthHeroTitle,
 		AuthHeroDescription: value.AuthHeroDescription,
+		CreationTitle:       value.CreationTitle,
+		CreationDescription: value.CreationDescription,
 		LogoURL:             defaultAppearanceLogoURL,
 		DarkLogoURL:         defaultAppearanceLogoURL,
 		LogoFrameEnabled:    value.LogoFrameEnabled,
