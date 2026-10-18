@@ -126,6 +126,7 @@ function SettingsHome({ props, theme, onOpen }: { props: AgentSettingsProps; the
             <section>
                 <SettingLabel label="能力与范围" />
                 <div className="space-y-1">
+                    <SettingRow theme={theme} icon={<Sparkles className="size-4" />} title="宠物外观" summary="换形象、调大小与位置锁定" onClick={() => window.dispatchEvent(new Event("yinghui:pet-settings"))} />
                     <SettingRow theme={theme} icon={<Cpu className="size-4" />} title="上下文" summary={`${props.nodeCount} 个节点 · ${props.contextScope.length} 个范围`} onClick={() => onOpen("context")} />
                     <SettingRow theme={theme} icon={<Sparkles className="size-4" />} title="长期偏好" summary={profileSummary(props.profileView)} onClick={() => onOpen("profile")} />
                     <SettingRow theme={theme} icon={<BookMarked className="size-4" />} title="个人记忆" summary="批准、添加、导出导入；只影响你的会话" onClick={() => onOpen("memories")} />

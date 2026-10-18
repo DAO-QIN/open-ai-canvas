@@ -1,15 +1,34 @@
 import { useRef, useState } from "react";
-import { Alert, App, Button, Form, Input, InputNumber, Radio } from "antd";
+import { Alert, App, Button, Form, Input, Radio, Slider, Switch } from "antd";
 import { ExternalLink, Upload } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import { Live2DAvatar } from "@/components/canvas/live2d-avatar";
 import { FluidOrb } from "@/components/ui/fluid-orb";
 import { agentCopy, type CanvasAppearance } from "@/lib/canvas/agent-appearance";
-import { live2DModelURL, uploadLive2D } from "@/services/api/appearance";
+import { live2DModelURL, uploadLive2D, type PetAppearance } from "@/services/api/appearance";
+import { PetThumbnail } from "@/components/canvas/pet-thumbnail";
+import "./pet-catalog-editor.css";
 import { SpritePetEditor } from "./sprite-pet-editor";
 import { validateSpritePet } from "@/lib/canvas/sprite-pet";
 
-export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading }: { value: CanvasAppearance; onChange: (value: CanvasAppearance) => void; disabled: boolean; onUploading: (value: boolean) => void }) {
+export function CanvasAppearanceEditor({
+    value: globalValue,
+    onChange,
+    catalog,
+    onCatalogChange,
+    disabled,
+    onUploading,
+}: {
+    value: CanvasAppearance;
+    onChange: (value: CanvasAppearance) => void;
+    catalog: PetAppearance[];
+    onCatalogChange: (value: PetAppearance[]) => void;
+    disabled: boolean;
+    onUploading: (value: boolean) => void;
+}) {
+    const [selectedId, setSelectedId] = useState(globalValue.defaultPetId || catalog[0]?.id || "");
+    const selected = catalog.find((p) => p.id === selectedId) || catalog[0];
+    const value = selected ? { ...globalValue, ...selected } : globalValue;
     const { message } = App.useApp();
     const reducedMotion = useReducedMotion() ?? false;
     const input = useRef<HTMLInputElement>(null);
@@ -19,7 +38,15 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
     const [attempt, setAttempt] = useState(0);
     const [spriteReady, setSpriteReady] = useState("");
     const url = value.live2dResourceId ? live2DModelURL(value.live2dResourceId, value.live2dEntry, true) : "";
-    const change = (patch: Partial<CanvasAppearance>) => onChange({ ...value, ...patch });
+    const change = (patch: Partial<CanvasAppearance>) => {
+        const modelKeys = ["avatarType", "avatarHeight", "live2dResourceId", "live2dEntry", "spriteResourceId", "sprite"];
+        if (Object.keys(patch).every((k) => !modelKeys.includes(k))) {
+            onChange({ ...globalValue, ...patch });
+            return;
+        }
+        if (selected) onCatalogChange(catalog.map((p) => (p.id === selected.id ? { ...p, ...patch } : p)));
+        if (!selected || selected.id === globalValue.defaultPetId) onChange({ ...globalValue, ...patch });
+    };
     async function upload(file?: File) {
         if (!file) return;
         if (!file.name.toLowerCase().endsWith(".zip") || file.size > 128 * 1024 * 1024) {
@@ -64,7 +91,89 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
                 </Form>
             </div>
             <div className="grid content-start gap-4">
-                <h3 className="font-semibold">Agent 形象</h3>
+                <h3 className="font-semibold">宠物形象库</h3>
+                <p className="text-sm text-foreground/60">已发布的形象可由用户自行选择。系统默认用于首页和未自定义的用户；调整后点击页面顶部保存。</p>
+                <div className="grid gap-2 sm:grid-cols-3" aria-label="后台宠物形象库">
+                    {catalog.map((p) => (
+                        <button
+                            key={p.id}
+                            type="button"
+                            className="pet-admin-choice"
+                            aria-pressed={selected?.id === p.id}
+                            disabled={disabled}
+                            onClick={() => {
+                                setSelectedId(p.id);
+                                setError("");
+                            }}
+                        >
+                            <PetThumbnail pet={p} preview />
+                            <span>{p.name}</span>
+                            <small>{p.id === globalValue.defaultPetId ? "系统默认" : p.published ? "已发布" : "未发布"}</small>
+                        </button>
+                    ))}
+                </div>
+                <Button
+                    disabled={disabled || catalog.length >= 24}
+                    onClick={() => {
+                        const pet: PetAppearance = { id: crypto.randomUUID(), name: "新形象", published: false, avatarType: "orb", avatarHeight: 220, live2dResourceId: "", live2dEntry: "", spriteResourceId: "" };
+                        onCatalogChange([...catalog, pet]);
+                        setSelectedId(pet.id);
+                    }}
+                >
+                    添加形象
+                </Button>
+                {selected ? (
+                    <div className="grid gap-3" aria-label="编辑形象">
+                        <label className="grid gap-1 text-sm">
+                            形象名称
+                            <Input aria-label="形象名称" value={selected.name} maxLength={40} disabled={disabled} onChange={(e) => onCatalogChange(catalog.map((p) => (p.id === selected.id ? { ...p, name: e.target.value } : p)))} />
+                        </label>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Switch
+                                aria-label="发布给用户选择"
+                                checked={selected.published}
+                                disabled={disabled || selected.id === globalValue.defaultPetId}
+                                onChange={(published) => onCatalogChange(catalog.map((p) => (p.id === selected.id ? { ...p, published } : p)))}
+                            />
+                            <span className="text-sm">发布给用户选择</span>
+                            <Button disabled={disabled || !selected.published || selected.id === globalValue.defaultPetId} onClick={() => onChange({ ...globalValue, ...selected, defaultPetId: selected.id })}>
+                                设为系统默认
+                            </Button>
+                            <Button
+                                disabled={disabled || catalog[0]?.id === selected.id}
+                                onClick={() => {
+                                    const next = [...catalog],
+                                        index = next.findIndex((p) => p.id === selected.id);
+                                    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                                    onCatalogChange(next);
+                                }}
+                            >
+                                前移
+                            </Button>
+                            <Button
+                                disabled={disabled || catalog.at(-1)?.id === selected.id}
+                                onClick={() => {
+                                    const next = [...catalog],
+                                        index = next.findIndex((p) => p.id === selected.id);
+                                    [next[index + 1], next[index]] = [next[index], next[index + 1]];
+                                    onCatalogChange(next);
+                                }}
+                            >
+                                后移
+                            </Button>
+                            <Button
+                                danger
+                                disabled={disabled || selected.id === globalValue.defaultPetId}
+                                onClick={() => {
+                                    onCatalogChange(catalog.filter((p) => p.id !== selected.id));
+                                    setSelectedId(globalValue.defaultPetId || "");
+                                }}
+                            >
+                                移除
+                            </Button>
+                        </div>
+                    </div>
+                ) : null}
                 <Radio.Group
                     value={value.avatarType}
                     disabled={disabled || uploading}
@@ -124,11 +233,16 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
                         </div>
                     </div>
                 </details>
-                <label className="flex items-center gap-3 text-sm">
-                    形象高度
-                    <InputNumber aria-label="形象高度" min={120} max={360} value={value.avatarHeight} disabled={disabled || uploading} onChange={(height) => height !== null && change({ avatarHeight: height })} />
-                    px
-                </label>
+                <div className="grid gap-1 text-sm">
+                    <label id="pet-admin-height-label">
+                        默认大小 <output>{value.avatarHeight} px</output>
+                    </label>
+                    <Slider ariaLabelledByForHandle="pet-admin-height-label" min={120} max={360} step={5} value={value.avatarHeight} disabled={disabled || uploading} onChange={(height) => change({ avatarHeight: height })} />
+                    <div className="flex justify-between text-xs text-foreground/60">
+                        <span>120 px</span>
+                        <span>360 px</span>
+                    </div>
+                </div>
                 {value.avatarType !== "sprite" ? (
                     <div className="grid justify-items-center gap-3 rounded-xl border border-border bg-background p-5" aria-label="Agent 形象预览">
                         {url ? (

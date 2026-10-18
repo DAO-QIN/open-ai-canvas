@@ -1,13 +1,20 @@
 ---
+
 title: HTTP API 合同
 description: 信封、错误码与 OpenAPI
 ---
 
 # HTTP API 合同
 
+## 宠物形象库与个人偏好
+
+`GET/PUT /api/me/pet-preference` 需要登录，账号由服务器解析，客户端不提交 userId。返回 `{preference:{modelId,scale,locked,hidden,revision}}`，modelId 为 `system` 或已发布形象 ID，scale 为50–150且步长5。PUT 提交完整偏好和读取到的 revision，版本冲突返回409；未发布形象不能选用。GET 设置 private/no-store。
+
+外观配置新增 `petCatalog`（id/name/published/avatarType/avatarHeight及对应素材字段），`canvas.defaultPetId` 指向已发布的系统默认项。公开外观仅返回已发布形象，后台返回完整库；已发布素材可以公开读取，未发布素材仍需要管理员权限。形象库所有引用都参与删除保护。
+
 ## 精灵宠物
 
-`POST /api/admin/settings/appearance/sprite` 接收 multipart `file`，管理员导入 ZIP（最大 16 MiB），返回 `{pet:{resourceId,config}}`。`GET /api/admin/settings/appearance/sprite/:id` 预览上传者或当前配置引用的图片；`GET /api/public/appearance/sprite/:id` 只允许读取当前已启用的图集，返回 PNG/WebP，不是 JSON 信封。
+`POST /api/admin/settings/appearance/sprite` 接收 multipart `file`，管理员导入 ZIP（最大 16 MiB），返回 `{pet:{resourceId,config}}`。`GET /api/admin/settings/appearance/sprite/:id` 预览上传者或形象库引用的图片；`GET /api/public/appearance/sprite/:id` 允许读取当前启用及已发布的图集，返回 PNG/WebP，不是 JSON 信封。
 
 外观 `canvas.avatarType` 增加 `sprite`，配置增加 `spriteResourceId` 与 `sprite`。`sprite` 包含服务端确认的图集路径/尺寸、单帧尺寸、`actions`（id/label/row/start/frames/fps/loop）、`bindings`（idle/working/waiting/failed/completed/moveLeft/moveRight/hover/greeting/sleep/wake）、播放倍率、注视、中立帧、空闲秒数和素材来源备注。待机必须绑定有效动作；所有行列帧数及引用服务端重验。配置仍经统一外观 PATCH 保存，不允许仅靠修改图片 URL 访问其他未启用资源。详见 [精灵宠物](/docs/overview/sprite-pets)。
 

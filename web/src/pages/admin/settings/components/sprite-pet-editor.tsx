@@ -193,6 +193,7 @@ export function SpritePetEditor({
                             showIcon
                         />
                     ) : null}
+                    <details><summary className="cursor-pointer text-sm font-medium">高级动作设置</summary><div className="mt-3 grid gap-4">
                     <div className="grid grid-cols-2 gap-3 text-sm">
                         <label className="grid gap-1">
                             单帧宽度
@@ -383,6 +384,7 @@ export function SpritePetEditor({
                     <p className="text-xs text-foreground/60">
                         图集 {pet.atlasWidth}×{pet.atlasHeight}。导出配置可与原图片一起打包复用。调整只影响展示，不改变任务权限；点击页面顶部“保存修改”后生效。
                     </p>
+                    </div></details>
                 </>
             ) : (
                 <p className="text-xs text-foreground/60">ZIP 内包含 pet.json 和一张 PNG / 静态 WebP 图集。可随包附带文字授权文件。</p>

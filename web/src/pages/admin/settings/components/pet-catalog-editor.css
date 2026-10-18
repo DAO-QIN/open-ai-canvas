@@ -1,0 +1,5 @@
+[data-admin-root] .pet-admin-choice { display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; padding:12px; border:1px solid var(--admin-border); border-radius:var(--admin-radius-lg); background:var(--admin-surface); color:var(--admin-text); cursor:pointer; }
+[data-admin-root] .pet-admin-choice[aria-pressed=true] { background:var(--admin-nav-active); border-color:var(--admin-border-strong); }
+[data-admin-root] .pet-admin-choice:focus-visible { outline:2px solid var(--admin-focus); outline-offset:2px; }
+[data-admin-root] .pet-admin-choice small { color:var(--admin-text-secondary); }
+[data-admin-root] .pet-admin-choice > span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

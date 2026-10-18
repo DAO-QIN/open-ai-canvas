@@ -7,6 +7,7 @@ import (
 
 // CanvasAppearance controls presentation and the Agent's name, never free-form system prompts or tool permissions.
 type CanvasAppearance struct {
+	DefaultPetID       string     `json:"defaultPetId,omitempty"`
 	AgentName          string     `json:"agentName"`
 	LauncherLabel      string     `json:"launcherLabel"`
 	PanelTitle         string     `json:"panelTitle"`

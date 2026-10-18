@@ -29,6 +29,36 @@ tags:
   - name: promotion
   - name: workbench
 paths:
+  /me/pet-preference:
+    get:
+      tags: [canvas]
+      summary: 读取当前账号的宠物外观偏好
+      description: 私有且不缓存。不存在时返回 system、100%、未锁定、未隐藏、revision=0。
+      responses:
+        "200": {description: "成功信封 data={preference:{modelId,scale,locked,hidden,revision}}"}
+        "401": {$ref: "#/components/responses/Error"}
+    put:
+      tags: [canvas]
+      summary: 保存当前账号的宠物外观偏好
+      description: 用户 ID 由认证会话解析；仅允许 system 或后台已发布的形象。旧 revision 拒绝，不修改其他账号。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [modelId, scale, locked, hidden, revision]
+              properties:
+                modelId: {type: string, maxLength: 64}
+                scale: {type: integer, minimum: 50, maximum: 150, multipleOf: 5}
+                locked: {type: boolean}
+                hidden: {type: boolean}
+                revision: {type: integer, minimum: 0}
+      responses:
+        "200": {description: "成功信封 data={preference}，revision 递增"}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
   /projects/{id}/assets/{assetId}/image:
     put:
       tags: [projects, assets]
@@ -425,7 +455,7 @@ paths:
     get:
       tags: [meta]
       security: []
-      summary: 读取当前启用的精灵图集，停用后拒绝公开读取
+      summary: 读取当前启用或形象库已发布的精灵图集
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
       responses:
@@ -491,7 +521,7 @@ paths:
     get:
       tags: [meta]
       security: []
-      summary: 读取当前启用的 Live2D 模型文件
+      summary: 读取当前启用或形象库已发布的 Live2D 模型文件
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - {

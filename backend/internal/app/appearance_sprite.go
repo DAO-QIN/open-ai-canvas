@@ -344,12 +344,17 @@ func (s *Service) SpriteAsset(actor *model.User, id string) ([]byte, string, err
 	if err != nil {
 		return nil, "", err
 	}
-	if a.Canvas.AvatarType != "sprite" || a.Canvas.SpriteResourceID != id {
+	public := a.Canvas.AvatarType == "sprite" && a.Canvas.SpriteResourceID == id || catalogReferences(publishedPets(a.PetCatalog), "sprite", id)
+	if !public {
 		if err = s.RequireAdmin(actor); err != nil {
 			return nil, "", err
 		}
 	}
-	r, err := s.spriteResource(actor, id, a.Canvas.SpriteResourceID)
+	known := a.Canvas.SpriteResourceID
+	if public || catalogReferences(a.PetCatalog, "sprite", id) {
+		known = id
+	}
+	r, err := s.spriteResource(actor, id, known)
 	if err != nil {
 		return nil, "", err
 	}

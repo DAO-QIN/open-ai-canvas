@@ -34,6 +34,7 @@ function acquire(url: string) {
 export function useSpriteImage(url: string) {
     const [result, setResult] = useState({ url: "", src: "", error: "" });
     useEffect(() => {
+        if (!url) return;
         let disposed = false;
         const image = acquire(url);
         image.promise.then(

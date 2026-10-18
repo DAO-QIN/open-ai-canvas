@@ -1,0 +1,283 @@
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { motion } from "motion/react";
+import { LoaderCircle, MessageCircle, Settings2 } from "lucide-react";
+import type { CanvasTheme } from "@/lib/canvas-theme";
+import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
+import { DEFAULT_CANVAS_APPEARANCE } from "@/lib/canvas/agent-appearance";
+import { DEFAULT_PET_PREFERENCE, effectivePet } from "@/lib/canvas/pet-menu";
+import { useAppearanceStore } from "@/stores/use-appearance-store";
+import { useUserStore } from "@/stores/use-user-store";
+import { usePetPreference } from "@/stores/use-pet-preference";
+import { usePetReducedMotion } from "@/hooks/use-pet-reduced-motion";
+import { useAgentLauncherPosition } from "./use-agent-launcher-position";
+import { PetAvatar } from "./pet-avatar";
+import { PetRadialMenu } from "./pet-radial-menu";
+import "./pet-radial-menu.css";
+
+export function AgentLauncher({
+    theme,
+    statusColor,
+    approvalPending,
+    reducedMotion,
+    hidden = false,
+    onOpen,
+    petState,
+}: {
+    theme: CanvasTheme;
+    statusColor: string;
+    approvalPending: boolean;
+    reducedMotion: boolean;
+    hidden?: boolean;
+    onOpen: () => void;
+    petState?: SpriteRunState;
+}) {
+    const appearance = useAppearanceStore((s) => s.appearance),
+        resolved = useAppearanceStore((s) => s.resolved);
+    const base = appearance.canvas || DEFAULT_CANVAS_APPEARANCE,
+        catalog = appearance.petCatalog || [];
+    const scope = useUserStore((s) => s.user?.id) || "guest",
+        store = usePetPreference();
+    const preference = store.scope === scope ? store.preference : DEFAULT_PET_PREFERENCE;
+    const available = preference.modelId === "system" || catalog.some((p) => p.id === preference.modelId && p.published);
+    const modelId = available ? preference.modelId : "system";
+    const current = effectivePet(base, catalog, modelId);
+    const mediaReduced = usePetReducedMotion(),
+        motionReduced = mediaReduced || reducedMotion;
+    const [previewScale, setPreviewScale] = useState<number | null>(null),
+        [menu, setMenu] = useState<DOMRect | null>(null),
+        [candidate, setCandidate] = useState<string | null>(null),
+        [switchError, setSwitchError] = useState("");
+    const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+    const ref = useRef<HTMLButtonElement>(null),
+        timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
+        touch = useRef<{ x: number; y: number } | null>(null),
+        longPressed = useRef(false),
+        suppress = useRef(false),
+        actor = useRef(scope);
+    actor.current = scope;
+    useEffect(() => {
+        void usePetPreference.getState().load(scope);
+        setMenu(null);
+        setCandidate(null);
+        setPreviewScale(null);
+        setSwitchError("");
+    }, [scope]);
+    useEffect(() => {
+        const resize = () => setViewport({ width: innerWidth, height: innerHeight });
+        const focus = () => void usePetPreference.getState().load(scope, true);
+        window.addEventListener("resize", resize);
+        window.addEventListener("focus", focus);
+        return () => {
+            window.removeEventListener("resize", resize);
+            window.removeEventListener("focus", focus);
+            clearTimeout(timer.current);
+        };
+    }, [scope]);
+    const sprite = current.avatarType === "sprite" && current.sprite && current.spriteResourceId,
+        live = current.avatarType === "live2d" && current.live2dResourceId;
+    const ratio = sprite && current.sprite ? current.sprite.frameWidth / current.sprite.frameHeight : live ? 0.75 : 1;
+    const requested = ((sprite || live ? current.avatarHeight : 76) * (previewScale ?? preference.scale)) / 100;
+    const height = Math.max(24, Math.min(requested, 360, viewport.height - 80, (viewport.width - 40) / ratio)),
+        width = Math.round(height * ratio);
+    const update = useCallback(
+        (patch: Partial<typeof preference>) => {
+            if (actor.current !== scope || usePetPreference.getState().scope !== scope) return;
+            usePetPreference.getState().update({ modelId, ...patch });
+        },
+        [modelId, scope],
+    );
+    const { position, dragging, moveDirection, handlers } = useAgentLauncherPosition(
+        () => {
+            if (!suppress.current && !longPressed.current) onOpen();
+            suppress.current = false;
+            longPressed.current = false;
+        },
+        width,
+        height,
+    );
+    const openMenu = useCallback(() => {
+        clearTimeout(timer.current);
+        const box = ref.current?.getBoundingClientRect();
+        setMenu(box && box.width ? box : new DOMRect(innerWidth - position.right - width, innerHeight - position.bottom - height, width, height));
+    }, [position.right, position.bottom, width, height]);
+    useEffect(() => {
+        const open = () => openMenu();
+        window.addEventListener("yinghui:pet-settings", open);
+        return () => window.removeEventListener("yinghui:pet-settings", open);
+    }, [openMenu]);
+    const closeMenu = useCallback(() => {
+        setMenu(null);
+        setPreviewScale(null);
+    }, []);
+    const choose = (id: string) => {
+        setSwitchError("");
+        if (id === modelId) return;
+        if ((id === "system" && base.avatarType === "orb") || (id !== "system" && catalog.find((p) => p.id === id)?.avatarType === "orb")) {
+            update({ modelId: id });
+            return;
+        }
+        setCandidate(id);
+    };
+    const prepared = candidate ? effectivePet(base, catalog, candidate) : null;
+    const candidateScope = scope;
+    return (
+        <>
+            {preference.hidden && !hidden ? (
+                <div className="pet-compact-entry app-user-overlays" style={position} data-canvas-no-zoom onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
+                    <button type="button" onClick={() => update({ hidden: false })} aria-label="显示宠物">
+                        <MessageCircle />
+                        <span>显示宠物</span>
+                        {approvalPending ? <span className="pet-compact-pending">待审批</span> : null}
+                    </button>
+                    <button type="button" aria-label="打开 Agent 对话" onClick={onOpen}>
+                        <MessageCircle />
+                    </button>
+                </div>
+            ) : null}
+            <motion.button
+                ref={ref}
+                type="button"
+                aria-label={`打开${base.agentName}`}
+                aria-haspopup="dialog"
+                title="点击对话 · 拖动移动 · 右键设置"
+                className={`canvas-agent-launcher pet-personal-launcher fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${sprite || live ? "canvas-agent-launcher-live2d" : ""} ${dragging ? "is-dragging" : ""}`}
+                style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden || preference.hidden ? { display: "none" } : null) } as CSSProperties}
+                aria-hidden={hidden || preference.hidden || undefined}
+                tabIndex={hidden || preference.hidden ? -1 : undefined}
+                data-canvas-no-zoom
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openMenu();
+                }}
+                onPointerDown={(e) => {
+                    e.stopPropagation();
+                    if (e.button === 0) suppress.current = false;
+                    longPressed.current = false;
+                    if (e.pointerType === "touch") {
+                        touch.current = { x: e.clientX, y: e.clientY };
+                        timer.current = setTimeout(() => {
+                            longPressed.current = true;
+                            suppress.current = true;
+                            openMenu();
+                        }, 500);
+                    }
+                    if (!preference.locked && !menu) handlers.onPointerDown(e);
+                }}
+                onPointerMove={(e) => {
+                    if (touch.current && Math.hypot(e.clientX - touch.current.x, e.clientY - touch.current.y) > 8) clearTimeout(timer.current);
+                    if (!preference.locked && !longPressed.current) handlers.onPointerMove(e);
+                    else e.stopPropagation();
+                }}
+                onPointerUp={(e) => {
+                    clearTimeout(timer.current);
+                    touch.current = null;
+                    if (longPressed.current) handlers.onPointerCancel(e);
+                    else handlers.onPointerUp(e);
+                }}
+                onPointerCancel={(e) => {
+                    clearTimeout(timer.current);
+                    touch.current = null;
+                    handlers.onPointerCancel(e);
+                }}
+                onLostPointerCapture={handlers.onLostPointerCapture}
+                onClick={(e) => {
+                    if (suppress.current || longPressed.current) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        suppress.current = false;
+                        longPressed.current = false;
+                        return;
+                    }
+                    handlers.onClick(e);
+                }}
+                onKeyDown={(e) => {
+                    if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openMenu();
+                        return;
+                    }
+                    if (preference.locked && e.key.startsWith("Arrow")) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+                    handlers.onKeyDown(e);
+                }}
+                onDoubleClick={handlers.onDoubleClick}
+                whileHover={motionReduced || dragging || menu ? undefined : { scale: 1.035 }}
+                whileTap={motionReduced || dragging || menu ? undefined : { scale: 0.96 }}
+                transition={{ duration: motionReduced ? 0 : 0.16 }}
+            >
+                {resolved ? (
+                    <PetAvatar appearance={current} height={height} paused={hidden || preference.hidden} reducedMotion={motionReduced} state={petState} moveDirection={moveDirection} />
+                ) : (
+                    <span role="status" aria-busy="true">
+                        <LoaderCircle className="size-6 motion-safe:animate-spin" aria-hidden />
+                        <span className="sr-only">正在加载助手形象</span>
+                    </span>
+                )}
+                {base.launcherLabel ? <span className="canvas-agent-launcher-label">{base.launcherLabel}</span> : null}
+                <span className={`canvas-agent-launcher-status ${approvalPending ? "is-pending" : ""}`} style={{ "--canvas-agent-status-color": statusColor } as CSSProperties} />
+                {approvalPending ? <span className="canvas-agent-launcher-badge">待审批</span> : null}
+            </motion.button>
+            {!hidden && !preference.hidden ? (
+                <button
+                    type="button"
+                    className="pet-discover-settings app-user-overlays"
+                    aria-label="宠物设置"
+                    title="宠物设置"
+                    data-canvas-no-zoom
+                    style={{ right: position.right, bottom: position.bottom + height + 8 }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        openMenu();
+                    }}
+                >
+                    <Settings2 />
+                </button>
+            ) : null}
+            {prepared && candidate ? (
+                <div className="pet-prepare-layer" aria-hidden>
+                    <PetAvatar
+                        key={candidate}
+                        appearance={prepared}
+                        height={120}
+                        reducedMotion
+                        paused={false}
+                        onReady={() => {
+                            if (actor.current === candidateScope) {
+                                update({ modelId: candidate });
+                                setCandidate(null);
+                            }
+                        }}
+                        onError={(detail) => {
+                            if (actor.current === candidateScope) {
+                                setCandidate(null);
+                                setSwitchError(detail + "，已保留原形象");
+                            }
+                        }}
+                    />
+                </div>
+            ) : null}
+            {menu ? (
+                <PetRadialMenu
+                    anchor={menu}
+                    catalog={catalog}
+                    preference={{ ...preference, modelId }}
+                    onChange={update}
+                    onSelect={choose}
+                    onClose={closeMenu}
+                    onPreviewScale={setPreviewScale}
+                    error={switchError || store.error || (!available ? "原形象已下架，已跟随系统" : "")}
+                    saving={store.saving}
+                    onRetry={() => void store.retry()}
+                    busy={candidate !== null}
+                    loading={store.loading || store.scope !== scope}
+                />
+            ) : null}
+        </>
+    );
+}

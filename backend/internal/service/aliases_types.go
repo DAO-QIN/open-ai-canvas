@@ -8,6 +8,7 @@ const (
 )
 
 type (
+	PetPreference                          = app.PetPreference
 	BindProjectAssetImageRequest           = app.BindProjectAssetImageRequest
 	PaymentOrderQuery                      = app.PaymentOrderQuery
 	PaymentReconciliationQuery             = app.PaymentReconciliationQuery

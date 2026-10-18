@@ -1,6 +1,7 @@
 import type { SpritePet } from "./sprite-pet";
 
 export type CanvasAppearance = {
+    defaultPetId?: string;
     agentName: string;
     launcherLabel: string;
     panelTitle: string;

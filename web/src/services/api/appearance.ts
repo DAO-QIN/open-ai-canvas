@@ -5,6 +5,7 @@ import { apiBaseURL } from "@/services/api/request";
 import type { UpdateAnnouncement } from "@/lib/update-announcement";
 
 export type PublicAppearance = {
+    petCatalog?: PetAppearance[];
     updates?: UpdateAnnouncement;
     canvas?: CanvasAppearance;
     schemaVersion: number;
@@ -39,6 +40,7 @@ export type PublicAppearance = {
 };
 
 export type AdminAppearance = {
+    petCatalog?: PetAppearance[];
     updates?: UpdateAnnouncement;
     canvas?: CanvasAppearance;
     schemaVersion: number;
@@ -95,6 +97,7 @@ export async function updateAdminAppearance(
         AdminAppearance,
         | "brandName"
         | "canvas"
+        | "petCatalog"
         | "updates"
         | "brandSlug"
         | "authHeroTitle"
@@ -158,4 +161,13 @@ export function spriteImageURL(resourceId: string, preview = false) {
 
 export function live2DModelURL(resourceId: string, entry: string, preview = false) {
     return `${apiBaseURL.replace(/\/$/, "")}/${preview ? "admin/settings" : "public"}/appearance/live2d/${encodeURIComponent(resourceId)}/${entry.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+export type PetAppearance = Pick<CanvasAppearance, "avatarType" | "avatarHeight" | "spriteResourceId" | "sprite" | "live2dResourceId" | "live2dEntry"> & { id: string; name: string; published: boolean };
+export type PetPreference = { modelId: string; scale: number; locked: boolean; hidden: boolean; revision: number };
+export async function getPetPreference(signal?: AbortSignal) {
+    return (await http.get<{ preference: PetPreference }>("/me/pet-preference", { signal })).preference;
+}
+export async function savePetPreference(preference: PetPreference) {
+    return (await http.put<{ preference: PetPreference }>("/me/pet-preference", preference)).preference;
 }

@@ -7,7 +7,9 @@ description: 影策后端核心持久化表与状态边界
 
 ## 精灵宠物存储
 
-`system_settings.appearance.canvas` 扩展 `avatarType=sprite`、`spriteResourceId` 和 `sprite` 动作配置对象。沿用外观 JSON 合同版本 10，无新增表或数据库迁移。`resources.kind=sprite`、`provider=local` 保存已验证的 ZIP；普通资源上传不能伪造该 kind。图集不会被解压成可执行目录。外观草稿引用和启用引用均参与资源删除保护；只有当前启用的图集可经专用公开地址读取。
+形象库保存在 `system_settings.appearance.petCatalog`，默认项由 `canvas.defaultPetId` 指定。个人外观偏好复用 JSON 设置存储，键为 `user-pet:<authenticated-user-id>`，包含 modelId、scale、locked、hidden、revision；键只能由认证主体在专用服务中构造。写入以原始 JSON 比较更新或首次 insert-if-absent，防止多页面/多实例旧版本覆盖。没有新增表或迁移。下架后保留个人选项记录，读取展示时回退系统默认。
+
+`system_settings.appearance.canvas` 扩展 `avatarType=sprite`、`spriteResourceId` 和 `sprite` 动作配置对象。沿用外观 JSON 合同版本 10，无新增表或数据库迁移。`resources.kind=sprite`、`provider=local` 保存已验证的 ZIP；普通资源上传不能伪造该 kind。图集不会被解压成可执行目录。外观草稿引用和启用引用均参与资源删除保护；当前启用及形象库已发布的图集可经专用公开地址读取。
 
 版本 58 `provider_catalog_source` 为渠道和渠道模型增加目录来源字段 `catalog_provider_id`、`catalog_model_key`。版本 59 `sql_perf_indexes` 增加任务与调用日志的 `created_at_epoch` 及查询索引，SQLite 升级时回填历史时间戳。已有版本 50–57 的迁移记录保持原有名称和校验和。
 
