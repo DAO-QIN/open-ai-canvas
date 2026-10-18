@@ -29,7 +29,7 @@
 .pet-menu-models.is-grid .pet-sector-label { position:static; transform:none; width:100%; }
 .pet-menu-models.is-grid .pet-sector-label > span:last-of-type { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
 .pet-menu-models.is-grid .pet-model-choice[aria-pressed=true] { border-color:var(--control-selected-border); background:var(--user-surface-hover); }
-.pet-radial-menu.is-more .pet-menu-actions { visibility:hidden; }
+.pet-radial-menu.is-more .pet-menu-actions,.pet-radial-menu.is-size .pet-menu-actions { visibility:hidden; }
 .pet-menu-back { grid-column:1/-1; display:flex; gap:4px; align-items:center; justify-self:start; }
 .pet-menu-back svg { width:16px; height:16px; }
 .pet-menu-size-panel { position:absolute; left:70px; top:0; width:276px; padding:12px; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface); box-shadow:var(--shadow-sm); }
@@ -53,7 +53,7 @@
  .pet-menu-center { display:none; }
  .pet-menu-close { left:auto; right:10px; top:10px; }
  .pet-menu-actions { position:static; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
- .pet-radial-menu.is-more .pet-menu-actions { visibility:visible; }
+ .pet-radial-menu.is-more .pet-menu-actions,.pet-radial-menu.is-size .pet-menu-actions { visibility:visible; }
  .pet-menu-petal,.pet-model-choice,.pet-menu-more { position:relative; left:auto!important; top:auto!important; width:100%!important; height:72px!important; clip-path:none!important; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface); }
  .pet-sector-surface { display:none; }
  .pet-sector-label { position:static; left:auto!important; top:auto!important; transform:none; height:100%; width:100%; white-space:normal; }

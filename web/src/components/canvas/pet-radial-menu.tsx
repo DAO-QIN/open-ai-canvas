@@ -125,7 +125,7 @@ export function PetRadialMenu({
                 role="dialog"
                 aria-modal="true"
                 aria-label="宠物设置"
-                className={`pet-radial-menu ${placement.right ? "is-right" : "is-left"} ${placement.bottom ? "is-bottom" : "is-top"} ${more ? "is-more" : ""}`}
+                className={`pet-radial-menu ${placement.right ? "is-right" : "is-left"} ${placement.bottom ? "is-bottom" : "is-top"} ${more ? "is-more" : ""} ${panel === "size" ? "is-size" : ""}`}
                 style={{ left: placement.left, top: placement.top, width: placement.width, height: placement.height, transformOrigin: "208px 208px" }}
                 initial={reducedMotion ? false : { opacity: 0, scale: 0.96, y: 6 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -226,6 +226,7 @@ export function PetRadialMenu({
                 ) : null}
                 {panel === "size" ? (
                     <div className="pet-menu-size-panel">
+                        <button type="button" className="pet-menu-back" onClick={() => { commit(); setPanel("look"); }}><ChevronLeft aria-hidden="true" />返回</button>
                         <label htmlFor="pet-personal-scale">
                             宠物大小 <output>{scale}%</output>
                         </label>
