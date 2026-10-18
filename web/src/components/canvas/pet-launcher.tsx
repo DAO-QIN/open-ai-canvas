@@ -123,7 +123,7 @@ export function AgentLauncher({
                 aria-label={`打开${base.agentName}`}
                 aria-haspopup="dialog"
                 title="点击对话 · 拖动移动 · 右键设置"
-                className={`canvas-agent-launcher pet-personal-launcher canvas-agent-launcher-live2d fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${dragging ? "is-dragging" : ""}`}
+                className={`canvas-agent-launcher pet-personal-launcher canvas-agent-launcher-live2d fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${dragging ? "is-dragging" : ""} ${menu ? "is-menu-open" : ""}`}
                 style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden || preference.hidden ? { display: "none" } : null) } as CSSProperties}
                 aria-hidden={hidden || preference.hidden || undefined}
                 tabIndex={hidden || preference.hidden ? -1 : undefined}
@@ -236,6 +236,7 @@ export function AgentLauncher({
                     key="pet-menu"
                     reducedMotion={motionReduced}
                     anchor={menu}
+                    appearance={current}
                     catalog={catalog}
                     preference={{ ...preference, modelId }}
                     onChange={update}

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { effectivePet, petAvatarSize, petMenuPosition, sanitizePetPreference } from "../src/lib/canvas/pet-menu";
+import { effectivePet, petAvatarSize, petMenuPosition, petRingSector, sanitizePetPreference } from "../src/lib/canvas/pet-menu";
 import { DEFAULT_CANVAS_APPEARANCE } from "../src/lib/canvas/agent-appearance";
 import type { PetAppearance } from "../src/services/api/appearance";
 
@@ -44,4 +44,17 @@ test("different silhouettes share a bounded stage while retaining their proporti
         expect(Math.max(result.width, result.height)).toBe(88);
         expect(result.width / result.height).toBeCloseTo(w / h, 4);
     }
+});
+test("arc items use fixed steps and leave unused space instead of filling a circle", () => {
+    const angles = [];
+    for (let i=0;i<4;i++) {
+        const sector=petRingSector(i);
+        const x=sector.left+sector.label.x-208,y=sector.top+sector.label.y-208;
+        expect(Math.hypot(x,y)).toBeCloseTo(106,5);
+        angles.push(Math.atan2(y,x)*180/Math.PI);
+        expect(sector.path).toContain("A 140 140");
+    }
+    expect(angles[3]-angles[0]).toBeCloseTo(108,5);
+    const outer = [0,1,2].map(i=>petRingSector(i,true));
+    for(const sector of outer) expect(Math.hypot(sector.left+sector.label.x-208,sector.top+sector.label.y-208)).toBeCloseTo(176,5);
 });
