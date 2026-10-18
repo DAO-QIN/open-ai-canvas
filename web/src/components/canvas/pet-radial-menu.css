@@ -4,9 +4,6 @@
 .pet-radial-menu { position:fixed; pointer-events:none; font-size:var(--fs-caption); }
 .pet-radial-menu button,.pet-radial-menu input,.pet-menu-size-panel,.pet-menu-feedback { pointer-events:auto; }
 .pet-radial-menu button { cursor:pointer; }
-.pet-menu-close { position:absolute; left:190px; top:278px; display:grid; place-items:center; width:36px; height:36px; border:1px solid var(--user-border); border-radius:50%; background:var(--user-surface); color:var(--user-ink-muted); }
-.pet-menu-close:hover { background:var(--user-surface-hover); color:var(--user-ink); }
-.pet-menu-close svg { width:16px; height:16px; }
 .pet-menu-actions,.pet-menu-models { position:absolute; inset:0; pointer-events:none; }
 .pet-menu-petal,.pet-model-choice,.pet-menu-more { position:absolute; border:0; padding:0; background:transparent; color:var(--user-ink); }
 .pet-menu-petal,.pet-model-choice,.pet-menu-more { animation:pet-sector-enter .2s ease-out both; }
@@ -15,7 +12,7 @@
 .pet-sector-label { position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; transform:translate(-50%,-50%); white-space:nowrap; pointer-events:none; font-size:var(--fs-label); }
 .pet-menu-petal .pet-sector-label > svg { width:26px; height:26px; color:var(--user-accent); }
 .pet-menu-petal:hover path,.pet-model-choice:hover path,.pet-menu-more:hover path { fill:var(--user-surface-hover); }
-.pet-radial-menu :is(button,input):focus-visible,.pet-compact-entry button:focus-visible { outline:2px solid var(--control-focus-ring); outline-offset:3px; }
+.pet-radial-menu :is(button,input):focus-visible { outline:2px solid var(--control-focus-ring); outline-offset:3px; }
 .pet-radial-menu :is(.pet-menu-petal,.pet-model-choice,.pet-menu-more):focus-visible path { stroke:var(--control-focus-ring); stroke-width:4; }
 .pet-menu-petal[aria-expanded=true] path,.pet-menu-petal[aria-pressed=true] path,.pet-model-choice[aria-pressed=true] path { fill:color-mix(in srgb,var(--control-selected-fg) 12%,var(--user-surface)); stroke:var(--control-selected-border); stroke-width:2; }
 .pet-model-choice .pet-sector-label > svg { width:30px; height:30px; color:var(--user-accent); }
@@ -48,13 +45,8 @@
 .pet-radial-menu button:disabled { opacity:.5; cursor:wait; }
 .pet-prepare-layer { position:fixed; left:0; top:0; opacity:0; pointer-events:none; z-index:-1; }
 .pet-personal-launcher { touch-action:none; }
-.pet-compact-entry { position:fixed; z-index:calc(var(--z-toast) + 1); display:flex; gap:4px; padding:4px; max-width:calc(100vw - 24px); border:1px solid var(--user-border); border-radius:var(--user-radius-control); background:var(--user-surface); color:var(--user-ink); }
-.pet-compact-entry button { display:flex; gap:6px; align-items:center; padding:8px; border:0; border-radius:var(--user-radius-control); background:transparent; }
-.pet-compact-entry svg { width:18px; height:18px; }
-.pet-compact-pending { color:var(--status-warning); }
 @media(max-width:640px) {
- .pet-radial-menu { left:12px!important; right:12px; top:auto!important; bottom:12px; width:auto!important; height:auto!important; max-height:calc(100dvh - 32px); overflow:auto; padding:52px 18px 18px; border:1px solid var(--user-border); border-radius:16px; background:var(--user-surface); pointer-events:auto; }
- .pet-menu-close { left:auto!important; right:10px; top:10px!important; }
+ .pet-radial-menu { left:12px!important; right:12px; top:auto!important; bottom:12px; width:auto!important; height:auto!important; max-height:calc(100dvh - 32px); overflow:auto; padding:18px; border:1px solid var(--user-border); border-radius:16px; background:var(--user-surface); pointer-events:auto; }
  .pet-menu-actions { position:static; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
  .pet-radial-menu.is-more .pet-menu-actions,.pet-radial-menu.is-size .pet-menu-actions { visibility:visible; }
  .pet-menu-petal,.pet-model-choice,.pet-menu-more { position:relative; left:auto!important; top:auto!important; width:100%!important; height:72px!important; clip-path:none!important; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface); }

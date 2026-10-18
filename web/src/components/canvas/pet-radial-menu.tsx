@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
-import { Check, ChevronLeft, Ellipsis, EyeOff, LoaderCircle, LockKeyhole, Minus, Palette, Plus, RotateCcw, Scaling, Sparkles, UnlockKeyhole, X } from "lucide-react";
+import { Check, ChevronLeft, Ellipsis, EyeOff, LoaderCircle, LockKeyhole, Minus, Palette, Plus, RotateCcw, Scaling, Sparkles, UnlockKeyhole } from "lucide-react";
 import type { PetAppearance, PetPreference } from "@/services/api/appearance";
 import { petArcLayout, petRingSector } from "@/lib/canvas/pet-menu";
 import { PetThumbnail } from "./pet-thumbnail";
@@ -40,7 +40,6 @@ export function PetRadialMenu({
     const [more, setMore] = useState(false);
     const [scale, setScale] = useState(preference.scale);
     const host = useRef<HTMLDivElement>(null),
-        close = useRef<HTMLButtonElement>(null),
         priorFocus = useRef(document.activeElement as HTMLElement | null),
         scaleRef = useRef(scale),
         changed = useRef(false);
@@ -54,7 +53,7 @@ export function PetRadialMenu({
         scaleRef.current = preference.scale;
     }, [preference.scale]);
     useEffect(() => {
-        close.current?.focus();
+        host.current?.querySelector<HTMLButtonElement>(".pet-menu-dismiss")?.focus();
         const focus = priorFocus.current;
         return () => {
             onPreviewScale(null);
@@ -131,19 +130,6 @@ export function PetRadialMenu({
                 exit={{ opacity: 0, scale: reducedMotion ? 1 : 0.98, y: reducedMotion ? 0 : 4 }}
                 transition={{ duration: reducedMotion ? 0 : 0.18, ease: "easeOut" }}
             >
-                <button
-                    ref={close}
-                    type="button"
-                    className="pet-menu-close"
-                    style={placement.close}
-                    aria-label="关闭宠物设置"
-                    onClick={() => {
-                        commit();
-                        onClose();
-                    }}
-                >
-                    <X />
-                </button>
                 <div className="pet-menu-actions" aria-label="宠物快捷操作">
                     <PetSectorButton ringIndex={0} geometry={sector(0)}
                         type="button"
@@ -177,13 +163,11 @@ export function PetRadialMenu({
                     </PetSectorButton>
                     <PetSectorButton ringIndex={3} geometry={sector(3)}
                         type="button"
-                        className="pet-menu-petal pet-menu-hide"
-                        aria-label="暂时收起"
-                        title="暂时收起"
-                        disabled={loading}
+                        className="pet-menu-petal pet-menu-dismiss"
+                        aria-label="收起菜单"
+                        title="收起菜单"
                         onClick={() => {
                             commit();
-                            onChange({ hidden: true });
                             onClose();
                         }}
                     >

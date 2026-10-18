@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { LoaderCircle, MessageCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
 import { effectivePet, petAvatarSize } from "@/lib/canvas/pet-menu";
@@ -105,18 +105,6 @@ export function AgentLauncher({
     const candidateScope = scope;
     return (
         <>
-            {preference.hidden && !hidden ? (
-                <div className="pet-compact-entry app-user-overlays" style={position} data-canvas-no-zoom onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
-                    <button type="button" onClick={() => update({ hidden: false })} aria-label="显示宠物">
-                        <MessageCircle />
-                        <span>显示宠物</span>
-                        {approvalPending ? <span className="pet-compact-pending">待审批</span> : null}
-                    </button>
-                    <button type="button" aria-label="打开 Agent 对话" onClick={onOpen}>
-                        <MessageCircle />
-                    </button>
-                </div>
-            ) : null}
             <motion.button
                 ref={ref}
                 type="button"
@@ -124,9 +112,9 @@ export function AgentLauncher({
                 aria-haspopup="dialog"
                 title="点击对话 · 拖动移动 · 右键设置"
                 className={`canvas-agent-launcher pet-personal-launcher canvas-agent-launcher-live2d fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${dragging ? "is-dragging" : ""}`}
-                style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, "--canvas-pet-inset": `${current.avatarType === "orb" ? (height - petAvatarSize(current, height).height) / 2 : 0}px`, ...(hidden || preference.hidden ? { display: "none" } : null) } as CSSProperties}
-                aria-hidden={hidden || preference.hidden || undefined}
-                tabIndex={hidden || preference.hidden ? -1 : undefined}
+                style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, "--canvas-pet-inset": `${current.avatarType === "orb" ? (height - petAvatarSize(current, height).height) / 2 : 0}px`, ...(hidden ? { display: "none" } : null) } as CSSProperties}
+                aria-hidden={hidden || undefined}
+                tabIndex={hidden ? -1 : undefined}
                 data-canvas-no-zoom
                 onContextMenu={(e) => {
                     e.preventDefault();
@@ -191,9 +179,9 @@ export function AgentLauncher({
                 onDoubleClick={handlers.onDoubleClick}
                 transition={{ duration: motionReduced ? 0 : 0.16 }}
             >
-                <PetAppearanceTransition appearance={current} resolved={resolved} reducedMotion={motionReduced || hidden || preference.hidden}>
+                <PetAppearanceTransition appearance={current} resolved={resolved} reducedMotion={motionReduced || hidden}>
                 {resolved ? (
-                    <PetAvatar appearance={current} height={height} paused={hidden || preference.hidden} reducedMotion={motionReduced} state={petState} moveDirection={moveDirection} />
+                    <PetAvatar appearance={current} height={height} paused={hidden} reducedMotion={motionReduced} state={petState} moveDirection={moveDirection} />
                 ) : (
                     <span role="status" aria-busy="true">
                         <LoaderCircle className="size-6 motion-safe:animate-spin" aria-hidden />
