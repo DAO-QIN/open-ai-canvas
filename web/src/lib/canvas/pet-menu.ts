@@ -8,6 +8,8 @@ export function effectivePet(canvas: CanvasAppearance, catalog: PetAppearance[],
 }
 /** Fit every model in the same square stage without stretching wide or tall sprites. */
 export function petAvatarSize(pet: Pick<CanvasAppearance, "avatarType" | "sprite">, size: number) {
+    // A filled disc carries more visual weight than a character silhouette.
+    if (pet.avatarType === "orb") return { width: size * 0.6, height: size * 0.6 };
     const ratio = pet.avatarType === "sprite" && pet.sprite ? pet.sprite.frameWidth / pet.sprite.frameHeight : pet.avatarType === "live2d" ? 0.75 : 1;
     return { width: Math.min(size, size * ratio), height: Math.min(size, size / ratio) };
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
-import { Check, ChevronLeft, EyeOff, LockKeyhole, Palette, Scaling, Sparkles, UnlockKeyhole, X } from "lucide-react";
+import { Check, ChevronLeft, Ellipsis, EyeOff, LoaderCircle, LockKeyhole, Minus, Palette, Plus, RotateCcw, Scaling, Sparkles, UnlockKeyhole, X } from "lucide-react";
 import type { PetAppearance, PetPreference } from "@/services/api/appearance";
 import { petArcLayout, petRingSector } from "@/lib/canvas/pet-menu";
 import { PetThumbnail } from "./pet-thumbnail";
@@ -148,6 +148,8 @@ export function PetRadialMenu({
                     <PetSectorButton ringIndex={0} geometry={sector(0)}
                         type="button"
                         className="pet-menu-petal pet-menu-look"
+                        aria-label="换形象"
+                        title="换形象"
                         aria-expanded={panel === "look"}
                         onClick={() => {
                             commit();
@@ -155,28 +157,29 @@ export function PetRadialMenu({
                             setPanel(panel === "look" ? "" : "look");
                         }}
                     >
-                        <Palette />
-                        <span>换形象</span>
+                        <Palette aria-hidden="true" />
                     </PetSectorButton>
                     <PetSectorButton ringIndex={1} geometry={sector(1)}
                         type="button"
                         className="pet-menu-petal pet-menu-size"
+                        aria-label="调大小"
+                        title="调大小"
                         aria-expanded={panel === "size"}
                         onClick={() => {
                             setMore(false);
                             setPanel(panel === "size" ? "" : "size");
                         }}
                     >
-                        <Scaling />
-                        <span>调大小</span>
+                        <Scaling aria-hidden="true" />
                     </PetSectorButton>
-                    <PetSectorButton ringIndex={2} geometry={sector(2)} type="button" className="pet-menu-petal pet-menu-lock" aria-pressed={preference.locked} disabled={loading} onClick={() => onChange({ locked: !preference.locked })}>
-                        {preference.locked ? <UnlockKeyhole /> : <LockKeyhole />}
-                        <span>{preference.locked ? "解锁位置" : "锁位置"}</span>
+                    <PetSectorButton ringIndex={2} geometry={sector(2)} type="button" className="pet-menu-petal pet-menu-lock" aria-label={preference.locked ? "解锁位置" : "锁位置"} title={preference.locked ? "解锁位置" : "锁位置"} aria-pressed={preference.locked} disabled={loading} onClick={() => onChange({ locked: !preference.locked })}>
+                        {preference.locked ? <UnlockKeyhole aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
                     </PetSectorButton>
                     <PetSectorButton ringIndex={3} geometry={sector(3)}
                         type="button"
                         className="pet-menu-petal pet-menu-hide"
+                        aria-label="暂时收起"
+                        title="暂时收起"
                         disabled={loading}
                         onClick={() => {
                             commit();
@@ -184,16 +187,14 @@ export function PetRadialMenu({
                             onClose();
                         }}
                     >
-                        <EyeOff />
-                        <span>暂时收起</span>
+                        <EyeOff aria-hidden="true" />
                     </PetSectorButton>
                 </div>
                 {panel === "look" ? (
                     <div className={`pet-menu-models ${more ? "is-grid" : ""}`} style={more?{left:panelLeft-placement.left,top:panelTop-placement.top,width:276}:undefined} aria-label="选择宠物形象">
                         {more ? (
-                            <button type="button" className="pet-menu-back" onClick={() => setMore(false)}>
-                                <ChevronLeft />
-                                返回
+                            <button type="button" className="pet-menu-back" aria-label="返回" title="返回" onClick={() => setMore(false)}>
+                                <ChevronLeft aria-hidden="true" />
                             </button>
                         ) : null}
                         {[{ id: "system", name: "跟随系统", published: true } as PetAppearance, ...catalog.filter((p) => p.published)].slice(0, more ? 25 : 3).map((pet, index) => (
@@ -214,17 +215,19 @@ export function PetRadialMenu({
                         ))}
                         {!more && catalog.length + 1 > 3 ? (
                             <PetSectorButton ringIndex={3} geometry={sector(3,true)} type="button" aria-label="更多形象" title="更多形象" className="pet-menu-more" onClick={() => setMore(true)}>
-                                更多
+                                <Ellipsis aria-hidden="true" />
                             </PetSectorButton>
                         ) : null}
                     </div>
                 ) : null}
                 {panel === "size" ? (
                     <div className="pet-menu-size-panel" style={{left:panelLeft-placement.left,top:panelTop-placement.top}}>
-                        <button type="button" className="pet-menu-back" onClick={() => { commit(); setPanel("look"); }}><ChevronLeft aria-hidden="true" />返回</button>
-                        <label htmlFor="pet-personal-scale">
-                            宠物大小 <output>{scale}%</output>
-                        </label>
+                        <div className="pet-menu-size-heading">
+                            <button type="button" className="pet-menu-back" aria-label="返回" title="返回" onClick={() => { commit(); setPanel("look"); }}><ChevronLeft aria-hidden="true" /></button>
+                            <label htmlFor="pet-personal-scale">
+                                <Scaling aria-hidden="true" /><span className="sr-only">宠物大小</span><output>{scale}%</output>
+                            </label>
+                        </div>
                         <input
                             id="pet-personal-scale"
                             type="range"
@@ -252,9 +255,11 @@ export function PetRadialMenu({
                             }}
                         />
                         <div>
-                            <span>小</span>
+                            <Minus aria-hidden="true" />
                             <button
                                 type="button"
+                                aria-label="恢复默认"
+                                title="恢复默认"
                                 disabled={loading}
                                 onClick={() => {
                                     setScale(100);
@@ -264,19 +269,15 @@ export function PetRadialMenu({
                                     onChange({ scale: 100 });
                                 }}
                             >
-                                恢复默认
+                                <RotateCcw aria-hidden="true" />
                             </button>
-                            <span>大</span>
+                            <Plus aria-hidden="true" />
                         </div>
                     </div>
                 ) : null}
                 <div className="pet-menu-feedback" style={{left:Math.max(12,Math.min(innerWidth-272,anchor.left))-placement.left,top:Math.max(12,Math.min(innerHeight-40,anchor.top+anchor.height+12))-placement.top}} role="status" aria-live="polite" hidden={!busy && !loading && !saving && !error}>
-                    {busy ? (
-                        "正在准备新形象…"
-                    ) : loading ? (
-                        "正在读取个人设置…"
-                    ) : saving ? (
-                        "正在保存…"
+                    {busy || loading || saving ? (
+                        <><LoaderCircle className="pet-menu-progress" aria-hidden="true" /><span className="sr-only">{busy ? "正在准备新形象…" : loading ? "正在读取个人设置…" : "正在保存…"}</span></>
                     ) : error ? (
                         <>
                             <span>{error}</span>

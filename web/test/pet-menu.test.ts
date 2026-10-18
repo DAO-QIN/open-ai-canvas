@@ -35,7 +35,8 @@ test("corrupt cached settings cannot create oversized or non-finite pets", () =>
 test("different silhouettes share a bounded stage while retaining their proportions", () => {
     const orb = { avatarType: "orb" } as const;
     const live = { avatarType: "live2d" } as const;
-    expect(petAvatarSize(orb, 208)).toEqual({ width: 208, height: 208 });
+    expect(petAvatarSize(orb, 208).height).toBeCloseTo(124.8);
+    expect(petAvatarSize(orb, 104).height).toBeCloseTo(62.4);
     expect(petAvatarSize(live, 208)).toEqual({ width: 156, height: 208 });
     for (const [w, h] of [[192, 208], [500, 100], [100, 500]]) {
         const result = petAvatarSize({ avatarType: "sprite", sprite: { frameWidth: w, frameHeight: h } as PetAppearance["sprite"] }, 88);

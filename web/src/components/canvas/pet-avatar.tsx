@@ -49,6 +49,6 @@ export function PetAvatar({
                     <Live2DAvatar url={live2DModelURL(appearance.live2dResourceId, appearance.live2dEntry)} width={165} height={220} reducedMotion={reducedMotion || paused} onReady={onReady} onError={onError} fallback={<FluidOrb size={60} />} />
                 </span>
             </span>
-        ) : <FluidOrb size={height} />;
+        ) : <FluidOrb size={fitted.height} />;
     return <span data-pet-avatar-stage style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: height, height, flexShrink: 0 }}>{content}</span>;
 }

@@ -13,7 +13,7 @@
 .pet-sector-surface { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .pet-sector-surface path { fill:var(--user-surface); stroke:var(--user-border-strong); stroke-width:1.5; stroke-linejoin:round; transition:fill .16s,stroke .16s; }
 .pet-sector-label { position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; transform:translate(-50%,-50%); white-space:nowrap; pointer-events:none; font-size:var(--fs-label); }
-.pet-menu-petal .pet-sector-label > svg { width:21px; height:21px; color:var(--user-accent); }
+.pet-menu-petal .pet-sector-label > svg { width:26px; height:26px; color:var(--user-accent); }
 .pet-menu-petal:hover path,.pet-model-choice:hover path,.pet-menu-more:hover path { fill:var(--user-surface-hover); }
 .pet-radial-menu :is(button,input):focus-visible,.pet-compact-entry button:focus-visible { outline:2px solid var(--control-focus-ring); outline-offset:3px; }
 .pet-radial-menu :is(.pet-menu-petal,.pet-model-choice,.pet-menu-more):focus-visible path { stroke:var(--control-focus-ring); stroke-width:4; }
@@ -22,6 +22,7 @@
 .pet-model-choice .pet-sector-label > span:last-of-type { display:none; }
 .pet-model-choice .pet-sector-label .pet-choice-check { position:absolute; right:-6px; top:-3px; width:12px; height:12px; }
 .pet-menu-more .pet-sector-label { font-size:var(--fs-label); width:40px; white-space:normal; line-height:1.4; }
+.pet-menu-more .pet-sector-label > svg { width:24px; height:24px; }
 .pet-menu-models,.pet-menu-size-panel { animation:pet-panel-appear .18s ease-out; }
 .pet-menu-models.is-grid { right:auto; bottom:auto; max-height:146px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding:10px; overflow:auto; pointer-events:auto; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface); box-shadow:var(--shadow-sm); }
 .pet-menu-models.is-grid .pet-model-choice { position:relative; display:flex; align-items:center; justify-content:center; min-width:0; height:80px; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface-muted); }
@@ -32,7 +33,12 @@
 .pet-menu-back { grid-column:1/-1; display:flex; gap:4px; align-items:center; justify-self:start; }
 .pet-menu-back svg { width:16px; height:16px; }
 .pet-menu-size-panel { position:absolute; left:70px; top:0; width:276px; padding:12px; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface); box-shadow:var(--shadow-sm); }
-.pet-menu-size-panel label { display:flex; justify-content:space-between; gap:12px; }
+.pet-menu-size-panel label { display:flex; flex:1; align-items:center; justify-content:space-between; gap:12px; }
+.pet-menu-size-heading { gap:8px; }
+.pet-menu-size-panel svg,.pet-menu-progress { width:18px; height:18px; }
+.pet-menu-size-panel button,.pet-menu-back { min-width:32px; min-height:32px; display:grid; place-items:center; }
+.pet-menu-size-panel button:hover,.pet-menu-back:hover { background:var(--user-surface-hover); }
+.pet-menu-progress { animation:pet-progress-spin 1s linear infinite; }
 .pet-menu-size-panel output { font-variant-numeric:tabular-nums; }
 .pet-menu-size-panel input { width:100%; min-height:32px; margin:4px 0; accent-color:var(--user-accent); cursor:ew-resize; }
 .pet-menu-size-panel > div { display:flex; align-items:center; justify-content:space-between; color:var(--user-ink-muted); }
@@ -65,5 +71,6 @@
  .pet-menu-petal[aria-expanded=true],.pet-menu-petal[aria-pressed=true],.pet-model-choice[aria-pressed=true] { border-color:var(--control-selected-border); background:var(--user-surface-hover); }
 }
 @keyframes pet-panel-appear { from { opacity:0; translate:0 4px; } to { opacity:1; translate:0 0; } }
+@keyframes pet-progress-spin { to { rotate:360deg; } }
 @keyframes pet-sector-enter { from { opacity:0; translate:var(--pet-enter-x,0) var(--pet-enter-y,4px); } to { opacity:1; translate:0 0; } }
-@media(prefers-reduced-motion:reduce) { .pet-sector-surface path { transition:none; } .pet-menu-models,.pet-menu-size-panel,.pet-menu-petal,.pet-model-choice,.pet-menu-more { animation:none; } }
+@media(prefers-reduced-motion:reduce) { .pet-sector-surface path { transition:none; } .pet-menu-models,.pet-menu-size-panel,.pet-menu-petal,.pet-model-choice,.pet-menu-more,.pet-menu-progress { animation:none; } }
