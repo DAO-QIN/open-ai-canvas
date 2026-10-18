@@ -133,7 +133,8 @@ export function updateChannelModelUpstreamCapabilities(values: ChannelModelFormV
         if (profile.image) {
             const fresh = profile.image.parameters?.length === 0;
             const resolved = resolveImageParameters(profile.image, definitions, values.providerModelKey?.trim() || values.modelKey.trim());
-            return { ...values, capabilityConfig: { ...profile, image: fresh ? initializeImageRatioDefaults(resolved, resolved.parameters!) : resolved } };
+            const preferredRatios = values.protocol === "cangyuan-seedream-5-pro" ? defaultModelCapabilityConfig(values.protocol).image?.size.values : undefined;
+            return { ...values, capabilityConfig: { ...profile, image: fresh ? initializeImageRatioDefaults(resolved, resolved.parameters!, undefined, preferredRatios) : resolved } };
         }
     }
     if (values.capability !== "image" || values.protocol !== "cangyuan-midjourney-v82") return values;

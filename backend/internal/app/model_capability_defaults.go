@@ -29,6 +29,13 @@ func DefaultImageCapabilityConfig(protocol string, modelName string) *ImageCapab
 		MaxOutputs:            15,
 	}
 	switch model.ChannelInterfaceType(protocol) {
+	case "cangyuan-seedream-5-pro":
+		image.References = ImageReferenceConfig{PromptMaxChars: 32000, MaxImages: 10, MaxImageBytes: 20 * 1024 * 1024, MaskSupported: false}
+		image.Size = ImageSizeConfig{Parameter: "size", Values: []string{"1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9"}, Default: "1:1", AllowCustom: true}
+		image.Resolution = ImageResolutionConfig{Supported: false, Values: []string{}, Default: "auto"}
+		image.Quality = ImageQualityConfig{Supported: false, Values: []string{}, Default: "auto"}
+		image.TransparentBackground = VideoBooleanConfig{Supported: false, Default: false}
+		image.MaxOutputs = 1
 	case "choosec-qwen-image":
 		image.References.MaxImages = 10
 		image.References.MaxImageBytes = 10 * 1024 * 1024

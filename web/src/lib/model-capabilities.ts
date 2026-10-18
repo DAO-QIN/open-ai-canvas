@@ -291,6 +291,14 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
         outputFormat: { supported: true },
         maxOutputs: 15,
     };
+    if (protocol === "cangyuan-seedream-5-pro") {
+        image.references = { promptMaxChars: 32000, maxImages: 10, maxImageBytes: 20 * 1024 * 1024, maskSupported: false };
+        image.size = { parameter: "size", values: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9"], default: "1:1", allowCustom: true };
+        image.quality = { supported: false, values: [], default: "auto" };
+        image.transparentBackground = { supported: false, default: false };
+        image.maxOutputs = 1;
+        return image;
+    }
     if (protocol === "choosec-qwen-image") {
         image.references = { ...image.references, maxImages: 10, maxImageBytes: 10 * 1024 * 1024, maskSupported: false };
         image.size = { parameter: "size", values: [], default: "1024x1024", allowCustom: true, defaultTier: "1k", presets: chooseCQwenImageSizePresets() };

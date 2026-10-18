@@ -5,6 +5,10 @@ description: 当前项目已实现的核心工作台能力与使用入口
 
 # 功能清单
 
+## 沧元 Seedream 5.0 Pro
+
+独立 `cangyuan-seedream` 协议包提供 `cangyuan-seedream-5-pro`，精确适配 `doubao-seedream-5-0-pro`。选择协议默认 1:1、单张、10 张参考图、JPEG / URL，关闭未声明的分辨率档、质量、透明背景和蒙版。八种推荐比例和自定义像素尺寸由后台参数配置；文生图与参考图编辑沿各自端点异步创建、轮询，使用宿主素材转换和结果持久化。Flash 需独立适配，不混入此 Pro 协议。接口依据见[模型文档](https://ai.cangyuansuanli.cn/docs/models/doubao-seedream-5-0-pro)。
+
 ## ChooseC 千问 2.1 图片
 
 独立声明式插件 `choosec-qwen-image` 适配 `qwen-image-2.1-turbo`：文生图走 JSON 生成接口，参考图按该站实际要求走 `/v1/images/edits`，由宿主通过 multipart `image[]` 上传真实文件。选择协议默认 1K、1024×1024、单张生成，初始支持值和像素预设仅开启 1K，比例及自定义尺寸可编辑；其他档位由管理员实测后配置。参考图上限 10 张、单图 10MB，默认不开放 4K 和独立蒙版。C 端控件及设置摘要隐藏画风、响应格式及原始质量，后台保留默认值与独立“前台展示”设置；隐藏不等于禁用参数。不改变售价或启用状态。依据见 [ChooseC](https://api.choosec.cn/pricing) 与 [New API 调用指南](https://docs.newapi.pro/zh/docs/plugins/usage)。

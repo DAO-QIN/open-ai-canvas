@@ -5,6 +5,12 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+## 沧元 Seedream Pro 图片协议
+
+- `plugin-packages/cangyuan-seedream/`：独立声明式包、可重现构建脚本及完整字段文档；文生图、参考图分别创建与轮询，不依赖 host 适配器。
+- `backend/internal/app/model_capability_defaults.go`、`web/src/lib/model-capabilities.ts`：选择协议时的参考图限制、尺寸与能力默认值。
+- `backend/internal/protocol/cangyuan_seedream_test.go`、`backend/internal/app/model_capability_cangyuan_seedream_test.go`、`web/test/cangyuan-seedream.test.ts`：请求、错误、轮询、结果提取及编辑器默认值验证。
+
 ## ChooseC 千问图片协议
 
 - `plugin-packages/choosec-qwen-image/`：独立声明式文生图/参考图协议，无图使用 JSON 生成接口，有图切换 edits 和 multipart `image[]`；`build.py` 同步完整接口文档并生成同名安装包。
