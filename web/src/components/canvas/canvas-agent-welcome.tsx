@@ -1,7 +1,7 @@
-import { ArrowUpRight, Clapperboard, Layers3, Sparkles } from "lucide-react";
+import { ArrowUpRight, Clapperboard, Layers3, LoaderCircle, Sparkles } from "lucide-react";
 import { agentCopy, type CanvasAppearance } from "@/lib/canvas/agent-appearance";
-import { SpriteAvatar } from "./sprite-avatar";
-import { spriteImageURL } from "@/services/api/appearance";
+import { PetAvatar } from "./pet-avatar";
+import { usePetAppearance } from "@/hooks/use-pet-appearance";
 
 type AgentWelcomeProps = {
     appearance: CanvasAppearance;
@@ -11,14 +11,14 @@ type AgentWelcomeProps = {
 };
 
 export function AgentWelcome({ appearance, nodeCount, onChooseSkill, onDraftPrompt }: AgentWelcomeProps) {
+    const { appearance: pet, resolved } = usePetAppearance();
+    const height = pet.avatarType === "sprite" && pet.sprite ? Math.min(88, (160 * pet.sprite.frameHeight) / pet.sprite.frameWidth) : 88;
     return (
         <section className="agent-welcome" aria-label="开始 Agent 创作">
             <div className="agent-welcome-intro">
-                {appearance.avatarType === "sprite" && appearance.sprite && appearance.spriteResourceId ? (
-                    <SpriteAvatar pet={appearance.sprite} url={spriteImageURL(appearance.spriteResourceId)} height={Math.min(88, (160 * appearance.sprite.frameHeight) / appearance.sprite.frameWidth)} reducedMotion />
-                ) : (
-                    <span className="agent-welcome-orb" aria-hidden="true" />
-                )}
+                <span className="agent-welcome-avatar" aria-hidden="true">
+                    {resolved ? <PetAvatar appearance={pet} height={height} paused={false} reducedMotion /> : <LoaderCircle className="size-6 motion-safe:animate-spin" />}
+                </span>
                 <h2>{agentCopy(appearance.welcomeTitle, appearance.agentName)}</h2>
                 <p>{agentCopy(appearance.welcomeDescription, appearance.agentName)}</p>
             </div>

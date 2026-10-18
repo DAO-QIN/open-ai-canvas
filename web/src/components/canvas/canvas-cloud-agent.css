@@ -604,18 +604,12 @@
     text-align: center;
 }
 
-.agent-welcome-orb {
-    display: inline-block;
-    width: 52px;
-    height: 52px;
+.agent-welcome-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 88px;
     margin-bottom: var(--space-5);
-    border-radius: 50%;
-    background:
-        radial-gradient(circle at 32% 24%, var(--color-neutral-0), transparent 36%), radial-gradient(circle at 70% 80%, var(--palette-node-audio), transparent 64%),
-        radial-gradient(circle at 35% 65%, color-mix(in srgb, var(--agent-accent) 65%, var(--color-neutral-0)), var(--agent-accent));
-    box-shadow:
-        inset -4px -6px 14px color-mix(in srgb, var(--agent-accent) 28%, transparent),
-        0 8px 32px color-mix(in srgb, var(--agent-accent) 14%, transparent);
 }
 
 .agent-welcome-intro h2 {

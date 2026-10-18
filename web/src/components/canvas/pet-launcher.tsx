@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { motion } from "motion/react";
-import { LoaderCircle, MessageCircle, Settings2 } from "lucide-react";
+import { LoaderCircle, MessageCircle } from "lucide-react";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
-import { DEFAULT_CANVAS_APPEARANCE } from "@/lib/canvas/agent-appearance";
-import { DEFAULT_PET_PREFERENCE, effectivePet } from "@/lib/canvas/pet-menu";
-import { useAppearanceStore } from "@/stores/use-appearance-store";
-import { useUserStore } from "@/stores/use-user-store";
+import { effectivePet } from "@/lib/canvas/pet-menu";
 import { usePetPreference } from "@/stores/use-pet-preference";
+import { usePetAppearance } from "@/hooks/use-pet-appearance";
 import { usePetReducedMotion } from "@/hooks/use-pet-reduced-motion";
 import { useAgentLauncherPosition } from "./use-agent-launcher-position";
 import { PetAvatar } from "./pet-avatar";
@@ -31,16 +29,7 @@ export function AgentLauncher({
     onOpen: () => void;
     petState?: SpriteRunState;
 }) {
-    const appearance = useAppearanceStore((s) => s.appearance),
-        resolved = useAppearanceStore((s) => s.resolved);
-    const base = appearance.canvas || DEFAULT_CANVAS_APPEARANCE,
-        catalog = appearance.petCatalog || [];
-    const scope = useUserStore((s) => s.user?.id) || "guest",
-        store = usePetPreference();
-    const preference = store.scope === scope ? store.preference : DEFAULT_PET_PREFERENCE;
-    const available = preference.modelId === "system" || catalog.some((p) => p.id === preference.modelId && p.published);
-    const modelId = available ? preference.modelId : "system";
-    const current = effectivePet(base, catalog, modelId);
+    const { base, catalog, scope, store, preference, available, modelId, appearance: current, resolved } = usePetAppearance();
     const mediaReduced = usePetReducedMotion(),
         motionReduced = mediaReduced || reducedMotion;
     const [previewScale, setPreviewScale] = useState<number | null>(null),
@@ -56,7 +45,6 @@ export function AgentLauncher({
         actor = useRef(scope);
     actor.current = scope;
     useEffect(() => {
-        void usePetPreference.getState().load(scope);
         setMenu(null);
         setCandidate(null);
         setPreviewScale(null);
@@ -64,12 +52,9 @@ export function AgentLauncher({
     }, [scope]);
     useEffect(() => {
         const resize = () => setViewport({ width: innerWidth, height: innerHeight });
-        const focus = () => void usePetPreference.getState().load(scope, true);
         window.addEventListener("resize", resize);
-        window.addEventListener("focus", focus);
         return () => {
             window.removeEventListener("resize", resize);
-            window.removeEventListener("focus", focus);
             clearTimeout(timer.current);
         };
     }, [scope]);
@@ -222,23 +207,6 @@ export function AgentLauncher({
                 <span className={`canvas-agent-launcher-status ${approvalPending ? "is-pending" : ""}`} style={{ "--canvas-agent-status-color": statusColor } as CSSProperties} />
                 {approvalPending ? <span className="canvas-agent-launcher-badge">待审批</span> : null}
             </motion.button>
-            {!hidden && !preference.hidden ? (
-                <button
-                    type="button"
-                    className="pet-discover-settings app-user-overlays"
-                    aria-label="宠物设置"
-                    title="宠物设置"
-                    data-canvas-no-zoom
-                    style={{ right: position.right, bottom: position.bottom + height + 8 }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        openMenu();
-                    }}
-                >
-                    <Settings2 />
-                </button>
-            ) : null}
             {prepared && candidate ? (
                 <div className="pet-prepare-layer" aria-hidden>
                     <PetAvatar

@@ -1,14 +1,13 @@
 import { useRef, useState } from "react";
 import { App, Button } from "antd";
 import { ArrowUpRight, FolderOpen, LoaderCircle, Sparkles } from "lucide-react";
-import { useReducedMotion } from "motion/react";
 import { useNavigate } from "react-router";
 import { FluidOrb } from "@/components/ui/fluid-orb";
 import { SpriteAvatar } from "@/components/canvas/sprite-avatar";
 import { Live2DAvatar } from "@/components/canvas/live2d-avatar";
 import { live2DModelURL, spriteImageURL } from "@/services/api/appearance";
-import { useAppearanceStore } from "@/stores/use-appearance-store";
-import { DEFAULT_CANVAS_APPEARANCE } from "@/lib/canvas/agent-appearance";
+import { usePetAppearance } from "@/hooks/use-pet-appearance";
+import { usePetReducedMotion } from "@/hooks/use-pet-reduced-motion";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { createCanvasProjectWithRemoteSync, hasRemoteUserDataSyncSession, saveRemoteUserDataNow } from "@/services/user-data-sync";
@@ -18,9 +17,8 @@ export function CreationAgentEntry() {
     const navigate = useNavigate();
     const { message } = App.useApp();
     const hydrated = useCanvasStore((state) => state.hydrated);
-    const appearance = useAppearanceStore((state) => state.appearance.canvas) || DEFAULT_CANVAS_APPEARANCE;
-    const appearanceResolved = useAppearanceStore((state) => state.resolved);
-    const reducedMotion = Boolean(useReducedMotion());
+    const { appearance, resolved: appearanceResolved } = usePetAppearance();
+    const reducedMotion = usePetReducedMotion();
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const lock = useRef(false);

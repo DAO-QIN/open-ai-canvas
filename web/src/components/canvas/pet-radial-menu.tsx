@@ -128,7 +128,6 @@ export function PetRadialMenu({
                 >
                     <X />
                 </button>
-                <span className="pet-menu-caption">宠物设置</span>
                 <div className="pet-menu-actions" aria-label="宠物快捷操作">
                     <button
                         type="button"
@@ -253,7 +252,7 @@ export function PetRadialMenu({
                         </div>
                     </div>
                 ) : null}
-                <div className="pet-menu-feedback" aria-live="polite">
+                <div className="pet-menu-feedback" role="status" aria-live="polite" hidden={!busy && !loading && !saving && !error}>
                     {busy ? (
                         "正在准备新形象…"
                     ) : loading ? (
@@ -267,9 +266,7 @@ export function PetRadialMenu({
                                 重试保存
                             </button>
                         </>
-                    ) : (
-                        "仅对你的宠物生效"
-                    )}
+                    ) : null}
                 </div>
             </div>
         </div>,

@@ -49,7 +49,7 @@ export const usePetPreference = create<State>((set, get) => ({
     pending: false,
     load: async (scope, refresh = false) => {
         const same = get().scope === scope;
-        if (same && (!refresh || get().pending || get().saving)) return;
+        if (same && (!refresh || get().loading || get().pending || get().saving)) return;
         const token = ++epoch;
         ready = false;
         worker = false;
