@@ -21,6 +21,7 @@
 .pet-menu-lock { right:88px; bottom:222px; transform:rotate(-6deg); }
 .pet-menu-hide { right:0; bottom:224px; transform:rotate(8deg); }
 .pet-menu-models { position:absolute; inset:0; pointer-events:none; }
+.pet-menu-models,.pet-menu-size-panel { animation:pet-panel-appear .16s ease-out; }
 .pet-model-choice { position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; width:80px; min-height:88px; padding:8px 4px; border:1px solid var(--border); border-radius:12px; background:var(--user-surface); color:var(--user-ink); }
 .pet-model-choice > span:last-of-type { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pet-model-choice:nth-of-type(1) { left:4px; bottom:48px; transform:rotate(-10deg); }
@@ -64,4 +65,5 @@
  .pet-menu-size-panel { position:static; width:auto; margin-top:14px; box-shadow:none; }
  .pet-menu-feedback { position:static; margin-top:12px; padding:0; flex-wrap:wrap; }
 }
-@media(prefers-reduced-motion:reduce) { .pet-menu-petal { transition:none; } }
+@keyframes pet-panel-appear { from { opacity:0; } to { opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .pet-menu-petal { transition:none; } .pet-menu-models,.pet-menu-size-panel { animation:none; } }

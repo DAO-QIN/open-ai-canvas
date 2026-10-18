@@ -22,5 +22,5 @@ export function usePetAppearance() {
         window.addEventListener("focus", refresh);
         return () => window.removeEventListener("focus", refresh);
     }, [scope]);
-    return { base, catalog, scope, store, preference, available, modelId, appearance: effectivePet(base, catalog, modelId), resolved: resolved && store.scope === scope };
+    return { base, catalog, scope, store, preference, available, modelId, appearance: effectivePet(base, catalog, modelId), resolved: resolved && store.scope === scope && store.resolved };
 }

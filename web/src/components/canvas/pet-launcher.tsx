@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { LoaderCircle, MessageCircle } from "lucide-react";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
@@ -9,6 +9,7 @@ import { usePetAppearance } from "@/hooks/use-pet-appearance";
 import { usePetReducedMotion } from "@/hooks/use-pet-reduced-motion";
 import { useAgentLauncherPosition } from "./use-agent-launcher-position";
 import { PetAvatar } from "./pet-avatar";
+import { PetAppearanceTransition } from "./pet-appearance-transition";
 import { PetRadialMenu } from "./pet-radial-menu";
 import "./pet-radial-menu.css";
 
@@ -195,6 +196,7 @@ export function AgentLauncher({
                 whileTap={motionReduced || dragging || menu ? undefined : { scale: 0.96 }}
                 transition={{ duration: motionReduced ? 0 : 0.16 }}
             >
+                <PetAppearanceTransition appearance={current} resolved={resolved} reducedMotion={motionReduced || hidden || preference.hidden}>
                 {resolved ? (
                     <PetAvatar appearance={current} height={height} paused={hidden || preference.hidden} reducedMotion={motionReduced} state={petState} moveDirection={moveDirection} />
                 ) : (
@@ -203,6 +205,7 @@ export function AgentLauncher({
                         <span className="sr-only">正在加载助手形象</span>
                     </span>
                 )}
+                </PetAppearanceTransition>
                 {base.launcherLabel ? <span className="canvas-agent-launcher-label">{base.launcherLabel}</span> : null}
                 <span className={`canvas-agent-launcher-status ${approvalPending ? "is-pending" : ""}`} style={{ "--canvas-agent-status-color": statusColor } as CSSProperties} />
                 {approvalPending ? <span className="canvas-agent-launcher-badge">待审批</span> : null}
@@ -230,8 +233,11 @@ export function AgentLauncher({
                     />
                 </div>
             ) : null}
+            <AnimatePresence>
             {menu ? (
                 <PetRadialMenu
+                    key="pet-menu"
+                    reducedMotion={motionReduced}
                     anchor={menu}
                     catalog={catalog}
                     preference={{ ...preference, modelId }}
@@ -246,6 +252,7 @@ export function AgentLauncher({
                     loading={store.loading || store.scope !== scope}
                 />
             ) : null}
+            </AnimatePresence>
         </>
     );
 }

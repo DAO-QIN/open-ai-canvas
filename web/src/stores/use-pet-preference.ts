@@ -6,6 +6,7 @@ type State = {
     scope: string;
     preference: PetPreference;
     loading: boolean;
+    resolved: boolean;
     saving: boolean;
     error: string;
     pending: boolean;
@@ -44,6 +45,7 @@ export const usePetPreference = create<State>((set, get) => ({
     scope: "",
     preference: { ...DEFAULT_PET_PREFERENCE },
     loading: true,
+    resolved: false,
     saving: false,
     error: "",
     pending: false,
@@ -55,24 +57,24 @@ export const usePetPreference = create<State>((set, get) => ({
         worker = false;
         const local = same ? get().preference : cached(scope),
             pending = scope !== "guest" && cachedPending(scope);
-        set({ scope, preference: local, loading: true, saving: false, error: "", pending });
+        set({ scope, preference: local, loading: true, resolved: same && get().resolved, saving: false, error: "", pending });
         if (scope === "guest") {
             ready = true;
-            set({ loading: false });
+            set({ loading: false, resolved: true });
             return;
         }
         try {
             const preference = await getPetPreference();
             if (epoch !== token) return;
             if (pending) {
-                set({ loading: false, pending: true, error: "有尚未保存的本机设置，请重试保存" });
+                set({ loading: false, resolved: true, pending: true, error: "有尚未保存的本机设置，请重试保存" });
                 return;
             }
             ready = true;
             cache(scope, preference);
-            set({ preference, loading: false });
+            set({ preference, loading: false, resolved: true });
         } catch {
-            if (epoch === token) set({ loading: false, error: "云端暂不可用，调整将暂存本机" });
+            if (epoch === token) set({ loading: false, resolved: true, error: "云端暂不可用，调整将暂存本机" });
         }
     },
     update: (patch) => {

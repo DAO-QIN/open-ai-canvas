@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { motion } from "motion/react";
 import { Check, ChevronLeft, EyeOff, LockKeyhole, Palette, Scaling, Sparkles, UnlockKeyhole, X } from "lucide-react";
 import type { PetAppearance, PetPreference } from "@/services/api/appearance";
 import { petMenuPosition } from "@/lib/canvas/pet-menu";
@@ -19,6 +20,7 @@ export function PetRadialMenu({
     onRetry,
     busy,
     loading,
+    reducedMotion,
 }: {
     anchor: DOMRect;
     catalog: PetAppearance[];
@@ -32,6 +34,7 @@ export function PetRadialMenu({
     onRetry: () => void;
     busy: boolean;
     loading: boolean;
+    reducedMotion: boolean;
 }) {
     const [panel, setPanel] = useState<"" | "look" | "size">("");
     const [more, setMore] = useState(false);
@@ -66,8 +69,12 @@ export function PetRadialMenu({
         }
     };
     return createPortal(
-        <div
+        <motion.div
             className="pet-menu-layer app-user-overlays"
+            initial={reducedMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reducedMotion ? 0 : 0.12 }}
             data-canvas-no-zoom
             data-canvas-wheel-scroll
             onPointerDown={(e) => e.stopPropagation()}
@@ -108,13 +115,17 @@ export function PetRadialMenu({
                     onClose();
                 }}
             />
-            <div
+            <motion.div
                 ref={host}
                 role="dialog"
                 aria-modal="true"
                 aria-label="宠物设置"
                 className={`pet-radial-menu ${placement.right ? "is-right" : "is-left"} ${placement.bottom ? "is-bottom" : "is-top"} ${more ? "is-more" : ""}`}
-                style={{ left: placement.left, top: placement.top, width: placement.width, height: placement.height }}
+                style={{ left: placement.left, top: placement.top, width: placement.width, height: placement.height, transformOrigin: `${placement.right ? "right" : "left"} ${placement.bottom ? "bottom" : "top"}` }}
+                initial={reducedMotion ? false : { opacity: 0, scale: 0.96, y: 6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: reducedMotion ? 1 : 0.98, y: reducedMotion ? 0 : 4 }}
+                transition={{ duration: reducedMotion ? 0 : 0.18, ease: "easeOut" }}
             >
                 <button
                     ref={close}
@@ -268,8 +279,8 @@ export function PetRadialMenu({
                         </>
                     ) : null}
                 </div>
-            </div>
-        </div>,
+            </motion.div>
+        </motion.div>,
         document.body,
     );
 }

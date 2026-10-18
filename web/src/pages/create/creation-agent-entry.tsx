@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 import { FluidOrb } from "@/components/ui/fluid-orb";
 import { SpriteAvatar } from "@/components/canvas/sprite-avatar";
 import { Live2DAvatar } from "@/components/canvas/live2d-avatar";
+import { PetAppearanceTransition } from "@/components/canvas/pet-appearance-transition";
 import { live2DModelURL, spriteImageURL } from "@/services/api/appearance";
 import { usePetAppearance } from "@/hooks/use-pet-appearance";
 import { usePetReducedMotion } from "@/hooks/use-pet-reduced-motion";
@@ -53,11 +54,13 @@ export function CreationAgentEntry() {
     };
     return <section className="creation-agent-entry" aria-label="画布 Agent 模式">
         <div className="creation-agent-avatar" aria-hidden="true">
+            <PetAppearanceTransition appearance={appearance} resolved={appearanceResolved} reducedMotion={reducedMotion}>
             {!appearanceResolved ? <LoaderCircle className="size-6 motion-safe:animate-spin" /> : appearance.avatarType === "sprite" && appearance.sprite && appearance.spriteResourceId ? (
                 <SpriteAvatar pet={appearance.sprite} url={spriteImageURL(appearance.spriteResourceId)} height={Math.min(132, 112 * appearance.sprite.frameHeight / appearance.sprite.frameWidth)} reducedMotion={reducedMotion} fallback={<FluidOrb size={88} />} />
             ) : appearance.avatarType === "live2d" && appearance.live2dResourceId && appearance.live2dEntry ? (
                 <Live2DAvatar url={live2DModelURL(appearance.live2dResourceId, appearance.live2dEntry)} width={112} height={132} reducedMotion={reducedMotion} fallback={<FluidOrb size={88} />} />
             ) : <FluidOrb size={88} />}
+            </PetAppearanceTransition>
         </div>
         <div className="creation-agent-copy"><span className="creation-agent-eyebrow">CANVAS AGENT</span><h2>不止回答，把想法落到画布上</h2><p>使用画布里的同一个 Agent，结合素材、技能与创作上下文协作。生成与修改仍需经过原有审批和额度检查。</p></div>
         <div className="creation-agent-actions"><Button type="primary" icon={<Sparkles />} loading={busy} disabled={!hydrated} onClick={() => void start()}>{created.current ? "重试同步并进入" : "新建画布，与 Agent 创作"}<ArrowUpRight /></Button><Button icon={<FolderOpen />} disabled={busy} onClick={() => navigate("/canvas?agent=1")}>在已有画布中继续</Button></div>
