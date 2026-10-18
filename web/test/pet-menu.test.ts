@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { effectivePet, petMenuPosition, sanitizePetPreference } from "../src/lib/canvas/pet-menu";
+import { effectivePet, petAvatarSize, petMenuPosition, sanitizePetPreference } from "../src/lib/canvas/pet-menu";
 import { DEFAULT_CANVAS_APPEARANCE } from "../src/lib/canvas/agent-appearance";
 import type { PetAppearance } from "../src/services/api/appearance";
 
@@ -31,4 +31,17 @@ test("corrupt cached settings cannot create oversized or non-finite pets", () =>
     expect(sanitizePetPreference({ scale: 55 }).scale).toBe(55);
     expect(sanitizePetPreference({ scale: 1 }).scale).toBe(50);
     expect(sanitizePetPreference({ scale: NaN }).scale).toBe(100);
+});
+test("different silhouettes share a bounded stage while retaining their proportions", () => {
+    const orb = { avatarType: "orb" } as const;
+    const live = { avatarType: "live2d" } as const;
+    expect(petAvatarSize(orb, 208)).toEqual({ width: 208, height: 208 });
+    expect(petAvatarSize(live, 208)).toEqual({ width: 156, height: 208 });
+    for (const [w, h] of [[192, 208], [500, 100], [100, 500]]) {
+        const result = petAvatarSize({ avatarType: "sprite", sprite: { frameWidth: w, frameHeight: h } as PetAppearance["sprite"] }, 88);
+        expect(result.width).toBeLessThanOrEqual(88);
+        expect(result.height).toBeLessThanOrEqual(88);
+        expect(Math.max(result.width, result.height)).toBe(88);
+        expect(result.width / result.height).toBeCloseTo(w / h, 4);
+    }
 });

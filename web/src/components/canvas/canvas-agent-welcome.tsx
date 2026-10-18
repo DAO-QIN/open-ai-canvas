@@ -15,7 +15,7 @@ type AgentWelcomeProps = {
 export function AgentWelcome({ appearance, nodeCount, onChooseSkill, onDraftPrompt }: AgentWelcomeProps) {
     const { appearance: pet, resolved } = usePetAppearance();
     const reducedMotion = usePetReducedMotion();
-    const height = pet.avatarType === "sprite" && pet.sprite ? Math.min(88, (160 * pet.sprite.frameHeight) / pet.sprite.frameWidth) : 88;
+    const height = 88;
     return (
         <section className="agent-welcome" aria-label="开始 Agent 创作">
             <div className="agent-welcome-intro">

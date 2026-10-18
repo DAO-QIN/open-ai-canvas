@@ -191,7 +191,7 @@ export function PetRadialMenu({
                                 返回
                             </button>
                         ) : null}
-                        {[{ id: "system", name: "跟随系统", published: true } as PetAppearance, ...catalog.filter((p) => p.published)].slice(0, more ? 25 : 5).map((pet, index) => (
+                        {[{ id: "system", name: "跟随系统", published: true } as PetAppearance, ...catalog.filter((p) => p.published)].slice(0, more ? 25 : 3).map((pet, index) => (
                             <button
                                 key={pet.id}
                                 type="button"
@@ -206,7 +206,7 @@ export function PetRadialMenu({
                                 {pet.id === preference.modelId ? <Check className="pet-choice-check" aria-hidden /> : null}
                             </button>
                         ))}
-                        {!more && catalog.length + 1 > 5 ? (
+                        {!more && catalog.length + 1 > 3 ? (
                             <button type="button" className="pet-menu-more" onClick={() => setMore(true)}>
                                 更多形象
                             </button>

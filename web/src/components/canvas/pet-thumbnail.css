@@ -1,4 +1,4 @@
 .pet-thumbnail { position:relative; display:block; overflow:hidden; flex-shrink:0; }
 .pet-thumbnail img { position:absolute; max-width:none; left:0; top:0; }
-.pet-thumbnail-symbol { display:grid; place-items:center; width:48px; height:44px; color:inherit; }
+.pet-thumbnail-stage,.pet-thumbnail-symbol { display:grid; place-items:center; width:44px; height:44px; flex-shrink:0; color:inherit; }
 .pet-thumbnail-symbol svg { width:30px; height:30px; }

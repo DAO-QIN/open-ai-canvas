@@ -59,12 +59,9 @@ export function AgentLauncher({
             clearTimeout(timer.current);
         };
     }, [scope]);
-    const sprite = current.avatarType === "sprite" && current.sprite && current.spriteResourceId,
-        live = current.avatarType === "live2d" && current.live2dResourceId;
-    const ratio = sprite && current.sprite ? current.sprite.frameWidth / current.sprite.frameHeight : live ? 0.75 : 1;
-    const requested = ((sprite || live ? current.avatarHeight : 76 * current.avatarHeight / 220) * (previewScale ?? preference.scale)) / 100;
-    const height = Math.max(24, Math.min(requested, 360, viewport.height - 80, (viewport.width - 40) / ratio)),
-        width = Math.round(height * ratio);
+    const requested = (base.avatarHeight * (previewScale ?? preference.scale)) / 100;
+    const height = Math.max(24, Math.min(requested, 360, viewport.height - 80, viewport.width - 40)),
+        width = height;
     const update = useCallback(
         (patch: Partial<typeof preference>) => {
             if (actor.current !== scope || usePetPreference.getState().scope !== scope) return;
@@ -126,7 +123,7 @@ export function AgentLauncher({
                 aria-label={`打开${base.agentName}`}
                 aria-haspopup="dialog"
                 title="点击对话 · 拖动移动 · 右键设置"
-                className={`canvas-agent-launcher pet-personal-launcher fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${sprite || live ? "canvas-agent-launcher-live2d" : ""} ${dragging ? "is-dragging" : ""}`}
+                className={`canvas-agent-launcher pet-personal-launcher canvas-agent-launcher-live2d fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${dragging ? "is-dragging" : ""}`}
                 style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden || preference.hidden ? { display: "none" } : null) } as CSSProperties}
                 aria-hidden={hidden || preference.hidden || undefined}
                 tabIndex={hidden || preference.hidden ? -1 : undefined}
