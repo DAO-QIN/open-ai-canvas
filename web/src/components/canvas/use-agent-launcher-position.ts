@@ -39,8 +39,14 @@ export function useAgentLauncherPosition(onOpen: () => void, width = 76, height 
         if (event.button !== 0 || !event.isPrimary || gestureRef.current) return;
         suppressClick.current = false;
         lastPointerX.current = event.clientX;
+        try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+        } catch (cause) {
+            // Motion synthesizes pointer events for keyboard activation, without an active browser pointer.
+            if ((cause as { name?: string }).name !== "NotFoundError") throw cause;
+            return;
+        }
         gestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, start: position, dragged: false };
-        event.currentTarget.setPointerCapture(event.pointerId);
     };
     const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
         event.stopPropagation();

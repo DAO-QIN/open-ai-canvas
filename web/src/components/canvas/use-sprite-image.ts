@@ -7,6 +7,7 @@ function acquire(url: string) {
     let cached = images.get(url);
     if (!cached) {
         const controller = new AbortController();
+        const deadline = setTimeout(() => controller.abort(), 30000);
         const entry: CachedImage = { refs: 0, controller, promise: Promise.resolve("") };
         entry.promise = fetch(url, { credentials: "include", signal: controller.signal })
             .then(async (response) => {
@@ -18,8 +19,10 @@ function acquire(url: string) {
             })
             .catch((error) => {
                 if (images.get(url) === entry) images.delete(url);
+                if (controller.signal.aborted) throw new Error("精灵图集加载超时，请重试");
                 throw error;
-            });
+            })
+            .finally(() => clearTimeout(deadline));
         images.set(url, entry);
         cached = entry;
     }

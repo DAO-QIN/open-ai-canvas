@@ -93,7 +93,7 @@ export function SpriteAvatar({
             if (business === "idle" && pet.sleepAfterSeconds > 0 && now - lastActivity >= pet.sleepAfterSeconds * 1000) asleep = true;
             const interactive = business === "idle" && !state.cleanupPending;
             const binding = business !== "idle" ? business : moveDirection ? (moveDirection > 0 ? "moveRight" : "moveLeft") : asleep ? "sleep" : "idle";
-            const nextId = previewAction || (business === "idle" && transientUntil > now ? transientId : spriteAction(pet, binding).id);
+            const nextId = previewAction || (business === "idle" && !moveDirection && transientUntil > now ? transientId : spriteAction(pet, binding).id);
             const action = pet.actions.find((a) => a.id === nextId) || spriteAction(pet, "idle");
             if (action.id !== actionId) {
                 actionId = action.id;
