@@ -1075,7 +1075,7 @@ export default function CreatePage() {
                 <main ref={threadScrollRef} onScroll={handleThreadScroll} className="creation-home-scroll creation-scrollbar">
                 <section ref={launchpadRef} className="creation-launchpad" aria-label="开始创作">
                     <header className="creation-start-heading">
-                        <div>
+                        <div className="creation-start-copy">
                             <h1>和{brandName}聊聊创作想法</h1>
                             <p>从一个画面、一个角色或一句话开始。</p>
                         </div>
