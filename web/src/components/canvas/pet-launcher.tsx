@@ -189,8 +189,6 @@ export function AgentLauncher({
                     handlers.onKeyDown(e);
                 }}
                 onDoubleClick={handlers.onDoubleClick}
-                whileHover={motionReduced || dragging || menu ? undefined : { scale: 1.035 }}
-                whileTap={motionReduced || dragging || menu ? undefined : { scale: 0.96 }}
                 transition={{ duration: motionReduced ? 0 : 0.16 }}
             >
                 <PetAppearanceTransition appearance={current} resolved={resolved} reducedMotion={motionReduced || hidden || preference.hidden}>

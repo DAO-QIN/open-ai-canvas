@@ -213,8 +213,8 @@ export function PetRadialMenu({
                             </PetSectorButton>
                         ))}
                         {!more && catalog.length + 1 > 3 ? (
-                            <PetSectorButton ringIndex={3} geometry={sector(3,true)} type="button" className="pet-menu-more" onClick={() => setMore(true)}>
-                                更多形象
+                            <PetSectorButton ringIndex={3} geometry={sector(3,true)} type="button" aria-label="更多形象" title="更多形象" className="pet-menu-more" onClick={() => setMore(true)}>
+                                更多
                             </PetSectorButton>
                         ) : null}
                     </div>
