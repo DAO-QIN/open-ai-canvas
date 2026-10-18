@@ -25,18 +25,46 @@ export function petMenuPosition(rect: { left: number; top: number; width: number
         bottom,
     };
 }
-export function petRingSector(index: number, thumbnail = false) {
-    const center = 208, inner = thumbnail ? 148 : 72, outer = thumbnail ? 204 : 140;
-    const middle = thumbnail ? -150 + index * 24 : -144 + index * 36;
-    const start = middle - (thumbnail ? 10 : 16), end = middle + (thumbnail ? 10 : 16);
+export function petRingSector(index: number, thumbnail = false, geometry = {center:256,inner:116,rotation:0}) {
+    const center = geometry.center, inner = thumbnail ? geometry.inner+72 : geometry.inner, outer = inner+(thumbnail ? 56 : 64);
+    const middle = (thumbnail ? -126+index*24 : -129+index*26)+geometry.rotation;
+    const start = middle - (thumbnail ? 10 : 12), end = middle + (thumbnail ? 10 : 12);
     const point = (radius: number, angle: number) => ({ x: center + radius * Math.cos(angle * Math.PI / 180), y: center + radius * Math.sin(angle * Math.PI / 180) });
     const a = point(outer, start), b = point(outer, end), c = point(inner, end), d = point(inner, start);
-    const left = Math.min(a.x,b.x,c.x,d.x), top = Math.min(a.y,b.y,c.y,d.y);
-    const width = Math.max(a.x,b.x,c.x,d.x)-left, height = Math.max(a.y,b.y,c.y,d.y)-top;
+    const points=[a,b,c,d];
+    for(let quadrant=Math.ceil(start/90);quadrant*90<=end;quadrant++)points.push(point(outer,quadrant*90),point(inner,quadrant*90));
+    const left = Math.min(...points.map(p=>p.x)), top = Math.min(...points.map(p=>p.y));
+    const width = Math.max(...points.map(p=>p.x))-left, height = Math.max(...points.map(p=>p.y))-top;
     const p = (value: {x:number;y:number}) => `${(value.x-left).toFixed(3)} ${(value.y-top).toFixed(3)}`;
-    const path = `M ${p(a)} A ${outer} ${outer} 0 0 1 ${p(b)} L ${p(c)} A ${inner} ${inner} 0 0 0 ${p(d)} Z`;
-    const label = point(thumbnail ? 176 : 106, middle);
+    const corner = 10, eo = corner/outer*180/Math.PI, ei = corner/inner*180/Math.PI;
+    const path = `M ${p(point(outer,start+eo))} A ${outer} ${outer} 0 0 1 ${p(point(outer,end-eo))} Q ${p(b)} ${p(point(outer-corner,end))} L ${p(point(inner+corner,end))} Q ${p(c)} ${p(point(inner,end-ei))} A ${inner} ${inner} 0 0 0 ${p(point(inner,start+ei))} Q ${p(d)} ${p(point(inner+corner,start))} L ${p(point(outer-corner,start))} Q ${p(a)} ${p(point(outer,start+eo))} Z`;
+    const label = point((inner+outer)/2, middle);
     return { left, top, width, height, path, label: {x:label.x-left,y:label.y-top} };
+}
+export function petArcLayout(rect: {left:number;top:number;width:number;height:number}, viewport: {width:number;height:number}) {
+    const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2,half=Math.max(rect.width,rect.height)/2;
+    const inner=Math.max(88,half+12),center=inner+136,preferred=Math.atan2(viewport.height/2-cy,viewport.width/2-cx)*180/Math.PI+90;
+    const distance=(a:number,b:number)=>Math.abs(((a-b+540)%360)-180);
+    let rotation=preferred,best=Infinity;
+    for(let angle=0;angle<360;angle+=3){
+        let overflow=0;
+        for(const [radius,start,end] of [[inner+64,-141,-39],[inner+128,-136,-44]])for(let degrees=start;degrees<=end;degrees+=2){
+            const x=cx+radius*Math.cos((degrees+angle)*Math.PI/180),y=cy+radius*Math.sin((degrees+angle)*Math.PI/180);
+            overflow+=Math.max(0,12-x,x-viewport.width+12)+Math.max(0,12-y,y-viewport.height+12);
+        }
+        const score=overflow*100+distance(angle,preferred);
+        if(score<best){best=score;rotation=angle;}
+    }
+    let close={x:cx,y:cy},closeScore=Infinity;
+    for(let r=half+24;r<=half+88;r+=4)for(let angle=0;angle<360;angle+=5){
+        const x=cx+r*Math.cos(angle*Math.PI/180),y=cy+r*Math.sin(angle*Math.PI/180);
+        if(x<30||y<30||x>viewport.width-30||y>viewport.height-30)continue;
+        if(x+24>rect.left&&x-24<rect.left+rect.width&&y+24>rect.top&&y-24<rect.top+rect.height)continue;
+        if(distance(angle,rotation-90)<70&&r>=inner-20&&r<=inner+84)continue;
+        const score=r+distance(angle,preferred-90)*0.1;
+        if(score<closeScore){closeScore=score;close={x,y};}
+    }
+    return {left:cx-center,top:cy-center,width:center*2,height:center*2,center,inner,rotation,close:{left:close.x-cx+center-18,top:close.y-cy+center-18}};
 }
 export function sanitizePetPreference(value: Partial<PetPreference>): PetPreference {
     return {

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { effectivePet, petAvatarSize, petMenuPosition, petRingSector, sanitizePetPreference } from "../src/lib/canvas/pet-menu";
+import { effectivePet, petAvatarSize, petMenuPosition, petRingSector, petArcLayout, sanitizePetPreference } from "../src/lib/canvas/pet-menu";
 import { DEFAULT_CANVAS_APPEARANCE } from "../src/lib/canvas/agent-appearance";
 import type { PetAppearance } from "../src/services/api/appearance";
 
@@ -49,12 +49,27 @@ test("arc items use fixed steps and leave unused space instead of filling a circ
     const angles = [];
     for (let i=0;i<4;i++) {
         const sector=petRingSector(i);
-        const x=sector.left+sector.label.x-208,y=sector.top+sector.label.y-208;
-        expect(Math.hypot(x,y)).toBeCloseTo(106,5);
+        const x=sector.left+sector.label.x-256,y=sector.top+sector.label.y-256;
+        expect(Math.hypot(x,y)).toBeCloseTo(148,5);
         angles.push(Math.atan2(y,x)*180/Math.PI);
-        expect(sector.path).toContain("A 140 140");
+        expect(sector.path).toContain("A 180 180");
+        expect(sector.path).toContain(" Q ");
     }
-    expect(angles[3]-angles[0]).toBeCloseTo(108,5);
+    expect(angles[3]-angles[0]).toBeCloseTo(78,5);
     const outer = [0,1,2].map(i=>petRingSector(i,true));
-    for(const sector of outer) expect(Math.hypot(sector.left+sector.label.x-208,sector.top+sector.label.y-208)).toBeCloseTo(176,5);
+    for(const sector of outer) expect(Math.hypot(sector.left+sector.label.x-256,sector.top+sector.label.y-256)).toBeCloseTo(216,5);
+});
+test("the arc follows the actual pet at every corner without resizing or moving its center",()=>{
+    for(const size of [60,114,208,312])for(const left of [20,1440-size-20])for(const top of [20,1000-size-20]){
+        const rect={left,top,width:size,height:size},layout=petArcLayout(rect,{width:1440,height:1000});
+        expect(layout.left+layout.center).toBeCloseTo(left+size/2,4);
+        expect(layout.top+layout.center).toBeCloseTo(top+size/2,4);
+        for(const thumbnail of [false,true])for(let i=0;i<4;i++){
+            const sector=petRingSector(i,thumbnail,layout);
+            expect(layout.left+sector.left).toBeGreaterThanOrEqual(0);
+            expect(layout.top+sector.top).toBeGreaterThanOrEqual(0);
+            expect(layout.left+sector.left+sector.width).toBeLessThanOrEqual(1440);
+            expect(layout.top+sector.top+sector.height).toBeLessThanOrEqual(1000);
+        }
+    }
 });

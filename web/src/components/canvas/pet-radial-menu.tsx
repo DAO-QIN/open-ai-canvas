@@ -3,16 +3,12 @@ import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { Check, ChevronLeft, EyeOff, LockKeyhole, Palette, Scaling, Sparkles, UnlockKeyhole, X } from "lucide-react";
 import type { PetAppearance, PetPreference } from "@/services/api/appearance";
-import { petMenuPosition, petRingSector } from "@/lib/canvas/pet-menu";
-import type { CanvasAppearance } from "@/lib/canvas/agent-appearance";
+import { petArcLayout, petRingSector } from "@/lib/canvas/pet-menu";
 import { PetThumbnail } from "./pet-thumbnail";
-import { PetAvatar } from "./pet-avatar";
-import { PetAppearanceTransition } from "./pet-appearance-transition";
 import "./pet-radial-menu.css";
 
 export function PetRadialMenu({
     anchor,
-    appearance,
     catalog,
     preference,
     onChange,
@@ -27,7 +23,6 @@ export function PetRadialMenu({
     reducedMotion,
 }: {
     anchor: DOMRect;
-    appearance: CanvasAppearance;
     catalog: PetAppearance[];
     preference: PetPreference;
     onChange: (patch: Partial<PetPreference>) => void;
@@ -49,7 +44,11 @@ export function PetRadialMenu({
         priorFocus = useRef(document.activeElement as HTMLElement | null),
         scaleRef = useRef(scale),
         changed = useRef(false);
-    const placement = petMenuPosition(anchor, { width: window.innerWidth, height: window.innerHeight });
+    const initialAnchor=useRef(anchor);
+    const placement = petArcLayout(anchor, { width: window.innerWidth, height: window.innerHeight });
+    const panelLeft=Math.max(12,Math.min(innerWidth-288,initialAnchor.current.left+initialAnchor.current.width/2-138));
+    const panelTop=Math.max(12,Math.min(innerHeight-156,initialAnchor.current.top>=164?initialAnchor.current.top-152:initialAnchor.current.top+initialAnchor.current.height+12));
+    const sector=(index:number,thumbnail=false)=>petRingSector(index,thumbnail,placement);
     useEffect(() => {
         setScale(preference.scale);
         scaleRef.current = preference.scale;
@@ -125,22 +124,18 @@ export function PetRadialMenu({
                 role="dialog"
                 aria-modal="true"
                 aria-label="宠物设置"
-                className={`pet-radial-menu ${placement.right ? "is-right" : "is-left"} ${placement.bottom ? "is-bottom" : "is-top"} ${more ? "is-more" : ""} ${panel === "size" ? "is-size" : ""}`}
-                style={{ left: placement.left, top: placement.top, width: placement.width, height: placement.height, transformOrigin: "208px 208px" }}
+                className={`pet-radial-menu ${more ? "is-more" : ""} ${panel === "size" ? "is-size" : ""}`}
+                style={{ left: placement.left, top: placement.top, width: placement.width, height: placement.height, transformOrigin: `${placement.center}px ${placement.center}px` }}
                 initial={reducedMotion ? false : { opacity: 0, scale: 0.96, y: 6 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: reducedMotion ? 1 : 0.98, y: reducedMotion ? 0 : 4 }}
                 transition={{ duration: reducedMotion ? 0 : 0.18, ease: "easeOut" }}
             >
-                <div className="pet-menu-center" aria-hidden="true">
-                    <PetAppearanceTransition appearance={appearance} reducedMotion={reducedMotion}>
-                        <PetAvatar appearance={appearance} height={88 * scale / 100} paused={false} reducedMotion={reducedMotion} />
-                    </PetAppearanceTransition>
-                </div>
                 <button
                     ref={close}
                     type="button"
                     className="pet-menu-close"
+                    style={placement.close}
                     aria-label="关闭宠物设置"
                     onClick={() => {
                         commit();
@@ -150,7 +145,7 @@ export function PetRadialMenu({
                     <X />
                 </button>
                 <div className="pet-menu-actions" aria-label="宠物快捷操作">
-                    <PetSectorButton ringIndex={0}
+                    <PetSectorButton ringIndex={0} geometry={sector(0)}
                         type="button"
                         className="pet-menu-petal pet-menu-look"
                         aria-expanded={panel === "look"}
@@ -163,7 +158,7 @@ export function PetRadialMenu({
                         <Palette />
                         <span>换形象</span>
                     </PetSectorButton>
-                    <PetSectorButton ringIndex={1}
+                    <PetSectorButton ringIndex={1} geometry={sector(1)}
                         type="button"
                         className="pet-menu-petal pet-menu-size"
                         aria-expanded={panel === "size"}
@@ -175,11 +170,11 @@ export function PetRadialMenu({
                         <Scaling />
                         <span>调大小</span>
                     </PetSectorButton>
-                    <PetSectorButton ringIndex={2} type="button" className="pet-menu-petal pet-menu-lock" aria-pressed={preference.locked} disabled={loading} onClick={() => onChange({ locked: !preference.locked })}>
+                    <PetSectorButton ringIndex={2} geometry={sector(2)} type="button" className="pet-menu-petal pet-menu-lock" aria-pressed={preference.locked} disabled={loading} onClick={() => onChange({ locked: !preference.locked })}>
                         {preference.locked ? <UnlockKeyhole /> : <LockKeyhole />}
                         <span>{preference.locked ? "解锁位置" : "锁位置"}</span>
                     </PetSectorButton>
-                    <PetSectorButton ringIndex={3}
+                    <PetSectorButton ringIndex={3} geometry={sector(3)}
                         type="button"
                         className="pet-menu-petal pet-menu-hide"
                         disabled={loading}
@@ -194,15 +189,15 @@ export function PetRadialMenu({
                     </PetSectorButton>
                 </div>
                 {panel === "look" ? (
-                    <div className={`pet-menu-models ${more ? "is-grid" : ""}`} aria-label="选择宠物形象">
+                    <div className={`pet-menu-models ${more ? "is-grid" : ""}`} style={more?{left:panelLeft-placement.left,top:panelTop-placement.top,width:276}:undefined} aria-label="选择宠物形象">
                         {more ? (
                             <button type="button" className="pet-menu-back" onClick={() => setMore(false)}>
                                 <ChevronLeft />
                                 返回
                             </button>
                         ) : null}
-                        {[{ id: "system", name: "跟随系统", published: true } as PetAppearance, ...catalog.filter((p) => p.published)].slice(0, more ? 25 : 4).map((pet, index) => (
-                            <PetSectorButton ringIndex={index} thumbnail flat={more}
+                        {[{ id: "system", name: "跟随系统", published: true } as PetAppearance, ...catalog.filter((p) => p.published)].slice(0, more ? 25 : 3).map((pet, index) => (
+                            <PetSectorButton ringIndex={index} geometry={sector(index,true)} flat={more}
                                 key={pet.id}
                                 aria-label={pet.name}
                                 title={pet.name}
@@ -217,15 +212,15 @@ export function PetRadialMenu({
                                 {pet.id === preference.modelId ? <Check className="pet-choice-check" aria-hidden /> : null}
                             </PetSectorButton>
                         ))}
-                        {!more && catalog.length + 1 > 4 ? (
-                            <PetSectorButton ringIndex={4} thumbnail type="button" className="pet-menu-more" onClick={() => setMore(true)}>
+                        {!more && catalog.length + 1 > 3 ? (
+                            <PetSectorButton ringIndex={3} geometry={sector(3,true)} type="button" className="pet-menu-more" onClick={() => setMore(true)}>
                                 更多形象
                             </PetSectorButton>
                         ) : null}
                     </div>
                 ) : null}
                 {panel === "size" ? (
-                    <div className="pet-menu-size-panel">
+                    <div className="pet-menu-size-panel" style={{left:panelLeft-placement.left,top:panelTop-placement.top}}>
                         <button type="button" className="pet-menu-back" onClick={() => { commit(); setPanel("look"); }}><ChevronLeft aria-hidden="true" />返回</button>
                         <label htmlFor="pet-personal-scale">
                             宠物大小 <output>{scale}%</output>
@@ -275,7 +270,7 @@ export function PetRadialMenu({
                         </div>
                     </div>
                 ) : null}
-                <div className="pet-menu-feedback" role="status" aria-live="polite" hidden={!busy && !loading && !saving && !error}>
+                <div className="pet-menu-feedback" style={{left:Math.max(12,Math.min(innerWidth-272,anchor.left))-placement.left,top:Math.max(12,Math.min(innerHeight-40,anchor.top+anchor.height+12))-placement.top}} role="status" aria-live="polite" hidden={!busy && !loading && !saving && !error}>
                     {busy ? (
                         "正在准备新形象…"
                     ) : loading ? (
@@ -297,9 +292,8 @@ export function PetRadialMenu({
     );
 }
 
-function PetSectorButton({ ringIndex, thumbnail = false, flat = false, children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { ringIndex: number; thumbnail?: boolean; flat?: boolean }) {
-    const sector = petRingSector(ringIndex, thumbnail);
-    return <button {...props} style={flat ? undefined : { left: sector.left, top: sector.top, width: sector.width, height: sector.height, clipPath: `path('${sector.path}')`, "--pet-enter-x": `${(208-sector.left-sector.label.x)*0.06}px`, "--pet-enter-y": `${(208-sector.top-sector.label.y)*0.06}px`, animationDelay: `${ringIndex*18}ms` } as CSSProperties}>
+function PetSectorButton({ ringIndex, geometry:sector, flat = false, children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { ringIndex: number; geometry:ReturnType<typeof petRingSector>; flat?: boolean }) {
+    return <button {...props} style={flat ? undefined : { left: sector.left, top: sector.top, width: sector.width, height: sector.height, clipPath: `path('${sector.path}')`, "--pet-enter-x": "0px", "--pet-enter-y": "4px", animationDelay: `${ringIndex*18}ms` } as CSSProperties}>
         {!flat ? <svg className="pet-sector-surface" viewBox={`0 0 ${sector.width} ${sector.height}`} aria-hidden="true"><path d={sector.path} /></svg> : null}
         <span className="pet-sector-label" style={flat ? undefined : { left: sector.label.x, top: sector.label.y }}>{children}</span>
     </button>;

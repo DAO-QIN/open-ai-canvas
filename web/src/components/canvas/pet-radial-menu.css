@@ -4,7 +4,6 @@
 .pet-radial-menu { position:fixed; pointer-events:none; font-size:var(--fs-caption); }
 .pet-radial-menu button,.pet-radial-menu input,.pet-menu-size-panel,.pet-menu-feedback { pointer-events:auto; }
 .pet-radial-menu button { cursor:pointer; }
-.pet-menu-center { position:absolute; left:142px; top:136px; width:132px; height:132px; display:grid; place-items:center; }
 .pet-menu-close { position:absolute; left:190px; top:278px; display:grid; place-items:center; width:36px; height:36px; border:1px solid var(--user-border); border-radius:50%; background:var(--user-surface); color:var(--user-ink-muted); }
 .pet-menu-close:hover { background:var(--user-surface-hover); color:var(--user-ink); }
 .pet-menu-close svg { width:16px; height:16px; }
@@ -24,7 +23,7 @@
 .pet-model-choice .pet-sector-label .pet-choice-check { position:absolute; right:-6px; top:-3px; width:12px; height:12px; }
 .pet-menu-more .pet-sector-label { font-size:var(--fs-label); width:40px; white-space:normal; line-height:1.4; }
 .pet-menu-models,.pet-menu-size-panel { animation:pet-panel-appear .18s ease-out; }
-.pet-menu-models.is-grid { inset:0 26px auto; max-height:146px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding:10px; overflow:auto; pointer-events:auto; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface); box-shadow:var(--shadow-sm); }
+.pet-menu-models.is-grid { right:auto; bottom:auto; max-height:146px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding:10px; overflow:auto; pointer-events:auto; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface); box-shadow:var(--shadow-sm); }
 .pet-menu-models.is-grid .pet-model-choice { position:relative; display:flex; align-items:center; justify-content:center; min-width:0; height:80px; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface-muted); }
 .pet-menu-models.is-grid .pet-sector-label { position:static; transform:none; width:100%; }
 .pet-menu-models.is-grid .pet-sector-label > span:last-of-type { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
@@ -47,17 +46,15 @@
 .pet-compact-entry button { display:flex; gap:6px; align-items:center; padding:8px; border:0; border-radius:var(--user-radius-control); background:transparent; }
 .pet-compact-entry svg { width:18px; height:18px; }
 .pet-compact-pending { color:var(--status-warning); }
-@media(min-width:641px) { .pet-personal-launcher.is-menu-open { opacity:0!important; pointer-events:none; } }
 @media(max-width:640px) {
  .pet-radial-menu { left:12px!important; right:12px; top:auto!important; bottom:12px; width:auto!important; height:auto!important; max-height:calc(100dvh - 32px); overflow:auto; padding:52px 18px 18px; border:1px solid var(--user-border); border-radius:16px; background:var(--user-surface); pointer-events:auto; }
- .pet-menu-center { display:none; }
- .pet-menu-close { left:auto; right:10px; top:10px; }
+ .pet-menu-close { left:auto!important; right:10px; top:10px!important; }
  .pet-menu-actions { position:static; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
  .pet-radial-menu.is-more .pet-menu-actions,.pet-radial-menu.is-size .pet-menu-actions { visibility:visible; }
  .pet-menu-petal,.pet-model-choice,.pet-menu-more { position:relative; left:auto!important; top:auto!important; width:100%!important; height:72px!important; clip-path:none!important; border:1px solid var(--user-border); border-radius:12px; background:var(--user-surface); }
  .pet-sector-surface { display:none; }
  .pet-sector-label { position:static; left:auto!important; top:auto!important; transform:none; height:100%; width:100%; white-space:normal; }
- .pet-menu-models,.pet-menu-models.is-grid { position:static; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; max-height:none; margin-top:14px; padding:0; border:0; background:transparent; box-shadow:none; }
+ .pet-menu-models,.pet-menu-models.is-grid { position:static; width:auto!important; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; max-height:none; margin-top:14px; padding:0; border:0; background:transparent; box-shadow:none; }
  .pet-model-choice { height:80px!important; }
  .pet-model-choice .pet-sector-label > span:last-of-type { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
  .pet-model-choice .pet-sector-label .pet-choice-check { right:4px; top:4px; }
