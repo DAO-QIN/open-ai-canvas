@@ -16,7 +16,7 @@
 .pet-radial-menu.is-left.is-top .pet-menu-actions,.pet-radial-menu.is-left.is-top .pet-menu-models:not(.is-grid),.pet-radial-menu.is-left.is-top :is(.pet-menu-petal,.pet-menu-models:not(.is-grid) .pet-model-choice) { transform:scale(-1,-1); }
 .pet-menu-petal svg { width:21px; height:21px; color:var(--user-accent); }
 .pet-menu-petal:hover { background:var(--user-surface-hover); }
-.pet-menu-petal[aria-expanded=true],.pet-menu-petal[aria-pressed=true],.pet-model-choice[aria-pressed=true] { background:var(--control-selected-bg); border-color:var(--control-selected-border); color:var(--control-selected-fg); }
+.pet-menu-petal[aria-expanded=true],.pet-menu-petal[aria-pressed=true],.pet-model-choice[aria-pressed=true] { background-color:var(--user-surface); background-image:linear-gradient(var(--control-selected-bg),var(--control-selected-bg)); border-color:var(--control-selected-border); color:var(--control-selected-fg); }
 .pet-menu-look { right:136px; bottom:48px; transform:rotate(-8deg); }
 .pet-menu-size { right:148px; bottom:142px; transform:rotate(8deg); }
 .pet-menu-lock { right:88px; bottom:222px; transform:rotate(-6deg); }
