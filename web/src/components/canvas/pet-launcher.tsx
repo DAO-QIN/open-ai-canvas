@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { LoaderCircle } from "lucide-react";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
-import { effectivePet, petAvatarSize } from "@/lib/canvas/pet-menu";
+import { effectivePet, petAvatarSize, petStatusPosition } from "@/lib/canvas/pet-menu";
 import { usePetPreference } from "@/stores/use-pet-preference";
 import { usePetAppearance } from "@/hooks/use-pet-appearance";
 import { usePetReducedMotion } from "@/hooks/use-pet-reduced-motion";
@@ -189,9 +189,8 @@ export function AgentLauncher({
                     </span>
                 )}
                 </PetAppearanceTransition>
-                {base.launcherLabel ? <span className="canvas-agent-launcher-label">{base.launcherLabel}</span> : null}
-                <span className={`canvas-agent-launcher-status ${approvalPending ? "is-pending" : ""}`} style={{ "--canvas-agent-status-color": statusColor } as CSSProperties} />
-                {approvalPending ? <span className="canvas-agent-launcher-badge">待审批</span> : null}
+                {base.launcherLabel || approvalPending ? <span className={`canvas-agent-launcher-label ${approvalPending ? "is-pending" : ""}`} title={approvalPending ? "待审批" : base.launcherLabel}>{approvalPending ? "待审批" : base.launcherLabel}</span> : null}
+                <span aria-hidden="true" className={`canvas-agent-launcher-status ${approvalPending ? "is-pending" : ""}`} style={{ ...petStatusPosition(current, height), "--canvas-agent-status-color": statusColor } as CSSProperties} />
             </motion.button>
             {prepared && candidate ? (
                 <div className="pet-prepare-layer" aria-hidden>

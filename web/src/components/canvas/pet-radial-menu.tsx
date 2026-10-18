@@ -53,13 +53,16 @@ export function PetRadialMenu({
         scaleRef.current = preference.scale;
     }, [preference.scale]);
     useEffect(() => {
-        host.current?.querySelector<HTMLButtonElement>(".pet-menu-dismiss")?.focus();
         const focus = priorFocus.current;
         return () => {
             onPreviewScale(null);
             if (focus?.isConnected) focus.focus();
         };
     }, [onPreviewScale]);
+    useEffect(() => {
+        const selector = panel === "size" ? ".pet-menu-size-panel input" : more ? ".pet-menu-models.is-grid .pet-menu-back" : ".pet-menu-dismiss";
+        host.current?.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
+    }, [panel, more]);
     useEffect(() => {
         const closeMenu = () => onClose();
         window.addEventListener("resize", closeMenu);
@@ -177,9 +180,12 @@ export function PetRadialMenu({
                 {panel === "look" ? (
                     <div className={`pet-menu-models ${more ? "is-grid" : ""}`} style={more?{left:panelLeft-placement.left,top:panelTop-placement.top,width:276}:undefined} aria-label="选择宠物形象">
                         {more ? (
+                            <div className="pet-menu-panel-heading">
                             <button type="button" className="pet-menu-back" aria-label="返回" title="返回" onClick={() => setMore(false)}>
                                 <ChevronLeft aria-hidden="true" />
                             </button>
+                            <button type="button" className="pet-menu-panel-dismiss" aria-label="收起菜单" title="收起菜单" onClick={onClose}><EyeOff aria-hidden="true" /></button>
+                            </div>
                         ) : null}
                         {[{ id: "system", name: "跟随系统", published: true } as PetAppearance, ...catalog.filter((p) => p.published)].slice(0, more ? 25 : 3).map((pet, index) => (
                             <PetSectorButton ringIndex={index} geometry={sector(index,true)} flat={more}
@@ -211,6 +217,7 @@ export function PetRadialMenu({
                             <label htmlFor="pet-personal-scale">
                                 <Scaling aria-hidden="true" /><span className="sr-only">宠物大小</span><output>{scale}%</output>
                             </label>
+                            <button type="button" className="pet-menu-panel-dismiss" aria-label="收起菜单" title="收起菜单" onClick={() => { commit(); onClose(); }}><EyeOff aria-hidden="true" /></button>
                         </div>
                         <input
                             id="pet-personal-scale"

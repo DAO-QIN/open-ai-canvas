@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { effectivePet, petAvatarSize, petMenuPosition, petRingSector, petArcLayout, sanitizePetPreference } from "../src/lib/canvas/pet-menu";
+import { effectivePet, petAvatarSize, petStatusPosition, petMenuPosition, petRingSector, petArcLayout, sanitizePetPreference } from "../src/lib/canvas/pet-menu";
 import { DEFAULT_CANVAS_APPEARANCE } from "../src/lib/canvas/agent-appearance";
 import type { PetAppearance } from "../src/services/api/appearance";
 
@@ -46,6 +46,21 @@ test("different silhouettes share a bounded stage while retaining their proporti
         expect(result.width / result.height).toBeCloseTo(w / h, 4);
     }
 });
+test("status dot clears the circle at every scale and stays outside rectangular silhouettes", () => {
+    for (const stage of [24, 64, 104, 156, 208, 312, 360]) {
+        const orb = { avatarType: "orb" } as const;
+        const dot = petStatusPosition(orb, stage);
+        const cx = stage - dot.right - dot.width / 2, cy = dot.top + dot.height / 2;
+        expect(Math.hypot(cx-stage/2, cy-stage/2)-dot.width/2-petAvatarSize(orb,stage).height/2).toBeCloseTo(3, 5);
+        expect(dot.width).toBe(8);
+        for (const pet of [{ avatarType: "live2d" } as const, ...[[192,208],[500,100],[100,500]].map(([w,h])=>({avatarType:"sprite" as const,sprite:{frameWidth:w,frameHeight:h} as PetAppearance["sprite"]}))]) {
+            const bounds=petAvatarSize(pet,stage), marker=petStatusPosition(pet,stage);
+            expect(stage-marker.right-marker.width-(stage+bounds.width)/2).toBeCloseTo(3,5);
+            expect(marker.right).toBeGreaterThanOrEqual(-11);
+        }
+    }
+});
+
 test("arc items use fixed steps and leave unused space instead of filling a circle", () => {
     const angles = [];
     for (let i=0;i<4;i++) {

@@ -13,6 +13,15 @@ export function petAvatarSize(pet: Pick<CanvasAppearance, "avatarType" | "sprite
     const ratio = pet.avatarType === "sprite" && pet.sprite ? pet.sprite.frameWidth / pet.sprite.frameHeight : pet.avatarType === "live2d" ? 0.75 : 1;
     return { width: Math.min(size, size * ratio), height: Math.min(size, size / ratio) };
 }
+/** Keep the status dot outside the rendered silhouette at every personal scale. */
+export function petStatusPosition(pet: Pick<CanvasAppearance, "avatarType" | "sprite">, stage: number) {
+    const fitted = petAvatarSize(pet, stage), size = 8, gap = 3;
+    if (pet.avatarType === "orb") {
+        const offset = (fitted.height / 2 + gap + size / 2) / Math.SQRT2;
+        return { top: stage / 2 - offset - size / 2, right: stage / 2 - offset - size / 2, width: size, height: size };
+    }
+    return { top: (stage - fitted.height) / 2 + 6, right: (stage - fitted.width) / 2 - gap - size, width: size, height: size };
+}
 export function petMenuPosition(rect: { left: number; top: number; width: number; height: number }, viewport: { width: number; height: number }) {
     const width = Math.min(416, viewport.width - 24),
         height = Math.min(352, viewport.height - 24);
