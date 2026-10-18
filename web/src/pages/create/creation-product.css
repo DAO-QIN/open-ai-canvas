@@ -88,8 +88,8 @@
         box-shadow: 0 0 10px rgba(99, 102, 241, 0.9), 0 0 16px rgba(99, 102, 241, 0.45);
     }
 }
-.creation-agent-entry { display: grid; grid-template-columns: 88px minmax(0, 1fr); align-items: center; gap: 16px 24px; padding: 28px; margin-bottom: 20px; border-radius: var(--user-radius-card); background: var(--user-surface); animation: product-card-enter var(--product-enter) var(--product-ease) backwards; }
-.creation-agent-orb { grid-row: span 2; }
+.creation-agent-entry { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 16px 24px; padding: 28px; margin-bottom: 20px; border-radius: var(--user-radius-card); background: var(--user-surface); animation: product-card-enter var(--product-enter) var(--product-ease) backwards; }
+.creation-agent-avatar { grid-row: span 2; display: grid; place-items: center; width: 112px; height: 132px; color: var(--user-ink-muted); }
 .creation-agent-eyebrow { font-size: 10px; font-weight: 650; letter-spacing: .14em; color: var(--user-accent); }
 .creation-agent-copy h2 { margin: 4px 0 8px; font-size: 21px; font-weight: 650; color: var(--user-ink); }
 .creation-agent-copy p { margin: 0; max-width: 62ch; font-size: 13px; line-height: 1.8; color: var(--user-ink-muted); }
@@ -129,7 +129,7 @@
 @media (max-width: 620px) {
     .creation-mode-button { padding-inline: 6px; font-size: 12px; gap: 6px; }
     .creation-agent-entry { grid-template-columns: 1fr; padding: 20px; gap: 12px; }
-    .creation-agent-orb { display: none; }
+    .creation-agent-avatar { grid-row: auto; justify-self: center; }
     .creation-agent-copy h2 { font-size: 18px; }
     .creation-agent-actions > .ant-btn { width: 100%; }
     .creation-inspiration-filters { gap: 4px; }
