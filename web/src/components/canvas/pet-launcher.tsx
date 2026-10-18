@@ -76,7 +76,7 @@ export function AgentLauncher({
     const sprite = current.avatarType === "sprite" && current.sprite && current.spriteResourceId,
         live = current.avatarType === "live2d" && current.live2dResourceId;
     const ratio = sprite && current.sprite ? current.sprite.frameWidth / current.sprite.frameHeight : live ? 0.75 : 1;
-    const requested = ((sprite || live ? current.avatarHeight : 76) * (previewScale ?? preference.scale)) / 100;
+    const requested = ((sprite || live ? current.avatarHeight : 76 * current.avatarHeight / 220) * (previewScale ?? preference.scale)) / 100;
     const height = Math.max(24, Math.min(requested, 360, viewport.height - 80, (viewport.width - 40) / ratio)),
         width = Math.round(height * ratio);
     const update = useCallback(
@@ -165,7 +165,7 @@ export function AgentLauncher({
                     if (!preference.locked && !menu) handlers.onPointerDown(e);
                 }}
                 onPointerMove={(e) => {
-                    if (touch.current && Math.hypot(e.clientX - touch.current.x, e.clientY - touch.current.y) > 8) clearTimeout(timer.current);
+                    if (touch.current && Math.hypot(e.clientX - touch.current.x, e.clientY - touch.current.y) >= 6) clearTimeout(timer.current);
                     if (!preference.locked && !longPressed.current) handlers.onPointerMove(e);
                     else e.stopPropagation();
                 }}

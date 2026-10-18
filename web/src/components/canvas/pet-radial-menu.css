@@ -1,4 +1,5 @@
 .pet-menu-layer { position:fixed; inset:0; z-index:calc(var(--z-toast) + 20); color:var(--user-ink); }
+.pet-menu-layer.app-user-overlays { background:transparent!important; }
 .pet-menu-backdrop { position:absolute; inset:0; }
 .pet-radial-menu { position:fixed; pointer-events:none; font-size:var(--fs-caption); }
 .pet-radial-menu button,.pet-radial-menu input,.pet-menu-size-panel,.pet-menu-feedback { pointer-events:auto; }

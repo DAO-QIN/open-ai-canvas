@@ -235,12 +235,12 @@ export function CanvasAppearanceEditor({
                 </details>
                 <div className="grid gap-1 text-sm">
                     <label id="pet-admin-height-label">
-                        默认大小 <output>{value.avatarHeight} px</output>
+                        默认大小 <output>{value.avatarType === "orb" ? `${Math.round(value.avatarHeight / 220 * 100)}%` : `${value.avatarHeight} px`}</output>
                     </label>
                     <Slider ariaLabelledByForHandle="pet-admin-height-label" min={120} max={360} step={5} value={value.avatarHeight} disabled={disabled || uploading} onChange={(height) => change({ avatarHeight: height })} />
                     <div className="flex justify-between text-xs text-foreground/60">
-                        <span>120 px</span>
-                        <span>360 px</span>
+                        <span>{value.avatarType === "orb" ? "小" : "120 px"}</span>
+                        <span>{value.avatarType === "orb" ? "大" : "360 px"}</span>
                     </div>
                 </div>
                 {value.avatarType !== "sprite" ? (
@@ -263,7 +263,7 @@ export function CanvasAppearanceEditor({
                                 }}
                             />
                         ) : (
-                            <FluidOrb size={60} color="#7164f6" />
+                            <FluidOrb size={Math.round(60 * value.avatarHeight / 220)} color="#7164f6" />
                         )}
                         <strong>{agentCopy(value.welcomeTitle, value.agentName)}</strong>
                         <p className="text-sm text-foreground/60">{agentCopy(value.welcomeDescription, value.agentName)}</p>
