@@ -168,7 +168,6 @@ export function SpritePetEditor({
                             value={action || pet.bindings.idle}
                             onChange={(id) => {
                                 setAction(id);
-                                setAttempt((n) => n + 1);
                             }}
                             options={pet.actions.map((a) => ({ value: a.id, label: a.label || a.id }))}
                         />

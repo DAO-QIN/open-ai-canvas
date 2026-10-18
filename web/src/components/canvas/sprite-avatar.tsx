@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LoaderCircle } from "lucide-react";
 import { spriteAction, spriteBusinessBinding, spriteFrame, spriteLookFrame, validateSpritePet, type SpritePet, type SpriteRunState } from "@/lib/canvas/sprite-pet";
+import { useSpriteImage } from "./use-sprite-image";
 
 export function SpriteAvatar({
     pet,
@@ -34,6 +35,13 @@ export function SpriteAvatar({
     const [loaded, setLoaded] = useState("");
     const [error, setError] = useState("");
     const greeted = useRef(false);
+    const spriteImage = useSpriteImage(url);
+    useEffect(() => {
+        if (spriteImage.error) {
+            setError(spriteImage.error);
+            callbacks.current.onError?.(spriteImage.error);
+        }
+    }, [spriteImage.error]);
     const width = Math.round((height * pet.frameWidth) / pet.frameHeight);
     useEffect(() => {
         setError("");
@@ -168,7 +176,7 @@ export function SpriteAvatar({
             {!error ? (
                 <img
                     ref={imageRef}
-                    src={url}
+                    src={spriteImage.src || undefined}
                     alt=""
                     aria-hidden="true"
                     draggable={false}
