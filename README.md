@@ -7,7 +7,7 @@
 <p align="center">让一个故事，从文字走向银幕</p>
 
 <p align="center">
-  <a href="https://github.com/ddcat-ai/open-ai-canvas">GitHub</a> ·
+  <a href="https://github.com/DAO-QIN/open-ai-canvas">GitHub</a> ·
   <a href="docs/content/docs/overview/features.mdx">功能</a> ·
   <a href="docs/content/docs/overview/quick-start.mdx">文档</a> ·
   <a href="SECURITY.md">安全策略</a>
@@ -17,7 +17,9 @@
 
 > 项目仍在快速开发，数据结构和外部接口可能调整。默认适合个人、本地或可信环境部署；未经安全配置，不要直接作为公网多人服务使用。
 
-在线演示：[https://yingce.tv](https://yingce.tv)
+本仓库为 **影绘** 定制分支，生产功能基准为 `c8ec75d9`（v1.6.8.10）。已包含沧元 Midjourney、Gemini 视频与香蕉 21:9 修复。部署本分支请使用下文的本仓库源码部署入口；上游镜像不包含这些定制。完整说明见[影绘部署与版本核对](docs/content/docs/overview/yinghui-deployment.mdx)。
+
+上游在线演示：[https://yingce.tv](https://yingce.tv)
 
 账号/密码：test/test123456
 
@@ -88,7 +90,7 @@ GitHub 用户：[@TripsCoder](https://github.com/TripsCoder) · [@sugtex](https:
 ### 宿主机启动
 
 ```bash
-git clone https://github.com/ddcat-ai/open-ai-canvas.git
+git clone https://github.com/DAO-QIN/open-ai-canvas.git
 cd open-ai-canvas
 
 # 使用 Git 忽略的目录保存本地开发数据和缓存
@@ -118,7 +120,7 @@ Windows PowerShell 用户可在仓库根目录执行：
 
 ### Docker 开发与本地构建
 
-以下命令用于本地开发或试运行。部署服务器并使用后台在线更新，请使用下文的官方 Release 镜像部署。
+以下命令用于本地开发或试运行。部署影绘定制分支请使用下文的本仓库源码部署；上游 Release 镜像使用上游代码。
 
 源码热更新：
 
@@ -157,7 +159,20 @@ docker compose -f docker-compose.local.yml up -d --build
 
 ## 服务器部署
 
-### 官方 Release 镜像（推荐，支持后台在线更新）
+### 本仓库源码部署（影绘定制版本）
+
+适用于 Linux 新服务器，构建当前仓库的前端、后端、插件包和独立 Agent，使用 PostgreSQL、Redis 和迁移服务：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DAO-QIN/open-ai-canvas/main/scripts/install-server.sh \
+  | sudo env REPOSITORY_URL=https://github.com/DAO-QIN/open-ai-canvas.git REPOSITORY_REF=main bash
+```
+
+脚本打印完整提交号，并将它写入前后端构建信息和镜像标签。需要固定版本时，将 `REPOSITORY_REF=main` 改为本仓库已发布的完整提交号。新部署还需配置自己的模型密钥、渠道、售价、品牌和存储；这些线上运行配置及业务数据不会随 Git 复制。详见[部署与验收说明](docs/content/docs/overview/yinghui-deployment.mdx)。
+
+该入口不安装 Host Updater，不能用上游在线更新覆盖定制代码。已有生产部署先备份并制定迁移方案，不要直接重跑新服务器安装命令。
+
+### 上游官方 Release 镜像（上游版本，支持后台在线更新）
 
 适用于使用 systemd 的 Linux 服务器。先从 [GitHub Releases](https://github.com/ddcat-ai/open-ai-canvas/releases) 选择包含镜像、Host Updater 二进制和 `SHA256SUMS` 的已发布版本，将下方 `vX.Y.Z` 替换为该版本：
 
@@ -179,11 +194,7 @@ sudo docker compose --env-file .env -f docker-compose.deploy.yml logs -f --tail=
 
 ### 源码构建与已有部署
 
-需要运行自行修改的源码时，可以使用源码安装脚本：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/ddcat-ai/open-ai-canvas/main/scripts/install-server.sh | sudo bash
-```
+本仓库的源码安装命令见上文。源码安装脚本默认使用 `DAO-QIN/open-ai-canvas`，可通过 `REPOSITORY_URL` 和 `REPOSITORY_REF` 指定其他来源与分支、标签或完整提交号。
 
 脚本使用 PostgreSQL、Redis、独立 Agent 和源码构建叠加层，但不安装 Host Updater；该部署不属于后台在线更新管理范围，需自行构建、备份和升级。根目录的 `docker-compose.yml`、`docker-compose.local.yml` 和自行编写的两容器 SQLite 编排用于本地试运行，不作为默认服务器部署方案。
 

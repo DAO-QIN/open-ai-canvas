@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-REPOSITORY_URL="${REPOSITORY_URL:-https://github.com/ddcat-ai/open-ai-canvas.git}"
+REPOSITORY_URL="${REPOSITORY_URL:-https://github.com/DAO-QIN/open-ai-canvas.git}"
 REPOSITORY_REF="${REPOSITORY_REF:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/open-ai-canvas}"
 CANVAS_HTTP_PORT="${CANVAS_HTTP_PORT:-3000}"
@@ -68,7 +68,11 @@ sync_source() {
     if [[ -d "$INSTALL_DIR/.git" ]]; then
         cd "$INSTALL_DIR"
         [[ -z "$(git status --porcelain --untracked-files=no)" ]] || fail "$INSTALL_DIR 存在本地代码改动，请先处理后再更新"
-        git pull --ff-only origin "$REPOSITORY_REF"
+        git fetch "$REPOSITORY_URL" "$REPOSITORY_REF"
+        local target_revision
+        target_revision="$(git rev-parse FETCH_HEAD)"
+        git merge --ff-only FETCH_HEAD
+        [[ "$(git rev-parse HEAD)" == "$target_revision" ]] || fail "目标版本早于当前源码；请使用新安装目录，已有实例回退需先制定数据与版本方案"
         return
     fi
 
@@ -76,14 +80,17 @@ sync_source() {
         fail "$INSTALL_DIR 已存在且不是本脚本安装的仓库，为避免覆盖文件已停止"
     fi
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    git clone --depth 1 --branch "$REPOSITORY_REF" "$REPOSITORY_URL" "$INSTALL_DIR"
+    git clone --depth 1 --no-checkout "$REPOSITORY_URL" "$INSTALL_DIR"
     cd "$INSTALL_DIR"
+    git fetch --depth 1 origin "$REPOSITORY_REF"
+    git checkout --detach FETCH_HEAD
 }
 
 prepare_environment() {
     if [[ -f .env ]]; then
         grep -Eq '^POSTGRES_PASSWORD=.+$' .env || fail "现有 .env 缺少 POSTGRES_PASSWORD"
         grep -Eq '^DATABASE_URL=.+$' .env || fail "现有 .env 缺少 DATABASE_URL"
+        grep -Eq '^YINGCE_AGENT_TOKEN=.{32,}$' .env || fail "现有 .env 缺少至少 32 字符的 YINGCE_AGENT_TOKEN，请先为 backend 和 Agent 配置相同令牌"
         local configured_http_port
         configured_http_port="$(sed -n 's/^CANVAS_HTTP_PORT=//p' .env | tail -n 1)"
         if [[ -n "$configured_http_port" ]]; then
@@ -117,8 +124,12 @@ EOF
 }
 
 start_services() {
+    CANVAS_BUILD_VERSION="$(tr -d '\r\n' < VERSION)"
+    CANVAS_BUILD_COMMIT="$(git rev-parse HEAD)"
+    CANVAS_BUILD_TIME="$(git show -s --format=%cI HEAD)"
+    export CANVAS_BUILD_VERSION CANVAS_BUILD_COMMIT CANVAS_BUILD_TIME
     step "从源码构建网页、后端和 Agent 镜像"
-    # 标准一键部署已下载完整仓库，直接本地构建可避免公开项目被 GHCR 包可见性阻断。
+    printf '源码版本：%s / %s\n' "$CANVAS_BUILD_VERSION" "$CANVAS_BUILD_COMMIT"
     docker compose --env-file .env -f "$COMPOSE_FILE" -f "$BUILD_COMPOSE_FILE" build migrate backend web yingce-agent
 
     step "启动 PostgreSQL、Redis、后端和网页服务"
@@ -133,6 +144,7 @@ print_result() {
     printf '\n部署完成。\n'
     printf '访问地址：http://%s:%s\n' "$local_ip" "$CANVAS_HTTP_PORT"
     printf '安装目录：%s\n' "$INSTALL_DIR"
+    printf '代码提交：%s\n' "$CANVAS_BUILD_COMMIT"
     printf '查看状态：cd %q && docker compose --env-file .env -f %s -f %s ps\n' "$INSTALL_DIR" "$COMPOSE_FILE" "$BUILD_COMPOSE_FILE"
     printf '\n首次打开后注册的第一个账号会自动成为管理员。公网长期使用前请配置 HTTPS。\n'
 }

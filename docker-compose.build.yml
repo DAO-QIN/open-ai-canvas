@@ -1,30 +1,49 @@
+x-source-labels: &source-labels
+  org.opencontainers.image.source: https://github.com/DAO-QIN/open-ai-canvas
+  org.opencontainers.image.version: ${CANVAS_BUILD_VERSION:-unknown}
+  org.opencontainers.image.revision: ${CANVAS_BUILD_COMMIT:-unknown}
+  org.opencontainers.image.created: ${CANVAS_BUILD_TIME:-unknown}
+
 services:
   migrate:
     image: open-ai-canvas-backend:server
     build:
       context: .
       dockerfile: backend/Dockerfile
+      labels: *source-labels
       args:
         GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        BUILD_VERSION: ${CANVAS_BUILD_VERSION:-}
+        BUILD_COMMIT: ${CANVAS_BUILD_COMMIT:-unknown}
+        BUILD_TIME: ${CANVAS_BUILD_TIME:-unknown}
 
   yingce-agent:
     image: open-ai-canvas-yingce-agent:server
     build:
       context: .
       dockerfile: yingce-agent/Dockerfile
+      labels: *source-labels
 
   backend:
     image: open-ai-canvas-backend:server
     build:
       context: .
       dockerfile: backend/Dockerfile
+      labels: *source-labels
       args:
         GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        BUILD_VERSION: ${CANVAS_BUILD_VERSION:-}
+        BUILD_COMMIT: ${CANVAS_BUILD_COMMIT:-unknown}
+        BUILD_TIME: ${CANVAS_BUILD_TIME:-unknown}
 
   web:
     image: open-ai-canvas-web:server
     build:
       context: .
       dockerfile: Dockerfile
+      labels: *source-labels
       args:
         VITE_TLDRAW_LICENSE_KEY: ${VITE_TLDRAW_LICENSE_KEY:-}
+        BUILD_VERSION: ${CANVAS_BUILD_VERSION:-}
+        BUILD_COMMIT: ${CANVAS_BUILD_COMMIT:-unknown}
+        BUILD_TIME: ${CANVAS_BUILD_TIME:-unknown}

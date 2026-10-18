@@ -4,7 +4,9 @@
 
 ## 部署与更新入口
 
-用户要求部署服务器时，默认使用官方 Release 镜像、`docker-compose.deploy.yml` 和 Host Updater。本地 SQLite 构建与自定义 Compose 不属于后台在线更新管理范围。
+部署影绘定制分支时，使用本仓库源码安装入口和 PostgreSQL、Redis、独立 Agent 编排。上游 Release 镜像和 Host Updater 用于上游版本，不包含本仓库定制。本地 SQLite 构建与自定义 Compose 不属于后台在线更新管理范围。
+
+- [影绘部署与版本核对](content/docs/overview/yinghui-deployment.mdx)：本仓库安装入口、固定提交、运行构建信息与线上配置边界。
 
 - [Docker 部署](content/docs/overview/docker.mdx)：默认服务器方案、Compose 选择与已有部署核对。
 - [在线更新与安全回退](content/docs/backend/system-update.mdx)：受管部署条件、安装、备份、迁移和回退。

@@ -1,0 +1,75 @@
+---
+title: 影绘部署与版本核对
+description: 从本仓库构建影绘定制版本，并核对源码、插件和运行制品。
+---
+
+## 选择本仓库版本
+
+`DAO-QIN/open-ai-canvas` 是影绘定制分支。当前生产功能基准为 `c8ec75d9b42a6d013e5c8143cde59e4b7b9dba4f`，应用版本 `v1.6.8.10`，数据库 Schema60。该基准包含：
+
+- 沧元 Midjourney 1.2.0：当前模型名、MJ/Niji 版本选择、异步任务、普通线路 1010 字提示词、1K/2K 四张参考图上限。
+- Gemini 视频插件 `yunfei-omni-video` 1.1.0：当前模型名、10 秒、720p、横竖屏；用户错误提示隐藏渠道身份，管理员诊断保留原始信息。
+- 图片生成保留声明的 `21:9`，避免被约分成 `7:3` 后导致协议参数拒绝。
+
+同一个 `v1.6.8.10` 可以对应不同提交。请使用完整 Git 提交号标识代码，不以品牌栏版本、旧镜像标签或 Host Updater 的历史记录替代实际构建信息。
+
+## 新服务器安装
+
+使用 Linux、Docker Compose 和本仓库安装脚本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DAO-QIN/open-ai-canvas/main/scripts/install-server.sh \
+  | sudo env REPOSITORY_URL=https://github.com/DAO-QIN/open-ai-canvas.git REPOSITORY_REF=main bash
+```
+
+脚本下载指定源码，生成新数据库密码和 Agent 令牌，使用 `docker-compose.deploy.yml` 与 `docker-compose.build.yml` 构建并启动 PostgreSQL、Redis、迁移服务、独立 Agent、backend 和 web。只向宿主机发布 web 端口，默认 `3000`。前后端和插件包均来自指定提交。
+
+部署固定版本时，将 `REPOSITORY_REF=main` 替换为已核对的完整提交号。安装脚本接受分支、标签和提交号；构建标识总是取实际检出的源码提交、VERSION 和提交时间。若使用历史基准 c8ec75d9，应使用本仓库 main 上的新版安装脚本，并注意历史 Compose 不包含新增的构建元数据传递；推荐使用本次同步后的 main 提交以同时获得这些改进。
+
+安装完成后，在受控网络内完成首次管理员注册，配置 HTTPS、准确的 `CANVAS_CORS_ORIGINS` 与 `CANVAS_PUBLIC_BASE_URL`。其他域名和端口可通过相应环境配置修改。
+
+本部署使用本地源码镜像，不安装 Host Updater。上游 `ddcat-ai` 的 Release 镜像和在线更新会使用上游代码，不能视为本分支定制版本的发布渠道。
+
+backend 与独立 Agent 使用同一个 `YINGCE_AGENT_TOKEN`。两种安装脚本均为新环境生成该令牌；已有环境需显式配置至少 32 字符的随机值，不再借用更新器令牌。源码部署不需要 `CANVAS_UPDATER_TOKEN`，缺少 Agent 令牌时应停止，不能以空令牌启动。
+
+## 手工构建时的版本信息
+
+已有经过确认的环境配置时，在仓库根目录导出实际源码元数据后构建：
+
+```bash
+export CANVAS_BUILD_VERSION="$(tr -d '\r\n' < VERSION)"
+export CANVAS_BUILD_COMMIT="$(git rev-parse HEAD)"
+export CANVAS_BUILD_TIME="$(git show -s --format=%cI HEAD)"
+docker compose --env-file .env -f docker-compose.deploy.yml -f docker-compose.build.yml build migrate backend web yingce-agent
+```
+
+以上只构建制品。已有服务的停止、迁移、切换和回退应先备份并演练，不要用新服务器安装过程替代生产升级方案。
+
+## 上线后核对
+
+1. 记录 `git rev-parse HEAD` 和 `git status --short`，确认源码没有未提交改动。
+2. 请求 `https://你的域名/api/health/ready`，核对 `data.build.commit` 与预期完整提交相同，`data.build.version` 为 VERSION 值，`ready` 与 schema 检查通过。
+3. 核对当前前端诊断包的 `buildCommit`，以及三个应用镜像的 `org.opencontainers.image.revision` 标签。前后端从同一提交构建时应一致；不能拿静态目录保留的旧分片判断当前版本。
+4. 在后台插件管理核对沧元 Midjourney 1.2.0、Gemini 视频插件 1.1.0，并确认模型绑定了相应协议。
+5. 验证登录、画布保存刷新、任务状态与资源访问；如执行收费模型验收，应单独明确模型、参数与费用范围。
+
+插件包完整性可在源码根目录核对：
+
+```bash
+sha256sum plugin-packages/cangyuan-midjourney.yingce-plugin plugin-packages/yunfei-omni-video.yingce-plugin
+```
+
+当前生产基准对应摘要：
+
+| 包 | SHA-256 |
+| --- | --- |
+| cangyuan-midjourney | `5a59912486b9334abdb022d221c349e3e50045f9302cc450f397b97c45dbba39` |
+| yunfei-omni-video | `b3432a91aa87ff1817afc9ab70c5f7ba720aee2f571a4778c70b15cadd041e5d` |
+
+## 代码一致与运行配置
+
+Git 提供相同功能代码与插件包。新部署不包含生产用户、画布、素材、任务、余额、模型密钥、渠道绑定、售价、品牌、公告、外部存储和云端跨域规则。
+
+这些设置由部署者使用自己的账号和业务需求配置。特别是模型能力必须匹配所购买的线路：普通香蕉与特惠香蕉、不同 Gemini 视频模型、沧元各线路的比例和参考限制不能直接互相套用。仓库代码支持某个参数，不表示每个供应商套餐均可用。
+
+生产环境文件、数据库、插件私有配置、存储凭据和业务数据不提交到公开仓库。需要迁移同一业务实例时，应通过单独授权的备份与恢复流程处理，并保留 `.settings-key` 等必要的解密材料；不要把旧数据库恢复当作代码同步。
