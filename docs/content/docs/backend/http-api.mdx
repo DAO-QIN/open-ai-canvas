@@ -5,6 +5,12 @@ description: 信封、错误码与 OpenAPI
 
 # HTTP API 合同
 
+## 精灵宠物
+
+`POST /api/admin/settings/appearance/sprite` 接收 multipart `file`，管理员导入 ZIP（最大 16 MiB），返回 `{pet:{resourceId,config}}`。`GET /api/admin/settings/appearance/sprite/:id` 预览上传者或当前配置引用的图片；`GET /api/public/appearance/sprite/:id` 只允许读取当前已启用的图集，返回 PNG/WebP，不是 JSON 信封。
+
+外观 `canvas.avatarType` 增加 `sprite`，配置增加 `spriteResourceId` 与 `sprite`。`sprite` 包含服务端确认的图集路径/尺寸、单帧尺寸、`actions`（id/label/row/start/frames/fps/loop）、`bindings`（idle/working/waiting/failed/completed/moveLeft/moveRight/hover/greeting/sleep/wake）、播放倍率、注视、中立帧、空闲秒数和素材来源备注。待机必须绑定有效动作；所有行列帧数及引用服务端重验。配置仍经统一外观 PATCH 保存，不允许仅靠修改图片 URL 访问其他未启用资源。详见 [精灵宠物](/docs/overview/sprite-pets)。
+
 ## 邀请返利
 
 注册 JSON 和 Linux.do 发起查询参数增加可选 `inviteCode`，仅新账号绑定；无效邀请码返回 `invalid_invite_code`，注册事务回滚。匿名 `GET /api/public/invite-code/:code` 仅返回 `{valid}`，每 IP 每分钟限 30 次。

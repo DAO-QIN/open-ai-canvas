@@ -7,16 +7,18 @@ import (
 
 // CanvasAppearance controls presentation and the Agent's name, never free-form system prompts or tool permissions.
 type CanvasAppearance struct {
-	AgentName          string `json:"agentName"`
-	LauncherLabel      string `json:"launcherLabel"`
-	PanelTitle         string `json:"panelTitle"`
-	WelcomeTitle       string `json:"welcomeTitle"`
-	WelcomeDescription string `json:"welcomeDescription"`
-	InputPlaceholder   string `json:"inputPlaceholder"`
-	AvatarType         string `json:"avatarType"`
-	Live2DResourceID   string `json:"live2dResourceId"`
-	Live2DEntry        string `json:"live2dEntry"`
-	AvatarHeight       int    `json:"avatarHeight"`
+	AgentName          string     `json:"agentName"`
+	LauncherLabel      string     `json:"launcherLabel"`
+	PanelTitle         string     `json:"panelTitle"`
+	WelcomeTitle       string     `json:"welcomeTitle"`
+	WelcomeDescription string     `json:"welcomeDescription"`
+	InputPlaceholder   string     `json:"inputPlaceholder"`
+	AvatarType         string     `json:"avatarType"`
+	Live2DResourceID   string     `json:"live2dResourceId"`
+	Live2DEntry        string     `json:"live2dEntry"`
+	SpriteResourceID   string     `json:"spriteResourceId"`
+	Sprite             *SpritePet `json:"sprite,omitempty"`
+	AvatarHeight       int        `json:"avatarHeight"`
 }
 
 func defaultCanvasAppearance() CanvasAppearance {
@@ -48,7 +50,7 @@ func normalizeCanvasAppearance(value CanvasAppearance) (CanvasAppearance, error)
 			return value, BadAuthRequest("助手名称不能包含控制字符")
 		}
 	}
-	if value.AvatarType != "orb" && value.AvatarType != "live2d" {
+	if value.AvatarType != "orb" && value.AvatarType != "live2d" && value.AvatarType != "sprite" {
 		return value, BadAuthRequest("请选择有效的 Agent 形象类型")
 	}
 	if value.AvatarHeight < 120 || value.AvatarHeight > 360 {
@@ -59,6 +61,17 @@ func normalizeCanvasAppearance(value CanvasAppearance) (CanvasAppearance, error)
 	}
 	if value.Live2DResourceID == "" {
 		value.Live2DEntry = ""
+	}
+	if value.AvatarType == "sprite" && (value.SpriteResourceID == "" || value.Sprite == nil) {
+		return value, BadAuthRequest("请先导入精灵宠物")
+	}
+	if value.SpriteResourceID == "" {
+		value.Sprite = nil
+	}
+	if value.Sprite != nil {
+		if err := validateSpriteConfig(value.Sprite); err != nil {
+			return value, err
+		}
 	}
 	return value, nil
 }

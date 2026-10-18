@@ -11,7 +11,9 @@ import { useAgentLauncherPosition } from "./use-agent-launcher-position";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Live2DAvatar } from "./live2d-avatar";
-import { live2DModelURL } from "@/services/api/appearance";
+import { live2DModelURL, spriteImageURL } from "@/services/api/appearance";
+import { SpriteAvatar } from "./sprite-avatar";
+import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
 import { FluidOrb } from "@/components/ui/fluid-orb";
 import { ArrowLeft, Check, CircleDot, Clock3, Download, History, LoaderCircle, MessageSquarePlus, RotateCcw, Settings2, ShieldCheck, Sparkles, Trash2, X } from "lucide-react";
 import { Button, Dropdown, Input, Popover } from "antd";
@@ -35,10 +37,28 @@ import type { ApprovalState } from "./canvas-cloud-agent-events";
 
 // hidden 为 true 时入口保持挂载但不显示：Live2D 模型加载开销大，面板开合不能卸载它，
 // 否则每次重新挂载都要重新下载模型并重建渲染上下文。
-export function AgentLauncher({ theme, statusColor, approvalPending, reducedMotion, hidden = false, onOpen }: { theme: CanvasTheme; statusColor: string; approvalPending: boolean; reducedMotion: boolean; hidden?: boolean; onOpen: () => void }) {
+export function AgentLauncher({
+    theme,
+    statusColor,
+    approvalPending,
+    reducedMotion,
+    hidden = false,
+    onOpen,
+    petState,
+}: {
+    theme: CanvasTheme;
+    statusColor: string;
+    approvalPending: boolean;
+    reducedMotion: boolean;
+    hidden?: boolean;
+    onOpen: () => void;
+    petState?: SpriteRunState;
+}) {
     const appearance = useAppearanceStore((state) => state.appearance.canvas) || DEFAULT_CANVAS_APPEARANCE;
     const appearanceResolved = useAppearanceStore((state) => state.resolved);
     const live = appearance.avatarType === "live2d" && Boolean(appearance.live2dResourceId && appearance.live2dEntry);
+    const sprite = appearance.avatarType === "sprite" && Boolean(appearance.spriteResourceId && appearance.sprite);
+    const ratio = sprite && appearance.sprite ? appearance.sprite.frameWidth / appearance.sprite.frameHeight : 0.75;
     const [live2DError, setLive2DError] = useState("");
     const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
     useEffect(() => {
@@ -46,15 +66,15 @@ export function AgentLauncher({ theme, statusColor, approvalPending, reducedMoti
         window.addEventListener("resize", resize);
         return () => window.removeEventListener("resize", resize);
     }, []);
-    const height = live ? Math.max(40, Math.min(appearance.avatarHeight, viewport.height - 60, (viewport.width - 40) / 0.75)) : 76;
-    const width = live ? Math.round(height * 0.75) : 76;
-    const { position, dragging, handlers } = useAgentLauncherPosition(onOpen, width, height);
+    const height = live || sprite ? Math.max(1, Math.min(appearance.avatarHeight, viewport.height - 60, (viewport.width - 40) / ratio)) : 76;
+    const width = live || sprite ? Math.round(height * ratio) : 76;
+    const { position, dragging, moveDirection, handlers } = useAgentLauncherPosition(onOpen, width, height);
     return (
         <motion.button
             type="button"
             aria-label={`打开${appearance.agentName}`}
             title={live && live2DError ? live2DError : `${approvalPending ? "Agent 等待你的审批" : "打开 Agent 助手"} · 拖动可调整位置，聚焦后可用方向键移动`}
-            className={cn("canvas-agent-launcher fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35", dragging && "is-dragging", live && "canvas-agent-launcher-live2d")}
+            className={cn("canvas-agent-launcher fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35", dragging && "is-dragging", (live || sprite) && "canvas-agent-launcher-live2d")}
             style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden ? { display: "none" } : null) } as CSSProperties}
             aria-hidden={hidden || undefined}
             tabIndex={hidden ? -1 : undefined}
@@ -64,7 +84,20 @@ export function AgentLauncher({ theme, statusColor, approvalPending, reducedMoti
             whileTap={reducedMotion || dragging ? undefined : { scale: 0.96 }}
             transition={{ duration: reducedMotion ? 0 : 0.18 }}
         >
-            {live ? (
+            {sprite && appearance.sprite ? (
+                <SpriteAvatar
+                    pet={appearance.sprite}
+                    url={spriteImageURL(appearance.spriteResourceId!)}
+                    height={height}
+                    state={petState}
+                    moveDirection={moveDirection}
+                    paused={hidden}
+                    reducedMotion={reducedMotion}
+                    fallback={<FluidOrb size={60} color="#7164f6" />}
+                    onError={setLive2DError}
+                    onReady={() => setLive2DError("")}
+                />
+            ) : live ? (
                 <Live2DAvatar
                     url={live2DModelURL(appearance.live2dResourceId, appearance.live2dEntry)}
                     width={width}
@@ -107,6 +140,8 @@ export function AgentHeader({
     onCollapse,
     onExport,
     exporting,
+    petState,
+    petReducedMotion = false,
 }: {
     theme: CanvasTheme;
     hasMessages: boolean;
@@ -120,10 +155,17 @@ export function AgentHeader({
     onCollapse: () => void;
     onExport: () => void;
     exporting: boolean;
+    petState?: SpriteRunState;
+    petReducedMotion?: boolean;
 }) {
     const appearance = useAppearanceStore((state) => state.appearance.canvas) || DEFAULT_CANVAS_APPEARANCE;
     return (
         <header data-agent-drag-handle className="agent-panel-header flex shrink-0 items-center gap-3">
+            {appearance.avatarType === "sprite" && appearance.sprite && appearance.spriteResourceId ? (
+                <span aria-hidden="true" className="inline-flex">
+                    <SpriteAvatar pet={appearance.sprite} url={spriteImageURL(appearance.spriteResourceId)} height={Math.min(48, (64 * appearance.sprite.frameHeight) / appearance.sprite.frameWidth)} state={petState} reducedMotion={petReducedMotion} />
+                </span>
+            ) : null}
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="agent-panel-title">

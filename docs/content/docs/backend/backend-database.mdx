@@ -5,6 +5,10 @@ description: 影策后端核心持久化表与状态边界
 
 # 后端数据库
 
+## 精灵宠物存储
+
+`system_settings.appearance.canvas` 扩展 `avatarType=sprite`、`spriteResourceId` 和 `sprite` 动作配置对象。沿用外观 JSON 合同版本 10，无新增表或数据库迁移。`resources.kind=sprite`、`provider=local` 保存已验证的 ZIP；普通资源上传不能伪造该 kind。图集不会被解压成可执行目录。外观草稿引用和启用引用均参与资源删除保护；只有当前启用的图集可经专用公开地址读取。
+
 版本 58 `provider_catalog_source` 为渠道和渠道模型增加目录来源字段 `catalog_provider_id`、`catalog_model_key`。版本 59 `sql_perf_indexes` 增加任务与调用日志的 `created_at_epoch` 及查询索引，SQLite 升级时回填历史时间戳。已有版本 50–57 的迁移记录保持原有名称和校验和。
 
 ## 视频普通参考图限制
@@ -50,7 +54,7 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 ## 画布 Agent 外观配置
 
-`system_settings` 的 `appearance` JSON 合同版本 9 新增 `canvas`：助手名称、入口标签、面板标题、欢迎文案、输入提示、`avatarType`（`orb|live2d`）、`avatarHeight`（120–360）、`live2dResourceId` 和服务端确认的 `live2dEntry`。独立于站点品牌；缺失时读取内置画布默认值。不新增数据库结构迁移，不改变全局 schema 版本。
+`system_settings` 的 `appearance` JSON 中 `canvas` 包括助手名称、入口标签、面板标题、欢迎文案、输入提示、`avatarType`（`orb|live2d|sprite`）、`avatarHeight`（120–360）、`live2dResourceId` 和服务端确认的 `live2dEntry`。独立于站点品牌；缺失时读取内置画布默认值。不新增数据库结构迁移，不改变全局 schema 版本。
 
 模型包复用 `resources` 表，`kind=live2d`、`provider=local`，ZIP 不解压到磁盘。该 kind 仅由验证后的管理员导入路径保留，普通上传不能声明它。外观配置中的模型 ID 参与删除引用检查；清除引用不删除资源。默认球仍可保留模型引用，便于切换。
 

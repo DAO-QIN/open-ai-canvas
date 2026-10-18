@@ -390,6 +390,48 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
         "500": { $ref: "#/components/responses/Error" }
+  /admin/settings/appearance/sprite:
+    post:
+      tags: [admin]
+      summary: 导入精灵宠物草稿（不自动启用）
+      description: ZIP 最大 16 MiB，最多 16 条目、解压累计 24 MiB。包含一个 pet.json 和引用的 PNG/静态 WebP，可附文字授权文件。支持 Codex v1/v2 或 yinghui 自定义图集配置。返回 data.pet.resourceId 和 data.pet.config；通过 PATCH 外观接口的 canvas.spriteResourceId、canvas.sprite 和 avatarType=sprite 保存启用。
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200": { description: 成功信封 data.pet 包含 resourceId 和已校验的 config }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /admin/settings/appearance/sprite/{id}:
+    get:
+      tags: [admin]
+      summary: 预览自己上传或当前配置引用的精灵图集
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: PNG 或 WebP 图片，非 JSON 信封 }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /public/appearance/sprite/{id}:
+    get:
+      tags: [meta]
+      security: []
+      summary: 读取当前启用的精灵图集，停用后拒绝公开读取
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { description: PNG 或 WebP 图片，非 JSON 信封 }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /admin/settings/appearance/live2d:
     post:
       tags: [admin]

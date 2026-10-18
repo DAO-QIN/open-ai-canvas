@@ -5,6 +5,11 @@ description: 当前项目已实现的核心工作台能力与使用入口
 
 # 功能清单
 
+## 通用精灵宠物
+
+- 画布 Agent 支持动态球、Live2D 和精灵宠物三种形象，不绑定固定角色；支持 Codex v1/v2 ZIP 和自定义 PNG/WebP 图集。
+- 后台可编辑动作帧、速度、循环、业务状态映射、注视及可选睡眠，支持试播和配置导出。详见 [精灵宠物](/docs/overview/sprite-pets)。
+
 ## 沧元 Seedream 5.0 Pro
 
 独立 `cangyuan-seedream` 协议包提供 `cangyuan-seedream-5-pro`，精确适配 `doubao-seedream-5-0-pro`。选择协议默认 1:1、单张、10 张参考图、JPEG / URL，关闭未声明的分辨率档、质量、透明背景和蒙版。八种推荐比例和自定义像素尺寸由后台参数配置；文生图与参考图编辑沿各自端点异步创建、轮询，使用宿主素材转换和结果持久化。Flash 需独立适配，不混入此 Pro 协议。接口依据见[模型文档](https://ai.cangyuansuanli.cn/docs/models/doubao-seedream-5-0-pro)。

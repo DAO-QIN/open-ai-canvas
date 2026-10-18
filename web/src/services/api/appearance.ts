@@ -145,6 +145,17 @@ export async function uploadLive2D(file: File) {
     return result.model;
 }
 
+export async function uploadSpritePet(file: File) {
+    const body = new FormData();
+    body.append("file", file);
+    const result = await http.post<{ pet: { resourceId: string; config: import("@/lib/canvas/sprite-pet").SpritePet } }>("/admin/settings/appearance/sprite", body);
+    return result.pet;
+}
+
+export function spriteImageURL(resourceId: string, preview = false) {
+    return `${apiBaseURL.replace(/\/$/, "")}/${preview ? "admin/settings" : "public"}/appearance/sprite/${encodeURIComponent(resourceId)}`;
+}
+
 export function live2DModelURL(resourceId: string, entry: string, preview = false) {
     return `${apiBaseURL.replace(/\/$/, "")}/${preview ? "admin/settings" : "public"}/appearance/live2d/${encodeURIComponent(resourceId)}/${entry.split("/").map(encodeURIComponent).join("/")}`;
 }

@@ -6,6 +6,8 @@ import { Live2DAvatar } from "@/components/canvas/live2d-avatar";
 import { FluidOrb } from "@/components/ui/fluid-orb";
 import { agentCopy, type CanvasAppearance } from "@/lib/canvas/agent-appearance";
 import { live2DModelURL, uploadLive2D } from "@/services/api/appearance";
+import { SpritePetEditor } from "./sprite-pet-editor";
+import { validateSpritePet } from "@/lib/canvas/sprite-pet";
 
 export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading }: { value: CanvasAppearance; onChange: (value: CanvasAppearance) => void; disabled: boolean; onUploading: (value: boolean) => void }) {
     const { message } = App.useApp();
@@ -15,6 +17,7 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
     const [readyURL, setReadyURL] = useState("");
     const [error, setError] = useState("");
     const [attempt, setAttempt] = useState(0);
+    const [spriteReady, setSpriteReady] = useState("");
     const url = value.live2dResourceId ? live2DModelURL(value.live2dResourceId, value.live2dEntry, true) : "";
     const change = (patch: Partial<CanvasAppearance>) => onChange({ ...value, ...patch });
     async function upload(file?: File) {
@@ -69,81 +72,90 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
                     options={[
                         { label: "默认动态球", value: "orb" },
                         { label: "Live2D", value: "live2d", disabled: !url || readyURL !== url },
+                        { label: "精灵宠物", value: "sprite", disabled: !value.sprite || Boolean(validateSpritePet(value.sprite)) || spriteReady !== value.spriteResourceId },
                     ]}
                 />
-                <p className="text-sm text-foreground/60">上传有授权的 Cubism 3/4 运行时 ZIP：一个 model3.json、moc3、PNG 纹理及可选动作/表情 JSON。首期不支持音频、旧版模型和编辑工程。模型会发送到浏览器，无法保证防下载。</p>
-                <div className="grid gap-2 text-sm">
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <span className="text-foreground/60">参考资料</span>
-                        <a href="https://www.live2d.com/en/learn/sample/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-4">
-                            官方示例模型库
-                            <ExternalLink className="size-3.5" aria-hidden="true" />
-                            <span className="sr-only">（在新标签页打开）</span>
-                        </a>
-                        <a href="https://docs.live2d.com/en/cubism-sdk-manual/cubism-sdk-for-web/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-4">
-                            Cubism Web SDK 文档
-                            <ExternalLink className="size-3.5" aria-hidden="true" />
-                            <span className="sr-only">（在新标签页打开）</span>
-                        </a>
-                    </div>
-                    <p className="text-xs text-foreground/60">下载前请确认素材授权；官方原始包需按上述要求整理为运行时 ZIP，不能直接整包导入。</p>
-                </div>
-                <input
-                    ref={input}
-                    type="file"
-                    accept=".zip,application/zip"
-                    className="hidden"
-                    onChange={(event) => {
-                        void upload(event.target.files?.[0]);
-                        event.currentTarget.value = "";
-                    }}
-                />
-                <div className="flex flex-wrap gap-2">
-                    <Button icon={<Upload className="size-4" />} loading={uploading} disabled={disabled} onClick={() => input.current?.click()}>
-                        导入 Live2D 模型（最大 128 MiB）
-                    </Button>
-                    {url ? (
-                        <Button
-                            disabled={disabled || uploading}
-                            onClick={() => {
-                                change({ avatarType: "orb", live2dResourceId: "", live2dEntry: "" });
-                                setError("");
+                <SpritePetEditor value={value} onChange={change} disabled={disabled || uploading} onUploading={onUploading} onReady={setSpriteReady} />
+                <details open={value.avatarType === "live2d" || Boolean(url)}>
+                    <summary className="cursor-pointer text-sm font-medium">Live2D 模型设置</summary>
+                    <div className="mt-3 grid gap-4">
+                        <p className="text-sm text-foreground/60">上传有授权的 Cubism 3/4 运行时 ZIP：一个 model3.json、moc3、PNG 纹理及可选动作/表情 JSON。首期不支持音频、旧版模型和编辑工程。模型会发送到浏览器，无法保证防下载。</p>
+                        <div className="grid gap-2 text-sm">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                <span className="text-foreground/60">参考资料</span>
+                                <a href="https://www.live2d.com/en/learn/sample/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-4">
+                                    官方示例模型库
+                                    <ExternalLink className="size-3.5" aria-hidden="true" />
+                                    <span className="sr-only">（在新标签页打开）</span>
+                                </a>
+                                <a href="https://docs.live2d.com/en/cubism-sdk-manual/cubism-sdk-for-web/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-4">
+                                    Cubism Web SDK 文档
+                                    <ExternalLink className="size-3.5" aria-hidden="true" />
+                                    <span className="sr-only">（在新标签页打开）</span>
+                                </a>
+                            </div>
+                            <p className="text-xs text-foreground/60">下载前请确认素材授权；官方原始包需按上述要求整理为运行时 ZIP，不能直接整包导入。</p>
+                        </div>
+                        <input
+                            ref={input}
+                            type="file"
+                            accept=".zip,application/zip"
+                            className="hidden"
+                            onChange={(event) => {
+                                void upload(event.target.files?.[0]);
+                                event.currentTarget.value = "";
                             }}
-                        >
-                            移除模型引用
-                        </Button>
-                    ) : null}
-                </div>
+                        />
+                        <div className="flex flex-wrap gap-2">
+                            <Button icon={<Upload className="size-4" />} loading={uploading} disabled={disabled} onClick={() => input.current?.click()}>
+                                导入 Live2D 模型（最大 128 MiB）
+                            </Button>
+                            {url ? (
+                                <Button
+                                    disabled={disabled || uploading}
+                                    onClick={() => {
+                                        change({ avatarType: "orb", live2dResourceId: "", live2dEntry: "" });
+                                        setError("");
+                                    }}
+                                >
+                                    移除模型引用
+                                </Button>
+                            ) : null}
+                        </div>
+                    </div>
+                </details>
                 <label className="flex items-center gap-3 text-sm">
                     形象高度
                     <InputNumber aria-label="形象高度" min={120} max={360} value={value.avatarHeight} disabled={disabled || uploading} onChange={(height) => height !== null && change({ avatarHeight: height })} />
                     px
                 </label>
-                <div className="grid justify-items-center gap-3 rounded-xl border border-border bg-background p-5" aria-label="Agent 形象预览">
-                    {url ? (
-                        <Live2DAvatar
-                            key={`${url}-${attempt}`}
-                            url={url}
-                            width={Math.round(value.avatarHeight * 0.75)}
-                            height={value.avatarHeight}
-                            reducedMotion={reducedMotion}
-                            fallback={<FluidOrb size={60} color="#7164f6" />}
-                            onReady={() => {
-                                setReadyURL(url);
-                                setError("");
-                            }}
-                            onError={(reason) => {
-                                setReadyURL("");
-                                setError(reason);
-                            }}
-                        />
-                    ) : (
-                        <FluidOrb size={60} color="#7164f6" />
-                    )}
-                    <strong>{agentCopy(value.welcomeTitle, value.agentName)}</strong>
-                    <p className="text-sm text-foreground/60">{agentCopy(value.welcomeDescription, value.agentName)}</p>
-                    {url ? <small>{readyURL === url ? "预览已就绪，可选择 Live2D 并保存启用" : "等待模型预览就绪"}</small> : null}
-                </div>
+                {value.avatarType !== "sprite" ? (
+                    <div className="grid justify-items-center gap-3 rounded-xl border border-border bg-background p-5" aria-label="Agent 形象预览">
+                        {url ? (
+                            <Live2DAvatar
+                                key={`${url}-${attempt}`}
+                                url={url}
+                                width={Math.round(value.avatarHeight * 0.75)}
+                                height={value.avatarHeight}
+                                reducedMotion={reducedMotion}
+                                fallback={<FluidOrb size={60} color="#7164f6" />}
+                                onReady={() => {
+                                    setReadyURL(url);
+                                    setError("");
+                                }}
+                                onError={(reason) => {
+                                    setReadyURL("");
+                                    setError(reason);
+                                }}
+                            />
+                        ) : (
+                            <FluidOrb size={60} color="#7164f6" />
+                        )}
+                        <strong>{agentCopy(value.welcomeTitle, value.agentName)}</strong>
+                        <p className="text-sm text-foreground/60">{agentCopy(value.welcomeDescription, value.agentName)}</p>
+                        {url ? <small>{readyURL === url ? "预览已就绪，可选择 Live2D 并保存启用" : "等待模型预览就绪"}</small> : null}
+                    </div>
+                ) : null}
                 {error ? (
                     <Alert
                         type="warning"

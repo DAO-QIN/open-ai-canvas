@@ -1,3 +1,5 @@
+import type { SpritePet } from "./sprite-pet";
+
 export type CanvasAppearance = {
     agentName: string;
     launcherLabel: string;
@@ -5,10 +7,12 @@ export type CanvasAppearance = {
     welcomeTitle: string;
     welcomeDescription: string;
     inputPlaceholder: string;
-    avatarType: "orb" | "live2d";
+    avatarType: "orb" | "live2d" | "sprite";
     live2dResourceId: string;
     live2dEntry: string;
     avatarHeight: number;
+    spriteResourceId?: string;
+    sprite?: SpritePet;
 };
 
 export const DEFAULT_CANVAS_APPEARANCE: CanvasAppearance = {

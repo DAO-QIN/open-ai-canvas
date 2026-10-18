@@ -5,6 +5,12 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+## 精灵宠物
+
+- `app/appearance_sprite.go`、`handler/appearance_sprite.go`：精灵包校验、管理员导入、图集读取和启用边界；资源引用复用外观保护。
+- `web/src/lib/canvas/sprite-pet.ts`、`components/canvas/sprite-avatar.tsx`、`use-sprite-run-state.ts`：数据合同、播放、注视与真实运行状态映射。
+- `web/src/pages/admin/settings/components/sprite-pet-editor.tsx`：图集/ZIP 导入、动作与映射编辑、预览、导出。
+
 ## 沧元 Seedream Pro 图片协议
 
 - `plugin-packages/cangyuan-seedream/`：独立声明式包、可重现构建脚本及完整字段文档；文生图、参考图分别创建与轮询，不依赖 host 适配器。

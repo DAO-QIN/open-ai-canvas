@@ -23,6 +23,9 @@ func TestAppearanceRoutesAreRegistered(t *testing.T) {
 	router := gin.New()
 	RegisterAppearanceRoutes(router.Group("/api"), &service.Service{})
 	wanted := map[string]bool{
+		"POST /api/admin/settings/appearance/sprite":          false,
+		"GET /api/admin/settings/appearance/sprite/:id":       false,
+		"GET /api/public/appearance/sprite/:id":               false,
 		"GET /api/public/appearance/updates/:id":              false,
 		"GET /api/admin/settings/appearance/updates/:id":      false,
 		"POST /api/admin/settings/appearance/live2d":          false,

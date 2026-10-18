@@ -9,6 +9,7 @@ import { Switch } from "@/pages/admin/ui/controls";
 import { WelcomeSetting } from "@/pages/admin/settings/components/welcome-setting";
 import { SkinThemeEditor } from "@/pages/admin/settings/components/skin-theme-editor";
 import { CanvasAppearanceEditor } from "./components/canvas-appearance-editor";
+import { validateSpritePet } from "@/lib/canvas/sprite-pet";
 import { UpdateAnnouncementEditor } from "./components/update-announcement-editor";
 import { DEFAULT_UPDATE_ANNOUNCEMENT, normalizeUpdateAnnouncement, validateUpdateAnnouncement, type UpdateAnnouncement } from "@/lib/update-announcement";
 import { App, Button, Tabs, Form, Input } from "antd";
@@ -282,6 +283,12 @@ export default function AppearanceSettingsPage() {
 
     const save = async () => {
         if (!setting || saving || restoring || canvasUploading) return;
+        const spriteError = canvas.sprite ? validateSpritePet(canvas.sprite) : "";
+        if (spriteError) {
+            setActiveTab("canvas");
+            message.error(spriteError);
+            return;
+        }
         const updatesError = validateUpdateAnnouncement(updates);
         if (updatesError) {
             setActiveTab("updates");
@@ -707,10 +714,25 @@ export default function AppearanceSettingsPage() {
                                                     <Input.TextArea id="creation-home-title" value={creationTitle} maxLength={80} showCount autoSize={{ minRows: 2, maxRows: 4 }} onChange={(event) => setCreationTitle(event.target.value)} />
                                                 </Form.Item>
                                                 <Form.Item label="创作首页副标题" htmlFor="creation-home-description" extra="最多 160 字，可换行；支持 {brandName}，留空隐藏副标题。">
-                                                    <Input.TextArea id="creation-home-description" value={creationDescription} maxLength={160} showCount autoSize={{ minRows: 2, maxRows: 5 }} onChange={(event) => setCreationDescription(event.target.value)} />
+                                                    <Input.TextArea
+                                                        id="creation-home-description"
+                                                        value={creationDescription}
+                                                        maxLength={160}
+                                                        showCount
+                                                        autoSize={{ minRows: 2, maxRows: 5 }}
+                                                        onChange={(event) => setCreationDescription(event.target.value)}
+                                                    />
                                                 </Form.Item>
                                             </Form>
-                                            <Button disabled={saving || refreshing || restoring} onClick={() => { setCreationTitle(DEFAULT_CREATION_TITLE); setCreationDescription(DEFAULT_CREATION_DESCRIPTION); }}>恢复默认文案</Button>
+                                            <Button
+                                                disabled={saving || refreshing || restoring}
+                                                onClick={() => {
+                                                    setCreationTitle(DEFAULT_CREATION_TITLE);
+                                                    setCreationDescription(DEFAULT_CREATION_DESCRIPTION);
+                                                }}
+                                            >
+                                                恢复默认文案
+                                            </Button>
                                             <div className="rounded-lg border border-border bg-background p-6 text-center text-foreground" role="region" aria-label="创作首页文案预览">
                                                 <div className="whitespace-pre-line break-words text-xl font-semibold">{creationPreview.title}</div>
                                                 {creationPreview.description ? <p className="mt-2 whitespace-pre-line break-words text-muted-foreground">{creationPreview.description}</p> : null}

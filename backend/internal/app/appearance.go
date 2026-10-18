@@ -240,6 +240,11 @@ func (s *Service) UpdateAppearance(actor *model.User, value AppearanceSetting) (
 		}
 		value.Canvas.Live2DEntry = entry
 	}
+	if value.Canvas.SpriteResourceID != "" {
+		if err := s.validateSpriteResource(actor, value.Canvas.SpriteResourceID, before.Canvas.SpriteResourceID, value.Canvas.Sprite); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.validateUpdateAnnouncementResources(actor, value.Updates, before.Updates); err != nil {
 		return nil, err
 	}
@@ -393,6 +398,7 @@ func (s *Service) appearanceResourceReferences(resourceIDs []string) map[string]
 		{resourceID: value.AuthVideoResourceID, title: "登录页品牌视频"},
 		{resourceID: value.AuthVideoPosterResourceID, title: "登录页视频封面"},
 		{resourceID: value.Canvas.Live2DResourceID, title: "画布 Agent Live2D 形象"},
+		{resourceID: value.Canvas.SpriteResourceID, title: "画布 Agent 精灵宠物"},
 	}
 	for _, release := range value.Updates.Releases {
 		for _, block := range release.Blocks {
