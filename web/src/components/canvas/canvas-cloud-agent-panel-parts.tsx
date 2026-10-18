@@ -140,8 +140,6 @@ export function AgentHeader({
     onCollapse,
     onExport,
     exporting,
-    petState,
-    petReducedMotion = false,
 }: {
     theme: CanvasTheme;
     hasMessages: boolean;
@@ -155,17 +153,10 @@ export function AgentHeader({
     onCollapse: () => void;
     onExport: () => void;
     exporting: boolean;
-    petState?: SpriteRunState;
-    petReducedMotion?: boolean;
 }) {
     const appearance = useAppearanceStore((state) => state.appearance.canvas) || DEFAULT_CANVAS_APPEARANCE;
     return (
         <header data-agent-drag-handle className="agent-panel-header flex shrink-0 items-center gap-3">
-            {appearance.avatarType === "sprite" && appearance.sprite && appearance.spriteResourceId ? (
-                <span aria-hidden="true" className="inline-flex">
-                    <SpriteAvatar pet={appearance.sprite} url={spriteImageURL(appearance.spriteResourceId)} height={Math.min(48, (64 * appearance.sprite.frameHeight) / appearance.sprite.frameWidth)} state={petState} reducedMotion={petReducedMotion} />
-                </span>
-            ) : null}
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="agent-panel-title">

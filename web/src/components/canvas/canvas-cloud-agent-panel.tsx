@@ -1036,8 +1036,6 @@ export function CanvasCloudAgentPanel({ canvasId, domainProjectId, nodeCount, se
                                         theme={theme}
                                         hasMessages={messages.length > 0}
                                         statusLabel={statusLabel}
-                                        petState={petState}
-                                        petReducedMotion={Boolean(reducedMotion)}
                                         statusColor={statusColor}
                                         nodeCount={nodeCount}
                                         onNew={newConversation}
