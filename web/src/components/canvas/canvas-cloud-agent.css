@@ -1733,7 +1733,7 @@
 
 .canvas-agent-launcher-label {
     position: absolute;
-    bottom: -17px;
+    bottom: calc(var(--canvas-pet-inset, 0px) - 17px);
     left: 50%;
     padding: 3px 7px;
     border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
@@ -1760,8 +1760,8 @@
 
 .canvas-agent-launcher-status {
     position: absolute;
-    top: 6px;
-    right: 7px;
+    top: calc(6px + var(--canvas-pet-inset, 0px));
+    right: calc(7px + var(--canvas-pet-inset, 0px));
     width: 10px;
     height: 10px;
     border: 2px solid var(--background);
@@ -1777,8 +1777,8 @@
 
 .canvas-agent-launcher-badge {
     position: absolute;
-    top: 1px;
-    right: 62px;
+    top: calc(1px + var(--canvas-pet-inset, 0px));
+    right: calc(62px + var(--canvas-pet-inset, 0px));
     border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
     border-radius: 999px;
     background: color-mix(in srgb, var(--background) 94%, transparent);

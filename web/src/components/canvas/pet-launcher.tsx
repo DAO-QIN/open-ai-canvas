@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { LoaderCircle, MessageCircle } from "lucide-react";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
-import { effectivePet } from "@/lib/canvas/pet-menu";
+import { effectivePet, petAvatarSize } from "@/lib/canvas/pet-menu";
 import { usePetPreference } from "@/stores/use-pet-preference";
 import { usePetAppearance } from "@/hooks/use-pet-appearance";
 import { usePetReducedMotion } from "@/hooks/use-pet-reduced-motion";
@@ -124,7 +124,7 @@ export function AgentLauncher({
                 aria-haspopup="dialog"
                 title="点击对话 · 拖动移动 · 右键设置"
                 className={`canvas-agent-launcher pet-personal-launcher canvas-agent-launcher-live2d fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${dragging ? "is-dragging" : ""}`}
-                style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden || preference.hidden ? { display: "none" } : null) } as CSSProperties}
+                style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, "--canvas-pet-inset": `${current.avatarType === "orb" ? (height - petAvatarSize(current, height).height) / 2 : 0}px`, ...(hidden || preference.hidden ? { display: "none" } : null) } as CSSProperties}
                 aria-hidden={hidden || preference.hidden || undefined}
                 tabIndex={hidden || preference.hidden ? -1 : undefined}
                 data-canvas-no-zoom
