@@ -1,5 +1,7 @@
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Link, useLocation } from "react-router";
+import type { Ref } from "react";
+import { workspaceNavigationTool } from "@/constant/navigation-tools";
 
 import { SystemAnnouncementCenter } from "@/components/layout/system-announcement-center";
 import { WorkspaceAccountMenu } from "@/components/layout/workspace-account-menu";
@@ -14,20 +16,7 @@ import { usePromotionOverview } from "@/hooks/use-promotion-overview";
 import { promotionDisplay } from "@/lib/promotion-display";
 import { openWorkspaceWallet } from "@/lib/workspace-wallet";
 
-const PAGE_TITLES: Record<string, string> = {
-    home: "创作",
-    create: "创作",
-    projects: "短剧制作",
-    canvas: "自由画布",
-    tasks: "创作历史",
-    assets: "资产",
-    skills: "技能",
-    plugins: "插件",
-    promotion: "邀请有礼",
-    settings: "设置",
-};
-
-export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar }: { sidebarOpen: boolean; onToggleSidebar: () => void }) {
+export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef }: { sidebarOpen: boolean; onToggleSidebar: () => void; sidebarToggleRef?: Ref<HTMLButtonElement> }) {
     const brandName = useAppearanceStore((state) => state.appearance.brandName);
     const theme = useThemeStore((state) => state.theme);
     const setTheme = useThemeStore((state) => state.setTheme);
@@ -37,12 +26,12 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar }: { sidebarOpen:
     const { pathname } = useLocation();
     const slug = pathname.split("/").filter(Boolean)[0];
     const promotion = usePromotionOverview(user?.id, slug === "promotion");
-    const pageTitle = slug === "promotion" ? promotionDisplay(promotion.data, Boolean(promotion.error)).title : slug ? PAGE_TITLES[slug] || brandName : PAGE_TITLES.home;
+    const pageTitle = slug === "promotion" && !promotionDisplay(promotion.data, Boolean(promotion.error)).canInvite ? "返利" : workspaceNavigationTool(pathname)?.label || brandName;
     const balance = availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 
     return (
         <header className="app-workspace-topbar">
-            <button type="button" className="app-workspace-mobile-menu app-workspace-topbar-icon-button" aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"} onClick={onToggleSidebar}>
+            <button ref={sidebarToggleRef} type="button" className="app-workspace-mobile-menu app-workspace-topbar-icon-button" aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"} aria-controls="workspace-sidebar" aria-expanded={sidebarOpen} onClick={onToggleSidebar}>
                 {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
             </button>
             <nav className="app-workspace-topbar-breadcrumb" aria-label="当前位置">

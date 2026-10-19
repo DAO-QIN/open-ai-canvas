@@ -1,5 +1,5 @@
 import { Popover } from "antd";
-import { ChevronRight, CircleUserRound, History as HistoryIcon, Image as ImageIcon, Infinity as InfinityIcon, PanelLeftClose, PanelLeftOpen, Video } from "lucide-react";
+import { ChevronRight, CircleUserRound, Infinity as InfinityIcon, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
@@ -22,6 +22,7 @@ import { openWorkspaceWallet } from "@/lib/workspace-wallet";
 export type WorkspaceNavItem = {
     id: string;
     title: string;
+    fullTitle?: string;
     icon?: ComponentType<{ className?: string; strokeWidth?: number }>;
     to?: string;
     shortcut?: string;
@@ -37,7 +38,7 @@ type WorkspaceNavGroup = {
 
 function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
     const tool = navigationTools.find((item) => item.slug === slug);
-    return { id: slug, title: tool?.label ?? slug, icon: tool?.icon, to };
+    return { id: slug, title: tool?.label ?? slug, fullTitle: tool?.fullLabel, icon: tool?.icon, to };
 }
 
 function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
@@ -45,22 +46,22 @@ function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[];
         {
             items: [
                 { ...toolItem("create", "/"), id: "home", title: "创作" },
-                { ...toolItem("projects", "/projects"), title: "短剧制作" },
-                { ...toolItem("canvas", "/canvas"), title: "自由画布" },
+                toolItem("projects", "/projects"),
+                toolItem("canvas", "/canvas"),
             ],
         },
         {
-            heading: "资源与工具",
+            heading: "工具",
             items: [
-                ...(features.imageWorkbenchEnabled ? [{ id: "toolbox-image", title: "图片生成", icon: ImageIcon, to: "/toolbox/image" }] : []),
-                ...(features.videoWorkbenchEnabled ? [{ id: "toolbox-video", title: "视频生成", icon: Video, to: "/toolbox/video" }] : []),
-                { ...toolItem("skills", "/skills"), title: "技能" },
-                ...(features.pluginCenterEnabled ? [{ ...toolItem("plugins", "/plugins"), title: "插件" }] : []),
+                ...(features.imageWorkbenchEnabled ? [toolItem("toolbox-image", "/toolbox/image")] : []),
+                ...(features.videoWorkbenchEnabled ? [toolItem("toolbox-video", "/toolbox/video")] : []),
+                toolItem("skills", "/skills"),
+                ...(features.pluginCenterEnabled ? [toolItem("plugins", "/plugins")] : []),
             ],
         },
         {
-            heading: "资产与历史",
-            items: [{ ...toolItem("assets", "/assets"), title: "资产" }, ...(features.taskCenterEnabled ? [{ id: "tasks", title: "创作历史", icon: HistoryIcon, to: "/tasks" }] : [])],
+            heading: "管理",
+            items: [toolItem("assets", "/assets"), ...(features.taskCenterEnabled ? [toolItem("tasks", "/tasks")] : [])],
         },
         ...(features.promotionEnabled ? [{ items: [toolItem("promotion", "/promotion")] }] : []),
     ];
@@ -157,7 +158,6 @@ function WorkspaceSwitcher({ collapsed, onNavigate }: { collapsed: boolean; onNa
                     />
                     <span className="flex min-w-0 flex-col">
                         <span className="app-workspace-brand-wordmark truncate text-[var(--fs-body)] leading-none font-semibold">{appearance.brandName}</span>
-                        <span className="mt-1 truncate text-[var(--fs-label)] leading-none text-foreground/60">创作工作台</span>
                     </span>
                 </span>
             </Link>
@@ -195,8 +195,6 @@ function NavItem({
     const Icon = item.icon;
     const rowStyle = collapsed ? undefined : ({ paddingLeft: `${level * 12 + 10}px` } as CSSProperties);
 
-    const collapsedTitle =
-        item.id === "home" ? "创作" : item.id === "projects" ? "短剧" : item.id === "canvas" ? "画布" : item.id === "assets" ? "资产" : item.id === "skills" ? "技能" : item.id === "plugins" ? "插件" : item.id === "tasks" ? "历史" : item.title.slice(0, 2);
     const rowContent = (
         <>
             <span className="app-workspace-nav-main flex min-w-0 items-center gap-2.5">
@@ -207,7 +205,7 @@ function NavItem({
                 ) : (
                     <span className="size-1.5 shrink-0 rounded-full bg-current opacity-40" aria-hidden />
                 )}
-                <span className="app-workspace-nav-title truncate">{collapsed ? collapsedTitle : item.title}</span>
+                <span className="app-workspace-nav-title truncate">{item.title}</span>
             </span>
             <span className="app-workspace-nav-meta flex shrink-0 items-center gap-2">
                 {item.shortcut ? <Kbd className="hidden group-hover:inline-flex">{item.shortcut}</Kbd> : null}
@@ -251,8 +249,9 @@ function NavItem({
                     className={rowClassName}
                     data-nav-id={item.id}
                     style={rowStyle}
-                    aria-label={collapsed ? item.title : undefined}
-                    title={collapsed ? item.title : undefined}
+                    aria-label={item.fullTitle || item.title}
+                    aria-current={isActive ? "page" : undefined}
+                    title={item.fullTitle || item.title}
                     onClick={handleClick}
                     onFocus={() => preloadWorkspaceRoute(linkTo)}
                     onPointerDown={() => preloadWorkspaceRoute(linkTo)}
@@ -267,8 +266,8 @@ function NavItem({
                     className={rowClassName}
                     data-nav-id={item.id}
                     style={rowStyle}
-                    aria-label={collapsed ? item.title : undefined}
-                    title={collapsed ? item.title : undefined}
+                    aria-label={item.fullTitle || item.title}
+                    title={item.fullTitle || item.title}
                     onClick={handleClick}
                     aria-expanded={hasChildren ? isOpen : undefined}
                 >

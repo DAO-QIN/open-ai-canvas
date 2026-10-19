@@ -1828,17 +1828,19 @@
             left: 0;
         }
 
-        .app-workspace-shell .app-workspace-sidebar {
+        .app-user-workspace .app-workspace-shell .app-workspace-sidebar {
             width: 0 !important;
+            flex-basis: 0 !important;
             border: 0 !important;
             transition: width var(--motion-state) var(--ease-aceternity);
         }
 
-        .app-workspace-shell .app-workspace-sidebar.is-mobile-expanded {
+        .app-user-workspace .app-workspace-shell .app-workspace-sidebar.is-mobile-expanded {
             position: absolute;
             z-index: 40;
             inset: 6px auto 6px 6px;
             width: min(264px, calc(100vw - 58px)) !important;
+            flex-basis: auto !important;
             border: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
             border-radius: var(--r-xl);
             box-shadow: 22px 0 70px rgba(0, 0, 0, 0.42), inset 0 1px 0 color-mix(in srgb, white 7%, transparent);
@@ -15483,12 +15485,12 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 
 /* ===== 2026-09 user workspace alignment =====
    这一组规则只作用于真实用户端壳层和首页，后台与画布编辑器保持原有职责和交互。
-   几何基准：侧栏 200px、顶部 56px、导航行 40px、首页内容最大宽度 1180px。 */
+   几何基准：侧栏 200px、顶部 56px、导航行 44px、首页内容最大宽度 1180px。 */
 .app-user-workspace {
     --workspace-reference-sidebar: 200px;
     --workspace-reference-collapsed: 64px;
     --workspace-reference-topbar: 56px;
-    --workspace-reference-row: 40px;
+    --workspace-reference-row: 44px;
     --workspace-reference-page-bg: #ffffff;
     background: var(--workspace-reference-page-bg);
 }
@@ -18632,7 +18634,6 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     .app-user-workspace .app-workspace-topbar-breadcrumb > a,
     .app-user-workspace .app-workspace-topbar-breadcrumb > span[aria-hidden] { display: none; }
     .app-user-workspace .app-workspace-topbar-breadcrumb { min-width: 0; white-space: nowrap; }
-    .app-user-workspace .app-workspace-sidebar { width: 180px !important; }
     .app-user-workspace .creation-home > .creation-empty-workspace { width: calc(100% - 24px) !important; padding-top: 28px !important; padding-bottom: 40px !important; }
     .app-user-workspace .creation-home-heading h1 { font-size: 28px !important; }
     .app-user-workspace .creation-home-heading p { font-size: 14px !important; }

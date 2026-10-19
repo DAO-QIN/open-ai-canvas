@@ -2,7 +2,7 @@ import { Command, Home, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { useNavigate } from "react-router";
 
-import { navigationTools } from "@/constant/navigation-tools";
+import { matchesNavigationQuery, navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
 import { Kbd } from "@/components/ui/base/kbd";
 import { cn } from "@/lib/utils";
 import { openWorkspaceWallet } from "@/lib/workspace-wallet";
@@ -11,6 +11,8 @@ import { useUserStore } from "@/stores/use-user-store";
 type PaletteEntry = {
     id: string;
     title: string;
+    fullLabel: string;
+    keywords: readonly string[];
     icon: ComponentType<{ className?: string; strokeWidth?: number }>;
     to?: string;
     run?: () => void;
@@ -25,17 +27,20 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
     const inputRef = useRef<HTMLInputElement>(null);
 
     const entries = useMemo<PaletteEntry[]>(() => {
-        const toolEntry = (slug: string, to?: string): PaletteEntry => {
+        const toolEntry = (slug: NavigationToolSlug, to?: string): PaletteEntry => {
             const tool = navigationTools.find((item) => item.slug === slug);
-            return { id: slug, title: tool?.label ?? slug, icon: tool?.icon ?? Home, to };
+            return { id: slug, title: tool?.label ?? slug, fullLabel: tool?.fullLabel ?? slug, keywords: tool?.keywords ?? [], icon: tool?.icon ?? Home, to };
         };
         return [
-            { id: "home", title: "首页", icon: Home, to: "/" },
+            { ...toolEntry("create", "/"), id: "home" },
             toolEntry("projects", "/projects"),
             toolEntry("canvas", "/canvas"),
+            ...(features.imageWorkbenchEnabled ? [toolEntry("toolbox-image", "/toolbox/image")] : []),
+            ...(features.videoWorkbenchEnabled ? [toolEntry("toolbox-video", "/toolbox/video")] : []),
             ...(features.taskCenterEnabled ? [toolEntry("tasks", "/tasks")] : []),
             toolEntry("assets", "/assets"),
             toolEntry("skills", "/skills"),
+            ...(features.pluginCenterEnabled ? [toolEntry("plugins", "/plugins")] : []),
             ...(features.promotionEnabled ? [toolEntry("promotion", "/promotion")] : []),
             ...(features.creditsEnabled ? [{ ...toolEntry("wallet"), run: () => openWorkspaceWallet() }] : []),
             toolEntry("settings", "/settings"),
@@ -45,7 +50,7 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
     const filtered = useMemo(() => {
         const keyword = query.trim().toLowerCase();
         if (!keyword) return entries;
-        return entries.filter((entry) => entry.title.toLowerCase().includes(keyword));
+        return entries.filter((entry) => matchesNavigationQuery({ label: entry.title, fullLabel: entry.fullLabel, keywords: entry.keywords }, keyword));
     }, [entries, query]);
 
     const activateEntry = (entry: PaletteEntry) => {

@@ -14,8 +14,8 @@ test("admin saves independent workbench switches without folding promotion into 
         Bun.file(new URL("../src/services/api/auth.ts", import.meta.url)).text(),
     ]);
 
-    expect(sidebar).toContain('features.imageWorkbenchEnabled ? [{ id: "toolbox-image"');
-    expect(sidebar).toContain('features.videoWorkbenchEnabled ? [{ id: "toolbox-video"');
+    expect(sidebar).toContain('features.imageWorkbenchEnabled ? [toolItem("toolbox-image", "/toolbox/image")]');
+    expect(sidebar).toContain('features.videoWorkbenchEnabled ? [toolItem("toolbox-video", "/toolbox/video")]');
     const payload = panel.slice(panel.indexOf("function toEditablePayload"), panel.indexOf("function sameEditableFeatures"));
     expect(payload).toContain("imageWorkbenchEnabled: features.imageWorkbenchEnabled");
     expect(payload).toContain("videoWorkbenchEnabled: features.videoWorkbenchEnabled");
