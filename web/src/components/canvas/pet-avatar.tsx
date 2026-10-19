@@ -6,6 +6,7 @@ import { FluidOrb } from "@/components/ui/fluid-orb";
 import { live2DModelURL, spriteImageURL } from "@/services/api/appearance";
 import { useEffect } from "react";
 import { petAvatarSize } from "@/lib/canvas/pet-menu";
+import { AgentAvatarBundle } from "./agent-avatar-bundle";
 
 export function PetAvatar({
     appearance,
@@ -30,7 +31,10 @@ export function PetAvatar({
         if (appearance.avatarType === "orb") onReady?.();
     }, [appearance.avatarType, onReady]);
     const fitted = petAvatarSize(appearance, height);
-    const content = appearance.avatarType === "sprite" && appearance.sprite && appearance.spriteResourceId ? (
+    const content =
+        appearance.avatarType === "bundle" ? (
+            <AgentAvatarBundle appearance={appearance} height={height} status={state?.status} paused={paused} reducedMotion={reducedMotion} onReady={onReady} onError={onError} />
+        ) : appearance.avatarType === "sprite" && appearance.sprite && appearance.spriteResourceId ? (
             <SpriteAvatar
                 pet={appearance.sprite}
                 url={spriteImageURL(appearance.spriteResourceId)}
@@ -49,6 +53,12 @@ export function PetAvatar({
                     <Live2DAvatar url={live2DModelURL(appearance.live2dResourceId, appearance.live2dEntry)} width={165} height={220} reducedMotion={reducedMotion || paused} onReady={onReady} onError={onError} fallback={<FluidOrb size={60} />} />
                 </span>
             </span>
-        ) : <FluidOrb size={fitted.height} />;
-    return <span data-pet-avatar-stage style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: height, height, flexShrink: 0 }}>{content}</span>;
+        ) : (
+            <FluidOrb size={fitted.height} />
+        );
+    return (
+        <span data-pet-avatar-stage style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: height, height, flexShrink: 0 }}>
+            {content}
+        </span>
+    );
 }

@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Compass, Eye, EyeOff, Focus, HelpCircle, LayoutTemplate, Minus, Plus } from "lucide-react";
 
 import { FloatingDock, type FloatingDockEntry } from "@/components/ui/aceternity/floating-dock";
@@ -32,6 +32,35 @@ export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoA
     const dockLabelRef = useRef<HTMLSpanElement>(null);
     const panelLabelRef = useRef<HTMLSpanElement>(null);
     const [precisionOpen, setPrecisionOpen] = useState(false);
+
+    useLayoutEffect(() => {
+        const root = rootRef.current;
+        const shell = root?.closest<HTMLElement>(".canvas-workspace-zoom-controls");
+        const main = root?.closest("main");
+        const dock = main?.querySelector<HTMLElement>(".canvas-floating-dock");
+        if (!root || !shell || !main || !dock) return;
+        // Decide from actual occupied width, including user toolbar preferences and side panels.
+        // Only horizontal overlap matters so moving the controls upward cannot oscillate the rule.
+        const measure = () => {
+            const a = root.getBoundingClientRect(),
+                b = dock.getBoundingClientRect();
+            const overlap = a.left < b.right + 8 && a.right + 8 > b.left;
+            const bottom = overlap ? "calc(var(--canvas-inset-y) + var(--space-16))" : "var(--canvas-inset-y)";
+            if (shell.style.bottom !== bottom) shell.style.bottom = bottom;
+        };
+        const resize = new ResizeObserver(measure);
+        for (const element of [root, main, dock, ...main.querySelectorAll(".canvas-workspace-shell,.canvas-project-sidebar")]) resize.observe(element);
+        const state = new MutationObserver(measure);
+        state.observe(main, { attributes: true, attributeFilter: ["class"] });
+        window.addEventListener("resize", measure);
+        measure();
+        return () => {
+            resize.disconnect();
+            state.disconnect();
+            window.removeEventListener("resize", measure);
+            shell.style.removeProperty("bottom");
+        };
+    }, []);
 
     useEffect(() => updateScaleDisplay(scale), [scale]);
 
@@ -75,7 +104,17 @@ export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoA
         { id: "zoom-minimap", label: isMiniMapOpen ? "关闭小地图" : "打开小地图", icon: <Compass />, active: isMiniMapOpen, onClick: onToggleMiniMap },
         { id: "zoom-fit", label: "适应画布", icon: <Focus />, onClick: onFitContent },
         ...(onAutoArrange ? [{ id: "zoom-auto-arrange", label: "自动整理节点", icon: <LayoutTemplate />, onClick: onAutoArrange }] : []),
-        ...(onHideNodeConnectionsChange ? [{ id: "zoom-hide-node-connections", label: hideNodeConnections ? "显示全部连线" : "设置隐藏节点连线", icon: hideNodeConnections ? <Eye /> : <EyeOff />, active: hideNodeConnections, onClick: () => onHideNodeConnectionsChange(!hideNodeConnections) }] : []),
+        ...(onHideNodeConnectionsChange
+            ? [
+                  {
+                      id: "zoom-hide-node-connections",
+                      label: hideNodeConnections ? "显示全部连线" : "设置隐藏节点连线",
+                      icon: hideNodeConnections ? <Eye /> : <EyeOff />,
+                      active: hideNodeConnections,
+                      onClick: () => onHideNodeConnectionsChange(!hideNodeConnections),
+                  },
+              ]
+            : []),
         { kind: "separator", id: "zoom-separator" },
         { id: "zoom-out", label: "缩小画布", icon: <Minus />, onClick: () => commitScale(liveScaleRef.current - 0.1) },
         {
@@ -83,7 +122,12 @@ export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoA
             label: "精确缩放",
             wide: true,
             quiet: true,
-            icon: <span className="inline-flex h-full items-center justify-center whitespace-nowrap text-[var(--fs-caption)] font-semibold leading-none tabular-nums"><span ref={dockLabelRef}>{Math.round(scale * 100)}</span><span className="ml-px text-[var(--fs-micro)] font-medium leading-none opacity-50">%</span></span>,
+            icon: (
+                <span className="inline-flex h-full items-center justify-center whitespace-nowrap text-[var(--fs-caption)] font-semibold leading-none tabular-nums">
+                    <span ref={dockLabelRef}>{Math.round(scale * 100)}</span>
+                    <span className="ml-px text-[var(--fs-micro)] font-medium leading-none opacity-50">%</span>
+                </span>
+            ),
             active: precisionOpen,
             onClick: () => setPrecisionOpen((value) => !value),
         },
@@ -108,9 +152,15 @@ export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoA
                         <div className="flex items-center justify-between gap-3">
                             <span>
                                 <span className="block text-[var(--fs-tiny)] font-semibold">画布尺度</span>
-                                <span className="mt-0.5 block text-[var(--fs-micro)]" style={{ color: theme.node.muted }}>精确控制视野密度</span>
+                                <span className="mt-0.5 block text-[var(--fs-micro)]" style={{ color: theme.node.muted }}>
+                                    精确控制视野密度
+                                </span>
                             </span>
-                            <span ref={panelLabelRef} className="rounded-full border px-2 py-0.5 text-[var(--fs-tiny)] font-semibold tabular-nums" style={{ background: theme.spatial.surface, borderColor: theme.toolbar.border, color: theme.accent.primary }}>
+                            <span
+                                ref={panelLabelRef}
+                                className="rounded-full border px-2 py-0.5 text-[var(--fs-tiny)] font-semibold tabular-nums"
+                                style={{ background: theme.spatial.surface, borderColor: theme.toolbar.border, color: theme.accent.primary }}
+                            >
                                 {Math.round(scale * 100)}%
                             </span>
                         </div>

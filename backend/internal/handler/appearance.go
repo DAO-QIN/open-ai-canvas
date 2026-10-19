@@ -14,6 +14,7 @@ func RegisterAppearanceRoutes(r *gin.RouterGroup, svc *service.Service) {
 	registerPetPreferenceRoutes(r, svc)
 	registerLive2DRoutes(r, svc)
 	registerSpriteRoutes(r, svc)
+	registerAgentAvatarBundleRoutes(r, svc)
 	serveUpdateMedia := func(admin bool) gin.HandlerFunc {
 		return func(c *gin.Context) {
 			var actor *model.User

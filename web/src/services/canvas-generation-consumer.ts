@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import { applyMaterializedGenerationTaskResultToNodes, generationTaskInput } from "@/lib/canvas/canvas-generation-task-sync";
-import { commitCanvasGenerationResult } from "@/lib/canvas/canvas-generation-result";
+import { commitCanvasGenerationResult, completedGenerationObservationBase } from "@/lib/canvas/canvas-generation-result";
 import { reconcileImageBatchRoot } from "@/lib/canvas/canvas-image-batch-retry";
 import { imageLayerCompositeSignature } from "@/lib/canvas/canvas-image-layers";
 import { findCanvasNodeAsset, requiresMaterializedCanvasAsset } from "@/lib/canvas/canvas-node-asset";
@@ -176,6 +176,7 @@ export async function applyCanvasGenerationTaskNodeEffect(input: {
             previousNodes,
             nodes,
             imageBatchRootId,
+            completedTaskId: input.task.status === "succeeded" ? input.task.id : undefined,
             signal: input.signal,
         });
     } catch (error) {
@@ -184,7 +185,7 @@ export async function applyCanvasGenerationTaskNodeEffect(input: {
     }
     throwIfAborted(input.signal);
     // 持久化已完成；最后一次 await 之后仍按节点合并，保留期间发生的编辑。
-    input.setNodes((current) => groupChanged(current) ? current : reconcileMaskBatchRoot(commitCanvasGenerationResult(current, before, node, input.task.id, additionalNodes), imageBatchRootId));
+    input.setNodes((current) => (groupChanged(current) ? current : reconcileMaskBatchRoot(commitCanvasGenerationResult(current, before, node, input.task.id, additionalNodes), imageBatchRootId)));
 }
 
 export async function persistCanvasOperationContinuationEffect(input: {
@@ -442,6 +443,7 @@ export async function persistCanvasCinematicSessionContinuationEffect(input: {
 export type CanvasGenerationEffectInput = {
     projectId: string;
     effectKey: string;
+    completedTaskId?: string;
     imageBatchRootId?: string;
     previousNodes?: CanvasNodeData[];
     nodes?: CanvasNodeData[];
@@ -530,91 +532,95 @@ export async function persistCanvasGenerationEffect(input: CanvasGenerationEffec
         return await withCanvasStorePersistenceLock(
             scope,
             async () => {
-            let latestDurable: ReturnType<typeof parseCanvasStorageDocument> | undefined;
-            let generationCommittedProject: CanvasProject | undefined;
-            let reconcileLiveOnFailure = false;
-            try {
-                throwIfAborted(input.signal);
-                const storage = localForageStorageForScope(scope);
-                await commitPendingCanvasStorePersistenceLocked(scope);
-                throwIfAborted(input.signal);
+                let latestDurable: ReturnType<typeof parseCanvasStorageDocument> | undefined;
+                let generationCommittedProject: CanvasProject | undefined;
+                let reconcileLiveOnFailure = false;
+                try {
+                    throwIfAborted(input.signal);
+                    const storage = localForageStorageForScope(scope);
+                    await commitPendingCanvasStorePersistenceLocked(scope);
+                    throwIfAborted(input.signal);
 
-                const durable = parseCanvasStorageDocument(await storage.getItem(CANVAS_STORE_KEY), memoryProjects);
-                latestDurable = durable;
-                throwIfAborted(input.signal);
-                const rebased = rebaseCanvasProjects({
-                    document: durable,
-                    baseProjects: [delta.baseProject],
-                    localProjects: [delta.localProject],
-                    baseRevision,
-                });
-                // The rebaser already resolves concurrent fields in favor of the
-                // latest durable value and merges unrelated generated fields.
-                // Commit that final document instead of rejecting the whole result.
-                if (rebased.conflicts.some((conflict) => conflict.reason !== "concurrent-update")) {
-                    reconcileLiveOnFailure = true;
-                    throw new Error("画布生成副作用与已删除内容冲突");
-                }
-
-                // 批量子图并发完成时，在锁内从最新子图派生主图，避免争写父节点。
-                if (input.imageBatchRootId) {
-                    rebased.document.state.projects = rebased.document.state.projects.map((project) => project.id === input.projectId
-                        ? { ...project, nodes: reconcileMaskBatchRoot(project.nodes, input.imageBatchRootId) }
-                        : project);
-                }
-
-                throwIfAborted(input.signal);
-                await storage.setItem(CANVAS_STORE_KEY, serializeCanvasStorageDocument(rebased.document));
-                // Dedicated generation setItem resolving is the commit point. From here, abort or ordinary persistence failures cannot negate the committed effect.
-                latestDurable = rebased.document;
-                generationCommittedProject = rebased.document.state.projects.find((candidate) => candidate.id === input.projectId);
-                recordCanvasStorageDocument(scope, rebased.document);
-                rebasePendingCanvasStorePersistenceAfterGenerationCommitLocked(scope, rebased.document);
-
-                while (pendingCanvasStorePersistence(scope)) {
-                    const ordinaryDocument = await commitPendingCanvasStorePersistenceLocked(scope);
-                    if (ordinaryDocument) {
-                        latestDurable = ordinaryDocument;
-                        recordCanvasStorageDocument(scope, ordinaryDocument);
+                    const durable = parseCanvasStorageDocument(await storage.getItem(CANVAS_STORE_KEY), memoryProjects);
+                    latestDurable = durable;
+                    throwIfAborted(input.signal);
+                    const baseProject = input.completedTaskId
+                        ? {
+                              ...delta.baseProject,
+                              nodes: completedGenerationObservationBase(delta.baseProject.nodes, delta.localProject.nodes, durable.state.projects.find((project) => project.id === input.projectId)?.nodes ?? [], input.completedTaskId, input.effectKey),
+                          }
+                        : delta.baseProject;
+                    const rebased = rebaseCanvasProjects({
+                        document: durable,
+                        baseProjects: [baseProject],
+                        localProjects: [delta.localProject],
+                        baseRevision,
+                    });
+                    // The rebaser already resolves concurrent fields in favor of the
+                    // latest durable value and merges unrelated generated fields.
+                    // Commit that final document instead of rejecting the whole result.
+                    if (rebased.conflicts.some((conflict) => conflict.reason !== "concurrent-update")) {
+                        reconcileLiveOnFailure = true;
+                        throw new Error("画布生成副作用与已删除内容冲突");
                     }
-                }
 
-                const finalDocument = parseCanvasStorageDocument(await storage.getItem(CANVAS_STORE_KEY), rebased.document.state.projects);
-                latestDurable = finalDocument;
-                recordCanvasStorageDocument(scope, finalDocument);
-                const persistedProject = rebaseCommittedCanvasGenerationOntoLiveProject(scope, input.projectId, finalDocument, memoryProject, baseRevision) ?? generationCommittedProject;
-                if (!persistedProject) throw new Error("画布项目不存在，无法确认生成副作用");
-                if (getActiveUserScope() === scope) {
-                    const publish = () => {
-                        useCanvasStore.setState((state) => ({
-                            projects: state.projects.map((project) => (project.id === input.projectId ? persistedProject : project)),
-                        }));
-                    };
-                    const durableProject = finalDocument.state.projects.find((project) => project.id === input.projectId);
-                    // 只有已落盘的快照才能跳过普通保存。rebase 带回的编辑仍是脏数据，
-                    // 否则 store 已接受编辑、后续 updateProject 判定无变化，刷新就会丢失。
-                    if (sameCanvasContent(durableProject, persistedProject) && JSON.stringify(durableProject?.viewport) === JSON.stringify(persistedProject.viewport)) {
-                        withCanvasStorePersistenceSuppressed(publish);
-                    } else {
-                        publish();
+                    // 批量子图并发完成时，在锁内从最新子图派生主图，避免争写父节点。
+                    if (input.imageBatchRootId) {
+                        rebased.document.state.projects = rebased.document.state.projects.map((project) => (project.id === input.projectId ? { ...project, nodes: reconcileMaskBatchRoot(project.nodes, input.imageBatchRootId) } : project));
                     }
-                }
-                return persistedProject;
-            } catch (error) {
-                if (generationCommittedProject) {
+
+                    throwIfAborted(input.signal);
+                    await storage.setItem(CANVAS_STORE_KEY, serializeCanvasStorageDocument(rebased.document));
+                    // Dedicated generation setItem resolving is the commit point. From here, abort or ordinary persistence failures cannot negate the committed effect.
+                    latestDurable = rebased.document;
+                    generationCommittedProject = rebased.document.state.projects.find((candidate) => candidate.id === input.projectId);
+                    recordCanvasStorageDocument(scope, rebased.document);
+                    rebasePendingCanvasStorePersistenceAfterGenerationCommitLocked(scope, rebased.document);
+
+                    while (pendingCanvasStorePersistence(scope)) {
+                        const ordinaryDocument = await commitPendingCanvasStorePersistenceLocked(scope);
+                        if (ordinaryDocument) {
+                            latestDurable = ordinaryDocument;
+                            recordCanvasStorageDocument(scope, ordinaryDocument);
+                        }
+                    }
+
+                    const finalDocument = parseCanvasStorageDocument(await storage.getItem(CANVAS_STORE_KEY), rebased.document.state.projects);
+                    latestDurable = finalDocument;
+                    recordCanvasStorageDocument(scope, finalDocument);
+                    const persistedProject = rebaseCommittedCanvasGenerationOntoLiveProject(scope, input.projectId, finalDocument, memoryProject, baseRevision) ?? generationCommittedProject;
+                    if (!persistedProject) throw new Error("画布项目不存在，无法确认生成副作用");
+                    if (getActiveUserScope() === scope) {
+                        const publish = () => {
+                            useCanvasStore.setState((state) => ({
+                                projects: state.projects.map((project) => (project.id === input.projectId ? persistedProject : project)),
+                            }));
+                        };
+                        const durableProject = finalDocument.state.projects.find((project) => project.id === input.projectId);
+                        // 只有已落盘的快照才能跳过普通保存。rebase 带回的编辑仍是脏数据，
+                        // 否则 store 已接受编辑、后续 updateProject 判定无变化，刷新就会丢失。
+                        if (sameCanvasContent(durableProject, persistedProject) && JSON.stringify(durableProject?.viewport) === JSON.stringify(persistedProject.viewport)) {
+                            withCanvasStorePersistenceSuppressed(publish);
+                        } else {
+                            publish();
+                        }
+                    }
+                    return persistedProject;
+                } catch (error) {
+                    if (generationCommittedProject) {
+                        if (latestDurable) {
+                            recordCanvasStorageDocument(scope, latestDurable);
+                            return rebaseCommittedCanvasGenerationOntoLiveProject(scope, input.projectId, latestDurable, memoryProject, baseRevision) ?? generationCommittedProject;
+                        }
+                        return generationCommittedProject;
+                    }
                     if (latestDurable) {
                         recordCanvasStorageDocument(scope, latestDurable);
-                        return rebaseCommittedCanvasGenerationOntoLiveProject(scope, input.projectId, latestDurable, memoryProject, baseRevision) ?? generationCommittedProject;
+                        reconcileCanvasGenerationFailure(scope, latestDurable.state.projects);
+                        if (reconcileLiveOnFailure) reconcileCanvasGenerationLiveProject(scope, latestDurable, delta.baseProject, delta.localProject);
                     }
-                    return generationCommittedProject;
+                    throw error;
                 }
-                if (latestDurable) {
-                    recordCanvasStorageDocument(scope, latestDurable);
-                    reconcileCanvasGenerationFailure(scope, latestDurable.state.projects);
-                    if (reconcileLiveOnFailure) reconcileCanvasGenerationLiveProject(scope, latestDurable, delta.baseProject, delta.localProject);
-                }
-                throw error;
-            }
             },
             { requireCrossRealmLock: true },
         );

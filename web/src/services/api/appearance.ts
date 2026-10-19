@@ -1,6 +1,6 @@
 import { http } from "@/services/api/request";
 import type { SkinDefinition } from "@/lib/skin-themes";
-import type { CanvasAppearance } from "@/lib/canvas/agent-appearance";
+import type { AgentAvatarBundleManifest, CanvasAppearance } from "@/lib/canvas/agent-appearance";
 import { apiBaseURL } from "@/services/api/request";
 import type { UpdateAnnouncement } from "@/lib/update-announcement";
 
@@ -73,6 +73,7 @@ export type AdminAppearance = {
 };
 
 export type AppearanceAssetSlot = "logo" | "logo-dark" | "video" | "poster";
+export type AppearanceAssetUploadSlot = AppearanceAssetSlot;
 
 export type AppearanceResource = {
     id: string;
@@ -80,6 +81,11 @@ export type AppearanceResource = {
     status: string;
     mimeType: string;
     size: number;
+};
+
+export type AgentAvatarBundleImport = {
+    resourceId: string;
+    manifest: AgentAvatarBundleManifest;
 };
 
 export async function getPublicAppearance(signal?: AbortSignal) {
@@ -130,11 +136,16 @@ export async function resetAdminAppearance() {
     return result.setting;
 }
 
-export async function uploadAppearanceAsset(slot: AppearanceAssetSlot | "update-image" | "update-video", file: File) {
+export async function uploadAppearanceAsset(slot: AppearanceAssetUploadSlot | "update-image" | "update-video", file: File) {
     const body = new FormData();
     body.append("file", file);
     const result = await http.post<{ resource: AppearanceResource }>(`/admin/settings/appearance/assets/${slot}`, body);
     return result.resource;
+}
+
+export function appearanceAssetURL(slot: AppearanceAssetUploadSlot, revision = "") {
+    const query = revision ? `?v=${encodeURIComponent(revision)}` : "";
+    return `${apiBaseURL.replace(/\/$/, "")}/public/appearance/assets/${encodeURIComponent(slot)}${query}`;
 }
 
 export function updateAnnouncementPreviewURL(resourceId: string) {
@@ -163,11 +174,24 @@ export function spriteThumbnailURL(resourceId: string, sprite: Pick<import("@/li
     return `${spriteImageURL(resourceId, preview)}/thumbnail?v=1&w=${sprite.frameWidth}&h=${sprite.frameHeight}&frame=${sprite.neutralFrame}`;
 }
 
+export async function uploadAgentAvatarBundle(file: File) {
+    const body = new FormData();
+    body.append("file", file);
+    const result = await http.post<{ bundle: AgentAvatarBundleImport }>("/admin/settings/appearance/avatar-bundles", body);
+    return result.bundle;
+}
+
+export function agentAvatarBundleFileURL(resourceId: string, file: string, preview = false, revision = "") {
+    const endpoint = preview ? "admin/settings" : "public";
+    const query = !preview && revision ? `?v=${encodeURIComponent(revision)}` : "";
+    return `${apiBaseURL.replace(/\/$/, "")}/${endpoint}/appearance/avatar/${encodeURIComponent(resourceId)}/${encodeURIComponent(file)}${query}`;
+}
+
 export function live2DModelURL(resourceId: string, entry: string, preview = false) {
     return `${apiBaseURL.replace(/\/$/, "")}/${preview ? "admin/settings" : "public"}/appearance/live2d/${encodeURIComponent(resourceId)}/${entry.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-export type PetAppearance = Pick<CanvasAppearance, "avatarType" | "avatarHeight" | "spriteResourceId" | "sprite" | "live2dResourceId" | "live2dEntry"> & { id: string; name: string; published: boolean };
+export type PetAppearance = Pick<CanvasAppearance, "avatarType" | "avatarHeight" | "spriteResourceId" | "sprite" | "live2dResourceId" | "live2dEntry" | "avatarBundleResourceId" | "avatarClipStates"> & { id: string; name: string; published: boolean };
 export type PetPreference = { modelId: string; scale: number; locked: boolean; hidden: boolean; revision: number };
 export async function getPetPreference(signal?: AbortSignal) {
     return (await http.get<{ preference: PetPreference }>("/me/pet-preference", { signal })).preference;

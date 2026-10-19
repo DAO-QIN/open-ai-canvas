@@ -12,15 +12,17 @@ import (
 
 // PetAppearance is a published presentation asset, never Agent identity or permissions.
 type PetAppearance struct {
-	ID               string     `json:"id"`
-	Name             string     `json:"name"`
-	Published        bool       `json:"published"`
-	AvatarType       string     `json:"avatarType"`
-	AvatarHeight     int        `json:"avatarHeight"`
-	SpriteResourceID string     `json:"spriteResourceId"`
-	Sprite           *SpritePet `json:"sprite,omitempty"`
-	Live2DResourceID string     `json:"live2dResourceId"`
-	Live2DEntry      string     `json:"live2dEntry"`
+	ID                     string            `json:"id"`
+	Name                   string            `json:"name"`
+	Published              bool              `json:"published"`
+	AvatarType             string            `json:"avatarType"`
+	AvatarHeight           int               `json:"avatarHeight"`
+	SpriteResourceID       string            `json:"spriteResourceId"`
+	Sprite                 *SpritePet        `json:"sprite,omitempty"`
+	Live2DResourceID       string            `json:"live2dResourceId"`
+	Live2DEntry            string            `json:"live2dEntry"`
+	AvatarBundleResourceID string            `json:"avatarBundleResourceId"`
+	AvatarClipStates       map[string]string `json:"avatarClipStates,omitempty"`
 }
 
 func petFromCanvas(c CanvasAppearance) PetAppearance {
@@ -34,7 +36,11 @@ func petFromCanvas(c CanvasAppearance) PetAppearance {
 		name = "Live2D 形象"
 		id = "live2d-" + c.Live2DResourceID
 	}
-	return PetAppearance{ID: id, Name: name, Published: true, AvatarType: c.AvatarType, AvatarHeight: c.AvatarHeight, SpriteResourceID: c.SpriteResourceID, Sprite: c.Sprite, Live2DResourceID: c.Live2DResourceID, Live2DEntry: c.Live2DEntry}
+	if c.AvatarType == "bundle" {
+		name = "状态动画形象"
+		id = "bundle-" + c.AvatarBundleResourceID
+	}
+	return PetAppearance{ID: id, Name: name, Published: true, AvatarType: c.AvatarType, AvatarHeight: c.AvatarHeight, SpriteResourceID: c.SpriteResourceID, Sprite: c.Sprite, Live2DResourceID: c.Live2DResourceID, Live2DEntry: c.Live2DEntry, AvatarBundleResourceID: c.AvatarBundleResourceID, AvatarClipStates: c.AvatarClipStates}
 }
 
 func applyPet(c CanvasAppearance, p PetAppearance) CanvasAppearance {
@@ -48,6 +54,10 @@ func applyPet(c CanvasAppearance, p PetAppearance) CanvasAppearance {
 	if p.AvatarType == "live2d" {
 		c.Live2DResourceID = p.Live2DResourceID
 		c.Live2DEntry = p.Live2DEntry
+	}
+	if p.AvatarType == "bundle" {
+		c.AvatarBundleResourceID = p.AvatarBundleResourceID
+		c.AvatarClipStates = p.AvatarClipStates
 	}
 	return c
 }
@@ -76,6 +86,10 @@ func publishedPets(pets []PetAppearance) []PetAppearance {
 				p.Live2DResourceID = ""
 				p.Live2DEntry = ""
 			}
+			if p.AvatarType != "bundle" {
+				p.AvatarBundleResourceID = ""
+				p.AvatarClipStates = nil
+			}
 			out = append(out, p)
 		}
 	}
@@ -84,7 +98,7 @@ func publishedPets(pets []PetAppearance) []PetAppearance {
 
 func catalogReferences(pets []PetAppearance, kind, id string) bool {
 	for _, p := range pets {
-		if (kind == "sprite" && p.SpriteResourceID == id) || (kind == "live2d" && p.Live2DResourceID == id) {
+		if (kind == "sprite" && p.SpriteResourceID == id) || (kind == "live2d" && p.Live2DResourceID == id) || (kind == "bundle" && p.AvatarBundleResourceID == id) {
 			return true
 		}
 	}
@@ -145,6 +159,21 @@ func (s *Service) validatePetCatalog(actor *model.User, a *AppearanceSetting, be
 			}
 		}
 		p.AvatarHeight = c.AvatarHeight
+		if p.AvatarBundleResourceID != "" {
+			known := ""
+			if before.Canvas.AvatarBundleResourceID == p.AvatarBundleResourceID || catalogReferences(before.PetCatalog, "bundle", p.AvatarBundleResourceID) {
+				known = p.AvatarBundleResourceID
+			}
+			manifest, err := s.validateAgentAvatarBundleResource(actor, p.AvatarBundleResourceID, known)
+			if err != nil {
+				return err
+			}
+			for _, clip := range c.AvatarClipStates {
+				if _, exists := manifest.Clips[clip]; !exists {
+					return BadAuthRequest("状态映射引用的动画不存在：" + clip)
+				}
+			}
+		}
 		if p.ID == a.Canvas.DefaultPetID {
 			if !p.Published {
 				return BadAuthRequest("默认形象必须已发布")

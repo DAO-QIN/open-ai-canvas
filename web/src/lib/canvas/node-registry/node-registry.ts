@@ -27,7 +27,10 @@ export function registerNodeDefinitions(defs: CanvasNodeDefinition[], ownerId = 
 
 /** Registers schema-driven canvas nodes from the unified plugin manifest. */
 export function registerPluginCanvasNodes(pluginId: string, nodes: PluginCanvasNodeContribution[]) {
-    registerNodeDefinitions(nodes.map((node) => canvasNodeDefinitionFromPlugin(pluginId, node)), pluginId);
+    registerNodeDefinitions(
+        nodes.map((node) => canvasNodeDefinitionFromPlugin(pluginId, node)),
+        pluginId,
+    );
 }
 
 /**
@@ -78,6 +81,14 @@ export function getNodeIcon(type: CanvasNodeTypeId) {
 /** 手动拉伸的最小尺寸 */
 export function getNodeMinSize(type: CanvasNodeTypeId) {
     return definitions.get(type)?.minSize ?? FALLBACK_MIN_SIZE;
+}
+
+/** Image previews can be narrower than media composer panels; keep a usable long edge. */
+export function getNodeResizeMinSize(node: CanvasNodeData) {
+    if (node.type !== "image") return getNodeMinSize(node.type);
+    if (node.metadata?.freeResize) return { width: 80, height: 80 };
+    const factor = 160 / Math.max(1, node.width, node.height);
+    return { width: node.width * factor, height: node.height * factor };
 }
 
 /** 拉伸时是否锁定宽高比 */

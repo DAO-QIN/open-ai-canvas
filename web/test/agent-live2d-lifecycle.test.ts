@@ -16,7 +16,7 @@ test("Live2D launcher remains mounted while the Agent panel is open", () => {
 });
 
 test("launcher waits for appearance configuration before displaying the default orb", () => {
-    expect(launcherSource).toContain("resolved = useAppearanceStore((s) => s.resolved)");
+    expect(launcherSource).toContain("usePetAppearance()");
     expect(launcherSource).toContain("{resolved ? (");
     expect(launcherSource).toContain("正在加载助手形象");
 });

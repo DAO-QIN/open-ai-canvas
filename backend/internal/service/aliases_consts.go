@@ -3,6 +3,7 @@ package service
 import "yingce/backend/internal/app"
 
 const (
+	AgentAvatarBundleMaxBytes          = app.AgentAvatarBundleMaxBytes
 	Live2DMaxBytes                     = app.Live2DMaxBytes
 	SpriteMaxBytes                     = app.SpriteMaxBytes
 	AnnouncementImageMaxBytes          = app.AnnouncementImageMaxBytes

@@ -6,6 +6,40 @@ import (
 	"yingce/backend/internal/model"
 )
 
+func TestPetCatalogBundleCoexistsAndRevokesPublicAccess(t *testing.T) {
+	s, _, _, admin := newAppearanceTestService(t)
+	data := agentAvatarBundleTestZIP(t, `{"version":1,"width":480,"height":432,"clips":{"idle":"idle.mp4"}}`, map[string][]byte{"idle.mp4": agentAvatarTestMP4()})
+	bundle, err := s.UploadAgentAvatarBundle(admin, multipartFileHeader(t, "avatar.zip", "application/zip", data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	value := defaultAppearanceSetting()
+	value.Canvas.AvatarType = "orb"
+	seedPetCatalog(&value)
+	value.PetCatalog = append(value.PetCatalog, PetAppearance{ID: "video-pet", Name: "动画形象", Published: true, AvatarType: "bundle", AvatarHeight: 220, AvatarBundleResourceID: bundle.ResourceID, AvatarClipStates: map[string]string{"idle": "idle", "running": "idle"}})
+	saved, err := s.UpdateAppearance(admin, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Canvas.AvatarType != "orb" || saved.Public.PetCatalog[1].AvatarBundleResourceID != bundle.ResourceID {
+		t.Fatal("catalog import changed the existing default or lost bundle data")
+	}
+	if _, _, err = s.AgentAvatarBundleAsset(nil, bundle.ResourceID, "idle.mp4"); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.appearanceResourceReferences([]string{bundle.ResourceID})[bundle.ResourceID]) == 0 {
+		t.Fatal("catalog bundle is not protected from deletion")
+	}
+	value = saved.AppearanceSetting
+	value.PetCatalog[1].Published = false
+	if _, err = s.UpdateAppearance(admin, value); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = s.AgentAvatarBundleAsset(nil, bundle.ResourceID, "idle.mp4"); err == nil {
+		t.Fatal("unpublished catalog bundle remained public")
+	}
+}
+
 func TestPetCatalogCapacity(t *testing.T) {
 	s, _, _, admin := newAppearanceTestService(t)
 	value := defaultAppearanceSetting()

@@ -10,17 +10,7 @@ export type ToolbarId = "main" | "selection" | "node-hover" | "add-node-menu";
 export type NodeToolbarGroup = "primary" | "portrait" | "viewpoint" | "lighting" | "panorama" | "process" | "nine_grid" | "workspace" | "utility" | "more";
 
 /** 工具分类——用于分组渲染、危险隔离与 separator 自动插入 */
-export type ToolCategory =
-    | "navigation"
-    | "history"
-    | "create"
-    | "appearance"
-    | "selection"
-    | "layout"
-    | "arrange"
-    | "danger"
-    | "node-state"
-    | "resource";
+export type ToolCategory = "navigation" | "history" | "create" | "appearance" | "selection" | "layout" | "arrange" | "danger" | "node-state" | "resource";
 
 /** 所有工具栏回调的聚合类型。工具定义通过 ctx.handlers.onXxx 访问 */
 export type ToolbarHandlers = {
@@ -89,6 +79,8 @@ export type ToolbarHandlers = {
     onNodeEmotion: (node: CanvasNodeData) => void;
     onNodePortraitTexture: (node: CanvasNodeData) => void;
     onNodeCrop: (node: CanvasNodeData) => void;
+    onNodeCreateEditCopy?: (node: CanvasNodeData) => void;
+    onNodeRotateImage?: (node: CanvasNodeData, direction: -1 | 0 | 1) => void;
     onNodeSplit: (node: CanvasNodeData) => void;
     onNodeUpscale: (node: CanvasNodeData) => void;
     onNodeSuperResolve: (node: CanvasNodeData) => void;
@@ -124,6 +116,7 @@ export type ToolContext = {
     /** 视频音频提取/片段截取进行中（节点悬停工具栏用） */
     extractingAudio: boolean;
     trimmingVideo: boolean;
+    rotatingImage?: boolean;
     /** 合并视频中（多选工具栏用） */
     mergingVideos: boolean;
     /** 主工具栏面板开关状态（仅主工具栏使用） */
@@ -139,7 +132,8 @@ export type AddNodeMenuContext = {
     isProjectLinked: boolean;
     /** 内置应用插件的启用状态；未声明时视为未提供 gating 信息。 */
     enabledPluginIds?: ReadonlySet<string>;
-    handlers: Pick<ToolbarHandlers,
+    handlers: Pick<
+        ToolbarHandlers,
         | "onAddText"
         | "onAddImage"
         | "onAddVideo"
