@@ -133,13 +133,13 @@ function WorkspaceSwitcher({ collapsed, onNavigate }: { collapsed: boolean; onNa
 
     if (collapsed) {
         return (
-            <div className="app-workspace-sidebar-brand-row relative shrink-0 flex items-center justify-center px-3 pt-3">
+            <div className="app-workspace-sidebar-brand-row relative shrink-0">
                 <Link to="/" onClick={onNavigate} className="app-workspace-sidebar-brand-button group" aria-label={`${appearance.brandName}首页`}>
                     <BrandLogoFrame
                         className="app-workspace-brand-mark grid size-8 shrink-0 place-items-center rounded-[var(--r-sm)] shadow-sm"
-                        logoClassName="size-5 object-contain"
+                        logoClassName="app-workspace-brand-logo object-contain"
                         alt=""
-                        fallback={<InfinityIcon className="size-4" strokeWidth={2.2} />}
+                        fallback={<InfinityIcon className="app-workspace-brand-logo" strokeWidth={2.2} />}
                     />
                 </Link>
             </div>
@@ -147,14 +147,14 @@ function WorkspaceSwitcher({ collapsed, onNavigate }: { collapsed: boolean; onNa
     }
 
     return (
-        <div className="app-workspace-sidebar-brand-row relative shrink-0 px-3 pt-3">
+        <div className="app-workspace-sidebar-brand-row relative shrink-0">
             <Link to="/" onClick={onNavigate} className="app-workspace-sidebar-brand-button group" aria-label={`${appearance.brandName}首页`}>
-                <span className="flex min-w-0 items-center gap-2">
+                <span className="flex min-w-0 items-center gap-[var(--space-3)]">
                     <BrandLogoFrame
                         className="app-workspace-brand-mark grid size-8 shrink-0 place-items-center rounded-[var(--r-sm)] shadow-sm"
-                        logoClassName="size-5 object-contain"
+                        logoClassName="app-workspace-brand-logo object-contain"
                         alt=""
-                        fallback={<InfinityIcon className="size-4" strokeWidth={2.2} />}
+                        fallback={<InfinityIcon className="app-workspace-brand-logo" strokeWidth={2.2} />}
                     />
                     <span className="flex min-w-0 flex-col">
                         <span className="app-workspace-brand-wordmark truncate text-[var(--fs-body)] leading-none font-semibold">{appearance.brandName}</span>

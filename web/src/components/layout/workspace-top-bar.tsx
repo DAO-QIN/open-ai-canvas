@@ -1,5 +1,5 @@
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { Link, useLocation } from "react-router";
+import { useLocation } from "react-router";
 import type { Ref } from "react";
 import { workspaceNavigationTool } from "@/constant/navigation-tools";
 
@@ -35,9 +35,7 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
                 {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
             </button>
             <nav className="app-workspace-topbar-breadcrumb" aria-label="当前位置">
-                <Link to="/" className="font-medium text-foreground/65 transition-colors hover:text-foreground">{brandName}</Link>
-                <span aria-hidden="true">/</span>
-                <span className="truncate font-medium text-foreground">{pageTitle}</span>
+                <span className="truncate font-semibold text-foreground">{pageTitle}</span>
             </nav>
             <WorkspaceTopBarExtensionSlot />
             <div className="app-workspace-topbar-actions">

@@ -15485,12 +15485,16 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 
 /* ===== 2026-09 user workspace alignment =====
    这一组规则只作用于真实用户端壳层和首页，后台与画布编辑器保持原有职责和交互。
-   几何基准：侧栏 200px、顶部 56px、导航行 44px、首页内容最大宽度 1180px。 */
+   几何基准：侧栏 224px、顶部 72px、导航行 48px、首页内容最大宽度 1180px。 */
 .app-user-workspace {
-    --workspace-reference-sidebar: 200px;
+    --workspace-reference-sidebar: 224px;
     --workspace-reference-collapsed: 64px;
-    --workspace-reference-topbar: 56px;
-    --workspace-reference-row: 44px;
+    --workspace-reference-topbar: 72px;
+    --workspace-reference-row: var(--space-12);
+    --workspace-navigation-brand-size: var(--fs-title);
+    --workspace-navigation-label-size: var(--fs-heading);
+    --workspace-navigation-icon-size: var(--space-5);
+    --workspace-navigation-surface: color-mix(in srgb, var(--user-page-bg) 55%, var(--user-surface-muted) 45%);
     --workspace-reference-page-bg: #ffffff;
     background: var(--workspace-reference-page-bg);
 }
@@ -15515,28 +15519,39 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 
 .app-user-workspace .app-workspace-sidebar-brand-row {
     display: flex;
-    min-height: 54px;
+    height: var(--workspace-reference-topbar);
+    min-height: var(--workspace-reference-topbar);
     align-items: center;
     gap: 2px;
-    padding: 10px 8px 0;
+    padding: 0 var(--space-6);
 }
 
 .app-user-workspace .app-workspace-sidebar-brand-button {
     display: flex;
     min-width: 0;
-    min-height: 38px;
+    min-height: var(--workspace-reference-row);
     flex: 1 1 auto;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 6px;
     border-radius: 10px;
-    padding: 0 7px;
+    padding: 0;
     transition: background-color 160ms cubic-bezier(.16, 1, .3, 1);
 }
 
 .app-user-workspace .app-workspace-sidebar-brand-button:hover,
 .app-user-workspace .app-workspace-sidebar-brand-button:focus-visible {
     background: rgba(62, 62, 68, .055);
+}
+
+.app-user-workspace .app-workspace-sidebar-nav.is-collapsed .app-workspace-sidebar-brand-row {
+    justify-content: center;
+    padding: 0;
+}
+
+.app-user-workspace .app-workspace-sidebar-nav.is-collapsed .app-workspace-sidebar-brand-button {
+    flex: 0 0 var(--workspace-reference-row);
+    justify-content: center;
 }
 
 .app-user-workspace .app-workspace-sidebar-collapse-button {
@@ -15596,14 +15611,19 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 }
 
 .app-user-workspace .app-workspace-brand-mark {
-    width: 28px;
-    height: 28px;
+    width: var(--space-8);
+    height: var(--space-8);
     border-radius: 8px;
     background: transparent;
     box-shadow: none;
     color: var(--user-accent) !important;
     border: 1px solid color-mix(in srgb, var(--user-accent) 28%, transparent);
     background: color-mix(in srgb, var(--user-accent) 8%, transparent);
+}
+
+.app-user-workspace .app-workspace-brand-logo {
+    width: var(--space-8);
+    height: var(--space-8);
 }
 
 .app-user-workspace .app-workspace-nav-link {
@@ -15621,9 +15641,9 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 
 .app-user-workspace .app-workspace-nav-link .app-workspace-nav-icon {
     display: grid;
-    width: 28px;
-    height: 28px;
-    flex: 0 0 28px;
+    width: var(--space-6);
+    height: var(--space-6);
+    flex: 0 0 var(--space-6);
     place-items: center;
     border-radius: 9px;
 }
@@ -15666,9 +15686,9 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 }
 
 .app-user-workspace .app-workspace-brand-wordmark {
-    font-size: 15px;
+    font-size: var(--workspace-navigation-brand-size);
     font-weight: 700;
-    letter-spacing: -.03em;
+    letter-spacing: normal;
 }
 
 .app-user-workspace .app-workspace-topbar {
@@ -15691,7 +15711,7 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     gap: 8px;
     margin-right: auto;
     color: rgba(0, 0, 0, .42);
-    font-size: 13px;
+    font-size: var(--fs-heading-lg);
 }
 
 .app-user-workspace .app-workspace-topbar-breadcrumb > span:not(.truncate) {
@@ -17469,7 +17489,7 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
 
 .app-user-workspace .app-workspace-sidebar,
 .app-user-workspace .app-workspace-sidebar-nav {
-    background: #f6f6f7;
+    background: var(--workspace-navigation-surface) !important;
 }
 
 .app-user-workspace .app-workspace-sidebar {
@@ -18218,11 +18238,11 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     background: var(--user-page-bg);
 }
 
-/* Navigation rail: 20% wider than the previous 180 / 58 compact track. */
+/* Brand and navigation share one left alignment; the header continues the same surface. */
 .app-user-workspace .app-workspace-sidebar {
     width: var(--workspace-reference-sidebar) !important;
     flex-basis: var(--workspace-reference-sidebar) !important;
-    background: var(--user-page-bg) !important;
+    background: var(--workspace-navigation-surface) !important;
     border-right: 0 !important;
     transition: width var(--user-motion);
 }
@@ -18230,24 +18250,24 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     width: var(--workspace-reference-collapsed) !important;
     flex-basis: var(--workspace-reference-collapsed) !important;
 }
-.app-user-workspace .app-workspace-sidebar-scroll-area { padding: 22px 12px 12px !important; gap: 24px !important; }
+.app-user-workspace .app-workspace-sidebar-scroll-area { padding: var(--space-3) !important; gap: var(--space-5) !important; }
 .app-user-workspace .app-workspace-sidebar-footer { padding: 12px 12px 14px !important; border-top: 0 !important; }
 .app-user-workspace .app-workspace-nav-link {
     min-height: var(--workspace-reference-row) !important;
-    padding: 3px 10px !important;
+    padding: 0 var(--space-4) !important;
     border-radius: 13px !important;
     color: var(--user-ink-muted) !important;
-    font-size: 13px !important;
+    font-size: var(--workspace-navigation-label-size) !important;
     font-weight: 560 !important;
     transition: background var(--user-motion), color var(--user-motion), transform var(--user-motion);
 }
-.app-user-workspace .app-workspace-nav-link .app-workspace-nav-main { gap: 10px !important; }
+.app-user-workspace .app-workspace-nav-link .app-workspace-nav-main { gap: var(--space-4) !important; }
 .app-user-workspace .app-workspace-nav-link .app-workspace-nav-icon svg,
-.app-user-workspace .app-workspace-nav-link .app-workspace-nav-main > svg { width: 16px !important; height: 16px !important; }
+.app-user-workspace .app-workspace-nav-link .app-workspace-nav-main > svg { width: var(--workspace-navigation-icon-size) !important; height: var(--workspace-navigation-icon-size) !important; }
 .app-user-workspace .app-workspace-nav-link.is-active { background: transparent !important; color: var(--user-ink) !important; font-weight: 680 !important; }
 .app-user-workspace .app-workspace-nav-link:hover:not(.is-active),
 .app-user-workspace .app-workspace-nav-link:focus-visible:not(.is-active) { background: var(--user-surface-hover) !important; color: var(--user-ink) !important; }
-.app-user-workspace .app-workspace-nav-group-toggle { color: var(--user-ink-soft) !important; }
+.app-user-workspace .app-workspace-nav-group-toggle { padding-inline: var(--space-4); color: var(--user-ink-soft) !important; font-size: var(--fs-caption); }
 .app-user-workspace .app-workspace-sidebar.is-collapsed .app-workspace-sidebar-scroll-area { padding-inline: 8px !important; }
 .app-user-workspace .app-workspace-sidebar.is-collapsed .app-workspace-nav-link { width: 48px !important; }
 
@@ -18255,9 +18275,9 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     min-height: var(--workspace-reference-topbar) !important;
     height: var(--workspace-reference-topbar) !important;
     overflow: visible;
-    padding-inline: 20px !important;
+    padding-inline: calc(var(--space-6) + var(--space-1)) !important;
     border-bottom: 0 !important;
-    background: color-mix(in srgb, var(--user-page-bg) 92%, transparent) !important;
+    background: var(--workspace-navigation-surface) !important;
     color: var(--user-ink) !important;
 }
 .app-user-workspace .app-workspace-topbar-breadcrumb { color: var(--user-ink-muted) !important; }
