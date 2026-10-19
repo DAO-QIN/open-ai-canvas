@@ -18241,7 +18241,7 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     background: var(--user-page-bg);
 }
 
-/* Brand and navigation share one left alignment; the header continues the same surface. */
+/* Brand and navigation share one left alignment; the header blends into page content. */
 .app-user-workspace .app-workspace-sidebar {
     width: var(--workspace-reference-sidebar) !important;
     flex-basis: var(--workspace-reference-sidebar) !important;
@@ -18280,7 +18280,7 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     overflow: visible;
     padding-inline: calc(var(--space-6) + var(--space-1)) !important;
     border-bottom: 0 !important;
-    background: var(--workspace-navigation-surface) !important;
+    background: var(--user-page-bg) !important;
     color: var(--user-ink) !important;
 }
 .app-user-workspace .app-workspace-topbar-breadcrumb { color: var(--user-ink-muted) !important; }
