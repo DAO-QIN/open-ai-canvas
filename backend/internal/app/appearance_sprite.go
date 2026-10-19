@@ -222,36 +222,49 @@ func validateSpriteArchive(reader io.ReaderAt, size int64) (*SpritePet, error) {
 	var m struct {
 		DisplayName     string     `json:"displayName"`
 		SpritesheetPath string     `json:"spritesheetPath"`
-		Version         int        `json:"spriteVersionNumber"`
+		Version         *int       `json:"spriteVersionNumber"`
 		Custom          *SpritePet `json:"yinghui"`
 	}
 	if json.Unmarshal(b, &m) != nil || !live2DFileName(m.SpritesheetPath) {
 		return nil, BadAuthRequest("pet.json 或 spritesheetPath 无效")
 	}
+	sheetPath := path.Join(path.Dir(entry), m.SpritesheetPath)
+	b, err = readSpriteFile(files[sheetPath], SpriteMaxBytes)
+	if err != nil {
+		return nil, err
+	}
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
+	if err != nil || !oneOf(format, "png", "webp") || !oneOf(strings.ToLower(path.Ext(sheetPath)), ".png", ".webp") {
+		return nil, BadAuthRequest("精灵图集须为有效 PNG 或静态 WebP")
+	}
+	if (format == "png") != strings.HasSuffix(strings.ToLower(sheetPath), ".png") {
+		return nil, BadAuthRequest("精灵图集扩展名与内容不符")
+	}
 	p := m.Custom
 	if p == nil {
-		if m.Version != 1 && m.Version != 2 {
-			return nil, BadAuthRequest("请提供 Codex v1/v2 清单或 yinghui 自定义动作配置")
+		version := 0
+		if m.Version != nil {
+			version = *m.Version
+		} else if cfg.Width == 1536 {
+			// Older Codex packages omit the version; infer only exact standard layouts.
+			switch cfg.Height {
+			case 1872:
+				version = 1
+			case 2288:
+				version = 2
+			}
 		}
-		p = codexSpritePet(m.Version)
+		if version != 1 && version != 2 {
+			return nil, BadAuthRequest("无法识别宠物图集，请提供 Codex v1/v2 版本号或 yinghui 自定义动作配置")
+		}
+		p = codexSpritePet(version)
 	}
-	p.SpritesheetPath = path.Join(path.Dir(entry), m.SpritesheetPath)
+	p.SpritesheetPath = sheetPath
 	if p.DisplayName == "" {
 		p.DisplayName = m.DisplayName
 	}
 	if p.Speed == 0 {
 		p.Speed = 1
-	}
-	b, err = readSpriteFile(files[p.SpritesheetPath], SpriteMaxBytes)
-	if err != nil {
-		return nil, err
-	}
-	cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
-	if err != nil || !oneOf(format, "png", "webp") || !oneOf(strings.ToLower(path.Ext(p.SpritesheetPath)), ".png", ".webp") {
-		return nil, BadAuthRequest("精灵图集须为有效 PNG 或静态 WebP")
-	}
-	if (format == "png") != strings.HasSuffix(strings.ToLower(p.SpritesheetPath), ".png") {
-		return nil, BadAuthRequest("精灵图集扩展名与内容不符")
 	}
 	if cfg.Width != p.AtlasWidth || cfg.Height != p.AtlasHeight {
 		return nil, BadAuthRequest(fmt.Sprintf("图集实际尺寸 %d×%d 与配置不一致", cfg.Width, cfg.Height))

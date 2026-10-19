@@ -51,6 +51,56 @@ func TestSpriteArchiveCustomAndCodex(t *testing.T) {
 	}
 }
 
+func TestSpriteArchiveCodexVersionInference(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		width, height int
+		version       any
+		wantVersion   int
+	}{
+		{"legacy v1 without version", 1536, 1872, nil, 1},
+		{"v2 without version", 1536, 2288, nil, 2},
+		{"explicit v1", 1536, 1872, 1, 1},
+		{"explicit v2", 1536, 2288, 2, 2},
+		{"explicit v1 mismatches v2", 1536, 2288, 1, 0},
+		{"explicit v2 mismatches v1", 1536, 1872, 2, 0},
+		{"unsupported version", 1536, 1872, 3, 0},
+		{"explicit zero", 1536, 1872, 0, 0},
+		{"wrong width", 768, 1872, nil, 0},
+		{"unknown height", 1536, 2080, nil, 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			manifest := map[string]any{"displayName": "旧版宠物", "spritesheetPath": "atlas.png"}
+			if tt.version != nil {
+				manifest["spriteVersionNumber"] = tt.version
+			}
+			body, err := json.Marshal(manifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var atlas bytes.Buffer
+			if err := png.Encode(&atlas, image.NewNRGBA(image.Rect(0, 0, tt.width, tt.height))); err != nil {
+				t.Fatal(err)
+			}
+			data := live2DTestZIP(t, map[string][]byte{"pet.json": body, "atlas.png": atlas.Bytes()})
+			p, err := validateSpriteArchive(bytes.NewReader(data), int64(len(data)))
+			if tt.wantVersion == 0 {
+				if err == nil {
+					t.Fatal("unsupported layout or explicit version accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := codexSpritePet(tt.wantVersion)
+			if p.AtlasHeight != want.AtlasHeight || p.LookDirections != want.LookDirections || p.NeutralFrame != want.NeutralFrame || p.Bindings != want.Bindings || len(p.Actions) != 9 || p.SleepAfterSeconds != 0 || p.DisplayName != "旧版宠物" {
+				t.Fatalf("inferred defaults differ from standard: %+v", p)
+			}
+		})
+	}
+}
+
 func TestSpriteArchiveRejectsUnsafeAndMalformedPackages(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
