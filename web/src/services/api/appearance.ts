@@ -159,6 +159,10 @@ export function spriteImageURL(resourceId: string, preview = false) {
     return `${apiBaseURL.replace(/\/$/, "")}/${preview ? "admin/settings" : "public"}/appearance/sprite/${encodeURIComponent(resourceId)}`;
 }
 
+export function spriteThumbnailURL(resourceId: string, sprite: Pick<import("@/lib/canvas/sprite-pet").SpritePet, "frameWidth" | "frameHeight" | "neutralFrame">, preview = false) {
+    return `${spriteImageURL(resourceId, preview)}/thumbnail?v=1&w=${sprite.frameWidth}&h=${sprite.frameHeight}&frame=${sprite.neutralFrame}`;
+}
+
 export function live2DModelURL(resourceId: string, entry: string, preview = false) {
     return `${apiBaseURL.replace(/\/$/, "")}/${preview ? "admin/settings" : "public"}/appearance/live2d/${encodeURIComponent(resourceId)}/${entry.split("/").map(encodeURIComponent).join("/")}`;
 }

@@ -8,6 +8,7 @@ import (
 	"image"
 	_ "image/png"
 	"io"
+	"log/slog"
 	"math"
 	"mime/multipart"
 	"path"
@@ -311,6 +312,12 @@ func (s *Service) UploadSpritePet(actor *model.User, header *multipart.FileHeade
 	if err != nil {
 		return nil, err
 	}
+	if _, _, err = s.SpriteAsset(actor, r.ID); err == nil {
+		_, _, err = s.SpriteThumbnail(actor, r.ID, p.FrameWidth, p.FrameHeight, p.NeutralFrame)
+	}
+	if err != nil {
+		slog.Warn("sprite thumbnail warmup failed", "resourceId", r.ID, "error", err)
+	}
 	return &SpriteImport{ResourceID: r.ID, Config: p}, nil
 }
 
@@ -352,25 +359,43 @@ func (s *Service) validateSpriteResource(actor *model.User, id, currentID string
 	return validateSpriteConfig(config)
 }
 
-func (s *Service) SpriteAsset(actor *model.User, id string) ([]byte, string, error) {
+func (s *Service) spriteReadResource(actor *model.User, id string) (*model.Resource, error) {
 	_, a, err := s.readAppearance()
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	public := a.Canvas.AvatarType == "sprite" && a.Canvas.SpriteResourceID == id || catalogReferences(publishedPets(a.PetCatalog), "sprite", id)
 	if !public {
 		if err = s.RequireAdmin(actor); err != nil {
-			return nil, "", err
+			return nil, err
 		}
 	}
 	known := a.Canvas.SpriteResourceID
 	if public || catalogReferences(a.PetCatalog, "sprite", id) {
 		known = id
 	}
-	r, err := s.spriteResource(actor, id, known)
+	return s.spriteResource(actor, id, known)
+}
+
+func (s *Service) SpriteAsset(actor *model.User, id string) ([]byte, string, error) {
+	// Authorization is rechecked before every cache read, including conditional HTTP requests.
+	r, err := s.spriteReadResource(actor, id)
 	if err != nil {
 		return nil, "", err
 	}
+	b, err := s.cachedSpriteBytes(r, "atlas", func() ([]byte, error) {
+		data, _, e := s.extractSpriteAsset(r)
+		return data, e
+	})
+	mime := "image/png"
+	if len(b) >= 12 && string(b[:4]) == "RIFF" {
+		mime = "image/webp"
+	}
+	return b, mime, err
+}
+
+func (s *Service) extractSpriteAsset(r *model.Resource) ([]byte, string, error) {
+	id := r.ID
 	_, body, err := s.OpenResource(r.UserID, id)
 	if err != nil {
 		return nil, "", err

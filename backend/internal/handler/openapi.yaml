@@ -462,6 +462,39 @@ paths:
         "200": { description: PNG 或 WebP 图片，非 JSON 信封 }
         "400": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
+  /public/appearance/sprite/{id}/thumbnail:
+    get:
+      tags: [meta]
+      security: []
+      summary: 读取当前启用或已发布形象的中立帧缩略图
+      description: 最长边88px，透明PNG。w、h、frame须匹配已发布配置；鉴权通过后支持ETag和If-None-Match。
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: w, required: true, schema: { type: integer, minimum: 8, maximum: 4096 } }
+        - { in: query, name: h, required: true, schema: { type: integer, minimum: 8, maximum: 4096 } }
+        - { in: query, name: frame, required: true, schema: { type: integer, minimum: 0, maximum: 4095 } }
+      responses:
+        "200": { description: PNG图片，非JSON信封 }
+        "304": { description: 内容未变化 }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /admin/settings/appearance/sprite/{id}/thumbnail:
+    get:
+      tags: [admin]
+      summary: 预览精灵中立帧缩略图
+      description: 最长边88px透明PNG；支持编辑后的单帧尺寸和中立帧。资源归属规则与图集预览一致。
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: query, name: w, required: true, schema: { type: integer, minimum: 8, maximum: 4096 } }
+        - { in: query, name: h, required: true, schema: { type: integer, minimum: 8, maximum: 4096 } }
+        - { in: query, name: frame, required: true, schema: { type: integer, minimum: 0, maximum: 4095 } }
+      responses:
+        "200": { description: PNG图片，非JSON信封 }
+        "304": { description: 内容未变化 }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
   /admin/settings/appearance/live2d:
     post:
       tags: [admin]

@@ -1,7 +1,11 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -40,7 +44,7 @@ func registerSpriteRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		ok(c, gin.H{"pet": result})
 	})
-	serve := func(admin bool) gin.HandlerFunc {
+	serve := func(admin, thumbnail bool) gin.HandlerFunc {
 		return func(c *gin.Context) {
 			var actor *model.User
 			if admin {
@@ -55,7 +59,22 @@ func registerSpriteRoutes(r *gin.RouterGroup, svc *service.Service) {
 					return
 				}
 			}
-			data, mime, err := svc.SpriteAsset(actor, c.Param("id"))
+			var data []byte
+			var mime string
+			var err error
+			if thumbnail {
+				var params [3]int
+				for i, key := range []string{"w", "h", "frame"} {
+					params[i], err = strconv.Atoi(c.Query(key))
+					if err != nil {
+						fail(c, http.StatusBadRequest, fmt.Errorf("缩略图帧参数无效"))
+						return
+					}
+				}
+				data, mime, err = svc.SpriteThumbnail(actor, c.Param("id"), params[0], params[1], params[2])
+			} else {
+				data, mime, err = svc.SpriteAsset(actor, c.Param("id"))
+			}
 			if err != nil {
 				failService(c, err)
 				return
@@ -63,9 +82,19 @@ func registerSpriteRoutes(r *gin.RouterGroup, svc *service.Service) {
 			c.Header("X-Content-Type-Options", "nosniff")
 			c.Header("Cache-Control", "private, no-cache")
 			c.Header("Content-Security-Policy", "default-src 'none'")
+			etag := fmt.Sprintf("\"%x\"", sha256.Sum256(data))
+			c.Header("ETag", etag)
+			for _, candidate := range strings.Split(c.GetHeader("If-None-Match"), ",") {
+				if strings.TrimPrefix(strings.TrimSpace(candidate), "W/") == etag || strings.TrimSpace(candidate) == "*" {
+					c.Status(http.StatusNotModified)
+					return
+				}
+			}
 			c.Data(http.StatusOK, mime, data)
 		}
 	}
-	r.GET("/public/appearance/sprite/:id", serve(false))
-	r.GET("/admin/settings/appearance/sprite/:id", serve(true))
+	r.GET("/public/appearance/sprite/:id", serve(false, false))
+	r.GET("/admin/settings/appearance/sprite/:id", serve(true, false))
+	r.GET("/public/appearance/sprite/:id/thumbnail", serve(false, true))
+	r.GET("/admin/settings/appearance/sprite/:id/thumbnail", serve(true, true))
 }

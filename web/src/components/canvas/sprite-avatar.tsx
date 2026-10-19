@@ -35,7 +35,7 @@ export function SpriteAvatar({
     const [loaded, setLoaded] = useState("");
     const [error, setError] = useState("");
     const greeted = useRef(false);
-    const spriteImage = useSpriteImage(url);
+    const spriteImage = useSpriteImage(url, "atlas", pet.atlasWidth * pet.atlasHeight * 4);
     useEffect(() => {
         if (spriteImage.error) {
             setError(spriteImage.error);

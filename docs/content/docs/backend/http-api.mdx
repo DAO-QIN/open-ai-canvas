@@ -16,6 +16,8 @@ description: 信封、错误码与 OpenAPI
 
 `POST /api/admin/settings/appearance/sprite` 接收 multipart `file`，管理员导入 ZIP（最大 16 MiB），返回 `{pet:{resourceId,config}}`。`GET /api/admin/settings/appearance/sprite/:id` 预览上传者或形象库引用的图片；`GET /api/public/appearance/sprite/:id` 允许读取当前启用及已发布的图集，返回 PNG/WebP，不是 JSON 信封。
 
+对应的`GET .../sprite/:id/thumbnail?w=<frameWidth>&h=<frameHeight>&frame=<neutralFrame>&v=1`返回最长边88px的中立帧PNG，供形象列表使用。公开接口只接受当前启用或已发布形象的帧配置，管理员可预览合法编辑值。图集和缩略图使用`ETag`、`If-None-Match`与`private, no-cache`；授权校验通过后才返回304，下架不会通过条件请求绕过权限。派生文件缓存不修改原始资源。
+
 外观 `canvas.avatarType` 增加 `sprite`，配置增加 `spriteResourceId` 与 `sprite`。`sprite` 包含服务端确认的图集路径/尺寸、单帧尺寸、`actions`（id/label/row/start/frames/fps/loop）、`bindings`（idle/working/waiting/failed/completed/moveLeft/moveRight/hover/greeting/sleep/wake）、播放倍率、注视、中立帧、空闲秒数和素材来源备注。待机必须绑定有效动作；所有行列帧数及引用服务端重验。配置仍经统一外观 PATCH 保存，不允许仅靠修改图片 URL 访问其他未启用资源。详见 [精灵宠物](/docs/overview/sprite-pets)。
 
 ## 邀请返利
