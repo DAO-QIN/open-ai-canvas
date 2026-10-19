@@ -68,6 +68,7 @@ func TestPetCatalogPublishUnpublishAndReferenceProtection(t *testing.T) {
 		t.Fatal(err)
 	}
 	value := defaultAppearanceSetting()
+	value.Canvas.AvatarType = "orb"
 	seedPetCatalog(&value)
 	value.PetCatalog = append(value.PetCatalog, PetAppearance{ID: "draft-pet", Name: "草稿角色", AvatarType: "sprite", AvatarHeight: 220, SpriteResourceID: imported.ResourceID, Sprite: imported.Config})
 	saved, err := s.UpdateAppearance(admin, value)

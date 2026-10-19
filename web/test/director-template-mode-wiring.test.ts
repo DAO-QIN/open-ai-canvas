@@ -26,7 +26,7 @@ function slice(source: string, from: string, to: string) {
 
 describe("新建场景必须显式选模板", () => {
     test("createPrevisShot 第一个参数是 templateId，没有默认值", () => {
-        expect(hook).toContain("const createPrevisShot = useCallback((templateId: PrevisTemplateId, position?: Position) => {");
+        expect(hook).toMatch(/const createPrevisShot = useCallback\(\s*\(templateId: PrevisTemplateId, position\?: Position\) => \{/);
         // 有默认模板等于又回到「无条件塞演员」。
         expect(hook).not.toContain("templateId: PrevisTemplateId = ");
     });

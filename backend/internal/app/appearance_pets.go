@@ -110,6 +110,9 @@ func (s *Service) validatePetCatalog(actor *model.User, a *AppearanceSetting, be
 	if a.PetCatalog == nil {
 		seedPetCatalog(a)
 	}
+	// Validation may fail after projecting a flat editor update into the catalog.
+	// Keep that projection local so a rejected save cannot mutate the caller's draft.
+	a.PetCatalog = append([]PetAppearance(nil), a.PetCatalog...)
 	if reflect.DeepEqual(a.PetCatalog, before.PetCatalog) && a.Canvas.DefaultPetID == before.Canvas.DefaultPetID && !reflect.DeepEqual(petFromCanvas(a.Canvas), petFromCanvas(before.Canvas)) {
 		for i := range a.PetCatalog {
 			if a.PetCatalog[i].ID == a.Canvas.DefaultPetID {
