@@ -1,12 +1,12 @@
 import { useRef, useState } from "react";
 import { Alert, App, Button, Form, Input, Radio, Slider, Switch } from "antd";
-import { ExternalLink, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink, Trash2, Upload } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import { Live2DAvatar } from "@/components/canvas/live2d-avatar";
 import { FluidOrb } from "@/components/ui/fluid-orb";
 import { agentCopy, type CanvasAppearance } from "@/lib/canvas/agent-appearance";
 import { live2DModelURL, uploadLive2D, type PetAppearance } from "@/services/api/appearance";
-import { PetThumbnail } from "@/components/canvas/pet-thumbnail";
+import { PetCatalogLibrary } from "./pet-catalog-library";
 import "./pet-catalog-editor.css";
 import { SpritePetEditor } from "./sprite-pet-editor";
 import { validateSpritePet } from "@/lib/canvas/sprite-pet";
@@ -69,9 +69,10 @@ export function CanvasAppearanceEditor({
         }
     }
     return (
-        <div className="grid gap-6 lg:grid-cols-2">
-            <div>
-                <h3 className="mb-3 font-semibold">Agent 身份与文案</h3>
+        <div className="pet-admin-workspace">
+            <details className="pet-admin-identity">
+                <summary>助手名称与文案</summary>
+                <div className="pet-admin-identity-fields">
                 <p className="mb-4 text-sm text-foreground/60">独立于站点品牌。助手名称同步用于界面文案和对话中的自我介绍；文案可使用 {"{agentName}"} 引用名称，不修改工具权限。</p>
                 <Form layout="vertical" disabled={disabled || uploading}>
                     {(
@@ -89,39 +90,11 @@ export function CanvasAppearanceEditor({
                         </Form.Item>
                     ))}
                 </Form>
-            </div>
-            <div className="grid content-start gap-4">
-                <h3 className="font-semibold">宠物形象库</h3>
-                <p className="text-sm text-foreground/60">已发布的形象可由用户自行选择。系统默认用于首页和未自定义的用户；调整后点击页面顶部保存。</p>
-                <div className="grid gap-2 sm:grid-cols-3" aria-label="后台宠物形象库">
-                    {catalog.map((p) => (
-                        <button
-                            key={p.id}
-                            type="button"
-                            className="pet-admin-choice"
-                            aria-pressed={selected?.id === p.id}
-                            disabled={disabled}
-                            onClick={() => {
-                                setSelectedId(p.id);
-                                setError("");
-                            }}
-                        >
-                            <PetThumbnail pet={p} preview />
-                            <span>{p.name}</span>
-                            <small>{p.id === globalValue.defaultPetId ? "系统默认" : p.published ? "已发布" : "未发布"}</small>
-                        </button>
-                    ))}
                 </div>
-                <Button
-                    disabled={disabled || catalog.length >= 24}
-                    onClick={() => {
-                        const pet: PetAppearance = { id: crypto.randomUUID(), name: "新形象", published: false, avatarType: "orb", avatarHeight: 220, live2dResourceId: "", live2dEntry: "", spriteResourceId: "" };
-                        onCatalogChange([...catalog, pet]);
-                        setSelectedId(pet.id);
-                    }}
-                >
-                    添加形象
-                </Button>
+            </details>
+            <PetCatalogLibrary catalog={catalog} selectedId={selected?.id || ""} defaultId={globalValue.defaultPetId} disabled={disabled || uploading} onChange={onCatalogChange} onUploading={onUploading} onSelect={(id) => { setSelectedId(id); setError(""); }} />
+            <section className="pet-admin-detail" aria-label="形象详情" key={selected?.id}>
+                <div className="pet-admin-detail-title"><h3>{selected?.name || "形象设置"}</h3><span>当前编辑</span></div>
                 {selected ? (
                     <div className="grid gap-3" aria-label="编辑形象">
                         <label className="grid gap-1 text-sm">
@@ -140,6 +113,9 @@ export function CanvasAppearanceEditor({
                                 设为系统默认
                             </Button>
                             <Button
+                                aria-label="形象前移"
+                                title="前移"
+                                icon={<ArrowUp size={16} aria-hidden />}
                                 disabled={disabled || catalog[0]?.id === selected.id}
                                 onClick={() => {
                                     const next = [...catalog],
@@ -147,10 +123,11 @@ export function CanvasAppearanceEditor({
                                     [next[index - 1], next[index]] = [next[index], next[index - 1]];
                                     onCatalogChange(next);
                                 }}
-                            >
-                                前移
-                            </Button>
+                            />
                             <Button
+                                aria-label="形象后移"
+                                title="后移"
+                                icon={<ArrowDown size={16} aria-hidden />}
                                 disabled={disabled || catalog.at(-1)?.id === selected.id}
                                 onClick={() => {
                                     const next = [...catalog],
@@ -158,19 +135,18 @@ export function CanvasAppearanceEditor({
                                     [next[index + 1], next[index]] = [next[index], next[index + 1]];
                                     onCatalogChange(next);
                                 }}
-                            >
-                                后移
-                            </Button>
+                            />
                             <Button
                                 danger
+                                aria-label="移除形象"
+                                title="移除形象"
+                                icon={<Trash2 size={16} aria-hidden />}
                                 disabled={disabled || selected.id === globalValue.defaultPetId}
                                 onClick={() => {
                                     onCatalogChange(catalog.filter((p) => p.id !== selected.id));
                                     setSelectedId(globalValue.defaultPetId || "");
                                 }}
-                            >
-                                移除
-                            </Button>
+                            />
                         </div>
                     </div>
                 ) : null}
@@ -184,8 +160,9 @@ export function CanvasAppearanceEditor({
                         { label: "精灵宠物", value: "sprite", disabled: !value.sprite || Boolean(validateSpritePet(value.sprite)) || spriteReady !== value.spriteResourceId },
                     ]}
                 />
-                <SpritePetEditor value={value} onChange={change} disabled={disabled || uploading} onUploading={onUploading} onReady={setSpriteReady} />
-                <details open={value.avatarType === "live2d" || Boolean(url)}>
+                <div className="pet-admin-model-content">
+                {value.avatarType === "sprite" || value.sprite ? <SpritePetEditor key={selected?.id} value={value} onChange={change} disabled={disabled || uploading} onUploading={onUploading} onReady={setSpriteReady} /> : <details className="pet-admin-import-details"><summary>导入精灵素材</summary><SpritePetEditor key={selected?.id} value={value} onChange={change} disabled={disabled || uploading} onUploading={onUploading} onReady={setSpriteReady} /></details>}
+                <details className="pet-admin-import-details" open={value.avatarType === "live2d"}>
                     <summary className="cursor-pointer text-sm font-medium">Live2D 模型设置</summary>
                     <div className="mt-3 grid gap-4">
                         <p className="text-sm text-foreground/60">上传有授权的 Cubism 3/4 运行时 ZIP：一个 model3.json、moc3、PNG 纹理及可选动作/表情 JSON。首期不支持音频、旧版模型和编辑工程。模型会发送到浏览器，无法保证防下载。</p>
@@ -233,6 +210,7 @@ export function CanvasAppearanceEditor({
                         </div>
                     </div>
                 </details>
+                </div>
                 <div className="grid gap-1 text-sm">
                     <label id="pet-admin-height-label">
                         默认大小 <output>{value.avatarType === "orb" ? `${Math.round(value.avatarHeight / 220 * 100)}%` : `${value.avatarHeight} px`}</output>
@@ -289,8 +267,7 @@ export function CanvasAppearanceEditor({
                         }
                     />
                 ) : null}
-                <p className="text-xs text-foreground/60">项目已内置 Cubism Core，无需另行安装。使用前仍需确认 Live2D SDK 及模型素材的适用授权。未启用的导入包可在资源管理中清理。</p>
-            </div>
+            </section>
         </div>
     );
 }

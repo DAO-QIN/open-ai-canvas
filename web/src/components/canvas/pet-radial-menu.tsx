@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
-import { Check, ChevronLeft, Ellipsis, EyeOff, LoaderCircle, LockKeyhole, Minus, Palette, Plus, RotateCcw, Scaling, Sparkles, UnlockKeyhole } from "lucide-react";
+import { Check, ChevronLeft, Ellipsis, EyeOff, LoaderCircle, LockKeyhole, Minus, Palette, Plus, RotateCcw, Scaling, Search, Sparkles, UnlockKeyhole } from "lucide-react";
 import type { PetAppearance, PetPreference } from "@/services/api/appearance";
 import { petArcLayout, petRingSector } from "@/lib/canvas/pet-menu";
+import { filterPetCatalog } from "@/lib/canvas/pet-catalog";
 import { PetThumbnail } from "./pet-thumbnail";
 import "./pet-radial-menu.css";
 
@@ -38,6 +39,7 @@ export function PetRadialMenu({
 }) {
     const [panel, setPanel] = useState<"" | "look" | "size">("look");
     const [more, setMore] = useState(false);
+    const [query, setQuery] = useState("");
     const [scale, setScale] = useState(preference.scale);
     const host = useRef<HTMLDivElement>(null),
         priorFocus = useRef(document.activeElement as HTMLElement | null),
@@ -46,8 +48,11 @@ export function PetRadialMenu({
     const initialAnchor=useRef(anchor);
     const placement = petArcLayout(anchor, { width: window.innerWidth, height: window.innerHeight });
     const panelLeft=Math.max(12,Math.min(innerWidth-288,initialAnchor.current.left+initialAnchor.current.width/2-138));
-    const panelTop=Math.max(12,Math.min(innerHeight-156,initialAnchor.current.top>=164?initialAnchor.current.top-152:initialAnchor.current.top+initialAnchor.current.height+12));
+    const panelHeight=more?Math.min(320,innerHeight-24):156;
+    const panelTop=Math.max(12,Math.min(innerHeight-panelHeight-12,initialAnchor.current.top>=panelHeight+12?initialAnchor.current.top-panelHeight-8:initialAnchor.current.top+initialAnchor.current.height+12));
     const sector=(index:number,thumbnail=false)=>petRingSector(index,thumbnail,placement);
+    const choices = [{ id: "system", name: "跟随系统", published: true } as PetAppearance, ...catalog.filter((pet) => pet.published)];
+    const visibleChoices = more ? filterPetCatalog(choices, query) : choices.slice(0, 3);
     useEffect(() => {
         setScale(preference.scale);
         scaleRef.current = preference.scale;
@@ -60,7 +65,7 @@ export function PetRadialMenu({
         };
     }, [onPreviewScale]);
     useEffect(() => {
-        const selector = panel === "size" ? ".pet-menu-size-panel input" : more ? ".pet-menu-models.is-grid .pet-menu-back" : ".pet-menu-dismiss";
+        const selector = panel === "size" ? ".pet-menu-size-panel input" : more ? ".pet-menu-models.is-grid input" : ".pet-menu-dismiss";
         host.current?.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
     }, [panel, more]);
     useEffect(() => {
@@ -187,7 +192,8 @@ export function PetRadialMenu({
                             <button type="button" className="pet-menu-panel-dismiss" aria-label="收起菜单" title="收起菜单" onClick={onClose}><EyeOff aria-hidden="true" /></button>
                             </div>
                         ) : null}
-                        {[{ id: "system", name: "跟随系统", published: true } as PetAppearance, ...catalog.filter((p) => p.published)].slice(0, more ? 25 : 3).map((pet, index) => (
+                        {more ? <label className="pet-menu-search"><Search aria-hidden="true" /><input type="search" aria-label="搜索形象" placeholder="搜索形象" value={query} onChange={(e) => setQuery(e.target.value)} /></label> : null}
+                        {visibleChoices.map((pet, index) => (
                             <PetSectorButton ringIndex={index} geometry={sector(index,true)} flat={more}
                                 key={pet.id}
                                 aria-label={pet.name}
@@ -203,6 +209,7 @@ export function PetRadialMenu({
                                 {pet.id === preference.modelId ? <Check className="pet-choice-check" aria-hidden /> : null}
                             </PetSectorButton>
                         ))}
+                        {more && !visibleChoices.length ? <p className="pet-menu-empty">没有找到形象</p> : null}
                         {!more && catalog.length + 1 > 3 ? (
                             <PetSectorButton ringIndex={3} geometry={sector(3,true)} type="button" aria-label="更多形象" title="更多形象" className="pet-menu-more" onClick={() => setMore(true)}>
                                 <Ellipsis aria-hidden="true" />

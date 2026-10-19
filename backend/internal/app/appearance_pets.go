@@ -105,8 +105,8 @@ func (s *Service) validatePetCatalog(actor *model.User, a *AppearanceSetting, be
 			}
 		}
 	}
-	if len(a.PetCatalog) < 1 || len(a.PetCatalog) > 24 {
-		return BadAuthRequest("形象库须包含 1–24 个形象")
+	if len(a.PetCatalog) < 1 || len(a.PetCatalog) > 64 {
+		return BadAuthRequest("形象库须包含 1–64 个形象")
 	}
 	ids := map[string]bool{}
 	found := false

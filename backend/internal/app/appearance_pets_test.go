@@ -1,9 +1,30 @@
 package app
 
 import (
+	"strconv"
 	"testing"
 	"yingce/backend/internal/model"
 )
+
+func TestPetCatalogCapacity(t *testing.T) {
+	s, _, _, admin := newAppearanceTestService(t)
+	value := defaultAppearanceSetting()
+	seedPetCatalog(&value)
+	for i := len(value.PetCatalog); i < 64; i++ {
+		value.PetCatalog = append(value.PetCatalog, PetAppearance{ID: "pet-" + strconv.Itoa(i), Name: "角色" + strconv.Itoa(i), Published: true, AvatarType: "orb", AvatarHeight: 220})
+	}
+	saved, err := s.UpdateAppearance(admin, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(saved.Public.PetCatalog) != 64 {
+		t.Fatal("published catalog truncated")
+	}
+	value.PetCatalog = append(value.PetCatalog, PetAppearance{ID: "overflow", Name: "超额", Published: true, AvatarType: "orb", AvatarHeight: 220})
+	if _, err = s.UpdateAppearance(admin, value); err == nil {
+		t.Fatal("oversized catalog accepted")
+	}
+}
 
 func TestPetCatalogPublishUnpublishAndReferenceProtection(t *testing.T) {
 	s, _, _, admin := newAppearanceTestService(t)
