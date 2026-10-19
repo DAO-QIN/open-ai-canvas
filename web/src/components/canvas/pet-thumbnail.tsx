@@ -11,7 +11,16 @@ export function PetThumbnail({ pet, preview = false }: { pet: Pick<CanvasAppeara
     const url = pet.avatarType === "sprite" && pet.spriteResourceId && pet.sprite ? spriteThumbnailURL(pet.spriteResourceId, pet.sprite, preview) : "";
     const host=useRef<HTMLSpanElement>(null),[visible,setVisible]=useState(false);
     const [loaded, setLoaded] = useState("");
-    useEffect(()=>{if(!host.current||!url)return;if(typeof IntersectionObserver === "undefined"){setVisible(true);return;}const observer=new IntersectionObserver(([entry])=>{if(entry.isIntersecting){setVisible(true);observer.disconnect();}},{rootMargin:"64px"});observer.observe(host.current);return()=>observer.disconnect();},[url]);
+    useEffect(() => {
+        const node = host.current;
+        if (!node || !url) return;
+        if (typeof IntersectionObserver === "undefined") { setVisible(true); return; }
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) { setVisible(true); observer.disconnect(); }
+        }, { root: node.closest(".pet-menu-models.is-grid"), rootMargin: "88px 0px" });
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [url]);
     const image = useSpriteImage(visible?url:"", "thumbnail");
     const [retried, setRetried] = useState("");
     useEffect(() => {
