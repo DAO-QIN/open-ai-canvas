@@ -18232,7 +18232,10 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     --user-shadow-hover: none;
 }
 
-.app-user-workspace .app-workspace-stage,
+.app-user-workspace .app-workspace-stage {
+    background: var(--user-page-bg);
+    border-radius: 0;
+}
 .app-user-workspace .app-user-content,
 .app-user-workspace .app-workspace-grid {
     background: var(--user-page-bg);
