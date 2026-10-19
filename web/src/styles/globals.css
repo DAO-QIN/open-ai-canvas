@@ -18667,6 +18667,11 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap { box-shadow: 0 
     .app-user-workspace .creation-empty-suggest .suggest-card { min-height: 64px !important; }
     .app-user-workspace .creation-featured-works { margin-top: 48px !important; }
 }
+@media (max-width: 380px) {
+    .app-user-workspace .app-workspace-topbar-breadcrumb { min-width: 2em; }
+    .app-user-workspace .app-workspace-topbar-credit-pill { gap: var(--space-1); padding-inline: var(--space-2); }
+    .app-user-workspace .app-workspace-topbar-credit-pill .app-workspace-credit-gift { display: none; }
+}
 @media (prefers-reduced-motion: reduce) {
     .app-user-workspace .app-workspace-sidebar,
     .app-user-workspace .creation-empty-suggest .creation-hero-prompt,
