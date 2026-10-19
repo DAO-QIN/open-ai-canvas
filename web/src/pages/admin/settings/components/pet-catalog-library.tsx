@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Alert, App, Button, Checkbox, Input, Pagination, Select } from "antd";
 import { Check, Plus, Search, Upload } from "lucide-react";
 import { PetThumbnail } from "@/components/canvas/pet-thumbnail";
-import { filterPetCatalog, PET_CATALOG_LIMIT, PET_CATALOG_PAGE_SIZE } from "@/lib/canvas/pet-catalog";
+import { filterPetCatalog, PET_CATALOG_LIMIT, PET_CATALOG_PAGE_SIZE, spriteImportID } from "@/lib/canvas/pet-catalog";
 import { uploadSpritePet, type PetAppearance } from "@/services/api/appearance";
 
 export function PetCatalogLibrary({ catalog, selectedId, defaultId, disabled, onSelect, onChange, onUploading }: {
@@ -39,10 +39,12 @@ export function PetCatalogLibrary({ catalog, selectedId, defaultId, disabled, on
             for (const [index, file] of files.entries()) {
                 setProgress(`正在导入 ${index + 1}/${files.length}`);
                 try {
+                    const id = await spriteImportID(file);
+                    if (next.some((pet) => pet.id === id)) { duplicates++; continue; }
                     const imported = await uploadSpritePet(file);
                     if (next.some((pet) => pet.spriteResourceId === imported.resourceId)) { duplicates++; continue; }
                     const pet: PetAppearance = {
-                        id: crypto.randomUUID(), name: imported.config.displayName.slice(0, 40), published: publish,
+                        id, name: imported.config.displayName.slice(0, 40), published: publish,
                         avatarType: "sprite", avatarHeight: 208, spriteResourceId: imported.resourceId, sprite: imported.config,
                         live2dResourceId: "", live2dEntry: "",
                     };
