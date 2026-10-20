@@ -1,1598 +1,598 @@
 {
-  "generator": "DiceBear 9.4.2",
-  "style": "big-smile",
+  "generator": "DiceBear Core 10.7.0 / Styles 10.6.0",
+  "style": "planets",
   "attribution": {
-    "title": "Custom Avatar",
-    "creator": "Ashley Seo",
-    "source": "https://www.figma.com/community/file/881358461963645496",
-    "license": "CC BY 4.0",
-    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-    "changes": "Generated combinations with curated expressions, colors, circular backgrounds and scale using DiceBear."
+    "license": {
+      "name": "CC0 1.0",
+      "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "text": "„Planets” (https://www.dicebear.com) by „DiceBear”, licensed under „CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/)"
+    },
+    "creator": {
+      "name": "DiceBear",
+      "url": "https://www.dicebear.com"
+    },
+    "source": {
+      "name": "Planets",
+      "url": "https://www.dicebear.com"
+    },
+    "changes": "Generated 48 static circular variants; animations disabled."
   },
   "avatars": [
     {
       "id": "spirit-v1-01",
       "options": {
-        "seed": "spirit-v1-01",
+        "seed": "yinghui-preview-10",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dcecf5"
-        ],
-        "hair": [
-          "shortHair"
-        ],
-        "hairColor": [
-          "302c3b"
-        ],
-        "skinColor": [
-          "ffe4c0"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5730,
-      "sha256": "3bfc458a7ce6d2a1fa6fc1d4811887dd007a9efe0a25444b8627b4be0bc8ed53"
+      "bytes": 3624,
+      "sha256": "f0feb24f520c6c3c0e1ae3444a6a4f9d65dbf17260d2d0eb97cf7c65da6f4d15"
     },
     {
       "id": "spirit-v1-02",
       "options": {
-        "seed": "spirit-v1-02",
+        "seed": "yinghui-preview-11",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e9e2f5"
-        ],
-        "hair": [
-          "wavyBob"
-        ],
-        "hairColor": [
-          "634a42"
-        ],
-        "skinColor": [
-          "e2ba87"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5297,
-      "sha256": "0006a830646d31ea2d6458c41ee9164073052e19881a1d400d2382df9189c28b"
+      "bytes": 3630,
+      "sha256": "f24f2bb53b3cfaa200f1a82c907faf90d2700969155bf10fab9f0a14af50ab2d"
     },
     {
       "id": "spirit-v1-03",
       "options": {
-        "seed": "spirit-v1-03",
+        "seed": "yinghui-preview-12",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dff0e5"
-        ],
-        "hair": [
-          "curlyBob"
-        ],
-        "hairColor": [
-          "987255"
-        ],
-        "skinColor": [
-          "8c5a2b"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4267,
-      "sha256": "f4c81de4feb6f512c6ef84ff8b14da5b55a9d8d4de8bb8f4c17f73d31ce2a3dc"
+      "bytes": 4136,
+      "sha256": "3d0be81c47ed8111aff0135774bc1192be5ac1947ced55e6fde76c5518425c7e"
     },
     {
       "id": "spirit-v1-04",
       "options": {
-        "seed": "spirit-v1-04",
+        "seed": "yinghui-preview-13",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "faeacb"
-        ],
-        "hair": [
-          "straightHair"
-        ],
-        "hairColor": [
-          "6760a9"
-        ],
-        "skinColor": [
-          "f5d7b1"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5194,
-      "sha256": "087e528114deae5887b74b9695be754a23025cea94b83fa81bd8f5dd00ba169c"
+      "bytes": 3934,
+      "sha256": "5f34dfe52145d74a19859a5466642685cb1cfd36b25f864ffaf781adde675cc2"
     },
     {
       "id": "spirit-v1-05",
       "options": {
-        "seed": "spirit-v1-05",
+        "seed": "yinghui-preview-14",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "f6e1df"
-        ],
-        "hair": [
-          "braids"
-        ],
-        "hairColor": [
-          "3c726b"
-        ],
-        "skinColor": [
-          "c99c62"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 13919,
-      "sha256": "190eef175d54b3de200d527ca0c46f80d78079507adb7269db6a44de7ca7cea2"
+      "bytes": 5216,
+      "sha256": "343f1ac893c48faec2cc0487a45dde5553982f3a31239a5234cb27e2b6614c9a"
     },
     {
       "id": "spirit-v1-06",
       "options": {
-        "seed": "spirit-v1-06",
+        "seed": "yinghui-preview-15",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e0e9f1"
-        ],
-        "hair": [
-          "bunHair"
-        ],
-        "hairColor": [
-          "c18b4c"
-        ],
-        "skinColor": [
-          "643d19"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5685,
-      "sha256": "098e6388a391b8235489900ca6caa59dc714c3d4255c10c8c1f67f8c2ed02929"
+      "bytes": 4204,
+      "sha256": "0f1a45f7aecce8118933afa02bc10d7cc919d4ff9a3b0a1ee8ee8a51d6ea6eba"
     },
     {
       "id": "spirit-v1-07",
       "options": {
-        "seed": "spirit-v1-07",
+        "seed": "yinghui-preview-16",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dcecf5"
-        ],
-        "hair": [
-          "froBun"
-        ],
-        "hairColor": [
-          "302c3b"
-        ],
-        "skinColor": [
-          "efcc9f"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5996,
-      "sha256": "5ac955195d834fd560cbfe858f59e32ad628de329375a6e8724e0ae9ccaaa834"
+      "bytes": 3795,
+      "sha256": "116cca2c1f7597a91dfef7431892c31375f9f300c62dea03aa12d9be27946256"
     },
     {
       "id": "spirit-v1-08",
       "options": {
-        "seed": "spirit-v1-08",
+        "seed": "yinghui-preview-17",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e9e2f5"
-        ],
-        "hair": [
-          "bangs"
-        ],
-        "hairColor": [
-          "634a42"
-        ],
-        "skinColor": [
-          "a47539"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5059,
-      "sha256": "6ca9f057746440d3e6b91864429d6326c8e4089169eaf6784a76de7aef4a6dd1"
+      "bytes": 4380,
+      "sha256": "e23b3043480af079d12edd8cfe91f48a8c5d2f2af8cbea813d475335ac0ceec7"
     },
     {
       "id": "spirit-v1-09",
       "options": {
-        "seed": "spirit-v1-09",
+        "seed": "yinghui-preview-18",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dff0e5"
-        ],
-        "hair": [
-          "curlyShortHair"
-        ],
-        "hairColor": [
-          "987255"
-        ],
-        "skinColor": [
-          "ffe4c0"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4290,
-      "sha256": "9d35756d3412d2fb0e61f685be3ced9ec7c52e725b2ebead90c9facd129c1409"
+      "bytes": 4841,
+      "sha256": "ef76f0cc712d382fefb8952c0f08f5813b6fea6149197c1870422d33b87fcd44"
     },
     {
       "id": "spirit-v1-10",
       "options": {
-        "seed": "spirit-v1-10",
+        "seed": "yinghui-preview-19",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "faeacb"
-        ],
-        "hair": [
-          "bowlCutHair"
-        ],
-        "hairColor": [
-          "6760a9"
-        ],
-        "skinColor": [
-          "e2ba87"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4333,
-      "sha256": "a5314af72f502453c2a3fe09b1ea75b055215e864264833a455f1a550e5e2be1"
+      "bytes": 4271,
+      "sha256": "30a5d1afb872e430b121605bba6e89cd5fffc1cebc3536d8009036f457a068fc"
     },
     {
       "id": "spirit-v1-11",
       "options": {
-        "seed": "spirit-v1-11",
+        "seed": "yinghui-preview-20",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "f6e1df"
-        ],
-        "hair": [
-          "shavedHead"
-        ],
-        "hairColor": [
-          "3c726b"
-        ],
-        "skinColor": [
-          "8c5a2b"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4979,
-      "sha256": "64b1095575b21aeab4a1e253c2331a7896a960c34b48689fd57d09e3a5a285fe"
+      "bytes": 4018,
+      "sha256": "9edd5f4c95727a94ca4f1a6b229693a4eb8b47924a6e1e43e04f763fedce1cd0"
     },
     {
       "id": "spirit-v1-12",
       "options": {
-        "seed": "spirit-v1-12",
+        "seed": "yinghui-preview-21",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e0e9f1"
-        ],
-        "hair": [
-          "halfShavedHead"
-        ],
-        "hairColor": [
-          "c18b4c"
-        ],
-        "skinColor": [
-          "f5d7b1"
-        ],
-        "eyes": [
-          "cheery"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5176,
-      "sha256": "a2738e166719fe5917d2436be97485e0965dc043b4d3bd9d3964b3cf5620b6a3"
+      "bytes": 5525,
+      "sha256": "481b8535917922a3a963e2c0b8011eda07ef71bb7a6dd1413d27e22ac08988a9"
     },
     {
       "id": "spirit-v1-13",
       "options": {
-        "seed": "spirit-v1-13",
+        "seed": "yinghui-preview-22",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dcecf5"
-        ],
-        "hair": [
-          "shortHair"
-        ],
-        "hairColor": [
-          "634a42"
-        ],
-        "skinColor": [
-          "a47539"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4527,
-      "sha256": "6e017d3225eb22ba8e5f719e260aca262596962ffd76c602727dd4304ec1b263"
+      "bytes": 5245,
+      "sha256": "fc5b0361bdf35c0dc2a139213b08bd5cfa88a08d8aeb8c9f3fd7861a128185b8"
     },
     {
       "id": "spirit-v1-14",
       "options": {
-        "seed": "spirit-v1-14",
+        "seed": "yinghui-preview-23",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e9e2f5"
-        ],
-        "hair": [
-          "wavyBob"
-        ],
-        "hairColor": [
-          "987255"
-        ],
-        "skinColor": [
-          "ffe4c0"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5075,
-      "sha256": "657defd795ffd6f7270c6b76dec91158405e5196f6d064ba075e8cb4d479eb29"
+      "bytes": 4202,
+      "sha256": "8c9e4f003ef561180c8d6e950fc1b6f5e7a026f92979321e01af9d55c3d24c35"
     },
     {
       "id": "spirit-v1-15",
       "options": {
-        "seed": "spirit-v1-15",
+        "seed": "yinghui-preview-24",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dff0e5"
-        ],
-        "hair": [
-          "curlyBob"
-        ],
-        "hairColor": [
-          "6760a9"
-        ],
-        "skinColor": [
-          "e2ba87"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4045,
-      "sha256": "1fc7e7152e60409b141d3cf35091466ab2b98c55d5990b2e262281e0feb23080"
+      "bytes": 3728,
+      "sha256": "349172982bc56260c3fe0b7a493463cffa8d095fd2909f0ee44724640a494120"
     },
     {
       "id": "spirit-v1-16",
       "options": {
-        "seed": "spirit-v1-16",
+        "seed": "yinghui-preview-25",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "faeacb"
-        ],
-        "hair": [
-          "straightHair"
-        ],
-        "hairColor": [
-          "3c726b"
-        ],
-        "skinColor": [
-          "8c5a2b"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5857,
-      "sha256": "c7fa9d585bcb82d6fb315657468297033a1a46b07522d53b25e6a6fb1468b1f7"
+      "bytes": 4385,
+      "sha256": "2aeede07c592176e78f4aa0216f998473763f6af670223a8c62f222d9f305b4b"
     },
     {
       "id": "spirit-v1-17",
       "options": {
-        "seed": "spirit-v1-17",
+        "seed": "yinghui-preview-26",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "f6e1df"
-        ],
-        "hair": [
-          "braids"
-        ],
-        "hairColor": [
-          "c18b4c"
-        ],
-        "skinColor": [
-          "f5d7b1"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 13697,
-      "sha256": "3ab30bb9d6b96922ca86c77398158e34b23b1edc7fc562e36ca294b106baa04e"
+      "bytes": 3488,
+      "sha256": "f11379e1dd8b01d86f7d212f7d3544d65642dd40c5eaa23e1f028182222f8bfa"
     },
     {
       "id": "spirit-v1-18",
       "options": {
-        "seed": "spirit-v1-18",
+        "seed": "yinghui-preview-27",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e0e9f1"
-        ],
-        "hair": [
-          "bunHair"
-        ],
-        "hairColor": [
-          "302c3b"
-        ],
-        "skinColor": [
-          "c99c62"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4578,
-      "sha256": "e2a85321e6e09cf05d11eab1111ded5dcb2bc0d531680cb6fedbfb5050c8153b"
+      "bytes": 4458,
+      "sha256": "aa374ce24700b98a0f9d1e9f30d004cb1002468c2567606c3f867d392d67e5fd"
     },
     {
       "id": "spirit-v1-19",
       "options": {
-        "seed": "spirit-v1-19",
+        "seed": "yinghui-preview-28",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dcecf5"
-        ],
-        "hair": [
-          "froBun"
-        ],
-        "hairColor": [
-          "634a42"
-        ],
-        "skinColor": [
-          "643d19"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5774,
-      "sha256": "2c30fba30f6baeb969e1b3d27eab4d8b427e74317e1f7609ac4997edf7652bbc"
+      "bytes": 4276,
+      "sha256": "1b699fc0f7adea0d89cfa9ea5b599a12eb3c53714cb65d847509631d1e36da26"
     },
     {
       "id": "spirit-v1-20",
       "options": {
-        "seed": "spirit-v1-20",
+        "seed": "yinghui-preview-29",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e9e2f5"
-        ],
-        "hair": [
-          "bangs"
-        ],
-        "hairColor": [
-          "987255"
-        ],
-        "skinColor": [
-          "efcc9f"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4837,
-      "sha256": "70db761aac9eb8c3a301a5f4915d3f5bd7072b0990b52548e42f90067ccd2269"
+      "bytes": 4506,
+      "sha256": "d8edb0c5ab745d49bd860dcc1787e84f3fab5ee32a44019c0623f2c3db81b249"
     },
     {
       "id": "spirit-v1-21",
       "options": {
-        "seed": "spirit-v1-21",
+        "seed": "yinghui-preview-30",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dff0e5"
-        ],
-        "hair": [
-          "curlyShortHair"
-        ],
-        "hairColor": [
-          "6760a9"
-        ],
-        "skinColor": [
-          "a47539"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5049,
-      "sha256": "43e9654abdf65c3d01bc8be3be0be3a2ec297e4eee223307465930723ef68d0d"
+      "bytes": 4767,
+      "sha256": "68caf2a77dc2da92030ac2cd2693f2eb88588dd7678371f707ade5b21f5656d0"
     },
     {
       "id": "spirit-v1-22",
       "options": {
-        "seed": "spirit-v1-22",
+        "seed": "yinghui-preview-31",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "faeacb"
-        ],
-        "hair": [
-          "bowlCutHair"
-        ],
-        "hairColor": [
-          "3c726b"
-        ],
-        "skinColor": [
-          "ffe4c0"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4111,
-      "sha256": "5eb50de8a851f9f9217df54350b3676634d52f88a42b1b11f14f3af38870c343"
+      "bytes": 4296,
+      "sha256": "72bbecf185ef731f830ed1fd8255cb323680e65fd7cd122971d4012025b3e229"
     },
     {
       "id": "spirit-v1-23",
       "options": {
-        "seed": "spirit-v1-23",
+        "seed": "yinghui-preview-32",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "f6e1df"
-        ],
-        "hair": [
-          "shavedHead"
-        ],
-        "hairColor": [
-          "c18b4c"
-        ],
-        "skinColor": [
-          "e2ba87"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 3776,
-      "sha256": "ac8130ae3c734ff1a3f7ac5b082824dd241e9f094704f7e82e0280793298897d"
+      "bytes": 4446,
+      "sha256": "58af5363064c081e6fce3114a8ef7e5a61346eef095af649cdd890f237f2c1e5"
     },
     {
       "id": "spirit-v1-24",
       "options": {
-        "seed": "spirit-v1-24",
+        "seed": "yinghui-preview-33",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e0e9f1"
-        ],
-        "hair": [
-          "halfShavedHead"
-        ],
-        "hairColor": [
-          "302c3b"
-        ],
-        "skinColor": [
-          "8c5a2b"
-        ],
-        "eyes": [
-          "normal"
-        ],
-        "mouth": [
-          "teethSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4954,
-      "sha256": "91f212e4e8d4d9130a8821888b1efd153e06140aeb75e12a9a5085e4ec74d80b"
+      "bytes": 4083,
+      "sha256": "8bb452d31896c5ffcbd635eefa8f636cde96ae10753a19ffb7ab28206155bbe8"
     },
     {
       "id": "spirit-v1-25",
       "options": {
-        "seed": "spirit-v1-25",
+        "seed": "yinghui-preview-34",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dcecf5"
-        ],
-        "hair": [
-          "shortHair"
-        ],
-        "hairColor": [
-          "987255"
-        ],
-        "skinColor": [
-          "efcc9f"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4744,
-      "sha256": "5ffe5b1a2f30500b3f0df53ca7bc4ecc755ef17940ad17ff2b7e5261accbdb1b"
+      "bytes": 4035,
+      "sha256": "36bd1f8be6fc21215854a555acb4c90377959c25de7ccb5ec3e3a87dd58ecfb0"
     },
     {
       "id": "spirit-v1-26",
       "options": {
-        "seed": "spirit-v1-26",
+        "seed": "yinghui-preview-35",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e9e2f5"
-        ],
-        "hair": [
-          "wavyBob"
-        ],
-        "hairColor": [
-          "6760a9"
-        ],
-        "skinColor": [
-          "a47539"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 6177,
-      "sha256": "dd0ffd355addc42c49c412083acfb1bdeb73e27c1f588d827e6d0b7159d5b485"
+      "bytes": 5531,
+      "sha256": "9bb5d2cf6b57d9e83926d84d29701838374d953f432a5811e95244b7c8744527"
     },
     {
       "id": "spirit-v1-27",
       "options": {
-        "seed": "spirit-v1-27",
+        "seed": "yinghui-preview-36",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dff0e5"
-        ],
-        "hair": [
-          "curlyBob"
-        ],
-        "hairColor": [
-          "3c726b"
-        ],
-        "skinColor": [
-          "ffe4c0"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4262,
-      "sha256": "2537e25b6e3d12846e866adea323a94d1fd35a6d89a16e14aa114081b8b26da8"
+      "bytes": 4643,
+      "sha256": "07af1ff52bf0ed4e6861cefc1e8dec3af89e312b321d90d8b891e9faabdddd60"
     },
     {
       "id": "spirit-v1-28",
       "options": {
-        "seed": "spirit-v1-28",
+        "seed": "yinghui-preview-37",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "faeacb"
-        ],
-        "hair": [
-          "straightHair"
-        ],
-        "hairColor": [
-          "c18b4c"
-        ],
-        "skinColor": [
-          "e2ba87"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5189,
-      "sha256": "78f61d69dba0e4448bbf485404aa6a8aaf603d39d89fdd1f2b9339197bb84be9"
+      "bytes": 5129,
+      "sha256": "920f36cf5d6cbef4e1a73e467d311f84eaa957e42fe363d4bbdedfef28a8b0b5"
     },
     {
       "id": "spirit-v1-29",
       "options": {
-        "seed": "spirit-v1-29",
+        "seed": "yinghui-preview-38",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "f6e1df"
-        ],
-        "hair": [
-          "braids"
-        ],
-        "hairColor": [
-          "302c3b"
-        ],
-        "skinColor": [
-          "8c5a2b"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 13914,
-      "sha256": "bc861faa3d15a8c6cc60a3c093f217c9ea0e4829f64c0a97217c5739b6eed60d"
+      "bytes": 5318,
+      "sha256": "5371fe40a8971925b892362e971efd8c79b3bc4df8bc60101e5fe075a16e1c55"
     },
     {
       "id": "spirit-v1-30",
       "options": {
-        "seed": "spirit-v1-30",
+        "seed": "yinghui-preview-39",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e0e9f1"
-        ],
-        "hair": [
-          "bunHair"
-        ],
-        "hairColor": [
-          "634a42"
-        ],
-        "skinColor": [
-          "f5d7b1"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4795,
-      "sha256": "fe051ed84dceb10f42ed53fe71eee784f62511dd96529700bee8e56f54a227e1"
+      "bytes": 5201,
+      "sha256": "dada0066d9199922d9d2559fd12773965ef03bf3977da7f5eb3c5ca3883c083e"
     },
     {
       "id": "spirit-v1-31",
       "options": {
-        "seed": "spirit-v1-31",
+        "seed": "yinghui-preview-40",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dcecf5"
-        ],
-        "hair": [
-          "froBun"
-        ],
-        "hairColor": [
-          "987255"
-        ],
-        "skinColor": [
-          "c99c62"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 6972,
-      "sha256": "b1b177b20273f4836004a90a371fdc24b485eb90b61d18ed71cf5f1199e24d53"
+      "bytes": 4521,
+      "sha256": "6e31dea888a618d43945ed76323025d17f090e32ea726b268aaa51f0fe02fce1"
     },
     {
       "id": "spirit-v1-32",
       "options": {
-        "seed": "spirit-v1-32",
+        "seed": "yinghui-preview-41",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e9e2f5"
-        ],
-        "hair": [
-          "bangs"
-        ],
-        "hairColor": [
-          "6760a9"
-        ],
-        "skinColor": [
-          "643d19"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5054,
-      "sha256": "8e1e0b76859d64e810748cf424ea143d2666ecb4151bbc109767d390dcfb22ce"
+      "bytes": 5030,
+      "sha256": "1de5ae6d771fab40bc67b450d87a7f488721259017215da63b386b99c8d2464d"
     },
     {
       "id": "spirit-v1-33",
       "options": {
-        "seed": "spirit-v1-33",
+        "seed": "yinghui-preview-42",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dff0e5"
-        ],
-        "hair": [
-          "curlyShortHair"
-        ],
-        "hairColor": [
-          "3c726b"
-        ],
-        "skinColor": [
-          "efcc9f"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4285,
-      "sha256": "eb675738ecf3d2e88c86fe00e5b8f0c14e301349435228d9ef268718ac7fde3c"
+      "bytes": 4513,
+      "sha256": "bdc6eba106d5c44519e640b7b0f1fdb7ffcf2ba19ac632cb5647bb143fed849d"
     },
     {
       "id": "spirit-v1-34",
       "options": {
-        "seed": "spirit-v1-34",
+        "seed": "yinghui-preview-43",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "faeacb"
-        ],
-        "hair": [
-          "bowlCutHair"
-        ],
-        "hairColor": [
-          "c18b4c"
-        ],
-        "skinColor": [
-          "a47539"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4328,
-      "sha256": "d3d6797786f49eb6fee330a109f4ddc15f15eca4a31876fdd7cd49d0b8e4152b"
+      "bytes": 5027,
+      "sha256": "bb58cd643c54ae2d30819e6662cc28912593a4b6b669774d89de645a3355a803"
     },
     {
       "id": "spirit-v1-35",
       "options": {
-        "seed": "spirit-v1-35",
+        "seed": "yinghui-preview-44",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "f6e1df"
-        ],
-        "hair": [
-          "shavedHead"
-        ],
-        "hairColor": [
-          "302c3b"
-        ],
-        "skinColor": [
-          "ffe4c0"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 3993,
-      "sha256": "b61bd72f05b4966ae37e565394edc59f8132af5f8efc4a0d66b54cb91d35f41a"
+      "bytes": 4730,
+      "sha256": "677d3407c1e86f818d141f3eef962c4dbc8929310920295a7908585e6dffa10b"
     },
     {
       "id": "spirit-v1-36",
       "options": {
-        "seed": "spirit-v1-36",
+        "seed": "yinghui-preview-45",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e0e9f1"
-        ],
-        "hair": [
-          "halfShavedHead"
-        ],
-        "hairColor": [
-          "634a42"
-        ],
-        "skinColor": [
-          "e2ba87"
-        ],
-        "eyes": [
-          "winking"
-        ],
-        "mouth": [
-          "gapSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 6056,
-      "sha256": "65aa6484de26072f7fda5ca36c15cc1ff7361408abbbfbcbe4746b9edc254474"
+      "bytes": 4644,
+      "sha256": "36449fd39c1b0f38792090009b4726f642802ebd176ccf34c26f029562ad3398"
     },
     {
       "id": "spirit-v1-37",
       "options": {
-        "seed": "spirit-v1-37",
+        "seed": "yinghui-preview-46",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dcecf5"
-        ],
-        "hair": [
-          "shortHair"
-        ],
-        "hairColor": [
-          "6760a9"
-        ],
-        "skinColor": [
-          "643d19"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5290,
-      "sha256": "950da0c1f75138a40248dfb076feada7605b0603f7d6d3fefd463820043b76ca"
+      "bytes": 4244,
+      "sha256": "9b92a692f67f07cc511f3a60cf343fcd662dff4b13b5c81478de93b0e6f3c3f0"
     },
     {
       "id": "spirit-v1-38",
       "options": {
-        "seed": "spirit-v1-38",
+        "seed": "yinghui-preview-47",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e9e2f5"
-        ],
-        "hair": [
-          "wavyBob"
-        ],
-        "hairColor": [
-          "3c726b"
-        ],
-        "skinColor": [
-          "efcc9f"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5838,
-      "sha256": "1d5f1783b5a98d15c252ef1f196c67f54c2363d82d4bb0f9fa53a0f5c8369d2e"
+      "bytes": 3415,
+      "sha256": "b7b5645a14323f580da1dc87c1524354cc02ca161f3b66ef11b80ec06c16c616"
     },
     {
       "id": "spirit-v1-39",
       "options": {
-        "seed": "spirit-v1-39",
+        "seed": "yinghui-preview-48",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dff0e5"
-        ],
-        "hair": [
-          "curlyBob"
-        ],
-        "hairColor": [
-          "c18b4c"
-        ],
-        "skinColor": [
-          "a47539"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4808,
-      "sha256": "204dcc4a73567475590591973d5880196502151ae502c840696295db7ea38df8"
+      "bytes": 4700,
+      "sha256": "028eaf7af32b14ff71b2f98d1e8f4fbdf69a3050c69e9fd111ce9f8fbb0b193e"
     },
     {
       "id": "spirit-v1-40",
       "options": {
-        "seed": "spirit-v1-40",
+        "seed": "yinghui-preview-49",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "faeacb"
-        ],
-        "hair": [
-          "straightHair"
-        ],
-        "hairColor": [
-          "302c3b"
-        ],
-        "skinColor": [
-          "ffe4c0"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5735,
-      "sha256": "8564e4060ff12c371a6fbf357051e21f82b58416b2292651c0c8c69089f853c1"
+      "bytes": 4915,
+      "sha256": "473eb9f60adb13f0bc8016c256ffc4189d4bccdb169a3d32c5fa4d08a8b04eb2"
     },
     {
       "id": "spirit-v1-41",
       "options": {
-        "seed": "spirit-v1-41",
+        "seed": "yinghui-preview-50",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "f6e1df"
-        ],
-        "hair": [
-          "braids"
-        ],
-        "hairColor": [
-          "634a42"
-        ],
-        "skinColor": [
-          "e2ba87"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 15441,
-      "sha256": "7f5fb4227d9c58fb6a8ce34ef3dea226ab5cb76cd269ac374c26cfbaf6d7eece"
+      "bytes": 3628,
+      "sha256": "f0d2096afbe34d41f94d5881cf97c6dc2ee9951e8d4a86731a6e533123288ef4"
     },
     {
       "id": "spirit-v1-42",
       "options": {
-        "seed": "spirit-v1-42",
+        "seed": "yinghui-preview-51",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e0e9f1"
-        ],
-        "hair": [
-          "bunHair"
-        ],
-        "hairColor": [
-          "987255"
-        ],
-        "skinColor": [
-          "8c5a2b"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5341,
-      "sha256": "4000277cbdf6098c712c302262e9504fe5865d14eea83afc756ca4d6cf6952ce"
+      "bytes": 4335,
+      "sha256": "6b2ae54582c2ffe32d07b212ae8b223a2075518c0e7e05ec477738994e97e45f"
     },
     {
       "id": "spirit-v1-43",
       "options": {
-        "seed": "spirit-v1-43",
+        "seed": "yinghui-preview-52",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dcecf5"
-        ],
-        "hair": [
-          "froBun"
-        ],
-        "hairColor": [
-          "6760a9"
-        ],
-        "skinColor": [
-          "f5d7b1"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 6537,
-      "sha256": "d02a1522df115e238503de88b897660b943974955d8433c0d0c9bd19d5219cf8"
+      "bytes": 4208,
+      "sha256": "55a92aac7bcb775c7010a0e6ff1abffa36e7e66621e81f09cd6eabbdafda3e60"
     },
     {
       "id": "spirit-v1-44",
       "options": {
-        "seed": "spirit-v1-44",
+        "seed": "yinghui-preview-53",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e9e2f5"
-        ],
-        "hair": [
-          "bangs"
-        ],
-        "hairColor": [
-          "3c726b"
-        ],
-        "skinColor": [
-          "c99c62"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5600,
-      "sha256": "cafea241b1d36128658124da23321b2c93479df9c4938211cabc6d0b89d597ab"
+      "bytes": 4059,
+      "sha256": "18b0929429da4dd9005fe77b824ca3acc12b80db6eb7353efdf5fcd31eab256c"
     },
     {
       "id": "spirit-v1-45",
       "options": {
-        "seed": "spirit-v1-45",
+        "seed": "yinghui-preview-54",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "dff0e5"
-        ],
-        "hair": [
-          "curlyShortHair"
-        ],
-        "hairColor": [
-          "c18b4c"
-        ],
-        "skinColor": [
-          "643d19"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4831,
-      "sha256": "2d0011d62704116a372494fe559a1c54d72d96b62138cbe27aa1c87b39654a07"
+      "bytes": 4119,
+      "sha256": "f5232ec43c04063e7e87dcc0ee0e8722c8c8c5783831c5660b352b9764d0f380"
     },
     {
       "id": "spirit-v1-46",
       "options": {
-        "seed": "spirit-v1-46",
+        "seed": "yinghui-preview-55",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "faeacb"
-        ],
-        "hair": [
-          "bowlCutHair"
-        ],
-        "hairColor": [
-          "302c3b"
-        ],
-        "skinColor": [
-          "efcc9f"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 100
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5759,
-      "sha256": "ddd4e4a3dcc36d094975a788210e9cc529b51ef74ba73c914319fec89630b0ef"
+      "bytes": 5048,
+      "sha256": "379b00e5cfff27fa704f83af1b19d62133f383659d368cacb47796fe9b523773"
     },
     {
       "id": "spirit-v1-47",
       "options": {
-        "seed": "spirit-v1-47",
+        "seed": "yinghui-preview-56",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "f6e1df"
-        ],
-        "hair": [
-          "shavedHead"
-        ],
-        "hairColor": [
-          "634a42"
-        ],
-        "skinColor": [
-          "a47539"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "glasses"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 4539,
-      "sha256": "358237a4fbbcc9a60b7fcf340368010920ab03241d18b23240591981abb87162"
+      "bytes": 5105,
+      "sha256": "df05720a863a933cb15315634b0f6e16b0c4e6d004a150f957ebebddb12a740b"
     },
     {
       "id": "spirit-v1-48",
       "options": {
-        "seed": "spirit-v1-48",
+        "seed": "yinghui-preview-57",
         "size": 128,
-        "radius": 50,
-        "scale": 100,
-        "backgroundColor": [
-          "e0e9f1"
-        ],
-        "hair": [
-          "halfShavedHead"
-        ],
-        "hairColor": [
-          "987255"
-        ],
-        "skinColor": [
-          "ffe4c0"
-        ],
-        "eyes": [
-          "starstruck"
-        ],
-        "mouth": [
-          "openedSmile"
-        ],
-        "accessories": [
-          "catEars"
-        ],
-        "accessoriesProbability": 0
+        "borderRadius": 50,
+        "idRandomization": false,
+        "animationVariant": "none"
       },
-      "bytes": 5717,
-      "sha256": "1b1df7008abd3c94d366e38e274f52529625c7f86a43b4d7c62011638db8adf0"
+      "bytes": 5459,
+      "sha256": "38a080ffddfc5fbb357b0b9eb2f3e220226a12314a82687fb9cc96fcf5273d12"
     }
   ]
 }
