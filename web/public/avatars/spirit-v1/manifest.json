@@ -1,18 +1,18 @@
 {
   "generator": "DiceBear Core 10.7.0 / Styles 10.6.0",
-  "style": "planets",
+  "style": "glass",
   "attribution": {
     "license": {
       "name": "CC0 1.0",
       "url": "https://creativecommons.org/publicdomain/zero/1.0/",
-      "text": "„Planets” (https://www.dicebear.com) by „DiceBear”, licensed under „CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/)"
+      "text": "„Glass” (https://www.dicebear.com) by „DiceBear”, licensed under „CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/)"
     },
     "creator": {
       "name": "DiceBear",
       "url": "https://www.dicebear.com"
     },
     "source": {
-      "name": "Planets",
+      "name": "Glass",
       "url": "https://www.dicebear.com"
     },
     "changes": "Generated 48 static circular variants; animations disabled."
@@ -27,8 +27,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 3624,
-      "sha256": "f0feb24f520c6c3c0e1ae3444a6a4f9d65dbf17260d2d0eb97cf7c65da6f4d15"
+      "bytes": 2693,
+      "sha256": "58d34aa2d49d952b5512d9794f58018e494c6f7db7323f4717b3ef28b30795fd"
     },
     {
       "id": "spirit-v1-02",
@@ -39,8 +39,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 3630,
-      "sha256": "f24f2bb53b3cfaa200f1a82c907faf90d2700969155bf10fab9f0a14af50ab2d"
+      "bytes": 2878,
+      "sha256": "4e06c8a4015747cd540fc0eaa4d8d3ffeaaa34fe638d7ffce1a0be4286b53160"
     },
     {
       "id": "spirit-v1-03",
@@ -51,8 +51,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4136,
-      "sha256": "3d0be81c47ed8111aff0135774bc1192be5ac1947ced55e6fde76c5518425c7e"
+      "bytes": 2514,
+      "sha256": "cabbd68cc71ead89ae5e5587d021411c85eaee73facebd685d163e1d96f42624"
     },
     {
       "id": "spirit-v1-04",
@@ -63,8 +63,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 3934,
-      "sha256": "5f34dfe52145d74a19859a5466642685cb1cfd36b25f864ffaf781adde675cc2"
+      "bytes": 2389,
+      "sha256": "a28f3f1ca96a0f0fe9bc7bf039cbfc421920bd931bbc049cbe937bb05dafe9d8"
     },
     {
       "id": "spirit-v1-05",
@@ -75,8 +75,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5216,
-      "sha256": "343f1ac893c48faec2cc0487a45dde5553982f3a31239a5234cb27e2b6614c9a"
+      "bytes": 2401,
+      "sha256": "0771083360a3527026fef4bb167f1bb5ed3f24c42c2fec23c522e569e2cd0160"
     },
     {
       "id": "spirit-v1-06",
@@ -87,8 +87,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4204,
-      "sha256": "0f1a45f7aecce8118933afa02bc10d7cc919d4ff9a3b0a1ee8ee8a51d6ea6eba"
+      "bytes": 2549,
+      "sha256": "2879488661335bd9b290b4220665f5ebf53393e7a500b8f54dbe074979a6021d"
     },
     {
       "id": "spirit-v1-07",
@@ -99,8 +99,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 3795,
-      "sha256": "116cca2c1f7597a91dfef7431892c31375f9f300c62dea03aa12d9be27946256"
+      "bytes": 2344,
+      "sha256": "9683f3eec06208274c0323ad7898cf4ce051b6b4727f379a61837ca9612dce90"
     },
     {
       "id": "spirit-v1-08",
@@ -111,8 +111,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4380,
-      "sha256": "e23b3043480af079d12edd8cfe91f48a8c5d2f2af8cbea813d475335ac0ceec7"
+      "bytes": 2515,
+      "sha256": "84129a82342b9afe8d57d5339101085ec158245b77ea922e46ad5d86120e88a7"
     },
     {
       "id": "spirit-v1-09",
@@ -123,8 +123,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4841,
-      "sha256": "ef76f0cc712d382fefb8952c0f08f5813b6fea6149197c1870422d33b87fcd44"
+      "bytes": 2514,
+      "sha256": "49b6e715cd4427ea0e071123cb55e5dee9934c1fefaeda0b14f864fa81e9c51a"
     },
     {
       "id": "spirit-v1-10",
@@ -135,8 +135,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4271,
-      "sha256": "30a5d1afb872e430b121605bba6e89cd5fffc1cebc3536d8009036f457a068fc"
+      "bytes": 2768,
+      "sha256": "f57ef7b9379c7c9dc86e85d6f5142abc0a2f43d64cd6e31f613faae8ead4cb41"
     },
     {
       "id": "spirit-v1-11",
@@ -147,8 +147,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4018,
-      "sha256": "9edd5f4c95727a94ca4f1a6b229693a4eb8b47924a6e1e43e04f763fedce1cd0"
+      "bytes": 2584,
+      "sha256": "6c8ca7a8627a963d1e34dfdcf37dca59b03a7f6988dc80a25d76168f457ae05e"
     },
     {
       "id": "spirit-v1-12",
@@ -159,8 +159,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5525,
-      "sha256": "481b8535917922a3a963e2c0b8011eda07ef71bb7a6dd1413d27e22ac08988a9"
+      "bytes": 2539,
+      "sha256": "840a1cfe0982b264766b9a689ae1d508c97664695771ed79753d6f9f6cdaeda3"
     },
     {
       "id": "spirit-v1-13",
@@ -171,8 +171,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5245,
-      "sha256": "fc5b0361bdf35c0dc2a139213b08bd5cfa88a08d8aeb8c9f3fd7861a128185b8"
+      "bytes": 2715,
+      "sha256": "e065bf4d02c02cc8ad540deced1847e88a94f9a983cd07412b0c9b4f21c2b03f"
     },
     {
       "id": "spirit-v1-14",
@@ -183,8 +183,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4202,
-      "sha256": "8c9e4f003ef561180c8d6e950fc1b6f5e7a026f92979321e01af9d55c3d24c35"
+      "bytes": 2515,
+      "sha256": "7fec91eef438a058a1b404f8b11a7e7de38020f7270fd5f8a64172771f5e575f"
     },
     {
       "id": "spirit-v1-15",
@@ -195,8 +195,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 3728,
-      "sha256": "349172982bc56260c3fe0b7a493463cffa8d095fd2909f0ee44724640a494120"
+      "bytes": 2282,
+      "sha256": "5de513da81a002cf521321d3c3c3b1cbf07822b2a6e1eac9c27c3dffee058c0b"
     },
     {
       "id": "spirit-v1-16",
@@ -207,8 +207,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4385,
-      "sha256": "2aeede07c592176e78f4aa0216f998473763f6af670223a8c62f222d9f305b4b"
+      "bytes": 2361,
+      "sha256": "26b861377eafd9d1c36fd20f337545ecd8aed4b8271c74753a5d157d197caf9d"
     },
     {
       "id": "spirit-v1-17",
@@ -219,8 +219,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 3488,
-      "sha256": "f11379e1dd8b01d86f7d212f7d3544d65642dd40c5eaa23e1f028182222f8bfa"
+      "bytes": 2671,
+      "sha256": "17422f4627bcbfc0975d90f2d771342988d408210fd96939f9df83dd21b29998"
     },
     {
       "id": "spirit-v1-18",
@@ -231,8 +231,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4458,
-      "sha256": "aa374ce24700b98a0f9d1e9f30d004cb1002468c2567606c3f867d392d67e5fd"
+      "bytes": 2372,
+      "sha256": "ffbfa6d86b692b881d769f5fc9a34552e5a776cafe366099f0ce2a67bcb25eeb"
     },
     {
       "id": "spirit-v1-19",
@@ -243,8 +243,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4276,
-      "sha256": "1b699fc0f7adea0d89cfa9ea5b599a12eb3c53714cb65d847509631d1e36da26"
+      "bytes": 2566,
+      "sha256": "9bfc5a0b3783d01e8e98204d0c47289e297f97b61cd9d719b5ed4678c023ea06"
     },
     {
       "id": "spirit-v1-20",
@@ -255,8 +255,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4506,
-      "sha256": "d8edb0c5ab745d49bd860dcc1787e84f3fab5ee32a44019c0623f2c3db81b249"
+      "bytes": 2674,
+      "sha256": "9c1c8a62a2e897529c95d210d2f1e2d56415901bacaaa50979b689a3c6688714"
     },
     {
       "id": "spirit-v1-21",
@@ -267,8 +267,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4767,
-      "sha256": "68caf2a77dc2da92030ac2cd2693f2eb88588dd7678371f707ade5b21f5656d0"
+      "bytes": 2726,
+      "sha256": "550df36ca3b0f67b84022510a85ba94779b4d4b6ab8b31e252fcd45434ad6eb3"
     },
     {
       "id": "spirit-v1-22",
@@ -279,8 +279,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4296,
-      "sha256": "72bbecf185ef731f830ed1fd8255cb323680e65fd7cd122971d4012025b3e229"
+      "bytes": 2671,
+      "sha256": "4875aa8a080390450959d73f7b536d4a935c81126ac09576ecf0649983971c6e"
     },
     {
       "id": "spirit-v1-23",
@@ -291,8 +291,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4446,
-      "sha256": "58af5363064c081e6fce3114a8ef7e5a61346eef095af649cdd890f237f2c1e5"
+      "bytes": 2275,
+      "sha256": "49ca380714b0d49768b37a2d88448b4b20be8088e40683f93f2d039fbc53e592"
     },
     {
       "id": "spirit-v1-24",
@@ -303,8 +303,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4083,
-      "sha256": "8bb452d31896c5ffcbd635eefa8f636cde96ae10753a19ffb7ab28206155bbe8"
+      "bytes": 2925,
+      "sha256": "373ed658debdb87b830fcadc478751c91888be84fdbf59795b7d58ad4ae0d347"
     },
     {
       "id": "spirit-v1-25",
@@ -315,8 +315,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4035,
-      "sha256": "36bd1f8be6fc21215854a555acb4c90377959c25de7ccb5ec3e3a87dd58ecfb0"
+      "bytes": 2268,
+      "sha256": "1d2fd086b3a9a6c07c8999303c454b0d63d1603756c638c766d3a144693dfe39"
     },
     {
       "id": "spirit-v1-26",
@@ -327,8 +327,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5531,
-      "sha256": "9bb5d2cf6b57d9e83926d84d29701838374d953f432a5811e95244b7c8744527"
+      "bytes": 2368,
+      "sha256": "b3800348a4a7532bdae4914ca51c2c083a12e253ce8be82b4867ed7ccefa1fa0"
     },
     {
       "id": "spirit-v1-27",
@@ -339,8 +339,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4643,
-      "sha256": "07af1ff52bf0ed4e6861cefc1e8dec3af89e312b321d90d8b891e9faabdddd60"
+      "bytes": 2879,
+      "sha256": "57a71216d72c5dfbc5bcc5ff8b5c14c81b232aa69c36ebb93d859cdb494e7488"
     },
     {
       "id": "spirit-v1-28",
@@ -351,8 +351,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5129,
-      "sha256": "920f36cf5d6cbef4e1a73e467d311f84eaa957e42fe363d4bbdedfef28a8b0b5"
+      "bytes": 2565,
+      "sha256": "2c7ceb21e93ff579928a2dab7be2753ed4133b23009a6b0aa31e1ca607418738"
     },
     {
       "id": "spirit-v1-29",
@@ -363,8 +363,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5318,
-      "sha256": "5371fe40a8971925b892362e971efd8c79b3bc4df8bc60101e5fe075a16e1c55"
+      "bytes": 2436,
+      "sha256": "3b5c34ae967bf1fde26cbca89d586ef55d960dfa4853a55c95c4c587c3a3c634"
     },
     {
       "id": "spirit-v1-30",
@@ -375,8 +375,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5201,
-      "sha256": "dada0066d9199922d9d2559fd12773965ef03bf3977da7f5eb3c5ca3883c083e"
+      "bytes": 2713,
+      "sha256": "4ed3e11e290ac17bd6e23113bb6875877240b38d734b9194f758bab0ad6f0d36"
     },
     {
       "id": "spirit-v1-31",
@@ -387,8 +387,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4521,
-      "sha256": "6e31dea888a618d43945ed76323025d17f090e32ea726b268aaa51f0fe02fce1"
+      "bytes": 2673,
+      "sha256": "23f785f9ac196f5286e12a30d50ce315d527577f5c550a9cd7a8a37f93a734a7"
     },
     {
       "id": "spirit-v1-32",
@@ -399,8 +399,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5030,
-      "sha256": "1de5ae6d771fab40bc67b450d87a7f488721259017215da63b386b99c8d2464d"
+      "bytes": 2596,
+      "sha256": "3bf08b4465d44a20e28f73a2a8aa5091da3ef3d3edf2bb165477f5e083dc5f22"
     },
     {
       "id": "spirit-v1-33",
@@ -411,8 +411,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4513,
-      "sha256": "bdc6eba106d5c44519e640b7b0f1fdb7ffcf2ba19ac632cb5647bb143fed849d"
+      "bytes": 2362,
+      "sha256": "3bf7ffeec8cfcf16518b5e2bbd0bdf2b6bef7b4616cbc279b54ad359f2772d30"
     },
     {
       "id": "spirit-v1-34",
@@ -423,8 +423,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5027,
-      "sha256": "bb58cd643c54ae2d30819e6662cc28912593a4b6b669774d89de645a3355a803"
+      "bytes": 2878,
+      "sha256": "6efa604c8ab22b6e8d5d826b4623522d93f117e88f34fac380331a0c7b3575df"
     },
     {
       "id": "spirit-v1-35",
@@ -435,8 +435,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4730,
-      "sha256": "677d3407c1e86f818d141f3eef962c4dbc8929310920295a7908585e6dffa10b"
+      "bytes": 2387,
+      "sha256": "eb3f37835b8cfcc23096be8c9bd9b9a0bbda4bca26ee417f2b4d080f92a12b5e"
     },
     {
       "id": "spirit-v1-36",
@@ -447,8 +447,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4644,
-      "sha256": "36449fd39c1b0f38792090009b4726f642802ebd176ccf34c26f029562ad3398"
+      "bytes": 2605,
+      "sha256": "bdabdec5c2d74f943581e94bdfc89d9c4e7ccfe73ded8dda7aada2a7b6ef4e1f"
     },
     {
       "id": "spirit-v1-37",
@@ -459,8 +459,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4244,
-      "sha256": "9b92a692f67f07cc511f3a60cf343fcd662dff4b13b5c81478de93b0e6f3c3f0"
+      "bytes": 2349,
+      "sha256": "93d848d7451210f750f19faa32c3c1a928ac2072d16cd6dcbb099af147d0d38b"
     },
     {
       "id": "spirit-v1-38",
@@ -471,8 +471,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 3415,
-      "sha256": "b7b5645a14323f580da1dc87c1524354cc02ca161f3b66ef11b80ec06c16c616"
+      "bytes": 2349,
+      "sha256": "b8a5de8d0dad8616ad8e552f62e24c014433d66f637f66212399680a37ee062a"
     },
     {
       "id": "spirit-v1-39",
@@ -483,8 +483,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4700,
-      "sha256": "028eaf7af32b14ff71b2f98d1e8f4fbdf69a3050c69e9fd111ce9f8fbb0b193e"
+      "bytes": 2710,
+      "sha256": "0554e9ce5067c4618e943ebdd2818ed80153ae317884e4c2f8c72b7cc5281206"
     },
     {
       "id": "spirit-v1-40",
@@ -495,8 +495,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4915,
-      "sha256": "473eb9f60adb13f0bc8016c256ffc4189d4bccdb169a3d32c5fa4d08a8b04eb2"
+      "bytes": 2360,
+      "sha256": "9acce7dc6a87673df3ceb394a8154db69fe44a1850965a651819dc3167f263ec"
     },
     {
       "id": "spirit-v1-41",
@@ -507,8 +507,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 3628,
-      "sha256": "f0d2096afbe34d41f94d5881cf97c6dc2ee9951e8d4a86731a6e533123288ef4"
+      "bytes": 2537,
+      "sha256": "27002251d30b401983fb9c64cb7fcf79a2f649271cfd0c9c1efb3da8636fb694"
     },
     {
       "id": "spirit-v1-42",
@@ -519,8 +519,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4335,
-      "sha256": "6b2ae54582c2ffe32d07b212ae8b223a2075518c0e7e05ec477738994e97e45f"
+      "bytes": 2877,
+      "sha256": "073694c9d5cdeb19738ae1a74799e14c56c2339238ce85745bc8bc69700890ee"
     },
     {
       "id": "spirit-v1-43",
@@ -531,8 +531,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4208,
-      "sha256": "55a92aac7bcb775c7010a0e6ff1abffa36e7e66621e81f09cd6eabbdafda3e60"
+      "bytes": 2883,
+      "sha256": "d88a9c37cd3728eba268a3b4c26c5f7cb2a9d43955d269c97c762c1634151b93"
     },
     {
       "id": "spirit-v1-44",
@@ -543,8 +543,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4059,
-      "sha256": "18b0929429da4dd9005fe77b824ca3acc12b80db6eb7353efdf5fcd31eab256c"
+      "bytes": 2767,
+      "sha256": "da6e68c64a950eb920277afbe78cf5d2464f2e78716fff9574ec51962fcfb4ef"
     },
     {
       "id": "spirit-v1-45",
@@ -555,8 +555,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 4119,
-      "sha256": "f5232ec43c04063e7e87dcc0ee0e8722c8c8c5783831c5660b352b9764d0f380"
+      "bytes": 2381,
+      "sha256": "2949c15c0f80978bab4e026feac16f30cbbbd1249c601ddbe0b8d24968fee424"
     },
     {
       "id": "spirit-v1-46",
@@ -567,8 +567,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5048,
-      "sha256": "379b00e5cfff27fa704f83af1b19d62133f383659d368cacb47796fe9b523773"
+      "bytes": 2284,
+      "sha256": "608eb1d449f26de429bf941d19213c60611499b76a314ae4592fde45c179ac4f"
     },
     {
       "id": "spirit-v1-47",
@@ -579,8 +579,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5105,
-      "sha256": "df05720a863a933cb15315634b0f6e16b0c4e6d004a150f957ebebddb12a740b"
+      "bytes": 2343,
+      "sha256": "60735465173d7d15b70341c2818c6b978d90d6fbb4dcce551ec2e8b638b2635c"
     },
     {
       "id": "spirit-v1-48",
@@ -591,8 +591,8 @@
         "idRandomization": false,
         "animationVariant": "none"
       },
-      "bytes": 5459,
-      "sha256": "38a080ffddfc5fbb357b0b9eb2f3e220226a12314a82687fb9cc96fcf5273d12"
+      "bytes": 2349,
+      "sha256": "630edfdfb570393267e7cb4056a100e150c8cd412168fd8e0b539930172bc894"
     }
   ]
 }

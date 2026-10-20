@@ -1,5 +1,5 @@
-Avatar design: Planets
-„Planets” (https://www.dicebear.com) by „DiceBear”, licensed under „CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/)
+Avatar design: Glass
+„Glass” (https://www.dicebear.com) by „DiceBear”, licensed under „CC0 1.0” (https://creativecommons.org/publicdomain/zero/1.0/)
 Changes: 48 static circular variants; animations disabled.
 
 Generator code license:
