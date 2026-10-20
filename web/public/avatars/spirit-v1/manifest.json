@@ -1,0 +1,870 @@
+{
+  "generator": "DiceBear 9.4.2",
+  "style": "bottts-neutral",
+  "avatars": [
+    {
+      "id": "spirit-v1-01",
+      "options": {
+        "seed": "spirit-v1-01",
+        "size": 128,
+        "backgroundColor": [
+          "4c78a8"
+        ],
+        "eyes": [
+          "eva"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1696,
+      "sha256": "72b4844e13f25065eec16f0190b052e0260c2c433a90658ee1ec6d90bfd70f37"
+    },
+    {
+      "id": "spirit-v1-02",
+      "options": {
+        "seed": "spirit-v1-02",
+        "size": 128,
+        "backgroundColor": [
+          "7964ad"
+        ],
+        "eyes": [
+          "eva"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 2083,
+      "sha256": "ebb6d70f186191e0dcd04499d35505d0458c465fa549b977850eb8404208f856"
+    },
+    {
+      "id": "spirit-v1-03",
+      "options": {
+        "seed": "spirit-v1-03",
+        "size": 128,
+        "backgroundColor": [
+          "32877d"
+        ],
+        "eyes": [
+          "eva"
+        ],
+        "mouth": [
+          "square01"
+        ]
+      },
+      "bytes": 1587,
+      "sha256": "4271756c2cf59b7b5a875c31e070ba1cf37d887d8c0e2c959576f8ea17e1ea8d"
+    },
+    {
+      "id": "spirit-v1-04",
+      "options": {
+        "seed": "spirit-v1-04",
+        "size": 128,
+        "backgroundColor": [
+          "aa7b32"
+        ],
+        "eyes": [
+          "eva"
+        ],
+        "mouth": [
+          "grill01"
+        ]
+      },
+      "bytes": 1790,
+      "sha256": "746aba252e8d3b7a075d37cc711fd3d5d0f89a0ec191422aced233ae8e68d20c"
+    },
+    {
+      "id": "spirit-v1-05",
+      "options": {
+        "seed": "spirit-v1-05",
+        "size": 128,
+        "backgroundColor": [
+          "b16950"
+        ],
+        "eyes": [
+          "eva"
+        ],
+        "mouth": [
+          "square02"
+        ]
+      },
+      "bytes": 1587,
+      "sha256": "240cdebe08c1c5e729d89f8626437b17af58b651a34d7ec0b4e995d0a3d631c9"
+    },
+    {
+      "id": "spirit-v1-06",
+      "options": {
+        "seed": "spirit-v1-06",
+        "size": 128,
+        "backgroundColor": [
+          "5b758d"
+        ],
+        "eyes": [
+          "eva"
+        ],
+        "mouth": [
+          "grill03"
+        ]
+      },
+      "bytes": 1746,
+      "sha256": "fec2a90d43bd8e1786bcb10b9b64cbb4fb0025b0431d22faac76750379b4440e"
+    },
+    {
+      "id": "spirit-v1-07",
+      "options": {
+        "seed": "spirit-v1-07",
+        "size": 128,
+        "backgroundColor": [
+          "4c78a8"
+        ],
+        "eyes": [
+          "happy"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 1809,
+      "sha256": "23eb33ef7ee226125ef29730b69f222c6b14833326f2b632c1a80a9a9482856b"
+    },
+    {
+      "id": "spirit-v1-08",
+      "options": {
+        "seed": "spirit-v1-08",
+        "size": 128,
+        "backgroundColor": [
+          "7964ad"
+        ],
+        "eyes": [
+          "happy"
+        ],
+        "mouth": [
+          "square01"
+        ]
+      },
+      "bytes": 1313,
+      "sha256": "ee7b5a844a543c5f5b8e3fd80b6727397e722366bb89712ade2589c72f45faa8"
+    },
+    {
+      "id": "spirit-v1-09",
+      "options": {
+        "seed": "spirit-v1-09",
+        "size": 128,
+        "backgroundColor": [
+          "32877d"
+        ],
+        "eyes": [
+          "happy"
+        ],
+        "mouth": [
+          "grill01"
+        ]
+      },
+      "bytes": 1516,
+      "sha256": "1e19e2fe56c1e44c4354b3b771e143be3e5c123eaf22f4c1fe68fdd0eff7f57f"
+    },
+    {
+      "id": "spirit-v1-10",
+      "options": {
+        "seed": "spirit-v1-10",
+        "size": 128,
+        "backgroundColor": [
+          "aa7b32"
+        ],
+        "eyes": [
+          "happy"
+        ],
+        "mouth": [
+          "square02"
+        ]
+      },
+      "bytes": 1313,
+      "sha256": "ffb967853d515fd0d75db55a53f6d16f8b45686a7eccf04f11870573edbac26d"
+    },
+    {
+      "id": "spirit-v1-11",
+      "options": {
+        "seed": "spirit-v1-11",
+        "size": 128,
+        "backgroundColor": [
+          "b16950"
+        ],
+        "eyes": [
+          "happy"
+        ],
+        "mouth": [
+          "grill03"
+        ]
+      },
+      "bytes": 1472,
+      "sha256": "f718f0ec28be156e51f6d51e94562f68bc13d1997a5d20cda02364ce5e5913a3"
+    },
+    {
+      "id": "spirit-v1-12",
+      "options": {
+        "seed": "spirit-v1-12",
+        "size": 128,
+        "backgroundColor": [
+          "5b758d"
+        ],
+        "eyes": [
+          "happy"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1422,
+      "sha256": "9bd8b3066596920b64c91d6d34ce9028a6f608f0a74239c8d9d02f434bbfd46c"
+    },
+    {
+      "id": "spirit-v1-13",
+      "options": {
+        "seed": "spirit-v1-13",
+        "size": 128,
+        "backgroundColor": [
+          "4c78a8"
+        ],
+        "eyes": [
+          "round"
+        ],
+        "mouth": [
+          "square01"
+        ]
+      },
+      "bytes": 1201,
+      "sha256": "a86a5be839fa168118ede500cf55c591e9c94045bedb30e4a32f3261e15cc571"
+    },
+    {
+      "id": "spirit-v1-14",
+      "options": {
+        "seed": "spirit-v1-14",
+        "size": 128,
+        "backgroundColor": [
+          "7964ad"
+        ],
+        "eyes": [
+          "round"
+        ],
+        "mouth": [
+          "grill01"
+        ]
+      },
+      "bytes": 1404,
+      "sha256": "b41b50596af16a60000053bda53d2baf01d0b6929b4f37eee39c24652f2fdd4d"
+    },
+    {
+      "id": "spirit-v1-15",
+      "options": {
+        "seed": "spirit-v1-15",
+        "size": 128,
+        "backgroundColor": [
+          "32877d"
+        ],
+        "eyes": [
+          "round"
+        ],
+        "mouth": [
+          "square02"
+        ]
+      },
+      "bytes": 1201,
+      "sha256": "86b2242cda3988654847c6040b8ca0ce57aec5aa85fa1f6a3d962e4949dbefbc"
+    },
+    {
+      "id": "spirit-v1-16",
+      "options": {
+        "seed": "spirit-v1-16",
+        "size": 128,
+        "backgroundColor": [
+          "aa7b32"
+        ],
+        "eyes": [
+          "round"
+        ],
+        "mouth": [
+          "grill03"
+        ]
+      },
+      "bytes": 1360,
+      "sha256": "ff3a26ed252d4cf1bd202ba446b8cb4a336a997091bb49bb2b939a54206a1a3b"
+    },
+    {
+      "id": "spirit-v1-17",
+      "options": {
+        "seed": "spirit-v1-17",
+        "size": 128,
+        "backgroundColor": [
+          "b16950"
+        ],
+        "eyes": [
+          "round"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1310,
+      "sha256": "98c5134ece660ffb1df008379a5bff204afb19425ebaf74df2efab7242bbbd13"
+    },
+    {
+      "id": "spirit-v1-18",
+      "options": {
+        "seed": "spirit-v1-18",
+        "size": 128,
+        "backgroundColor": [
+          "5b758d"
+        ],
+        "eyes": [
+          "round"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 1697,
+      "sha256": "89280d4dfc6aa6aa6637b2e803c9cb4275f5a4fe5bf029004bdb52e1d9548b25"
+    },
+    {
+      "id": "spirit-v1-19",
+      "options": {
+        "seed": "spirit-v1-19",
+        "size": 128,
+        "backgroundColor": [
+          "4c78a8"
+        ],
+        "eyes": [
+          "roundFrame01"
+        ],
+        "mouth": [
+          "grill01"
+        ]
+      },
+      "bytes": 1531,
+      "sha256": "907c7e6f6829e91ceceae6ccbe6f59960e1967e017623391348e058da174a838"
+    },
+    {
+      "id": "spirit-v1-20",
+      "options": {
+        "seed": "spirit-v1-20",
+        "size": 128,
+        "backgroundColor": [
+          "7964ad"
+        ],
+        "eyes": [
+          "roundFrame01"
+        ],
+        "mouth": [
+          "square02"
+        ]
+      },
+      "bytes": 1328,
+      "sha256": "54e2dd803925d4400812e3699ef90f328de947e06f8e01e5c05fb852db25b20a"
+    },
+    {
+      "id": "spirit-v1-21",
+      "options": {
+        "seed": "spirit-v1-21",
+        "size": 128,
+        "backgroundColor": [
+          "32877d"
+        ],
+        "eyes": [
+          "roundFrame01"
+        ],
+        "mouth": [
+          "grill03"
+        ]
+      },
+      "bytes": 1487,
+      "sha256": "5fe5dea4b9e69e3617c0d654ea5bc2dd118f1be8a97dcabf47d43583f125f4e5"
+    },
+    {
+      "id": "spirit-v1-22",
+      "options": {
+        "seed": "spirit-v1-22",
+        "size": 128,
+        "backgroundColor": [
+          "aa7b32"
+        ],
+        "eyes": [
+          "roundFrame01"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1437,
+      "sha256": "0211255776869c34a4d0e7d0efcb91a2a75ce5346707b5ff5e9e294ce50eb7e6"
+    },
+    {
+      "id": "spirit-v1-23",
+      "options": {
+        "seed": "spirit-v1-23",
+        "size": 128,
+        "backgroundColor": [
+          "b16950"
+        ],
+        "eyes": [
+          "roundFrame01"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 1824,
+      "sha256": "a880503b2f990910c5ca3afad733af9e09e389a0a41713519add887cdc9ec4c6"
+    },
+    {
+      "id": "spirit-v1-24",
+      "options": {
+        "seed": "spirit-v1-24",
+        "size": 128,
+        "backgroundColor": [
+          "5b758d"
+        ],
+        "eyes": [
+          "roundFrame01"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1437,
+      "sha256": "a8c8d4e9a15e793a8a02a3f8076f250643fbbf535322ff7a2092c58d0f799cb3"
+    },
+    {
+      "id": "spirit-v1-25",
+      "options": {
+        "seed": "spirit-v1-25",
+        "size": 128,
+        "backgroundColor": [
+          "4c78a8"
+        ],
+        "eyes": [
+          "roundFrame02"
+        ],
+        "mouth": [
+          "square02"
+        ]
+      },
+      "bytes": 1452,
+      "sha256": "a3a84e32be7581fff96e3aafccc60aee28d4997b7b6d120f2150e35327c372e9"
+    },
+    {
+      "id": "spirit-v1-26",
+      "options": {
+        "seed": "spirit-v1-26",
+        "size": 128,
+        "backgroundColor": [
+          "7964ad"
+        ],
+        "eyes": [
+          "roundFrame02"
+        ],
+        "mouth": [
+          "grill03"
+        ]
+      },
+      "bytes": 1611,
+      "sha256": "1a1c477e692a786309857d5fd49f48ee9965bd7ab2d5a31b8656d9506fec3a6f"
+    },
+    {
+      "id": "spirit-v1-27",
+      "options": {
+        "seed": "spirit-v1-27",
+        "size": 128,
+        "backgroundColor": [
+          "32877d"
+        ],
+        "eyes": [
+          "roundFrame02"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1561,
+      "sha256": "acb8c7c6c9cd4e1605bd06c5852c11b3ecd945d9bc37d9bd79959aef397deccd"
+    },
+    {
+      "id": "spirit-v1-28",
+      "options": {
+        "seed": "spirit-v1-28",
+        "size": 128,
+        "backgroundColor": [
+          "aa7b32"
+        ],
+        "eyes": [
+          "roundFrame02"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 1948,
+      "sha256": "39b0a3ed91d8da864f62d6f9caec5b749174393dbea95dcbbad2e450f5e64fed"
+    },
+    {
+      "id": "spirit-v1-29",
+      "options": {
+        "seed": "spirit-v1-29",
+        "size": 128,
+        "backgroundColor": [
+          "b16950"
+        ],
+        "eyes": [
+          "roundFrame02"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1561,
+      "sha256": "ea49a9cb6a7e4ba70e5f72570a98948959212d191ddfa39206fafb9fb53b6392"
+    },
+    {
+      "id": "spirit-v1-30",
+      "options": {
+        "seed": "spirit-v1-30",
+        "size": 128,
+        "backgroundColor": [
+          "5b758d"
+        ],
+        "eyes": [
+          "roundFrame02"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 1948,
+      "sha256": "a159789cbdb06677e73ca4b8d3dd9ffd168fc6029f267fe7fa219f990d066e84"
+    },
+    {
+      "id": "spirit-v1-31",
+      "options": {
+        "seed": "spirit-v1-31",
+        "size": 128,
+        "backgroundColor": [
+          "4c78a8"
+        ],
+        "eyes": [
+          "glow"
+        ],
+        "mouth": [
+          "grill03"
+        ]
+      },
+      "bytes": 1694,
+      "sha256": "9c5b52aedf0b93eab31bfadac9a7dab61103a4c8f59a2de4c8a45013662de29d"
+    },
+    {
+      "id": "spirit-v1-32",
+      "options": {
+        "seed": "spirit-v1-32",
+        "size": 128,
+        "backgroundColor": [
+          "7964ad"
+        ],
+        "eyes": [
+          "glow"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1644,
+      "sha256": "00c4f93391395f010cdeb319325256f0eedb8575fe5aca076bce452a8922175e"
+    },
+    {
+      "id": "spirit-v1-33",
+      "options": {
+        "seed": "spirit-v1-33",
+        "size": 128,
+        "backgroundColor": [
+          "32877d"
+        ],
+        "eyes": [
+          "glow"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 2031,
+      "sha256": "232f4b00ea1722dba5f1a40efc6bd1692bc7231667cdf6097b9f39b461a23e26"
+    },
+    {
+      "id": "spirit-v1-34",
+      "options": {
+        "seed": "spirit-v1-34",
+        "size": 128,
+        "backgroundColor": [
+          "aa7b32"
+        ],
+        "eyes": [
+          "glow"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1644,
+      "sha256": "4c7b7e055c221e79f8d5160145356c20dcce589c0c2ce0b34cdf05d2fc68747d"
+    },
+    {
+      "id": "spirit-v1-35",
+      "options": {
+        "seed": "spirit-v1-35",
+        "size": 128,
+        "backgroundColor": [
+          "b16950"
+        ],
+        "eyes": [
+          "glow"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 2031,
+      "sha256": "e8e625e5ef0b867f8e268ed485e7d39ddffa41b1bbdcb33446034c53bf0299c2"
+    },
+    {
+      "id": "spirit-v1-36",
+      "options": {
+        "seed": "spirit-v1-36",
+        "size": 128,
+        "backgroundColor": [
+          "5b758d"
+        ],
+        "eyes": [
+          "glow"
+        ],
+        "mouth": [
+          "square01"
+        ]
+      },
+      "bytes": 1535,
+      "sha256": "62aa8d8add1ad8ebb2b468a4145dcbdd9bc7509deebc404d6e08549f6dea5a95"
+    },
+    {
+      "id": "spirit-v1-37",
+      "options": {
+        "seed": "spirit-v1-37",
+        "size": 128,
+        "backgroundColor": [
+          "4c78a8"
+        ],
+        "eyes": [
+          "hearts"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1783,
+      "sha256": "dcb0b291b41ffc93a4e1d6734c714cf26471202775454c3908dc32d1b05d3910"
+    },
+    {
+      "id": "spirit-v1-38",
+      "options": {
+        "seed": "spirit-v1-38",
+        "size": 128,
+        "backgroundColor": [
+          "7964ad"
+        ],
+        "eyes": [
+          "hearts"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 2170,
+      "sha256": "43acadd2e043fc34a405de1587e58163885b7e878bb2b54e403582dee18fd53b"
+    },
+    {
+      "id": "spirit-v1-39",
+      "options": {
+        "seed": "spirit-v1-39",
+        "size": 128,
+        "backgroundColor": [
+          "32877d"
+        ],
+        "eyes": [
+          "hearts"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1783,
+      "sha256": "022bb8b1155cd8272c3611b100196d51aa3b7f5fe1c329aadac9a7640b76264a"
+    },
+    {
+      "id": "spirit-v1-40",
+      "options": {
+        "seed": "spirit-v1-40",
+        "size": 128,
+        "backgroundColor": [
+          "aa7b32"
+        ],
+        "eyes": [
+          "hearts"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 2170,
+      "sha256": "a4664116c88404656d1ed9031af96182899719115218f340defd5389ee174238"
+    },
+    {
+      "id": "spirit-v1-41",
+      "options": {
+        "seed": "spirit-v1-41",
+        "size": 128,
+        "backgroundColor": [
+          "b16950"
+        ],
+        "eyes": [
+          "hearts"
+        ],
+        "mouth": [
+          "square01"
+        ]
+      },
+      "bytes": 1674,
+      "sha256": "2a165bc2b38036c0f7d3c9a285b18a0e47bff46450adb7dfd6adeb2a9e70a3e4"
+    },
+    {
+      "id": "spirit-v1-42",
+      "options": {
+        "seed": "spirit-v1-42",
+        "size": 128,
+        "backgroundColor": [
+          "5b758d"
+        ],
+        "eyes": [
+          "hearts"
+        ],
+        "mouth": [
+          "grill01"
+        ]
+      },
+      "bytes": 1877,
+      "sha256": "1d4d97575113b3d7407d9407f1b8a147eb82d5faf375b83c69e084e8110b501a"
+    },
+    {
+      "id": "spirit-v1-43",
+      "options": {
+        "seed": "spirit-v1-43",
+        "size": 128,
+        "backgroundColor": [
+          "4c78a8"
+        ],
+        "eyes": [
+          "robocop"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 2042,
+      "sha256": "716e2ffa54a4125b65d05322132569d74790894999aca4c98908f21630835ac9"
+    },
+    {
+      "id": "spirit-v1-44",
+      "options": {
+        "seed": "spirit-v1-44",
+        "size": 128,
+        "backgroundColor": [
+          "7964ad"
+        ],
+        "eyes": [
+          "robocop"
+        ],
+        "mouth": [
+          "smile01"
+        ]
+      },
+      "bytes": 1655,
+      "sha256": "4fac192a8ed3d341012540134d831963913106ba6f25de48a7bf4a0f266f0164"
+    },
+    {
+      "id": "spirit-v1-45",
+      "options": {
+        "seed": "spirit-v1-45",
+        "size": 128,
+        "backgroundColor": [
+          "32877d"
+        ],
+        "eyes": [
+          "robocop"
+        ],
+        "mouth": [
+          "smile02"
+        ]
+      },
+      "bytes": 2042,
+      "sha256": "bf324265248a056383ba1451f7859c0e15ce865a453af5ff91b9ae46a449c2bb"
+    },
+    {
+      "id": "spirit-v1-46",
+      "options": {
+        "seed": "spirit-v1-46",
+        "size": 128,
+        "backgroundColor": [
+          "aa7b32"
+        ],
+        "eyes": [
+          "robocop"
+        ],
+        "mouth": [
+          "square01"
+        ]
+      },
+      "bytes": 1546,
+      "sha256": "1aef4f7ec33c76f8ca3a21e46f367d0a8e49a75f563658d9d22d8ce4bcb0f9af"
+    },
+    {
+      "id": "spirit-v1-47",
+      "options": {
+        "seed": "spirit-v1-47",
+        "size": 128,
+        "backgroundColor": [
+          "b16950"
+        ],
+        "eyes": [
+          "robocop"
+        ],
+        "mouth": [
+          "grill01"
+        ]
+      },
+      "bytes": 1749,
+      "sha256": "2cdd3deb109a1881a30e9baf0362cc7899322550ec50d04deaac7392a175af76"
+    },
+    {
+      "id": "spirit-v1-48",
+      "options": {
+        "seed": "spirit-v1-48",
+        "size": 128,
+        "backgroundColor": [
+          "5b758d"
+        ],
+        "eyes": [
+          "robocop"
+        ],
+        "mouth": [
+          "square02"
+        ]
+      },
+      "bytes": 1546,
+      "sha256": "4de5b42315cde20b72c2a4c780ce7ea1701cf7f0b6e02c4744ee8b502ac75671"
+    }
+  ]
+}

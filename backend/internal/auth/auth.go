@@ -223,6 +223,9 @@ func (s *Service) Register(req RegisterRequest) (*AuthSessionResult, error) {
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
+	if err := AssignNewUserAvatar(&user); err != nil {
+		return nil, err
+	}
 	if count == 0 {
 		user.Role = model.UserRoleAdmin
 	}

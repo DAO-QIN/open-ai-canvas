@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Avatar, Button, Form, Input, Skeleton } from "antd";
-import { BadgeCheck, Crop, ImagePlus, KeyRound, Mail, RefreshCw, ShieldCheck } from "lucide-react";
+import { App, Button, Form, Input, Skeleton } from "antd";
+import { BadgeCheck, ImagePlus, KeyRound, Mail, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -8,8 +8,7 @@ import { UserAvatar } from "@/components/layout/user-avatar";
 import { ImageCropDialog, type ImageCropRect } from "@/components/image-crop-dialog";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { Callout } from "@/components/ui/product/callout";
-import { SegmentedControl } from "@/components/ui/base/segmented-control";
-import { DEFAULT_USER_AVATARS } from "@/lib/default-user-avatars";
+import { ProfileAvatarPicker } from "./profile-avatar-picker";
 import { cropProfileAvatar } from "@/services/profile-avatar";
 import { loadProfileSession } from "@/services/profile-session";
 import { applyUserSession } from "@/lib/user-session";
@@ -150,6 +149,7 @@ export function ProfilePane() {
             const file = await cropProfileAvatar(source.url, crop, source.file.name);
             if (cropGeneration.current !== generation || useUserStore.getState().user?.id !== userId) return;
             setDraftAvatar({ file, url: URL.createObjectURL(file), sourceFile: source.file });
+            setAvatarTab("upload");
             setCropSource(null);
         } catch (error) {
             if (cropGeneration.current !== generation) return;
@@ -186,7 +186,7 @@ export function ProfilePane() {
             const { user } = await selectDefaultProfileAvatar(defaultAvatarDraft);
             await queryClient.cancelQueries({ queryKey });
             updateAvatarUser(user);
-            message.success("已使用选择的系统头像");
+            message.success("头像已保存");
         } catch (error) {
             setError("avatar", errorMessage(error, "保存头像失败，请重试"));
         } finally {
@@ -508,9 +508,10 @@ export function ProfilePane() {
                 <AppModal
                     open={avatarDialogOpen}
                     centered
-                    width={560}
+                    width={600}
                     title="更换头像"
                     okText="保存头像"
+                    cancelText="取消"
                     confirmLoading={pending === "avatar" || pending === "reset-avatar"}
                     okButtonProps={{ disabled: !!pending || (avatarTab === "upload" ? !draftAvatar : profile.user.avatarMode === "default" && (profile.user.avatarPreset || "person") === defaultAvatarDraft) }}
                     cancelButtonProps={{ disabled: !!pending }}
@@ -521,64 +522,28 @@ export function ProfilePane() {
                     onOk={() => void (avatarTab === "upload" ? saveAvatar() : saveDefaultAvatar())}
                 >
                     <div className="profile-avatar-dialog-body">
-                        <SegmentedControl<AvatarTab>
-                            block
-                            ariaLabel="头像来源"
-                            value={avatarTab}
+                        <input ref={fileInput} type="file" accept="image/png,image/jpeg" hidden aria-label="选择头像图片" onChange={selectAvatar} disabled={!!pending} />
+                        <ProfileAvatarPicker
+                            user={profile.user}
+                            source={avatarTab}
+                            preset={defaultAvatarDraft}
+                            uploadPreview={draftAvatar?.url}
                             disabled={!!pending}
-                            options={[
-                                { value: "upload", label: "上传图片" },
-                                { value: "preset", label: "系统头像" },
-                            ]}
-                            onChange={(tab) => {
-                                setAvatarTab(tab);
+                            onSelect={(preset) => {
+                                setAvatarTab("preset");
+                                setDefaultAvatarDraft(preset);
+                                setDraftAvatar(null);
                                 setError("avatar", "");
                             }}
+                            onUpload={() => fileInput.current?.click()}
+                            onCrop={() => {
+                                if (draftAvatar) setCropSource({ file: draftAvatar.sourceFile, url: URL.createObjectURL(draftAvatar.sourceFile) });
+                            }}
+                            onPreviewError={() => {
+                                setDraftAvatar(null);
+                                setError("avatar", "无法读取图片，请重新上传 PNG 或 JPEG 图片");
+                            }}
                         />
-                        {avatarTab === "upload" ? (
-                            <div className="profile-avatar-upload">
-                                {draftAvatar ? (
-                                    <img
-                                        className="profile-avatar-dialog-preview"
-                                        src={draftAvatar.url}
-                                        alt="待保存的头像预览"
-                                        onError={() => {
-                                            setDraftAvatar(null);
-                                            setError("avatar", "无法读取图片，请选择有效的 PNG 或 JPEG 图片");
-                                        }}
-                                    />
-                                ) : (
-                                    <UserAvatar user={profile.user} className="profile-avatar-dialog-preview" />
-                                )}
-                                <div className="profile-avatar-upload-controls">
-                                    <p className="profile-avatar-upload-title">{draftAvatar ? "裁剪后的头像" : "当前头像"}</p>
-                                    <p className="profile-hint">选择 PNG 或 JPEG 图片，可裁剪为正方形；文件最大 5 MiB。</p>
-                                    <input ref={fileInput} type="file" accept="image/png,image/jpeg" hidden aria-label="选择头像图片" onChange={selectAvatar} disabled={!!pending} />
-                                    <div className="profile-actions">
-                                        <Button icon={<ImagePlus className="size-4" />} disabled={!!pending} onClick={() => fileInput.current?.click()}>
-                                            {draftAvatar ? "重新选择" : "选择图片"}
-                                        </Button>
-                                        {draftAvatar ? (
-                                            <Button icon={<Crop className="size-4" />} disabled={!!pending} onClick={() => setCropSource({ file: draftAvatar.sourceFile, url: URL.createObjectURL(draftAvatar.sourceFile) })}>
-                                                调整裁剪
-                                            </Button>
-                                        ) : null}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <p className="profile-hint">选择一款系统头像，保存后会同步到工作区。</p>
-                                <div className="profile-default-avatar-grid" role="group" aria-label="系统头像">
-                                    {DEFAULT_USER_AVATARS.map((preset) => (
-                                        <button key={preset.id} type="button" className="profile-default-avatar-choice" aria-pressed={defaultAvatarDraft === preset.id} disabled={!!pending} onClick={() => setDefaultAvatarDraft(preset.id)}>
-                                            <Avatar size={56} className="profile-default-avatar-icon" icon={<UserAvatar user={{ ...profile.user, avatarUrl: undefined, avatarMode: "default", avatarPreset: preset.id }} className="size-8" />} />
-                                            <span>{preset.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
                         {errors.avatar ? (
                             <Callout tone="error" role="alert" className="profile-feedback">
                                 {errors.avatar}

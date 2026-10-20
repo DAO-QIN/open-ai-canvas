@@ -164,6 +164,18 @@ func TestProfileDefaultAvatarSelectionPersistsAndRejectsUnknownPreset(t *testing
 	if reloaded.Code != 200 || !strings.Contains(reloaded.Body.String(), `"avatarPreset":"cat"`) {
 		t.Fatalf("reloaded profile lost selection: %d", reloaded.Code)
 	}
+	spirit := profileRequest(router, "POST", "/api/auth/profile/avatar/default", `{"preset":"spirit-v1-48"}`, cookie)
+	if spirit.Code != 200 {
+		t.Fatalf("spirit selection status %d: %s", spirit.Code, spirit.Body.String())
+	}
+	invalid = profileRequest(router, "POST", "/api/auth/profile/avatar/default", `{"preset":"spirit-v1-49"}`, cookie)
+	if invalid.Code != 400 {
+		t.Fatalf("out of range spirit status %d", invalid.Code)
+	}
+	reloaded = profileRequest(router, "GET", "/api/auth/profile", "", cookie)
+	if reloaded.Code != 200 || !strings.Contains(reloaded.Body.String(), `"avatarPreset":"spirit-v1-48"`) {
+		t.Fatalf("profile lost saved spirit: %d, %s", reloaded.Code, reloaded.Body.String())
+	}
 }
 
 func TestProfileAvatarHTTPPersistsServesAndRestoresDefault(t *testing.T) {

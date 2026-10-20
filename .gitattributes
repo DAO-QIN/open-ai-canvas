@@ -1,1 +1,2 @@
 plugin-packages/*.sh text eol=lf
+web/public/avatars/spirit-v1/* text eol=lf

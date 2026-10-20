@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { UserAvatar } from "../src/components/layout/user-avatar";
 import { resolveUserAvatarURL } from "../src/lib/user-avatar-url";
-import { DEFAULT_USER_AVATARS, isDefaultUserAvatarID } from "../src/lib/default-user-avatars";
+import { DEFAULT_USER_AVATARS, LEGACY_USER_AVATARS, isDefaultUserAvatarID } from "../src/lib/default-user-avatars";
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { apiBaseURL } from "../src/services/api/request";
 import type { LocalUser } from "../src/stores/use-user-store";
 
@@ -93,9 +95,9 @@ describe("profile avatar deployment routing", () => {
 
 describe("system avatar catalog and shared rendering", () => {
     test("exposes eight stable distinct presets and validates exact IDs", () => {
-        expect(DEFAULT_USER_AVATARS.map((avatar) => avatar.id)).toEqual(["person", "director", "camera", "cat", "rabbit", "robot", "rocket", "sparkles"]);
-        expect(new Set(DEFAULT_USER_AVATARS.map((avatar) => avatar.id)).size).toBe(8);
-        for (const avatar of DEFAULT_USER_AVATARS) {
+        expect(LEGACY_USER_AVATARS.map((avatar) => avatar.id)).toEqual(["person", "director", "camera", "cat", "rabbit", "robot", "rocket", "sparkles"]);
+        expect(new Set(LEGACY_USER_AVATARS.map((avatar) => avatar.id)).size).toBe(8);
+        for (const avatar of LEGACY_USER_AVATARS) {
             expect(isDefaultUserAvatarID(avatar.id)).toBe(true);
             expect(avatar.label).not.toBe("");
         }
@@ -106,7 +108,7 @@ describe("system avatar catalog and shared rendering", () => {
 
     test("renders the selected icon globally and overrides inherited image URLs", () => {
         const iconClasses = ["lucide-circle-user-round", "lucide-clapperboard", "lucide-camera", "lucide-cat", "lucide-rabbit", "lucide-bot", "lucide-rocket", "lucide-sparkles"];
-        for (const [index, preset] of DEFAULT_USER_AVATARS.entries()) {
+        for (const [index, preset] of LEGACY_USER_AVATARS.entries()) {
             const markup = renderToStaticMarkup(
                 <UserAvatar user={{ ...user, avatarMode: "default", avatarPreset: preset.id, avatarUrl: "https://example.com/inherited.png" }} className="creation-user-avatar" iconClassName="size-6 app-workspace-account-icon" />,
             );
@@ -123,5 +125,39 @@ describe("system avatar catalog and shared rendering", () => {
         expect(markup).not.toContain("lucide-cat");
         const legacyDefault = renderToStaticMarkup(<UserAvatar user={{ ...user, avatarMode: "default" }} />);
         expect(legacyDefault).toContain("lucide-circle-user-round");
+    });
+});
+
+describe("spirit avatar assets", () => {
+    test("ships 48 distinct, passive SVGs with exact IDs and source receipts", () => {
+        expect(DEFAULT_USER_AVATARS).toHaveLength(48);
+        const manifest = JSON.parse(readFileSync(new URL("../public/avatars/spirit-v1/manifest.json", import.meta.url), "utf8"));
+        const hashes = new Set<string>();
+        let totalBytes = 0;
+        for (const [index, avatar] of DEFAULT_USER_AVATARS.entries()) {
+            expect(avatar.id).toBe(`spirit-v1-${String(index + 1).padStart(2, "0")}`);
+            expect(isDefaultUserAvatarID(avatar.id)).toBe(true);
+            expect(avatar.id.length).toBeLessThanOrEqual(16);
+            const bytes = readFileSync(new URL(`../public${avatar.src}`, import.meta.url));
+            const svg = bytes.toString();
+            expect(svg).toContain("<svg");
+            expect(svg).not.toMatch(/<(?:script|animate|animateTransform|set|foreignObject)\b|\bon\w+=|(?:href|src)=["'](?:https?:|\/\/)/i);
+            const hash = createHash("sha256").update(bytes).digest("hex");
+            expect(manifest.avatars[index]).toMatchObject({ id: avatar.id, bytes: bytes.length, sha256: hash });
+            hashes.add(hash);
+            totalBytes += bytes.length;
+            const markup = renderToStaticMarkup(<UserAvatar user={{ ...user, avatarMode: "default", avatarPreset: avatar.id, avatarUrl: "https://example.com/ignored.png" }} />);
+            expect(markup).toContain(`src="${avatar.src}"`);
+            expect(markup).not.toContain("example.com");
+        }
+        expect(hashes.size).toBe(48);
+        expect(totalBytes).toBeLessThan(2 * 1024 * 1024);
+        for (const invalid of ["spirit-v1-00", "spirit-v1-49", "spirit-v1-1", "spirit-v1-001", "spirit-v1-+1", "spirit-v1-01/../02"]) expect(isDefaultUserAvatarID(invalid)).toBe(false);
+    });
+
+    test("custom images override remembered spirit presets", () => {
+        const markup = renderToStaticMarkup(<UserAvatar user={{ ...user, avatarMode: "custom", avatarPreset: "spirit-v1-48", avatarUrl: "/api/auth/profile/avatar/user-1?v=012abc" }} />);
+        expect(markup).toContain("/auth/profile/avatar/user-1?v=012abc");
+        expect(markup).not.toContain("/avatars/spirit-v1/");
     });
 });

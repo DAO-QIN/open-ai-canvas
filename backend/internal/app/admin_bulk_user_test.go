@@ -1,6 +1,7 @@
 package app
 
 import (
+	"regexp"
 	"testing"
 
 	"yingce/backend/internal/model"
@@ -34,6 +35,13 @@ func TestCreateAdminUserCreatesActiveUserWithPasswordAndAudit(t *testing.T) {
 	}
 	if created.Role != model.UserRoleUser || created.Status != model.UserStatusActive {
 		t.Fatalf("created user role/status = %q/%q", created.Role, created.Status)
+	}
+	var persisted model.User
+	if err := db.First(&persisted, "id = ?", created.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if created.AvatarMode != "default" || !regexp.MustCompile(`^spirit-v1-(0[1-9]|[1-3][0-9]|4[0-8])$`).MatchString(created.AvatarPreset) || persisted.AvatarPreset != created.AvatarPreset {
+		t.Fatalf("admin-created account avatar was not assigned and persisted: %#v", created.User)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(created.PasswordHash), []byte("strong-password")); err != nil {
 		t.Fatalf("password hash does not match: %v", err)

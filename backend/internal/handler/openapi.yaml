@@ -1935,7 +1935,7 @@ paths:
     post:
       tags: [auth]
       summary: 选择系统头像
-      description: 保存选择并原子清除自定义图片，返回 data.user。系统头像由共享组件渲染；不接受客户端 URL 或任意图标标识。
+      description: 保存选择并原子清除自定义图片，返回 data.user。支持48款灵感伙伴 spirit-v1-01 至 spirit-v1-48，并保留旧8款标识。头像由网站静态资源渲染，不接受客户端 URL。
       requestBody:
         required: true
         content:
@@ -1946,17 +1946,9 @@ paths:
               properties:
                 preset:
                   type: string
-                  enum:
-                    [
-                      person,
-                      director,
-                      camera,
-                      cat,
-                      rabbit,
-                      robot,
-                      rocket,
-                      sparkles,
-                    ]
+                  anyOf:
+                    - enum: [person, director, camera, cat, rabbit, robot, rocket, sparkles]
+                    - pattern: "^spirit-v1-(0[1-9]|[1-3][0-9]|4[0-8])$"
       responses:
         "200":
           $ref: "#/components/responses/Envelope"

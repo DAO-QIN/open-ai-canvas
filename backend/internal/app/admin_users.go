@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"yingce/backend/internal/auth"
 	"yingce/backend/internal/model"
 	"yingce/backend/internal/repository"
 )
@@ -150,6 +151,9 @@ func (s *Service) CreateAdminUser(actor *model.User, req CreateAdminUserRequest)
 		PasswordHash: passwordHash,
 		CreatedAt:    now,
 		UpdatedAt:    now,
+	}
+	if err := auth.AssignNewUserAvatar(user); err != nil {
+		return nil, err
 	}
 	if err := s.repo.Create(user); err != nil {
 		return nil, err

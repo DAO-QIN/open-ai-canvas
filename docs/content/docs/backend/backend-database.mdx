@@ -76,7 +76,7 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 版本 54 `personal_profile_security` 为个人资料与安全流程增加 `users.avatar_mode/avatar_version`、`user_avatars`，并扩展会话重新核验状态、OAuth 重新核验绑定及 `profile_email` 验证凭据绑定。头像与账号资料隔离于创作素材；密码/邮箱变更和旧会话撤销原子提交，Linux.do 重新核验只接受原账号及会话，不创建新账号或会话。
 
-版本 55 `user_avatar_presets` 为 `users` 新增 `avatar_preset`，保存 `person`、`director`、`camera`、`cat`、`rabbit`、`robot`、`rocket`、`sparkles` 稳定标识。选择系统头像时原子清除上传头像；上传个人头像保留上次系统头像偏好。未知标识被拒绝，不保存客户端任意图片地址。
+版本55 `user_avatar_presets` 为 `users` 新增 `avatar_preset`。当前同时支持48款灵感伙伴标识 `spirit-v1-01` 至 `spirit-v1-48` 和既有 `person`、`director`、`camera`、`cat`、`rabbit`、`robot`、`rocket`、`sparkles`；无需新增迁移，12字符的灵感伙伴编号符合原字段长度。本地新账号和无第三方头像的新OAuth账号在创建前随机分配一次，编号随账号持久化；既有账号不覆盖。选择系统头像时原子清除上传头像；上传个人头像保留上次系统头像偏好。未知标识被拒绝，不保存客户端任意图片地址。
 
 版本 56 `user_login_logs` 新增 `login_logs`，保存用户及尝试账号快照、登录/退出事件、方式、来源、结果、IP、客户端自报 UA、安全原因与单向哈希会话引用。会话签发/撤销与成功日志同事务提交；不记录密码、验证码、OAuth 凭据、Cookie 或 Token，不补造历史，不因刷新或自然过期生成事件。
 

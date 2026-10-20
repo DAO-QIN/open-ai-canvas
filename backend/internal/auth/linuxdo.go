@@ -385,6 +385,11 @@ func (s *Service) createLinuxDOUser(subject string, providerUsername string, dis
 		}
 	}
 	user := &model.User{ID: kernel.NewID(), Username: username, Email: email, DisplayName: NormalizeDisplayName(displayName, username), Role: model.UserRoleUser, Status: model.UserStatusActive}
+	if strings.TrimSpace(avatarURL) == "" {
+		if err := AssignNewUserAvatar(user); err != nil {
+			return nil, nil, err
+		}
+	}
 	identity := &model.UserIdentity{ID: kernel.NewID(), UserID: user.ID, Provider: "linuxdo", Subject: subject, ProviderUsername: providerUsername, AvatarURL: avatarURL}
 	return user, identity, nil
 }

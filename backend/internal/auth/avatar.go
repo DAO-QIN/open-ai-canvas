@@ -92,12 +92,10 @@ func (s *Service) SelectDefaultProfileAvatar(actor *model.User, preset string) (
 	if err != nil {
 		return nil, err
 	}
-	switch preset {
-	case "person", "director", "camera", "cat", "rabbit", "robot", "rocket", "sparkles":
-		return s.saveProfileAvatar(user, nil, "", preset)
-	default:
+	if !validProfileAvatarPreset(preset) {
 		return nil, kernel.BadAuthRequest("请选择有效的系统头像")
 	}
+	return s.saveProfileAvatar(user, nil, "", preset)
 }
 
 func (s *Service) saveProfileAvatar(user *model.User, data []byte, version string, preset string) (*AuthUser, error) {
