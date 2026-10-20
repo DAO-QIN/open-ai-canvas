@@ -45,7 +45,7 @@ const tick = () =>
         await new Promise((resolve) => setTimeout(resolve, 40));
     });
 const button = (text: string) => Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.replace(/\s/g, "") === text)!;
-const select = (number: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="灵感伙伴 ${number}"]`)!;
+const select = (number: string) => document.querySelector<HTMLButtonElement>(`button[aria-label="头像 ${number}"]`)!;
 
 test("48款同页展示，选择和取消不写入；失败保留草稿，重试保存全局生效", async () => {
     const originalRequest = apiClient.request;
@@ -95,14 +95,14 @@ test("48款同页展示，选择和取消不写入；失败保留草稿，重试
         await act(async () => button("更换头像").click());
         expect(select("01").getAttribute("aria-pressed")).toBe("true");
         await act(async () => select("48").click());
-        await act(async () => button("保存头像").click());
+        await act(async () => button("保存").click());
         await tick();
         expect(writes).toBe(1);
         expect(document.body.textContent).toContain("保存暂时失败");
         expect(select("48").getAttribute("aria-pressed")).toBe("true");
         expect(useUserStore.getState().user?.avatarPreset).toBe("spirit-v1-01");
         failSave = false;
-        await act(async () => button("保存头像").click());
+        await act(async () => button("保存").click());
         await tick();
         expect(writes).toBe(2);
         expect(useUserStore.getState().user?.avatarPreset).toBe("spirit-v1-48");
@@ -137,12 +137,12 @@ test("上传预览不标选系统头像，旧头像保持显示且上传和调�
         await act(async () => root.render(<ProfileAvatarPicker {...props} />));
         expect(host.querySelector(".profile-avatar-dialog-preview .lucide-cat")).not.toBeNull();
         expect(host.querySelectorAll('[aria-pressed="true"]')).toHaveLength(0);
-        await act(async () => button("上传图片").click());
+        await act(async () => button("上传头像").click());
         expect(uploads).toBe(1);
         await act(async () => root.render(<ProfileAvatarPicker {...props} source="upload" uploadPreview="blob:test-upload" />));
         expect(host.querySelector('img[alt="待保存的头像预览"]')?.getAttribute("src")).toBe("blob:test-upload");
         expect(host.querySelectorAll('[aria-pressed="true"]')).toHaveLength(0);
-        await act(async () => button("调整裁剪").click());
+        await act(async () => button("重新裁剪").click());
         expect(crops).toBe(1);
     } finally {
         await act(async () => root.unmount());

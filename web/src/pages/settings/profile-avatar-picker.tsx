@@ -23,21 +23,19 @@ export function ProfileAvatarPicker({ user, source, preset, uploadPreview, disab
             <div className="profile-avatar-picker-header">
                 {source === "upload" && uploadPreview ? <img className="profile-avatar-dialog-preview" src={uploadPreview} alt="待保存的头像预览" onError={onPreviewError} /> : <UserAvatar user={previewUser} className="profile-avatar-dialog-preview" />}
                 <div className="profile-avatar-upload-controls">
-                    <p className="profile-avatar-upload-title">选一个喜欢的灵感伙伴</p>
-                    <p className="profile-hint">也可以上传自己的图片，保存后生效。</p>
                     <div className="profile-actions">
                         <Button icon={<ImagePlus className="size-4" />} disabled={disabled} onClick={onUpload}>
-                            上传图片
+                            上传头像
                         </Button>
                         {source === "upload" && uploadPreview ? (
                             <Button icon={<Crop className="size-4" />} disabled={disabled} onClick={onCrop}>
-                                调整裁剪
+                                重新裁剪
                             </Button>
                         ) : null}
                     </div>
                 </div>
             </div>
-            <div className="profile-default-avatar-grid" role="group" aria-label="灵感伙伴头像">
+            <div className="profile-default-avatar-grid" role="group" aria-label="默认头像">
                 {DEFAULT_USER_AVATARS.map((avatar, index) => (
                     <button key={avatar.id} type="button" className="profile-default-avatar-choice" aria-label={avatar.label} aria-pressed={source === "preset" && preset === avatar.id} disabled={disabled} onClick={() => onSelect(avatar.id)}>
                         <UserAvatar user={{ ...user, avatarMode: "default", avatarPreset: avatar.id }} className="profile-default-avatar-image" loading={index < 24 ? "eager" : "lazy"} />

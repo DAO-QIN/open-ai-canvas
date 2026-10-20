@@ -1,870 +1,1598 @@
 {
   "generator": "DiceBear 9.4.2",
-  "style": "bottts-neutral",
+  "style": "big-smile",
+  "attribution": {
+    "title": "Custom Avatar",
+    "creator": "Ashley Seo",
+    "source": "https://www.figma.com/community/file/881358461963645496",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "Generated combinations with curated expressions, colors, circular backgrounds and scale using DiceBear."
+  },
   "avatars": [
     {
       "id": "spirit-v1-01",
       "options": {
         "seed": "spirit-v1-01",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "4c78a8"
+          "dcecf5"
+        ],
+        "hair": [
+          "shortHair"
+        ],
+        "hairColor": [
+          "302c3b"
+        ],
+        "skinColor": [
+          "ffe4c0"
         ],
         "eyes": [
-          "eva"
+          "cheery"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1696,
-      "sha256": "72b4844e13f25065eec16f0190b052e0260c2c433a90658ee1ec6d90bfd70f37"
+      "bytes": 5730,
+      "sha256": "3bfc458a7ce6d2a1fa6fc1d4811887dd007a9efe0a25444b8627b4be0bc8ed53"
     },
     {
       "id": "spirit-v1-02",
       "options": {
         "seed": "spirit-v1-02",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "7964ad"
+          "e9e2f5"
+        ],
+        "hair": [
+          "wavyBob"
+        ],
+        "hairColor": [
+          "634a42"
+        ],
+        "skinColor": [
+          "e2ba87"
         ],
         "eyes": [
-          "eva"
+          "cheery"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 2083,
-      "sha256": "ebb6d70f186191e0dcd04499d35505d0458c465fa549b977850eb8404208f856"
+      "bytes": 5297,
+      "sha256": "0006a830646d31ea2d6458c41ee9164073052e19881a1d400d2382df9189c28b"
     },
     {
       "id": "spirit-v1-03",
       "options": {
         "seed": "spirit-v1-03",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "32877d"
+          "dff0e5"
+        ],
+        "hair": [
+          "curlyBob"
+        ],
+        "hairColor": [
+          "987255"
+        ],
+        "skinColor": [
+          "8c5a2b"
         ],
         "eyes": [
-          "eva"
+          "cheery"
         ],
         "mouth": [
-          "square01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1587,
-      "sha256": "4271756c2cf59b7b5a875c31e070ba1cf37d887d8c0e2c959576f8ea17e1ea8d"
+      "bytes": 4267,
+      "sha256": "f4c81de4feb6f512c6ef84ff8b14da5b55a9d8d4de8bb8f4c17f73d31ce2a3dc"
     },
     {
       "id": "spirit-v1-04",
       "options": {
         "seed": "spirit-v1-04",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "aa7b32"
+          "faeacb"
+        ],
+        "hair": [
+          "straightHair"
+        ],
+        "hairColor": [
+          "6760a9"
+        ],
+        "skinColor": [
+          "f5d7b1"
         ],
         "eyes": [
-          "eva"
+          "cheery"
         ],
         "mouth": [
-          "grill01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1790,
-      "sha256": "746aba252e8d3b7a075d37cc711fd3d5d0f89a0ec191422aced233ae8e68d20c"
+      "bytes": 5194,
+      "sha256": "087e528114deae5887b74b9695be754a23025cea94b83fa81bd8f5dd00ba169c"
     },
     {
       "id": "spirit-v1-05",
       "options": {
         "seed": "spirit-v1-05",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "b16950"
+          "f6e1df"
+        ],
+        "hair": [
+          "braids"
+        ],
+        "hairColor": [
+          "3c726b"
+        ],
+        "skinColor": [
+          "c99c62"
         ],
         "eyes": [
-          "eva"
+          "cheery"
         ],
         "mouth": [
-          "square02"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1587,
-      "sha256": "240cdebe08c1c5e729d89f8626437b17af58b651a34d7ec0b4e995d0a3d631c9"
+      "bytes": 13919,
+      "sha256": "190eef175d54b3de200d527ca0c46f80d78079507adb7269db6a44de7ca7cea2"
     },
     {
       "id": "spirit-v1-06",
       "options": {
         "seed": "spirit-v1-06",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "5b758d"
+          "e0e9f1"
+        ],
+        "hair": [
+          "bunHair"
+        ],
+        "hairColor": [
+          "c18b4c"
+        ],
+        "skinColor": [
+          "643d19"
         ],
         "eyes": [
-          "eva"
+          "cheery"
         ],
         "mouth": [
-          "grill03"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1746,
-      "sha256": "fec2a90d43bd8e1786bcb10b9b64cbb4fb0025b0431d22faac76750379b4440e"
+      "bytes": 5685,
+      "sha256": "098e6388a391b8235489900ca6caa59dc714c3d4255c10c8c1f67f8c2ed02929"
     },
     {
       "id": "spirit-v1-07",
       "options": {
         "seed": "spirit-v1-07",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "4c78a8"
+          "dcecf5"
+        ],
+        "hair": [
+          "froBun"
+        ],
+        "hairColor": [
+          "302c3b"
+        ],
+        "skinColor": [
+          "efcc9f"
         ],
         "eyes": [
-          "happy"
+          "cheery"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1809,
-      "sha256": "23eb33ef7ee226125ef29730b69f222c6b14833326f2b632c1a80a9a9482856b"
+      "bytes": 5996,
+      "sha256": "5ac955195d834fd560cbfe858f59e32ad628de329375a6e8724e0ae9ccaaa834"
     },
     {
       "id": "spirit-v1-08",
       "options": {
         "seed": "spirit-v1-08",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "7964ad"
+          "e9e2f5"
+        ],
+        "hair": [
+          "bangs"
+        ],
+        "hairColor": [
+          "634a42"
+        ],
+        "skinColor": [
+          "a47539"
         ],
         "eyes": [
-          "happy"
+          "cheery"
         ],
         "mouth": [
-          "square01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1313,
-      "sha256": "ee7b5a844a543c5f5b8e3fd80b6727397e722366bb89712ade2589c72f45faa8"
+      "bytes": 5059,
+      "sha256": "6ca9f057746440d3e6b91864429d6326c8e4089169eaf6784a76de7aef4a6dd1"
     },
     {
       "id": "spirit-v1-09",
       "options": {
         "seed": "spirit-v1-09",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "32877d"
+          "dff0e5"
+        ],
+        "hair": [
+          "curlyShortHair"
+        ],
+        "hairColor": [
+          "987255"
+        ],
+        "skinColor": [
+          "ffe4c0"
         ],
         "eyes": [
-          "happy"
+          "cheery"
         ],
         "mouth": [
-          "grill01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1516,
-      "sha256": "1e19e2fe56c1e44c4354b3b771e143be3e5c123eaf22f4c1fe68fdd0eff7f57f"
+      "bytes": 4290,
+      "sha256": "9d35756d3412d2fb0e61f685be3ced9ec7c52e725b2ebead90c9facd129c1409"
     },
     {
       "id": "spirit-v1-10",
       "options": {
         "seed": "spirit-v1-10",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "aa7b32"
+          "faeacb"
+        ],
+        "hair": [
+          "bowlCutHair"
+        ],
+        "hairColor": [
+          "6760a9"
+        ],
+        "skinColor": [
+          "e2ba87"
         ],
         "eyes": [
-          "happy"
+          "cheery"
         ],
         "mouth": [
-          "square02"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1313,
-      "sha256": "ffb967853d515fd0d75db55a53f6d16f8b45686a7eccf04f11870573edbac26d"
+      "bytes": 4333,
+      "sha256": "a5314af72f502453c2a3fe09b1ea75b055215e864264833a455f1a550e5e2be1"
     },
     {
       "id": "spirit-v1-11",
       "options": {
         "seed": "spirit-v1-11",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "b16950"
+          "f6e1df"
+        ],
+        "hair": [
+          "shavedHead"
+        ],
+        "hairColor": [
+          "3c726b"
+        ],
+        "skinColor": [
+          "8c5a2b"
         ],
         "eyes": [
-          "happy"
+          "cheery"
         ],
         "mouth": [
-          "grill03"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1472,
-      "sha256": "f718f0ec28be156e51f6d51e94562f68bc13d1997a5d20cda02364ce5e5913a3"
+      "bytes": 4979,
+      "sha256": "64b1095575b21aeab4a1e253c2331a7896a960c34b48689fd57d09e3a5a285fe"
     },
     {
       "id": "spirit-v1-12",
       "options": {
         "seed": "spirit-v1-12",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "5b758d"
+          "e0e9f1"
+        ],
+        "hair": [
+          "halfShavedHead"
+        ],
+        "hairColor": [
+          "c18b4c"
+        ],
+        "skinColor": [
+          "f5d7b1"
         ],
         "eyes": [
-          "happy"
+          "cheery"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1422,
-      "sha256": "9bd8b3066596920b64c91d6d34ce9028a6f608f0a74239c8d9d02f434bbfd46c"
+      "bytes": 5176,
+      "sha256": "a2738e166719fe5917d2436be97485e0965dc043b4d3bd9d3964b3cf5620b6a3"
     },
     {
       "id": "spirit-v1-13",
       "options": {
         "seed": "spirit-v1-13",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "4c78a8"
+          "dcecf5"
+        ],
+        "hair": [
+          "shortHair"
+        ],
+        "hairColor": [
+          "634a42"
+        ],
+        "skinColor": [
+          "a47539"
         ],
         "eyes": [
-          "round"
+          "normal"
         ],
         "mouth": [
-          "square01"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1201,
-      "sha256": "a86a5be839fa168118ede500cf55c591e9c94045bedb30e4a32f3261e15cc571"
+      "bytes": 4527,
+      "sha256": "6e017d3225eb22ba8e5f719e260aca262596962ffd76c602727dd4304ec1b263"
     },
     {
       "id": "spirit-v1-14",
       "options": {
         "seed": "spirit-v1-14",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "7964ad"
+          "e9e2f5"
+        ],
+        "hair": [
+          "wavyBob"
+        ],
+        "hairColor": [
+          "987255"
+        ],
+        "skinColor": [
+          "ffe4c0"
         ],
         "eyes": [
-          "round"
+          "normal"
         ],
         "mouth": [
-          "grill01"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1404,
-      "sha256": "b41b50596af16a60000053bda53d2baf01d0b6929b4f37eee39c24652f2fdd4d"
+      "bytes": 5075,
+      "sha256": "657defd795ffd6f7270c6b76dec91158405e5196f6d064ba075e8cb4d479eb29"
     },
     {
       "id": "spirit-v1-15",
       "options": {
         "seed": "spirit-v1-15",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "32877d"
+          "dff0e5"
+        ],
+        "hair": [
+          "curlyBob"
+        ],
+        "hairColor": [
+          "6760a9"
+        ],
+        "skinColor": [
+          "e2ba87"
         ],
         "eyes": [
-          "round"
+          "normal"
         ],
         "mouth": [
-          "square02"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1201,
-      "sha256": "86b2242cda3988654847c6040b8ca0ce57aec5aa85fa1f6a3d962e4949dbefbc"
+      "bytes": 4045,
+      "sha256": "1fc7e7152e60409b141d3cf35091466ab2b98c55d5990b2e262281e0feb23080"
     },
     {
       "id": "spirit-v1-16",
       "options": {
         "seed": "spirit-v1-16",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "aa7b32"
+          "faeacb"
+        ],
+        "hair": [
+          "straightHair"
+        ],
+        "hairColor": [
+          "3c726b"
+        ],
+        "skinColor": [
+          "8c5a2b"
         ],
         "eyes": [
-          "round"
+          "normal"
         ],
         "mouth": [
-          "grill03"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1360,
-      "sha256": "ff3a26ed252d4cf1bd202ba446b8cb4a336a997091bb49bb2b939a54206a1a3b"
+      "bytes": 5857,
+      "sha256": "c7fa9d585bcb82d6fb315657468297033a1a46b07522d53b25e6a6fb1468b1f7"
     },
     {
       "id": "spirit-v1-17",
       "options": {
         "seed": "spirit-v1-17",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "b16950"
+          "f6e1df"
+        ],
+        "hair": [
+          "braids"
+        ],
+        "hairColor": [
+          "c18b4c"
+        ],
+        "skinColor": [
+          "f5d7b1"
         ],
         "eyes": [
-          "round"
+          "normal"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1310,
-      "sha256": "98c5134ece660ffb1df008379a5bff204afb19425ebaf74df2efab7242bbbd13"
+      "bytes": 13697,
+      "sha256": "3ab30bb9d6b96922ca86c77398158e34b23b1edc7fc562e36ca294b106baa04e"
     },
     {
       "id": "spirit-v1-18",
       "options": {
         "seed": "spirit-v1-18",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "5b758d"
+          "e0e9f1"
+        ],
+        "hair": [
+          "bunHair"
+        ],
+        "hairColor": [
+          "302c3b"
+        ],
+        "skinColor": [
+          "c99c62"
         ],
         "eyes": [
-          "round"
+          "normal"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1697,
-      "sha256": "89280d4dfc6aa6aa6637b2e803c9cb4275f5a4fe5bf029004bdb52e1d9548b25"
+      "bytes": 4578,
+      "sha256": "e2a85321e6e09cf05d11eab1111ded5dcb2bc0d531680cb6fedbfb5050c8153b"
     },
     {
       "id": "spirit-v1-19",
       "options": {
         "seed": "spirit-v1-19",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "4c78a8"
+          "dcecf5"
+        ],
+        "hair": [
+          "froBun"
+        ],
+        "hairColor": [
+          "634a42"
+        ],
+        "skinColor": [
+          "643d19"
         ],
         "eyes": [
-          "roundFrame01"
+          "normal"
         ],
         "mouth": [
-          "grill01"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1531,
-      "sha256": "907c7e6f6829e91ceceae6ccbe6f59960e1967e017623391348e058da174a838"
+      "bytes": 5774,
+      "sha256": "2c30fba30f6baeb969e1b3d27eab4d8b427e74317e1f7609ac4997edf7652bbc"
     },
     {
       "id": "spirit-v1-20",
       "options": {
         "seed": "spirit-v1-20",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "7964ad"
+          "e9e2f5"
+        ],
+        "hair": [
+          "bangs"
+        ],
+        "hairColor": [
+          "987255"
+        ],
+        "skinColor": [
+          "efcc9f"
         ],
         "eyes": [
-          "roundFrame01"
+          "normal"
         ],
         "mouth": [
-          "square02"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1328,
-      "sha256": "54e2dd803925d4400812e3699ef90f328de947e06f8e01e5c05fb852db25b20a"
+      "bytes": 4837,
+      "sha256": "70db761aac9eb8c3a301a5f4915d3f5bd7072b0990b52548e42f90067ccd2269"
     },
     {
       "id": "spirit-v1-21",
       "options": {
         "seed": "spirit-v1-21",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "32877d"
+          "dff0e5"
+        ],
+        "hair": [
+          "curlyShortHair"
+        ],
+        "hairColor": [
+          "6760a9"
+        ],
+        "skinColor": [
+          "a47539"
         ],
         "eyes": [
-          "roundFrame01"
+          "normal"
         ],
         "mouth": [
-          "grill03"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1487,
-      "sha256": "5fe5dea4b9e69e3617c0d654ea5bc2dd118f1be8a97dcabf47d43583f125f4e5"
+      "bytes": 5049,
+      "sha256": "43e9654abdf65c3d01bc8be3be0be3a2ec297e4eee223307465930723ef68d0d"
     },
     {
       "id": "spirit-v1-22",
       "options": {
         "seed": "spirit-v1-22",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "aa7b32"
+          "faeacb"
+        ],
+        "hair": [
+          "bowlCutHair"
+        ],
+        "hairColor": [
+          "3c726b"
+        ],
+        "skinColor": [
+          "ffe4c0"
         ],
         "eyes": [
-          "roundFrame01"
+          "normal"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1437,
-      "sha256": "0211255776869c34a4d0e7d0efcb91a2a75ce5346707b5ff5e9e294ce50eb7e6"
+      "bytes": 4111,
+      "sha256": "5eb50de8a851f9f9217df54350b3676634d52f88a42b1b11f14f3af38870c343"
     },
     {
       "id": "spirit-v1-23",
       "options": {
         "seed": "spirit-v1-23",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "b16950"
+          "f6e1df"
+        ],
+        "hair": [
+          "shavedHead"
+        ],
+        "hairColor": [
+          "c18b4c"
+        ],
+        "skinColor": [
+          "e2ba87"
         ],
         "eyes": [
-          "roundFrame01"
+          "normal"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1824,
-      "sha256": "a880503b2f990910c5ca3afad733af9e09e389a0a41713519add887cdc9ec4c6"
+      "bytes": 3776,
+      "sha256": "ac8130ae3c734ff1a3f7ac5b082824dd241e9f094704f7e82e0280793298897d"
     },
     {
       "id": "spirit-v1-24",
       "options": {
         "seed": "spirit-v1-24",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "5b758d"
+          "e0e9f1"
+        ],
+        "hair": [
+          "halfShavedHead"
+        ],
+        "hairColor": [
+          "302c3b"
+        ],
+        "skinColor": [
+          "8c5a2b"
         ],
         "eyes": [
-          "roundFrame01"
+          "normal"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "teethSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1437,
-      "sha256": "a8c8d4e9a15e793a8a02a3f8076f250643fbbf535322ff7a2092c58d0f799cb3"
+      "bytes": 4954,
+      "sha256": "91f212e4e8d4d9130a8821888b1efd153e06140aeb75e12a9a5085e4ec74d80b"
     },
     {
       "id": "spirit-v1-25",
       "options": {
         "seed": "spirit-v1-25",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "4c78a8"
+          "dcecf5"
+        ],
+        "hair": [
+          "shortHair"
+        ],
+        "hairColor": [
+          "987255"
+        ],
+        "skinColor": [
+          "efcc9f"
         ],
         "eyes": [
-          "roundFrame02"
+          "winking"
         ],
         "mouth": [
-          "square02"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1452,
-      "sha256": "a3a84e32be7581fff96e3aafccc60aee28d4997b7b6d120f2150e35327c372e9"
+      "bytes": 4744,
+      "sha256": "5ffe5b1a2f30500b3f0df53ca7bc4ecc755ef17940ad17ff2b7e5261accbdb1b"
     },
     {
       "id": "spirit-v1-26",
       "options": {
         "seed": "spirit-v1-26",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "7964ad"
+          "e9e2f5"
+        ],
+        "hair": [
+          "wavyBob"
+        ],
+        "hairColor": [
+          "6760a9"
+        ],
+        "skinColor": [
+          "a47539"
         ],
         "eyes": [
-          "roundFrame02"
+          "winking"
         ],
         "mouth": [
-          "grill03"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1611,
-      "sha256": "1a1c477e692a786309857d5fd49f48ee9965bd7ab2d5a31b8656d9506fec3a6f"
+      "bytes": 6177,
+      "sha256": "dd0ffd355addc42c49c412083acfb1bdeb73e27c1f588d827e6d0b7159d5b485"
     },
     {
       "id": "spirit-v1-27",
       "options": {
         "seed": "spirit-v1-27",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "32877d"
+          "dff0e5"
+        ],
+        "hair": [
+          "curlyBob"
+        ],
+        "hairColor": [
+          "3c726b"
+        ],
+        "skinColor": [
+          "ffe4c0"
         ],
         "eyes": [
-          "roundFrame02"
+          "winking"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1561,
-      "sha256": "acb8c7c6c9cd4e1605bd06c5852c11b3ecd945d9bc37d9bd79959aef397deccd"
+      "bytes": 4262,
+      "sha256": "2537e25b6e3d12846e866adea323a94d1fd35a6d89a16e14aa114081b8b26da8"
     },
     {
       "id": "spirit-v1-28",
       "options": {
         "seed": "spirit-v1-28",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "aa7b32"
+          "faeacb"
+        ],
+        "hair": [
+          "straightHair"
+        ],
+        "hairColor": [
+          "c18b4c"
+        ],
+        "skinColor": [
+          "e2ba87"
         ],
         "eyes": [
-          "roundFrame02"
+          "winking"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1948,
-      "sha256": "39b0a3ed91d8da864f62d6f9caec5b749174393dbea95dcbbad2e450f5e64fed"
+      "bytes": 5189,
+      "sha256": "78f61d69dba0e4448bbf485404aa6a8aaf603d39d89fdd1f2b9339197bb84be9"
     },
     {
       "id": "spirit-v1-29",
       "options": {
         "seed": "spirit-v1-29",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "b16950"
+          "f6e1df"
+        ],
+        "hair": [
+          "braids"
+        ],
+        "hairColor": [
+          "302c3b"
+        ],
+        "skinColor": [
+          "8c5a2b"
         ],
         "eyes": [
-          "roundFrame02"
+          "winking"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1561,
-      "sha256": "ea49a9cb6a7e4ba70e5f72570a98948959212d191ddfa39206fafb9fb53b6392"
+      "bytes": 13914,
+      "sha256": "bc861faa3d15a8c6cc60a3c093f217c9ea0e4829f64c0a97217c5739b6eed60d"
     },
     {
       "id": "spirit-v1-30",
       "options": {
         "seed": "spirit-v1-30",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "5b758d"
+          "e0e9f1"
+        ],
+        "hair": [
+          "bunHair"
+        ],
+        "hairColor": [
+          "634a42"
+        ],
+        "skinColor": [
+          "f5d7b1"
         ],
         "eyes": [
-          "roundFrame02"
+          "winking"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1948,
-      "sha256": "a159789cbdb06677e73ca4b8d3dd9ffd168fc6029f267fe7fa219f990d066e84"
+      "bytes": 4795,
+      "sha256": "fe051ed84dceb10f42ed53fe71eee784f62511dd96529700bee8e56f54a227e1"
     },
     {
       "id": "spirit-v1-31",
       "options": {
         "seed": "spirit-v1-31",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "4c78a8"
+          "dcecf5"
+        ],
+        "hair": [
+          "froBun"
+        ],
+        "hairColor": [
+          "987255"
+        ],
+        "skinColor": [
+          "c99c62"
         ],
         "eyes": [
-          "glow"
+          "winking"
         ],
         "mouth": [
-          "grill03"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1694,
-      "sha256": "9c5b52aedf0b93eab31bfadac9a7dab61103a4c8f59a2de4c8a45013662de29d"
+      "bytes": 6972,
+      "sha256": "b1b177b20273f4836004a90a371fdc24b485eb90b61d18ed71cf5f1199e24d53"
     },
     {
       "id": "spirit-v1-32",
       "options": {
         "seed": "spirit-v1-32",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "7964ad"
+          "e9e2f5"
+        ],
+        "hair": [
+          "bangs"
+        ],
+        "hairColor": [
+          "6760a9"
+        ],
+        "skinColor": [
+          "643d19"
         ],
         "eyes": [
-          "glow"
+          "winking"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1644,
-      "sha256": "00c4f93391395f010cdeb319325256f0eedb8575fe5aca076bce452a8922175e"
+      "bytes": 5054,
+      "sha256": "8e1e0b76859d64e810748cf424ea143d2666ecb4151bbc109767d390dcfb22ce"
     },
     {
       "id": "spirit-v1-33",
       "options": {
         "seed": "spirit-v1-33",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "32877d"
+          "dff0e5"
+        ],
+        "hair": [
+          "curlyShortHair"
+        ],
+        "hairColor": [
+          "3c726b"
+        ],
+        "skinColor": [
+          "efcc9f"
         ],
         "eyes": [
-          "glow"
+          "winking"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 2031,
-      "sha256": "232f4b00ea1722dba5f1a40efc6bd1692bc7231667cdf6097b9f39b461a23e26"
+      "bytes": 4285,
+      "sha256": "eb675738ecf3d2e88c86fe00e5b8f0c14e301349435228d9ef268718ac7fde3c"
     },
     {
       "id": "spirit-v1-34",
       "options": {
         "seed": "spirit-v1-34",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "aa7b32"
+          "faeacb"
+        ],
+        "hair": [
+          "bowlCutHair"
+        ],
+        "hairColor": [
+          "c18b4c"
+        ],
+        "skinColor": [
+          "a47539"
         ],
         "eyes": [
-          "glow"
+          "winking"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1644,
-      "sha256": "4c7b7e055c221e79f8d5160145356c20dcce589c0c2ce0b34cdf05d2fc68747d"
+      "bytes": 4328,
+      "sha256": "d3d6797786f49eb6fee330a109f4ddc15f15eca4a31876fdd7cd49d0b8e4152b"
     },
     {
       "id": "spirit-v1-35",
       "options": {
         "seed": "spirit-v1-35",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "b16950"
+          "f6e1df"
+        ],
+        "hair": [
+          "shavedHead"
+        ],
+        "hairColor": [
+          "302c3b"
+        ],
+        "skinColor": [
+          "ffe4c0"
         ],
         "eyes": [
-          "glow"
+          "winking"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 2031,
-      "sha256": "e8e625e5ef0b867f8e268ed485e7d39ddffa41b1bbdcb33446034c53bf0299c2"
+      "bytes": 3993,
+      "sha256": "b61bd72f05b4966ae37e565394edc59f8132af5f8efc4a0d66b54cb91d35f41a"
     },
     {
       "id": "spirit-v1-36",
       "options": {
         "seed": "spirit-v1-36",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "5b758d"
+          "e0e9f1"
+        ],
+        "hair": [
+          "halfShavedHead"
+        ],
+        "hairColor": [
+          "634a42"
+        ],
+        "skinColor": [
+          "e2ba87"
         ],
         "eyes": [
-          "glow"
+          "winking"
         ],
         "mouth": [
-          "square01"
-        ]
+          "gapSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1535,
-      "sha256": "62aa8d8add1ad8ebb2b468a4145dcbdd9bc7509deebc404d6e08549f6dea5a95"
+      "bytes": 6056,
+      "sha256": "65aa6484de26072f7fda5ca36c15cc1ff7361408abbbfbcbe4746b9edc254474"
     },
     {
       "id": "spirit-v1-37",
       "options": {
         "seed": "spirit-v1-37",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "4c78a8"
+          "dcecf5"
+        ],
+        "hair": [
+          "shortHair"
+        ],
+        "hairColor": [
+          "6760a9"
+        ],
+        "skinColor": [
+          "643d19"
         ],
         "eyes": [
-          "hearts"
+          "starstruck"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1783,
-      "sha256": "dcb0b291b41ffc93a4e1d6734c714cf26471202775454c3908dc32d1b05d3910"
+      "bytes": 5290,
+      "sha256": "950da0c1f75138a40248dfb076feada7605b0603f7d6d3fefd463820043b76ca"
     },
     {
       "id": "spirit-v1-38",
       "options": {
         "seed": "spirit-v1-38",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "7964ad"
+          "e9e2f5"
+        ],
+        "hair": [
+          "wavyBob"
+        ],
+        "hairColor": [
+          "3c726b"
+        ],
+        "skinColor": [
+          "efcc9f"
         ],
         "eyes": [
-          "hearts"
+          "starstruck"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 2170,
-      "sha256": "43acadd2e043fc34a405de1587e58163885b7e878bb2b54e403582dee18fd53b"
+      "bytes": 5838,
+      "sha256": "1d5f1783b5a98d15c252ef1f196c67f54c2363d82d4bb0f9fa53a0f5c8369d2e"
     },
     {
       "id": "spirit-v1-39",
       "options": {
         "seed": "spirit-v1-39",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "32877d"
+          "dff0e5"
+        ],
+        "hair": [
+          "curlyBob"
+        ],
+        "hairColor": [
+          "c18b4c"
+        ],
+        "skinColor": [
+          "a47539"
         ],
         "eyes": [
-          "hearts"
+          "starstruck"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1783,
-      "sha256": "022bb8b1155cd8272c3611b100196d51aa3b7f5fe1c329aadac9a7640b76264a"
+      "bytes": 4808,
+      "sha256": "204dcc4a73567475590591973d5880196502151ae502c840696295db7ea38df8"
     },
     {
       "id": "spirit-v1-40",
       "options": {
         "seed": "spirit-v1-40",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "aa7b32"
+          "faeacb"
+        ],
+        "hair": [
+          "straightHair"
+        ],
+        "hairColor": [
+          "302c3b"
+        ],
+        "skinColor": [
+          "ffe4c0"
         ],
         "eyes": [
-          "hearts"
+          "starstruck"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 2170,
-      "sha256": "a4664116c88404656d1ed9031af96182899719115218f340defd5389ee174238"
+      "bytes": 5735,
+      "sha256": "8564e4060ff12c371a6fbf357051e21f82b58416b2292651c0c8c69089f853c1"
     },
     {
       "id": "spirit-v1-41",
       "options": {
         "seed": "spirit-v1-41",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "b16950"
+          "f6e1df"
+        ],
+        "hair": [
+          "braids"
+        ],
+        "hairColor": [
+          "634a42"
+        ],
+        "skinColor": [
+          "e2ba87"
         ],
         "eyes": [
-          "hearts"
+          "starstruck"
         ],
         "mouth": [
-          "square01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1674,
-      "sha256": "2a165bc2b38036c0f7d3c9a285b18a0e47bff46450adb7dfd6adeb2a9e70a3e4"
+      "bytes": 15441,
+      "sha256": "7f5fb4227d9c58fb6a8ce34ef3dea226ab5cb76cd269ac374c26cfbaf6d7eece"
     },
     {
       "id": "spirit-v1-42",
       "options": {
         "seed": "spirit-v1-42",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "5b758d"
+          "e0e9f1"
+        ],
+        "hair": [
+          "bunHair"
+        ],
+        "hairColor": [
+          "987255"
+        ],
+        "skinColor": [
+          "8c5a2b"
         ],
         "eyes": [
-          "hearts"
+          "starstruck"
         ],
         "mouth": [
-          "grill01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1877,
-      "sha256": "1d4d97575113b3d7407d9407f1b8a147eb82d5faf375b83c69e084e8110b501a"
+      "bytes": 5341,
+      "sha256": "4000277cbdf6098c712c302262e9504fe5865d14eea83afc756ca4d6cf6952ce"
     },
     {
       "id": "spirit-v1-43",
       "options": {
         "seed": "spirit-v1-43",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "4c78a8"
+          "dcecf5"
+        ],
+        "hair": [
+          "froBun"
+        ],
+        "hairColor": [
+          "6760a9"
+        ],
+        "skinColor": [
+          "f5d7b1"
         ],
         "eyes": [
-          "robocop"
+          "starstruck"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 2042,
-      "sha256": "716e2ffa54a4125b65d05322132569d74790894999aca4c98908f21630835ac9"
+      "bytes": 6537,
+      "sha256": "d02a1522df115e238503de88b897660b943974955d8433c0d0c9bd19d5219cf8"
     },
     {
       "id": "spirit-v1-44",
       "options": {
         "seed": "spirit-v1-44",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "7964ad"
+          "e9e2f5"
+        ],
+        "hair": [
+          "bangs"
+        ],
+        "hairColor": [
+          "3c726b"
+        ],
+        "skinColor": [
+          "c99c62"
         ],
         "eyes": [
-          "robocop"
+          "starstruck"
         ],
         "mouth": [
-          "smile01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1655,
-      "sha256": "4fac192a8ed3d341012540134d831963913106ba6f25de48a7bf4a0f266f0164"
+      "bytes": 5600,
+      "sha256": "cafea241b1d36128658124da23321b2c93479df9c4938211cabc6d0b89d597ab"
     },
     {
       "id": "spirit-v1-45",
       "options": {
         "seed": "spirit-v1-45",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "32877d"
+          "dff0e5"
+        ],
+        "hair": [
+          "curlyShortHair"
+        ],
+        "hairColor": [
+          "c18b4c"
+        ],
+        "skinColor": [
+          "643d19"
         ],
         "eyes": [
-          "robocop"
+          "starstruck"
         ],
         "mouth": [
-          "smile02"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 2042,
-      "sha256": "bf324265248a056383ba1451f7859c0e15ce865a453af5ff91b9ae46a449c2bb"
+      "bytes": 4831,
+      "sha256": "2d0011d62704116a372494fe559a1c54d72d96b62138cbe27aa1c87b39654a07"
     },
     {
       "id": "spirit-v1-46",
       "options": {
         "seed": "spirit-v1-46",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "aa7b32"
+          "faeacb"
+        ],
+        "hair": [
+          "bowlCutHair"
+        ],
+        "hairColor": [
+          "302c3b"
+        ],
+        "skinColor": [
+          "efcc9f"
         ],
         "eyes": [
-          "robocop"
+          "starstruck"
         ],
         "mouth": [
-          "square01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 100
       },
-      "bytes": 1546,
-      "sha256": "1aef4f7ec33c76f8ca3a21e46f367d0a8e49a75f563658d9d22d8ce4bcb0f9af"
+      "bytes": 5759,
+      "sha256": "ddd4e4a3dcc36d094975a788210e9cc529b51ef74ba73c914319fec89630b0ef"
     },
     {
       "id": "spirit-v1-47",
       "options": {
         "seed": "spirit-v1-47",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "b16950"
+          "f6e1df"
+        ],
+        "hair": [
+          "shavedHead"
+        ],
+        "hairColor": [
+          "634a42"
+        ],
+        "skinColor": [
+          "a47539"
         ],
         "eyes": [
-          "robocop"
+          "starstruck"
         ],
         "mouth": [
-          "grill01"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "glasses"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1749,
-      "sha256": "2cdd3deb109a1881a30e9baf0362cc7899322550ec50d04deaac7392a175af76"
+      "bytes": 4539,
+      "sha256": "358237a4fbbcc9a60b7fcf340368010920ab03241d18b23240591981abb87162"
     },
     {
       "id": "spirit-v1-48",
       "options": {
         "seed": "spirit-v1-48",
         "size": 128,
+        "radius": 50,
+        "scale": 100,
         "backgroundColor": [
-          "5b758d"
+          "e0e9f1"
+        ],
+        "hair": [
+          "halfShavedHead"
+        ],
+        "hairColor": [
+          "987255"
+        ],
+        "skinColor": [
+          "ffe4c0"
         ],
         "eyes": [
-          "robocop"
+          "starstruck"
         ],
         "mouth": [
-          "square02"
-        ]
+          "openedSmile"
+        ],
+        "accessories": [
+          "catEars"
+        ],
+        "accessoriesProbability": 0
       },
-      "bytes": 1546,
-      "sha256": "4de5b42315cde20b72c2a4c780ce7ea1701cf7f0b6e02c4744ee8b502ac75671"
+      "bytes": 5717,
+      "sha256": "1b1df7008abd3c94d366e38e274f52529625c7f86a43b4d7c62011638db8adf0"
     }
   ]
 }

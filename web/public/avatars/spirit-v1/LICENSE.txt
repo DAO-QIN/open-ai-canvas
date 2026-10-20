@@ -4,9 +4,9 @@ Licenses
 # Design
 Applies to all design files in this package.
 
-Source: Bottts (https://bottts.com/)
-Designer: Pablo Stanley (https://twitter.com/pablostanley)
-License: Free for personal and commercial use (https://bottts.com/)
+Source: Custom Avatar (https://www.figma.com/community/file/881358461963645496)
+Designer: Ashley Seo (http://www.ashleyseo.com/)
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 
 # Code
 Applies to all non-design files in this package.

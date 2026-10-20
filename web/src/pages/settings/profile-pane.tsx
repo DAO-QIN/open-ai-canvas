@@ -510,7 +510,7 @@ export function ProfilePane() {
                     centered
                     width={600}
                     title="更换头像"
-                    okText="保存头像"
+                    okText="保存"
                     cancelText="取消"
                     confirmLoading={pending === "avatar" || pending === "reset-avatar"}
                     okButtonProps={{ disabled: !!pending || (avatarTab === "upload" ? !draftAvatar : profile.user.avatarMode === "default" && (profile.user.avatarPreset || "person") === defaultAvatarDraft) }}

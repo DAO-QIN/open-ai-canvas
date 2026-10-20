@@ -13,7 +13,7 @@ export type LegacyUserAvatarID = (typeof LEGACY_USER_AVATARS)[number]["id"];
 
 export const DEFAULT_USER_AVATARS = Array.from({ length: 48 }, (_, index) => {
     const number = String(index + 1).padStart(2, "0");
-    return { id: `spirit-v1-${number}`, label: `灵感伙伴 ${number}`, src: `/avatars/spirit-v1/spirit-v1-${number}.svg` };
+    return { id: `spirit-v1-${number}`, label: `头像 ${number}`, src: `/avatars/spirit-v1/spirit-v1-${number}.svg` };
 });
 
 export type DefaultUserAvatarID = LegacyUserAvatarID | `spirit-v1-${string}`;

@@ -181,12 +181,6 @@
 .profile-avatar-upload-controls {
     min-width: 0;
 }
-.profile-avatar-upload-title {
-    margin: 0;
-    color: var(--user-ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
-}
 .profile-hint {
     margin-block: var(--space-3);
     color: var(--user-ink-muted);
@@ -236,7 +230,7 @@
     justify-content: center;
     padding: 3px;
     border: 2px solid transparent;
-    border-radius: var(--user-radius-control);
+    border-radius: 50%;
     background: transparent;
     cursor: pointer;
     transition:
@@ -341,5 +335,6 @@
 @media (max-width: 360px) {
     .profile-default-avatar-grid {
         grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 0;
     }
 }
