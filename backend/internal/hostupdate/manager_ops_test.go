@@ -187,22 +187,20 @@ func TestWriteComposeEnvOverrideReplacesImageRefs(t *testing.T) {
 	}
 }
 
-// v1.5.8.x 的 Host Updater 只注入 backend/web 镜像，也不会生成 Agent Token。
-// 部署 Compose 中 Agent 相关变量必须有回退值，否则旧更新器的预检会直接失败。
-func TestDeployComposeAgentVariablesFallbackForLegacyUpdater(t *testing.T) {
+// Agent 使用独立令牌；镜像标签保留旧更新器所需的回退值。
+func TestDeployComposeRequiresDedicatedAgentToken(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "..", "docker-compose.deploy.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	compose := string(data)
-	for _, required := range []string{"${CANVAS_YINGCE_AGENT_IMAGE:?", "${YINGCE_AGENT_TOKEN:?"} {
-		if strings.Contains(compose, required) {
-			t.Errorf("docker-compose.deploy.yml must not hard-require %s…}", required)
-		}
+	if !strings.Contains(compose, "${YINGCE_AGENT_TOKEN:?") {
+		t.Error("docker-compose.deploy.yml must require a dedicated Agent token")
 	}
-	for _, fallback := range []string{"${CANVAS_YINGCE_AGENT_IMAGE:-", "${YINGCE_AGENT_TOKEN:-${CANVAS_UPDATER_TOKEN:?"} {
-		if !strings.Contains(compose, fallback) {
-			t.Errorf("docker-compose.deploy.yml is missing fallback %s…}", fallback)
-		}
+	if strings.Contains(compose, "${YINGCE_AGENT_TOKEN:-${CANVAS_UPDATER_TOKEN") {
+		t.Error("Agent token must not fall back to the updater token")
+	}
+	if !strings.Contains(compose, "${CANVAS_YINGCE_AGENT_IMAGE:-") {
+		t.Error("docker-compose.deploy.yml is missing the Agent image fallback")
 	}
 }

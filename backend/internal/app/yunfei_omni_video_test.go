@@ -93,7 +93,7 @@ func TestYunfeiOmniHostRetriesAndResumesSameTask(t *testing.T) {
 		case "/v1/videos":
 			creates++
 			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body["model"] != "omni-flash" || body["duration"] != float64(8) || len(body) != 5 || r.Method != "POST" {
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body["model"] != "gemini-omni-1.1-flash" || body["duration"] != float64(10) || len(body) != 5 || r.Method != "POST" {
 				t.Errorf("bad create request: %#v err=%v", body, err)
 			}
 			_, _ = w.Write([]byte(`{"id":"task-yunfei-1","status":"queued"}`))
@@ -122,7 +122,7 @@ func TestYunfeiOmniHostRetriesAndResumesSameTask(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	input := canvasGenerationInput{Mode: "video", Prompt: "小猫在房间里奔跑", Config: providerConfig{BaseURL: server.URL + "/v1", APIKey: "test-key", Model: "omni-flash", InterfaceType: "yunfei-omni-flash-video", VideoSeconds: "8", VQuality: "720p", Size: "16:9"}}
+	input := canvasGenerationInput{Mode: "video", Prompt: "小猫在房间里奔跑", Config: providerConfig{BaseURL: server.URL + "/v1", APIKey: "test-key", Model: "gemini-omni-1.1-flash", InterfaceType: "yunfei-omni-flash-video", VideoSeconds: "10", VQuality: "720p", Size: "16:9"}}
 	result, err := runProtocolAdapterTaskWithPolicy(context.Background(), input, a, fastVideoPollPolicy())
 	if err != nil || result["mode"] != "video" || creates != 1 || polls != 3 || downloads != 2 {
 		t.Fatalf("result=%#v creates=%d polls=%d downloads=%d err=%v", result, creates, polls, downloads, err)

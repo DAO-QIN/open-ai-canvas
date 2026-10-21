@@ -134,8 +134,9 @@ func TestEnsureFailedProviderAttemptLoggedFillsPreflightGapOnce(t *testing.T) {
 	if logged.ChannelID != "channel-1" || logged.Model != "agnes-video-2.5" || logged.Capability != "video" {
 		t.Fatalf("unexpected provider metadata: %#v", logged)
 	}
-	if logged.Error != failure.Error() {
-		t.Fatalf("preflight error = %q, want %q", logged.Error, failure.Error())
+	const expectedError = "模型服务 Video 2.5 size 必须是 720P、960P 或 2K"
+	if logged.Error != expectedError {
+		t.Fatalf("preflight error = %q, want %q", logged.Error, expectedError)
 	}
 	serialized := logged.RequestBody + logged.ResponseBody + logged.UpstreamURL + logged.Error
 	if strings.Contains(serialized, "secret-key") || logged.RequestBody != "" || logged.ResponseBody != "" {
