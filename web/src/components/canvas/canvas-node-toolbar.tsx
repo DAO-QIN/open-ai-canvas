@@ -60,6 +60,7 @@ type CanvasNodeToolbarProps = {
     onExtractVideoFrames: (node: CanvasNodeData) => void;
     onExtractAudioFromVideo: (node: CanvasNodeData) => void;
     onTrimVideoSegments: (node: CanvasNodeData) => void;
+    onEnhanceVideo?: (node: CanvasNodeData) => void;
     onSubtitles: (node: CanvasNodeData) => void;
     onTimeline: (node: CanvasNodeData) => void;
     extractingVideoFrames: boolean;
@@ -130,6 +131,7 @@ export function CanvasNodeToolbar({
     onExtractVideoFrames,
     onExtractAudioFromVideo,
     onTrimVideoSegments,
+    onEnhanceVideo,
     onSubtitles,
     onTimeline,
     extractingVideoFrames,
@@ -294,39 +296,13 @@ export function CanvasNodeToolbar({
 
     // 构建 ToolContext——供注册表解析工具
     const nodeHoverHandlers = {
-        onNodeInfo: onInfo,
-        onNodeDelete: onDelete,
-        onNodeRetry: onRetry,
-        onNodeEditText: onEditText,
-        onNodeDecreaseFont: onDecreaseFont,
-        onNodeIncreaseFont: onIncreaseFont,
-        onNodeToggleDialog: onToggleDialog,
-        onNodeAnnotate: onAnnotate,
-        onNodeGenerateImage: onGenerateImage,
-        onNodeUpload: onUpload,
-        onNodeDownload: onDownload,
-        onNodeSaveAsset: onSaveAsset,
-        onNodeMaskEdit: onMaskEdit,
-        onNodeRemoveBackground: onRemoveBackground,
-        onNodeEmotion: onEmotion,
-        onNodePortraitTexture: onPortraitTexture,
-        onNodeCrop: onCrop,
-        onNodeCreateEditCopy: onCreateEditCopy,
-        onNodeRotateImage: onRotateImage,
-        onNodeSplit: (target) => onSplit(target, { rows: 2, columns: 2 }),
-        onNodeUpscale: onUpscale,
-        onNodeSuperResolve: onSuperResolve,
-        onNodeAngle: onAngle,
-        onNodeViewImage: onViewImage,
-        onNodeExtractVideoFrames: onExtractVideoFrames,
-        onNodeExtractAudioFromVideo: onExtractAudioFromVideo,
-        onNodeTrimVideoSegments: onTrimVideoSegments,
-        onNodeReversePrompt: onReversePrompt,
-        onNodeToggleFreeResize: onToggleFreeResize,
-        onNodeSubtitles: onSubtitles,
-        onNodeTimeline: onTimeline,
-        onNodeToggleLocked: onToggleLocked,
-        onNodeCopyPrompt: copyImagePrompt,
+        onNodeInfo: onInfo, onNodeDelete: onDelete, onNodeRetry: onRetry, onNodeEditText: onEditText, onNodeDecreaseFont: onDecreaseFont, onNodeIncreaseFont: onIncreaseFont,
+        onNodeToggleDialog: onToggleDialog, onNodeAnnotate: onAnnotate, onNodeGenerateImage: onGenerateImage, onNodeUpload: onUpload, onNodeDownload: onDownload,
+        onNodeSaveAsset: onSaveAsset, onNodeMaskEdit: onMaskEdit, onNodeRemoveBackground: onRemoveBackground, onNodeEmotion: onEmotion, onNodePortraitTexture: onPortraitTexture, onNodeCrop: onCrop,
+        onNodeCreateEditCopy: onCreateEditCopy, onNodeRotateImage: onRotateImage,
+        onNodeSplit: (target) => onSplit(target, { rows: 2, columns: 2 }), onNodeUpscale: onUpscale, onNodeSuperResolve: onSuperResolve, onNodeAngle: onAngle, onNodeViewImage: onViewImage,
+        onNodeExtractVideoFrames: onExtractVideoFrames, onNodeExtractAudioFromVideo: onExtractAudioFromVideo, onNodeTrimVideoSegments: onTrimVideoSegments, onNodeEnhanceVideo: onEnhanceVideo, onNodeReversePrompt: onReversePrompt, onNodeToggleFreeResize: onToggleFreeResize,
+        onNodeSubtitles: onSubtitles, onNodeTimeline: onTimeline, onNodeToggleLocked: onToggleLocked, onNodeCopyPrompt: copyImagePrompt,
     } as Partial<ToolbarHandlers> as ToolbarHandlers;
 
     const nodeHoverCtx: ToolContext = {
@@ -446,18 +422,19 @@ export function CanvasNodeToolbar({
 
 function NodeDockToolButton({ tool, iconOnly = false }: { tool: ToolbarTool; iconOnly?: boolean }) {
     return (
-        <Tooltip title={tool.description ? `${tool.label}：${tool.description}` : tool.label}>
-            <button
-                type="button"
-                className={`aceternity-dock-command is-labeled pointer-events-auto inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[var(--dock-item-radius)] px-2.5 outline-none ${tool.active ? "is-active" : ""} ${tool.danger ? "is-danger" : ""}`}
-                aria-label={tool.label}
-                aria-pressed={tool.active}
-                disabled={tool.disabled}
-                onClick={tool.onClick}
-            >
-                <span className="grid size-3.5 shrink-0 place-items-center">{tool.icon}</span>
-                {!iconOnly ? <span className="inline-flex h-4 items-center whitespace-nowrap text-[var(--fs-label)] font-medium leading-none">{tool.label}</span> : null}
-            </button>
+        // 默认 250px 宽度会把“名称：说明”折成两行，放宽到 360px 让常见说明单行显示。
+        <Tooltip title={tool.description ? `${tool.label}：${tool.description}` : tool.label} styles={{ root: { maxWidth: 360 } }}>
+        <button
+            type="button"
+            className={`aceternity-dock-command is-labeled pointer-events-auto inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[var(--dock-item-radius)] px-2.5 outline-none ${tool.active ? "is-active" : ""} ${tool.danger ? "is-danger" : ""}`}
+            aria-label={tool.label}
+            aria-pressed={tool.active}
+            disabled={tool.disabled}
+            onClick={tool.onClick}
+        >
+            <span className="grid size-3.5 shrink-0 place-items-center">{tool.icon}</span>
+            {!iconOnly ? <span className="inline-flex h-4 items-center whitespace-nowrap text-[var(--fs-label)] font-medium leading-none">{tool.label}</span> : null}
+        </button>
         </Tooltip>
     );
 }
