@@ -1,7 +1,7 @@
 import { Tooltip } from "@/components/ui/base/tooltip";
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { PanelBottom, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, PanelBottom, X, ZoomIn, ZoomOut } from "lucide-react";
 
 import { aceternityMotion } from "@/lib/aceternity-motion";
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -27,7 +27,7 @@ export function CanvasFocusModeBar({ syncIcon, dockRevealed, zoomPercent, onTogg
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.panel}
-            className="pointer-events-auto absolute left-1/2 top-2 z-[var(--z-toolbar)] -translate-x-1/2"
+            className="canvas-focus-mode-bar pointer-events-auto absolute left-1/2 top-2 z-[var(--z-toolbar)] -translate-x-1/2"
             role="toolbar"
             aria-label="专注模式工具栏"
         >
@@ -59,10 +59,12 @@ export function CanvasFocusModeBar({ syncIcon, dockRevealed, zoomPercent, onTogg
                 <button
                     type="button"
                     onClick={onFit}
-                    className="grid h-8 min-w-14 place-items-center rounded-full px-2 text-xs font-medium tabular-nums transition hover:bg-black/5 dark:hover:bg-white/10"
+                    className="inline-flex h-8 min-w-14 items-center justify-center gap-1 rounded-full px-2 text-xs font-medium tabular-nums transition hover:bg-black/5 dark:hover:bg-white/10"
                     style={{ color: theme.node.text }}
                     title="适应画布"
+                    aria-label={`适应画布，当前缩放 ${Math.round(zoomPercent * 100)}%`}
                 >
+                    <Maximize2 className="size-3.5" aria-hidden="true" />
                     {Math.round(zoomPercent * 100)}%
                 </button>
                 <Tooltip title="放大">

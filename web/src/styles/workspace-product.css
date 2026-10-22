@@ -49,6 +49,17 @@
     .app-user-workspace .app-workspace-topbar-credit-pill { min-height: 44px; max-width: 140px; }
     .app-user-workspace .app-workspace-topbar-credit-pill strong { overflow: hidden; text-overflow: ellipsis; }
     .app-user-workspace .app-workspace-account-theme-toggle { display: none; }
+    .app-user-workspace .app-workspace-topbar:has(.creation-thread-toolbar) { height: auto !important; min-height: 112px; flex-wrap: wrap; padding-block: var(--space-2) !important; row-gap: 0; }
+    .app-user-workspace .app-workspace-topbar:has(.creation-thread-toolbar) .app-workspace-topbar-breadcrumb { flex: 1; }
+    .app-user-workspace .app-workspace-topbar:has(.creation-thread-toolbar) .app-workspace-topbar-actions { order: 2; margin-left: auto; }
+    .app-user-workspace .app-workspace-topbar-extension:has(.creation-thread-toolbar) { order: 3; flex: 1 0 100%; min-height: 44px; }
+    .app-user-workspace .app-workspace-topbar-extension .creation-thread-toolbar { gap: var(--space-2); }
+    .app-user-workspace .creation-rail-trigger > span { display: none; }
+    .app-user-workspace :is(.creation-rail-trigger, .creation-toolbar-action, .creation-toolbar-actions > .ant-btn) { min-width: 44px; min-height: 44px; white-space: nowrap; }
+    .app-user-workspace .creation-rail-trigger { justify-content: center; }
+    .app-user-overlays:has(.creation-thread-composer) .pet-personal-launcher { display: none; }
+    .canvas-focus-mode-bar { top: max(var(--space-2), env(safe-area-inset-top)); }
+    .canvas-focus-mode-bar button { min-width: 44px; min-height: 44px; }
     .app-product-overlays :is(input.ant-input, textarea.ant-input),
     .app-product-workspace :is(input.ant-input, textarea.ant-input) { font-size: 16px; }
     .app-product-overlays:has([aria-modal="true"]) .pet-personal-launcher,

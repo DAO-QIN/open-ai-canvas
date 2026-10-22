@@ -29,6 +29,7 @@ import { modelQuoteDescription, modelQuoteRequest } from "@/lib/model-pricing";
 import { quoteModel, type LogicalModelQuote } from "@/services/api/logical-models";
 import { modelOptionName, resolveModelChannel, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { useGlobalAgentStore } from "@/stores/use-global-agent-store";
 import type { PromptOptimizerProvider } from "@/lib/plugins/plugin-types";
 import { type CreationReference } from "./creation-references";
 import { creationAttachmentKind, type CreationAttachment, type CreationMode } from "./creation-assets";
@@ -46,6 +47,9 @@ const CanvasPromptOptimizerDrawer = lazy(() => import("@/components/canvas/canva
 export const creationAssetCategoryLabels: Record<string, string> = { all: "全部素材", ...ASSET_CATEGORY_LABELS };
 
 export function CreationWorkspaceToolbar({ shots, onJumpToShot, onNewConversation, onOpenHistory, onContinueCanvas, openingCanvas }: { shots: CreationShotRailEntry[]; onJumpToShot: (shot: CreationShotRailEntry) => void; onNewConversation: () => void; onOpenHistory: () => void; onContinueCanvas: () => void; openingCanvas: boolean }) {
+    const compact = useMediaQuery("(max-width: 720px)");
+    const userId = useUserStore((state) => state.user?.id);
+    const openAgent = useGlobalAgentStore((state) => state.openAgent);
     const [railOpen, setRailOpen] = useState(false);
     const railRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -57,7 +61,7 @@ export function CreationWorkspaceToolbar({ shots, onJumpToShot, onNewConversatio
     const mount = useWorkspaceTopBarMount();
     const toolbar = <header className="creation-thread-toolbar">
         <div className="creation-toolbar-shots" ref={railRef}>
-            <button type="button" className="creation-rail-trigger" aria-expanded={railOpen} aria-haspopup="listbox" onClick={() => setRailOpen((open) => !open)}><Clapperboard />镜头时间线{shots.length > 0 ? <em className="creation-rail-count">{shots.length}</em> : null}</button>
+            <button type="button" className="creation-rail-trigger" aria-label="镜头时间线" aria-expanded={railOpen} aria-haspopup="listbox" onClick={() => setRailOpen((open) => !open)}><Clapperboard /><span>镜头时间线</span>{shots.length > 0 ? <em className="creation-rail-count">{shots.length}</em> : null}</button>
             {railOpen ? <div className="creation-rail-pop" role="listbox" aria-label="镜头时间线">
                 <div className="creation-rail-pop-head"><span className="creation-rail-pop-title">镜头时间线<small>{shots.length ? `共 ${shots.length} 镜` : "空轨道"}</small></span><button type="button" className="creation-rail-pop-close" aria-label="关闭镜头列表" onClick={() => setRailOpen(false)}><X /></button></div>
                 {shots.length ? <ol className="creation-rail-list">{shots.map((shot) => {
@@ -75,6 +79,7 @@ export function CreationWorkspaceToolbar({ shots, onJumpToShot, onNewConversatio
             <Button size="small" loading={openingCanvas} onClick={onContinueCanvas}>画布中继续</Button>
             <Tooltip title="新建创作"><button type="button" aria-label="新建创作" className="creation-toolbar-action" onClick={onNewConversation}><Plus /></button></Tooltip>
             <Tooltip title="历史对话"><button type="button" aria-label="查看历史对话" className="creation-toolbar-action" onClick={onOpenHistory}><History /></button></Tooltip>
+            {compact && userId ? <Tooltip title="打开创作助手"><button type="button" aria-label="打开创作助手" className="creation-toolbar-action" onClick={openAgent}><Brain /></button></Tooltip> : null}
         </div>
     </header>;
     if (mount) return createPortal(toolbar, mount);
