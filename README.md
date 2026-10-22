@@ -17,7 +17,7 @@
 
 > 项目仍在快速开发，数据结构和外部接口可能调整。默认适合个人、本地或可信环境部署；未经安全配置，不要直接作为公网多人服务使用。
 
-本仓库为 **影绘** 定制分支，生产功能基准为 `c8ec75d9`（v1.6.8.10）。已包含沧元 Midjourney、Gemini 视频与香蕉 21:9 修复。部署本分支请使用下文的本仓库源码部署入口；上游镜像不包含这些定制。完整说明见[影绘部署与版本核对](docs/content/docs/overview/yinghui-deployment.mdx)。
+本仓库为 **影绘** 定制版本，包含宠物形象库、邀请返利及多种模型渠道适配。部署请使用下文的本仓库源码部署入口，并按实际构建提交核对版本。完整说明见[影绘部署与版本核对](docs/content/docs/overview/yinghui-deployment.mdx)。
 
 上游在线演示：[https://yingce.tv](https://yingce.tv)
 

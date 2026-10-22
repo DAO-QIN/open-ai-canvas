@@ -638,6 +638,12 @@ for (const [id, name, vendor, baseUrl] of [
     "https://api.atlascloud.ai",
   ],
   [
+    "cheaperinference-chat",
+    "Cheaper Inference Chat",
+    "Cheaper Inference",
+    "https://api.cheaperinference.com",
+  ],
+  [
     "litellm-proxy-chat",
     "LiteLLM Proxy Chat",
     "LiteLLM",
