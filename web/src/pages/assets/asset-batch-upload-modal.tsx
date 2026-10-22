@@ -20,6 +20,7 @@ export function AssetBatchUploadModal({ open, defaultFolderId, folders, onClose,
     const [folderId, setFolderId] = useState(defaultFolderId);
     const [tags, setTags] = useState<string[]>([]);
     const [uploading, setUploading] = useState(false);
+    const [dragging, setDragging] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const doneCount = items.filter((item) => item.status === "done").length;
     const failedItems = items.filter((item) => item.status === "error");
@@ -121,10 +122,30 @@ export function AssetBatchUploadModal({ open, defaultFolderId, folders, onClose,
                         <Select mode="tags" className="mt-1 w-full" value={tags} tokenSeparators={[",", "，"]} onChange={setTags} placeholder="输入后回车" />
                     </label>
                 </div>
-                <button type="button" className="batch-upload-dropzone" onClick={() => inputRef.current?.click()}>
+                <button
+                    type="button"
+                    className={dragging ? "batch-upload-dropzone is-dragging" : "batch-upload-dropzone"}
+                    onClick={() => inputRef.current?.click()}
+                    onDragEnter={(event) => {
+                        event.preventDefault();
+                        setDragging(true);
+                    }}
+                    onDragOver={(event) => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "copy";
+                    }}
+                    onDragLeave={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+                    }}
+                    onDrop={(event) => {
+                        event.preventDefault();
+                        setDragging(false);
+                        if (!uploading) chooseFiles(Array.from(event.dataTransfer.files));
+                    }}
+                >
                     <UploadCloud className="size-7" />
                     <strong>选择多张图片</strong>
-                    <span>支持拖拽思路的多选上传，标题默认取文件名</span>
+                    <span>支持拖拽或多选上传，标题默认取文件名</span>
                 </button>
                 <input
                     ref={inputRef}
@@ -151,8 +172,15 @@ export function AssetBatchUploadModal({ open, defaultFolderId, folders, onClose,
                             {items.map((item) => (
                                 <div key={item.id} className="batch-upload-item">
                                     <FileImage className="size-4 shrink-0 text-foreground/45" />
-                                    <span className="min-w-0 flex-1 truncate" title={item.file.name}>
-                                        {item.file.name}
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate" title={item.file.name}>
+                                            {item.file.name}
+                                        </span>
+                                        {item.status === "error" && item.error ? (
+                                            <span className="block truncate text-[11px] text-red-500" title={item.error}>
+                                                {item.error}
+                                            </span>
+                                        ) : null}
                                     </span>
                                     {item.status === "uploading" ? (
                                         <div className="w-20 shrink-0">
