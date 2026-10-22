@@ -12,6 +12,17 @@ export type ModelPickerGroup = {
 
 export { isDirectSystemModel } from "@/lib/model-selection";
 
+// Search preserves each channel choice and the catalogue order, including the last group.
+export function filterModelPickerGroups(groups: ModelPickerGroup[], query: string): ModelPickerGroup[] {
+    const term = query.trim().toLocaleLowerCase();
+    if (!term) return groups;
+    return groups.flatMap((group) => {
+        if (`${group.label} ${group.scope}`.toLocaleLowerCase().includes(term)) return [group];
+        const models = group.models.filter((item) => `${item.label} ${item.models.join(" ")}`.toLocaleLowerCase().includes(term));
+        return models.length ? [{ ...group, models }] : [];
+    });
+}
+
 export function modelChannelLabel(config: AiConfig, value: string) {
     const channel = resolveModelChannel(config, value);
     const cost = channel.modelCosts?.find((item) => item.model === modelOptionName(value));

@@ -1,14 +1,16 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { Check, ChevronDown, Coins } from "lucide-react";
+import { Check, ChevronDown, Coins, Search, X } from "lucide-react";
 import { Popover } from "antd";
 import { usePopoverAnchorAlign } from "@/hooks/use-popover-anchor-align";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { AppModal } from "@/components/ui/product/app-modal/app-modal";
 
 import { imageQualityLabel } from "@/lib/image-quality";
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { modelCapabilityConfigFor, videoDurationOptions } from "@/lib/model-capabilities";
 import { formatPriceRange, modelQuoteDescription, modelQuoteRequest, normalizeTierResolution, priceTierSummaryLabel, priceTiersForCurrentSelection } from "@/lib/model-pricing";
 import { compatibleModelInGroup, configuredModelDisplayName, modelCompatibilityError, resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
-import { groupModelsForPicker, isDirectSystemModel, modelChannelLabel, type ModelPickerGroup } from "@/lib/model-picker-groups";
+import { filterModelPickerGroups, groupModelsForPicker, isDirectSystemModel, modelChannelLabel, type ModelPickerGroup } from "@/lib/model-picker-groups";
 import { cn } from "@/lib/utils";
 import { modelDisplayName, modelIcon, modelOptionName, resolveModelChannel, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
@@ -59,6 +61,9 @@ export function ModelPicker({
     const rawTheme = useActiveTheme();
     const theme = (canvasThemes[rawTheme as keyof typeof canvasThemes] ?? canvasThemes.dark) as CanvasTheme;
     const [open, setOpen] = useState(false);
+    const compact = useMediaQuery("(max-width: 720px)");
+    const [query, setQuery] = useState("");
+    const [mobileHeight, setMobileHeight] = useState<number>();
     const popoverRef = usePopoverAnchorAlign(open);
     const [availableHeight, setAvailableHeight] = useState(0);
     const [activeGroupKey, setActiveGroupKey] = useState<string | null>(null);
@@ -66,6 +71,8 @@ export function ModelPicker({
     const triggerRef = useRef<HTMLButtonElement>(null);
     const options = useMemo(() => Array.from(new Set(selectableModelsByCapability(config, capability).filter((model) => Boolean(model) && (!modelFilter || modelFilter(model))))), [capability, config, modelFilter]);
     const optionGroups = useMemo(() => groupModelsForPicker(config, options), [config, options]);
+    const mobileGroups = useMemo(() => filterModelPickerGroups(optionGroups, query), [optionGroups, query]);
+    const mobileOptionCount = mobileGroups.reduce((count, group) => count + group.models.length, 0);
     const storedCurrent = value?.trim() || "";
     // 参数档位会在选中模型后由调用方归一到其能力配置，不能因为旧模型留下的参数而禁止切换。
     const selectionRequirements = requirements ? { ...requirements, videoSeconds: undefined, imageSize: undefined, options: undefined } : undefined;
@@ -76,6 +83,19 @@ export function ModelPicker({
     const quoteRequest = useMemo(() => modelQuoteRequest(config, current, capability, requirements), [capability, config, current, requirements]);
     const [routeQuote, setRouteQuote] = useState<LogicalModelQuote | undefined>();
     const creationVariant = variant === "creation";
+
+    useLayoutEffect(() => {
+        if (!open || !compact) return;
+        const viewport = window.visualViewport;
+        const update = () => setMobileHeight(viewport?.height ?? window.innerHeight);
+        update();
+        viewport?.addEventListener("resize", update);
+        window.addEventListener("resize", update);
+        return () => {
+            viewport?.removeEventListener("resize", update);
+            window.removeEventListener("resize", update);
+        };
+    }, [compact, open]);
 
     useLayoutEffect(() => {
         if (!open) return;
@@ -116,7 +136,7 @@ export function ModelPicker({
     }, [pickerId]);
 
     useEffect(() => {
-        if (!open) return;
+        if (!open || compact) return;
         // 画布拖拽从 pointerdown 开始，须在捕获阶段关闭 Portal 菜单，避免菜单与触发器分离。
         const closeOnOutsidePointer = (event: PointerEvent) => {
             const target = event.target;
@@ -126,12 +146,13 @@ export function ModelPicker({
         };
         window.addEventListener("pointerdown", closeOnOutsidePointer, true);
         return () => window.removeEventListener("pointerdown", closeOnOutsidePointer, true);
-    }, [open]);
+    }, [compact, open]);
 
     const setPickerOpen = (nextOpen: boolean) => {
         if (nextOpen && !options.length) onMissingConfig?.();
         if (nextOpen) window.dispatchEvent(new CustomEvent("model-picker-open", { detail: pickerId }));
         if (nextOpen) {
+            setQuery("");
             setActiveGroupKey(optionGroups.find((group) => group.models.some((item) => item.models.includes(current)))?.key ?? null);
         }
         setOpen(nextOpen);
@@ -156,7 +177,8 @@ export function ModelPicker({
             triggerRef.current?.focus({ preventScroll: true });
             return;
         }
-        if (event.key === "ArrowLeft" && activeGroupKey !== null) {
+        if (event.target instanceof HTMLInputElement) return;
+        if (!compact && event.key === "ArrowLeft" && activeGroupKey !== null) {
             event.preventDefault();
             setActiveGroupKey(null);
             focusMenuOption();
@@ -170,9 +192,48 @@ export function ModelPicker({
         const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : event.key === "ArrowUp" ? Math.max(0, activeIndex - 1) : Math.min(buttons.length - 1, activeIndex + 1);
         focusPickerOption(buttons[nextIndex]);
     };
+    const renderModelOptions = (group: ModelPickerGroup) => group.models.map((modelGroup) => {
+                                const selected = modelGroup.models.includes(current);
+                                const model = compatibleModelInGroup(config, modelGroup.models, selectionRequirements, selected ? current : undefined);
+                                const displayModel = model || (selected ? current : modelGroup.models[0]);
+                                const disabledReason = model ? "" : modelCompatibilityError(config, modelGroup.models[0], selectionRequirements) || "当前输入不符合该模型能力";
+                                return (
+                                    <button
+                                        key={modelGroup.key}
+                                        type="button"
+                                        data-model-picker-item
+                                        role="option"
+                                        aria-selected={selected}
+                                        aria-disabled={Boolean(disabledReason)}
+                                        disabled={Boolean(disabledReason)}
+                                        className="canvas-model-picker-option disabled:cursor-not-allowed disabled:opacity-45"
+                                        style={{ background: selected ? theme.toolbar.activeBg : "transparent", color: theme.node.text }}
+                                        onClick={() => {
+                                            if (!model) return;
+                                            onChange(model);
+                                            if (compact) setPickerOpen(false);
+                                        }}
+                                    >
+                                        <ModelLabel
+                                            config={config}
+                                            model={displayModel}
+                                            capability={capability}
+                                            theme={theme}
+                                            creationVariant
+                                            showConfiguredModelName={showConfiguredModelName}
+                                            label={group.kind === "product" ? modelGroup.label : undefined}
+                                            requirements={requirements}
+                                            showPrice={showOptionPrices && creditsEnabled}
+                                            disabledReason={disabledReason}
+                                            showDescription
+                                        />
+                                        <span className="canvas-model-picker-option-check ml-1 shrink-0" aria-hidden="true">{selected ? <Check className="size-full" style={{ color: theme.node.activeStroke }} /> : null}</span>
+                                    </button>
+                                );
+                            });
     const content = (
         <div
-            ref={menuRef}
+            ref={compact ? undefined : menuRef}
             data-canvas-no-zoom
             className={cn(
                 "canvas-model-picker-menu creation-model-picker-menu max-w-[calc(100vw-24px)]",
@@ -221,44 +282,7 @@ export function ModelPicker({
                     </div>
                     {optionGroups.filter((group) => group.key === activeGroupKey).map((group) => <section key={group.key} className="canvas-model-picker-group canvas-model-picker-model-pane min-w-0">
                         <div className="grid min-w-0 gap-1">
-                            {group.models.map((modelGroup) => {
-                                const selected = modelGroup.models.includes(current);
-                                const model = compatibleModelInGroup(config, modelGroup.models, selectionRequirements, selected ? current : undefined);
-                                const displayModel = model || (selected ? current : modelGroup.models[0]);
-                                const disabledReason = model ? "" : modelCompatibilityError(config, modelGroup.models[0], selectionRequirements) || "当前输入不符合该模型能力";
-                                return (
-                                    <button
-                                        key={modelGroup.key}
-                                        type="button"
-                                        data-model-picker-item
-                                        role="option"
-                                        aria-selected={selected}
-                                        aria-disabled={Boolean(disabledReason)}
-                                        disabled={Boolean(disabledReason)}
-                                        className="canvas-model-picker-option disabled:cursor-not-allowed disabled:opacity-45"
-                                        style={{ background: selected ? theme.toolbar.activeBg : "transparent", color: theme.node.text }}
-                                        onClick={() => {
-                                            if (!model) return;
-                                            onChange(model);
-                                        }}
-                                    >
-                                        <ModelLabel
-                                            config={config}
-                                            model={displayModel}
-                                            capability={capability}
-                                            theme={theme}
-                                            creationVariant
-                                            showConfiguredModelName={showConfiguredModelName}
-                                            label={group.kind === "product" ? modelGroup.label : undefined}
-                                            requirements={requirements}
-                                            showPrice={showOptionPrices && creditsEnabled}
-                                            disabledReason={disabledReason}
-                                            showDescription
-                                        />
-                                        <span className="canvas-model-picker-option-check ml-1 shrink-0" aria-hidden="true">{selected ? <Check className="size-full" style={{ color: theme.node.activeStroke }} /> : null}</span>
-                                    </button>
-                                );
-                            })}
+                            {renderModelOptions(group)}
                         </div>
                     </section>)}
                 </div>
@@ -274,9 +298,9 @@ export function ModelPicker({
         <div className={cn(fullWidth ? "w-full min-w-0" : "w-fit max-w-full")} onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
             <Popover
                 ref={popoverRef}
-                open={open}
+                open={!compact && open}
                 onOpenChange={setPickerOpen}
-                trigger="click"
+                trigger={compact ? [] : "click"}
                 placement="bottomLeft"
                 align={{ overflow: { adjustY: true, shiftX: true } }}
                 arrow={false}
@@ -297,6 +321,7 @@ export function ModelPicker({
                     aria-label={placeholder}
                     title={current ? pickerModelOptionLabel(config, current, showConfiguredModelName) : placeholder}
                     onKeyDown={handleTriggerKeyDown}
+                    onClick={compact ? () => setPickerOpen(!open) : undefined}
                 >
                     <span className="canvas-model-picker-label flex min-w-0 items-center gap-1.5">
                         <span className="canvas-model-picker-trigger-icon" style={{ background: theme.toolbar.itemHover }}>
@@ -308,6 +333,38 @@ export function ModelPicker({
                     <ChevronDown className={cn("canvas-model-picker-chevron", open && "is-open")} aria-hidden="true" />
                 </button>
             </Popover>
+            <AppModal
+                flush
+                open={compact && open}
+                onCancel={() => setPickerOpen(false)}
+                footer={null}
+                closable={false}
+                style={{ top: 16 }}
+                aria-label={placeholder}
+                width="calc(100vw - 16px)"
+                className="model-picker-mobile-modal"
+                title={null}
+            >
+                <div className="model-picker-mobile" style={{ height: mobileHeight ? `${Math.max(180, mobileHeight - 32)}px` : "calc(100dvh - 32px)", background: theme.node.panel, color: theme.node.text }} data-canvas-no-zoom>
+                    <div className="model-picker-mobile-header">
+                        <h2>{placeholder}</h2>
+                        <button type="button" aria-label="关闭模型列表" onClick={() => setPickerOpen(false)}><X size={20} /></button>
+                    </div>
+                    <label className="model-picker-mobile-search">
+                        <Search size={18} aria-hidden="true" />
+                        <input type="search" aria-label="搜索模型或渠道" placeholder="搜索模型或渠道" value={query} onChange={(event) => setQuery(event.target.value)} />
+                        {query && <button type="button" aria-label="清空模型搜索" onClick={() => setQuery("")}><X size={18} /></button>}
+                    </label>
+                    <p className="model-picker-mobile-count" role="status">{query ? "找到" : "全部"} {mobileOptionCount} 个选项 · {mobileGroups.length} 个分组</p>
+                    <div ref={compact ? menuRef : undefined} className="model-picker-mobile-list" role="listbox" aria-label={placeholder} onKeyDown={handleMenuKeyDown}>
+                        {mobileGroups.map((group) => <section key={group.key} role="group" aria-label={group.label} className="model-picker-mobile-group">
+                            <h3>{group.label}<small>{group.models.length} 个{group.kind === "product" ? "渠道" : "模型"}</small></h3>
+                            {renderModelOptions(group)}
+                        </section>)}
+                        {!mobileGroups.length && <div className="model-picker-mobile-empty">{query ? "没有匹配的模型，试试其他名称" : emptyModelLabel(config, capability)}</div>}
+                    </div>
+                </div>
+            </AppModal>
         </div>
     );
 }
@@ -316,7 +373,7 @@ function focusPickerOption(target: HTMLButtonElement | null | undefined) {
     if (!target) return;
     target.focus({ preventScroll: true });
     // Only reveal the focused row inside its pane; scrolling portal ancestors moves the page.
-    const pane = target.closest<HTMLElement>(".canvas-model-picker-model-pane, .canvas-model-picker-menu");
+    const pane = target.closest<HTMLElement>(".model-picker-mobile-list, .canvas-model-picker-model-pane, .canvas-model-picker-menu");
     if (!pane) return;
     const row = target.getBoundingClientRect();
     const top = pane.getBoundingClientRect().top + pane.clientTop;
