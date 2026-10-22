@@ -27,16 +27,16 @@ export function VoiceRecordingButton({ onTranscribed, disabled, className }: Voi
 
     return (
         <>
-            <Tooltip title="实时对话">
+            <Tooltip title="语音输入">
                 <Button
                     type="text"
                     shape="circle"
-                    className={cn("!h-8 !w-8 !min-w-8", className)}
+                    className={cn(!className && "!h-8 !w-8 !min-w-8", className)}
                     disabled={disabled}
                     style={className ? undefined : { color: theme.node.muted }}
                     icon={<Mic className="size-4" />}
                     onClick={() => setOpen(true)}
-                    aria-label="实时对话"
+                    aria-label="语音输入"
                 />
             </Tooltip>
             {open ? (

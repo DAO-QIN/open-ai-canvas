@@ -27493,13 +27493,13 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
     }
     .app-user-workspace .creation-chat-writing-surface,
     .app-user-workspace .creation-chat-composer.is-empty .creation-chat-writing-surface {
-        min-height: 250px !important;
-        padding: 22px 18px 12px !important;
+        min-height: 108px !important;
+        padding: var(--space-4) var(--space-4) var(--space-2) !important;
     }
     .app-user-workspace .creation-chat-editor textarea,
     .app-user-workspace .creation-chat-mention-editor {
-        min-height: 120px !important;
-        font-size: 17px !important;
+        min-height: 72px !important;
+        font-size: 16px !important;
     }
     .app-user-workspace .creation-empty-suggest {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;

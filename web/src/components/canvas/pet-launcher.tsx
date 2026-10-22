@@ -7,6 +7,7 @@ import { effectivePet, petAvatarSize, petStatusPosition } from "@/lib/canvas/pet
 import { usePetPreference } from "@/stores/use-pet-preference";
 import { usePetAppearance } from "@/hooks/use-pet-appearance";
 import { usePetReducedMotion } from "@/hooks/use-pet-reduced-motion";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useAgentLauncherPosition } from "./use-agent-launcher-position";
 import { PetAvatar } from "./pet-avatar";
 import { PetAppearanceTransition } from "./pet-appearance-transition";
@@ -38,6 +39,20 @@ export function AgentLauncher({
         [candidate, setCandidate] = useState<string | null>(null),
         [switchError, setSwitchError] = useState("");
     const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+    const compact = useMediaQuery("(max-width: 720px)");
+    const [editing, setEditing] = useState(false);
+    useEffect(() => {
+        if (!compact) return;
+        const update = () => setEditing(Boolean(document.activeElement?.matches('input, textarea, [contenteditable="true"]')));
+        update();
+        document.addEventListener("focusin", update);
+        document.addEventListener("focusout", update);
+        return () => {
+            document.removeEventListener("focusin", update);
+            document.removeEventListener("focusout", update);
+        };
+    }, [compact]);
+    const launcherHidden = hidden || (compact && editing);
     const ref = useRef<HTMLButtonElement>(null),
         timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
         touch = useRef<{ x: number; y: number } | null>(null),
@@ -60,7 +75,7 @@ export function AgentLauncher({
         };
     }, [scope]);
     const requested = (base.avatarHeight * (previewScale ?? preference.scale)) / 100;
-    const height = Math.max(24, Math.min(requested, 360, viewport.height - 80, viewport.width - 40)),
+    const height = Math.max(24, Math.min(requested, compact ? 72 : 360, viewport.height - 80, viewport.width - 40)),
         width = height;
     const update = useCallback(
         (patch: Partial<typeof preference>) => {
@@ -83,6 +98,7 @@ export function AgentLauncher({
         const box = ref.current?.getBoundingClientRect();
         setMenu(box && box.width ? box : new DOMRect(innerWidth - position.right - width, innerHeight - position.bottom - height, width, height));
     }, [position.right, position.bottom, width, height]);
+    const launcherPosition = compact ? { ...position, bottom: `max(${position.bottom}px, calc(80px + env(safe-area-inset-bottom)))` } : position;
     useEffect(() => {
         const open = () => openMenu();
         window.addEventListener("yinghui:pet-settings", open);
@@ -112,9 +128,9 @@ export function AgentLauncher({
                 aria-haspopup="dialog"
                 title="点击对话 · 拖动移动 · 右键设置"
                 className={`canvas-agent-launcher pet-personal-launcher canvas-agent-launcher-live2d fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${dragging ? "is-dragging" : ""}`}
-                style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, "--canvas-pet-inset": `${current.avatarType === "orb" ? (height - petAvatarSize(current, height).height) / 2 : 0}px`, ...(hidden ? { display: "none" } : null) } as CSSProperties}
-                aria-hidden={hidden || undefined}
-                tabIndex={hidden ? -1 : undefined}
+                style={{ ...launcherPosition, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, "--canvas-pet-inset": `${current.avatarType === "orb" ? (height - petAvatarSize(current, height).height) / 2 : 0}px`, ...(launcherHidden ? { display: "none" } : null) } as CSSProperties & Record<`--${string}`, string>}
+                aria-hidden={launcherHidden || undefined}
+                tabIndex={launcherHidden ? -1 : undefined}
                 data-canvas-no-zoom
                 onContextMenu={(e) => {
                     e.preventDefault();
@@ -179,9 +195,9 @@ export function AgentLauncher({
                 onDoubleClick={handlers.onDoubleClick}
                 transition={{ duration: motionReduced ? 0 : 0.16 }}
             >
-                <PetAppearanceTransition appearance={current} resolved={resolved} reducedMotion={motionReduced || hidden}>
+                <PetAppearanceTransition appearance={current} resolved={resolved} reducedMotion={motionReduced || launcherHidden}>
                 {resolved ? (
-                    <PetAvatar appearance={current} height={height} paused={hidden} reducedMotion={motionReduced} state={petState} moveDirection={moveDirection} />
+                    <PetAvatar appearance={current} height={height} paused={launcherHidden} reducedMotion={motionReduced} state={petState} moveDirection={moveDirection} />
                 ) : (
                     <span role="status" aria-busy="true">
                         <LoaderCircle className="size-6 motion-safe:animate-spin" aria-hidden />

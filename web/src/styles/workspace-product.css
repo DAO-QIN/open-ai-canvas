@@ -1,3 +1,63 @@
+.app-workspace-mobile-nav { display: none; }
+.app-workspace-sidebar-mobile-close { display: none; }
+@media (max-width: 1023px) {
+    .app-user-workspace .app-workspace-sidebar-mobile-close {
+        position: absolute;
+        top: var(--space-3);
+        right: var(--space-2);
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border: 0;
+        border-radius: var(--user-radius-control);
+        background: var(--user-surface-muted);
+        color: var(--user-ink);
+        cursor: pointer;
+    }
+    .app-workspace-sidebar-mobile-close svg { width: 18px; height: 18px; }
+    .app-workspace-sidebar-mobile-close:focus-visible { outline: 2px solid var(--control-focus-ring); outline-offset: -2px; }
+}
+@media (max-width: 720px) {
+    .app-user-workspace .app-workspace-shell { padding-top: env(safe-area-inset-top); }
+    .app-user-workspace .app-workspace-main-row { padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
+    .app-user-workspace .app-workspace-mobile-nav:not([hidden]) {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        flex: 0 0 auto;
+        padding: var(--space-1) max(var(--space-2), env(safe-area-inset-right)) max(var(--space-1), env(safe-area-inset-bottom)) max(var(--space-2), env(safe-area-inset-left));
+        border-top: 1px solid var(--user-border);
+        background: var(--user-surface);
+    }
+    .app-workspace-mobile-nav a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: var(--space-1);
+        min-height: 52px;
+        border-radius: var(--user-radius-control);
+        color: var(--user-ink-muted);
+        font-size: 11px;
+        text-decoration: none;
+    }
+    .app-workspace-mobile-nav a[aria-current="page"] { color: var(--user-accent); background: var(--user-accent-soft); font-weight: 600; }
+    .app-workspace-mobile-nav a:focus-visible { outline: 2px solid var(--control-focus-ring); outline-offset: -2px; }
+    .app-workspace-mobile-nav svg { width: 20px; height: 20px; stroke-width: 1.8; }
+    .app-user-workspace .app-workspace-topbar-icon-button { min-width: 44px; min-height: 44px; }
+    .app-user-workspace .app-workspace-topbar-credit-pill { min-height: 44px; max-width: 140px; }
+    .app-user-workspace .app-workspace-topbar-credit-pill strong { overflow: hidden; text-overflow: ellipsis; }
+    .app-user-workspace .app-workspace-account-theme-toggle { display: none; }
+    .app-product-overlays :is(input.ant-input, textarea.ant-input),
+    .app-product-workspace :is(input.ant-input, textarea.ant-input) { font-size: 16px; }
+    .app-product-overlays:has([aria-modal="true"]) .pet-personal-launcher,
+    .app-user-overlays:has([aria-modal="true"]) .pet-personal-launcher { visibility: hidden; pointer-events: none; }
+    .app-product-workspace .creation-start-heading { position: relative; padding-top: var(--space-2); }
+    .app-product-workspace .creation-start-copy { grid-row: 1; padding-inline: var(--space-7); }
+    .app-product-workspace .creation-history-entry { position: absolute; top: 0; right: 0; min-width: 44px; min-height: 44px; }
+}
+
 /* Shared product components. Page files own composition; these rules own material,
    control geometry and interaction. Spatial canvas and admin layouts stay isolated. */
 .app-user-workspace .studio-collection-page > div {
@@ -122,6 +182,7 @@
     overflow: hidden;
     margin-bottom: 0;
 }
+.assets-collection-filters[hidden] { display: none; }
 .assets-collection-filter-scroll {
     display: flex;
     min-height: 0;
@@ -243,6 +304,8 @@
         overflow: visible;
     }
     .assets-collection-filter-scroll { overflow: visible; }
+    .assets-library-page .collection-toolbar-controls .assets-density-select { width: auto; flex: 1; min-width: 90px; }
+    .assets-library-page .collection-toolbar-controls > .ant-btn { min-height: 44px; }
     .collection-filter-group { gap: var(--space-2); }
     .assets-collection-filters .collection-filter-options,
     .assets-collection-filters .collection-folder-list { flex-direction: row; flex-wrap: wrap; }

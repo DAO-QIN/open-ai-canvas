@@ -1,5 +1,6 @@
 import { ImageSizePicker } from "@/components/image-size-picker";
 import { ImageParameterFields } from "@/components/image-parameter-fields";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { imageResolutionUsesQuality, imageSizePresets } from "@/lib/image-size-presets";
 import { createPortal } from "react-dom";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
@@ -139,6 +140,8 @@ export function CreationComposer(props: ComposerProps) {
     const [previewUrl, setPreviewUrl] = useState("");
     const [previewType, setPreviewType] = useState<"image" | "video">("image");
     const [promptOptimizerOpen, setPromptOptimizerOpen] = useState(false);
+    const compact = useMediaQuery("(max-width: 720px)");
+    const [moreOpen, setMoreOpen] = useState(false);
     const [referenceFilter, setReferenceFilter] = useState<CreationReferenceFilter>("all");
     const [canDragReferences, setCanDragReferences] = useState(false);
     const [dropTargetReferenceId, setDropTargetReferenceId] = useState<string | null>(null);
@@ -295,6 +298,15 @@ export function CreationComposer(props: ComposerProps) {
         }
         return undefined;
     };
+    const secondaryControls = <>
+        {canOptimizePrompt ? <button type="button" className="creation-chat-control" onClick={() => { setMoreOpen(false); setPromptOptimizerOpen(true); }} aria-label="优化提示词" aria-haspopup="dialog"><WandSparkles /><span>优化提示词</span></button> : null}
+        {props.mode === "text" ? <>
+            <button type="button" className="creation-chat-control" aria-pressed={props.textStreaming} disabled={interactionBusy} onClick={() => props.setTextStreaming(!props.textStreaming)}><Waves /><span>流式输出</span></button>
+            <button type="button" className="creation-chat-control" aria-pressed={props.textThinking} disabled={interactionBusy} onClick={() => props.setTextThinking(!props.textThinking)}><Brain /><span>模型思考</span></button>
+        </> : null}
+        {props.prompt.trim() || props.attachments.length || props.references.some((reference) => reference.active) ? <button type="button" className="creation-chat-control is-clear" onClick={props.onClearComposer} disabled={interactionBusy} aria-label="清空提示词和参考内容"><Trash2 /><span>清空内容</span></button> : null}
+    </>;
+    const hasSecondaryControls = canOptimizePrompt || props.mode === "text" || Boolean(props.prompt.trim() || props.attachments.length || props.references.some((reference) => reference.active));
     const composer = <HoverBorderGradient as="div" duration={2.2} containerClassName="creation-composer-shell" className="creation-composer-shell-inner">
         <SpotlightSurface
             className={`creation-chat-composer is-${props.variant}`}
@@ -304,7 +316,7 @@ export function CreationComposer(props: ComposerProps) {
         >
         <div className="creation-chat-writing-surface">
             <div className="creation-chat-editor">
-                <CanvasResourceMentionTextarea ref={props.composerFocusRef} value={props.prompt} references={props.references} mentionMenuWidth={400} sendOnEnter onFocus={props.onPromptFocus} onChange={props.setPrompt} onSubmit={props.onSubmit} containerClassName="creation-chat-mention-container" className="creation-chat-mention-editor creation-scrollbar" style={{ color: "var(--creation-text)" }} placeholder={props.placeholderOverride || (props.variant === "empty" ? emptyPlaceholder : placeholder)} aria-label="创作提示词，可使用 @ 引用当前参考内容或技能；回车发送，Shift+回车换行" spellCheck disabled={interactionBusy} activeDropReferenceId={dropTargetReferenceId} onReferenceFilesDrop={(reference, files) => { const target = props.references.find((item) => item.id === reference.id); if (target?.attachmentId) props.onReplaceReferenceFiles(target.attachmentId, files); }} />
+                <CanvasResourceMentionTextarea ref={props.composerFocusRef} value={props.prompt} references={props.references} mentionMenuWidth={400} sendOnEnter={!compact} enterKeyHint={compact ? "enter" : "send"} onFocus={props.onPromptFocus} onChange={props.setPrompt} onSubmit={props.onSubmit} containerClassName="creation-chat-mention-container" className="creation-chat-mention-editor creation-scrollbar" style={{ color: "var(--creation-text)" }} placeholder={props.placeholderOverride || (props.variant === "empty" ? emptyPlaceholder : placeholder)} aria-label={compact ? "创作提示词，回车换行，点击开始创作发送" : "创作提示词，可使用 @ 引用当前参考内容或技能；回车发送，Shift+回车换行"} spellCheck disabled={interactionBusy} activeDropReferenceId={dropTargetReferenceId} onReferenceFilesDrop={(reference, files) => { const target = props.references.find((item) => item.id === reference.id); if (target?.attachmentId) props.onReplaceReferenceFiles(target.attachmentId, files); }} />
                 {props.attachments.length ? <div className={`creation-reference-panel${trackState.isExpanded ? " is-expanded" : ""}`} aria-busy={interactionBusy}>
                     {trackState.isExpanded ? <div className="creation-reference-panel-header">
                         <div className="creation-reference-filter-tabs" role="group" aria-label="筛选参考内容">
@@ -372,6 +384,11 @@ export function CreationComposer(props: ComposerProps) {
             </div>
         </div>
         <footer className="creation-chat-dock">
+            <div className="creation-chat-model-controls">
+                <ModelPicker config={props.config} value={props.model} onChange={props.onModelChange} capability={props.mode} requirements={props.modelRequirements} className="creation-model-picker" placeholder={`选择${modeLabels[props.mode]}模型`} showSelectedPrice={false} showOptionPrices variant="creation" />
+                {props.mode === "video" || (props.mode === "image" && imageSettingsSupported) ? <GenerationSettingsMenu {...props} /> : null}
+                {props.mode === "video" ? <DurationMenu profile={videoCapabilityForResolution(props.videoProfile, props.videoQuality)} seconds={props.seconds} onChange={props.setSeconds} /> : null}
+            </div>
             <div className="creation-chat-controls">
                 {props.variant === "thread" ? <ModePicker mode={props.mode} onModeChange={props.onModeChange} /> : null}
                 {referencesSupported && !props.attachments.length ? <Tooltip title={addReferenceLabel}><button type="button" className="creation-chat-control" onClick={props.onOpenLibrary} disabled={interactionBusy || !canAddMoreReferences} aria-label={addReferenceLabel}><Plus aria-hidden="true" /><span>参考内容</span></button></Tooltip> : null}
@@ -380,7 +397,7 @@ export function CreationComposer(props: ComposerProps) {
                     disabled={interactionBusy}
                     onTranscribed={(text) => props.setPrompt(props.prompt.trim() ? `${props.prompt} ${text}` : text)}
                 />
-                {canOptimizePrompt ? <Tooltip title="用 AI 优化提示词">
+                {!compact && canOptimizePrompt ? <Tooltip title="用 AI 优化提示词">
                     <button
                         type="button"
                         className="creation-chat-control"
@@ -393,14 +410,12 @@ export function CreationComposer(props: ComposerProps) {
                         <span>优化</span>
                     </button>
                 </Tooltip> : null}
-				<ModelPicker config={props.config} value={props.model} onChange={props.onModelChange} capability={props.mode} requirements={props.modelRequirements} className="creation-model-picker" placeholder={`选择${modeLabels[props.mode]}模型`} showSelectedPrice={false} showOptionPrices variant="creation" />
-                {props.mode === "video" || (props.mode === "image" && imageSettingsSupported) ? <GenerationSettingsMenu {...props} /> : null}
-                {props.mode === "video" ? <DurationMenu profile={videoCapabilityForResolution(props.videoProfile, props.videoQuality)} seconds={props.seconds} onChange={props.setSeconds} /> : null}
-                {props.mode === "text" ? <>
+                {!compact && props.mode === "text" ? <>
                     <Tooltip title={interactionBusy ? "生成中，此开关将在下次发送时生效" : (props.textStreaming ? "流式输出已开启" : "流式输出已关闭")}><button type="button" className="creation-chat-control" aria-pressed={props.textStreaming} disabled={interactionBusy} onClick={() => props.setTextStreaming(!props.textStreaming)}><Waves /><span>流式</span></button></Tooltip>
                     <Tooltip title={interactionBusy ? "生成中，此开关将在下次发送时生效" : (props.textThinking ? "思考已开启，会展示模型返回的推理摘要" : "开启模型思考")}><button type="button" className="creation-chat-control" aria-pressed={props.textThinking} disabled={interactionBusy} onClick={() => props.setTextThinking(!props.textThinking)}><Brain /><span>思考</span></button></Tooltip>
                 </> : null}
-                {props.prompt.trim() || props.attachments.length || props.references.some((reference) => reference.active) ? <Tooltip title="清空提示词和参考内容"><button type="button" className="creation-chat-control is-clear" onClick={props.onClearComposer} disabled={interactionBusy} aria-label="清空提示词和参考内容"><Trash2 /><span>清空</span></button></Tooltip> : null}
+                {!compact && (props.prompt.trim() || props.attachments.length || props.references.some((reference) => reference.active)) ? <Tooltip title="清空提示词和参考内容"><button type="button" className="creation-chat-control is-clear" onClick={props.onClearComposer} disabled={interactionBusy} aria-label="清空提示词和参考内容"><Trash2 /><span>清空</span></button></Tooltip> : null}
+                {compact && hasSecondaryControls ? <Popover trigger="click" placement="topLeft" arrow={false} open={moreOpen} onOpenChange={setMoreOpen} classNames={{root:"creation-control-popover"}} content={<div className="creation-extra-controls">{secondaryControls}</div>}><button type="button" className="creation-chat-control is-more" aria-label="更多创作选项" aria-expanded={moreOpen}><SlidersHorizontal /></button></Popover> : null}
             </div>
             <Button
                 type="text"

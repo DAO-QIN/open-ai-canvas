@@ -1,5 +1,5 @@
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import type { Ref } from "react";
 import { workspaceNavigationTool } from "@/constant/navigation-tools";
 
@@ -39,13 +39,13 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
             </nav>
             <WorkspaceTopBarExtensionSlot />
             <div className="app-workspace-topbar-actions">
-                {creditsEnabled ? <button type="button" className="app-workspace-topbar-credit-pill" aria-label={`打开积分中心，可用 ${balance} 积分`} onClick={() => openWorkspaceWallet()}>
+                {creditsEnabled && !user ? <Link to="/login" className="app-workspace-topbar-credit-pill">登录领积分</Link> : creditsEnabled ? <button type="button" className="app-workspace-topbar-credit-pill" aria-label={`打开积分中心，可用 ${balance} 积分`} onClick={() => openWorkspaceWallet()}>
                     <WorkspaceCreditGiftMark />
                     <span>积分</span>
                     <strong>{balance}</strong>
                 </button> : null}
                 {user ? <SystemAnnouncementCenter userId={user.id} className="app-workspace-topbar-icon-button" autoOpen /> : null}
-                <AnimatedThemeToggler className="app-workspace-topbar-icon-button" theme={theme} onThemeChange={setTheme} aria-label="切换主题" />
+                <AnimatedThemeToggler className={`app-workspace-topbar-icon-button ${user ? "app-workspace-account-theme-toggle" : ""}`} theme={theme} onThemeChange={setTheme} aria-label="切换主题" />
                 <WorkspaceAccountMenu />
             </div>
         </header>

@@ -4,7 +4,7 @@ import { readFileAsDataUrl, readImageMeta, formatBytes } from "@/lib/image-utils
 import { uploadMediaFile } from "@/services/file-storage";
 import { exportAssets, readAssetPackage } from "./asset-transfer";
 import { WorkspacePage, PageHeader, CollectionGrid, PaginationBar } from "@/components/layout/workspace-page";
-import { Trash2, RotateCcw, Plus, Images, FolderOpen, FileUp, Upload, Download, MoreHorizontal, Search, LayoutGrid, FolderPlus, PencilLine, AlertTriangle } from "lucide-react";
+import { Trash2, RotateCcw, Plus, Images, FolderOpen, FileUp, Upload, Download, MoreHorizontal, Search, LayoutGrid, FolderPlus, PencilLine, AlertTriangle, SlidersHorizontal } from "lucide-react";
 import { CollectionToolbar } from "@/components/layout/collection-toolbar";
 import { Select } from "@/components/ui/base/select";
 import { AssetFilterGroup, AssetsBatchBar, AssetsEmptyState, AssetDrawer } from "./asset-library-panels";
@@ -22,6 +22,7 @@ import { App, Form, Popconfirm, Button, Dropdown, Input, Modal, Space, Tag, Typo
 import { useNavigate } from "react-router";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { ASSET_CATEGORY_OPTIONS } from "@/lib/asset-category";
 import { downloadBrowserMedia } from "@/services/browser-download";
 import { flushAssetStorePersistence, useAssetStore, type AssetCategory, type AssetKind, type ImageAsset } from "@/stores/use-asset-store";
@@ -89,6 +90,8 @@ export default function AssetsPage() {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(40);
     const [gridDensity, setGridDensity] = useState<AssetGridDensity>(readAssetGridDensity);
+    const compact = useMediaQuery("(max-width: 720px)");
+    const [filtersExpanded, setFiltersExpanded] = useState(false);
     const [editingAsset, setEditingAsset] = useState<LibraryAsset | null>(null);
     const [isAssetOpen, setIsAssetOpen] = useState(false);
     const [previewAsset, setPreviewAsset] = useState<LibraryAsset | null>(null);
@@ -176,6 +179,7 @@ export default function AssetsPage() {
     const kindCounts = useMemo(() => assetCountMap(kindOptions, useRemotePage ? assetPageQuery.data?.kindCounts : undefined, viewMode === "trash" ? trashAssets : activeAssets, (asset) => asset.kind), [activeAssets, assetPageQuery.data?.kindCounts, trashAssets, useRemotePage, viewMode]);
     const categoryCounts = useMemo(() => assetCountMap(categoryOptions, useRemotePage ? assetPageQuery.data?.categoryCounts : undefined, viewMode === "trash" ? trashAssets : activeAssets, (asset) => asset.category || "other"), [activeAssets, assetPageQuery.data?.categoryCounts, trashAssets, useRemotePage, viewMode]);
     const folderCounts = assetPageQuery.data?.folderCounts || {};
+    const activeFilterCount = [kindFilter, categoryFilter, folderFilter].filter((value) => value !== "all").length;
 
     useEffect(() => {
         const maxPage = Math.max(1, Math.ceil(totalAssets / pageSize));
@@ -618,11 +622,14 @@ export default function AssetsPage() {
                             <Select
                                 aria-label="素材显示密度"
                                 value={gridDensity}
-                                className="w-full sm:w-32"
+                                className="assets-density-select w-full sm:w-32"
                                 prefix={<LayoutGrid aria-hidden className="size-3.5" />}
                                 options={assetGridDensityOptions}
                                 onChange={(value) => setGridDensity(parseAssetGridDensity(value))}
                             />
+                            {compact ? <Button icon={<SlidersHorizontal className="size-4" />} aria-controls="asset-library-filters" aria-expanded={filtersExpanded} onClick={() => setFiltersExpanded((value) => !value)}>
+                                {filtersExpanded ? "收起筛选" : "筛选"}{activeFilterCount ? ` (${activeFilterCount})` : ""}
+                            </Button> : null}
                             <Button aria-pressed={selectionMode} onClick={() => {
                                 setSelecting(!selectionMode);
                                 setSelectedIds([]);
@@ -635,7 +642,7 @@ export default function AssetsPage() {
 
                 <div className="collection-content assets-collection-content">
                     <div className="assets-collection-layout">
-                        <aside className="assets-collection-filters" aria-label="素材分类">
+                        <aside id="asset-library-filters" className="assets-collection-filters" aria-label="素材分类" hidden={compact && !filtersExpanded}>
                             <div className="assets-collection-filter-scroll">
                             <AssetFilterGroup
                                 title="素材类型"
@@ -666,7 +673,7 @@ export default function AssetsPage() {
                                 </div>
                                 <div className="collection-folder-list">
                                     <button type="button" aria-pressed={folderFilter === "all"} className={`assets-filter-item ${folderFilter === "all" ? "is-active" : ""}`} onClick={() => { setFolderFilter("all"); setPage(1); }}>
-                                        <span className="assets-filter-item-label">全部</span><span className="assets-filter-count">{activeAssets.length}</span>
+                                        <span className="assets-filter-item-label">全部</span><span className="assets-filter-count">{kindCounts.get("all") ?? activeAssets.length}</span>
                                     </button>
                                     <button type="button" aria-pressed={folderFilter === "uncategorized"} className={`assets-filter-item ${folderFilter === "uncategorized" ? "is-active" : ""}`} onClick={() => { setFolderFilter("uncategorized"); setPage(1); }}>
                                         <span className="assets-filter-item-label">未分类</span><span className="assets-filter-count">{folderCounts[""] ?? activeAssets.filter((asset) => !asset.folderId).length}</span>
