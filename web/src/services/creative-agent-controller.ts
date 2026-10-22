@@ -3,7 +3,7 @@ import { applyCanvasOperations, type CanvasOperation, type CanvasSnapshot } from
 import { buildCanvasContext } from "@/lib/canvas/canvas-context-discovery";
 import { applyCreativeAnswers, creativeScenarioPrompt, normalizeCreativeQuestions, CREATIVE_SCENARIOS, type CreativeAnswers, type CreativeQuote } from "@/lib/creation/creative-agent-contract";
 import { assertCreativeBriefSpecifications, creativeNodeId, creativeProposalOps, initialCreativeState, mergeCreativeBrief, normalizeCreativeProposal, readCreativeState, type CreativeAgentState, type CreativeMediaState } from "@/lib/creation/creative-agent-state";
-import { CREATIVE_AGENT_SYSTEM_PROMPT, CREATIVE_AGENT_TOOLS, parseCreativeToolArguments } from "@/lib/creation/creative-agent-tools";
+import { buildCreativeAgentSystemPrompt, CREATIVE_AGENT_TOOLS, parseCreativeToolArguments } from "@/lib/creation/creative-agent-tools";
 import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
 import { submittedProducedModel } from "@/lib/canvas/produced-model";
 import { getActiveUserScope } from "@/lib/user-scope";
@@ -21,6 +21,7 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { creativeVideoSpecificationError } from "@/lib/creation/creative-agent-state";
 import { updateCreativePlan } from "@/lib/creation/creative-plan";
 import { generationErrorMessage } from "@/lib/generation-error";
+import { useAppearanceStore } from "@/stores/use-appearance-store";
 
 export type CreativeCanvasAdapter = { canvasId: string; read: () => CanvasSnapshot; apply: (ops: CanvasOperation[]) => Promise<CanvasSnapshot> };
 export type CreativeControllerView = { run?: CreationRun; state: CreativeAgentState; busy: boolean; hasControl: boolean; error?: string; quote?: CreativeQuote };
@@ -204,7 +205,7 @@ export class CreativeAgentController {
         const canvas = this.options.canvas();
         const imageReferences = this.state.references.filter((reference) => reference.kind === "image" && reference.storageKey);
         const protocol: ResponseInputMessage[] = [
-            { role: "system", content: `${CREATIVE_AGENT_SYSTEM_PROMPT}\n${creativeScenarioPrompt(this.state.scene)}\n用户系统提示：${config.systemPrompt || ""}` },
+            { role: "system", content: `${buildCreativeAgentSystemPrompt(useAppearanceStore.getState().appearance.brandName)}\n${creativeScenarioPrompt(this.state.scene)}\n用户系统提示：${config.systemPrompt || ""}` },
             ...this.state.messages.slice(-20).map((message) => ({ role: message.role, content: message.text })),
             { role: "user", content: [{ type: "text", text: JSON.stringify({ brief: this.state.brief, proposal: this.state.proposal, availableModels: catalogue, references: this.state.references, canvas: canvas ? buildCanvasContext(canvas.read()) : { available: false, instruction: "首页不能操作画布" }, currentRequest: prepared.prompt }) }, ...imageReferences.map((reference) => ({ type: "image_url" as const, image_url: { url: reference.storageKey! } }))] },
         ];
