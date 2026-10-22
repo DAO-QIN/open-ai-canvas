@@ -10,10 +10,12 @@ import { parseSrt, serializeSrtEntries } from "@/lib/timeline/srt-parser";
 import { getSubtitleTracks } from "@/lib/timeline/timeline-tracks";
 import { formatTimelineTime } from "@/lib/timeline/timeline-view";
 import type { SrtEntry, TimelineClip } from "@/types/timeline";
+import { useAppearanceStore } from "@/stores/use-appearance-store";
 
 const DEFAULT_SRT_NODE_ID = "srt-import";
 
 export function EditorSubtitleTools() {
+    const brandName = useAppearanceStore((state) => state.appearance.brandName);
     const { project, dispatch } = useEditorStoreContext();
     const [srtText, setSrtText] = useState("");
     const [message, setMessage] = useState<string | null>(null);
@@ -90,7 +92,7 @@ export function EditorSubtitleTools() {
                         value={srtText}
                         onChange={(e) => setSrtText(e.target.value)}
                         rows={8}
-                        placeholder={"1\n00:00:00,500 --> 00:00:02,500\n你好，影策"}
+                        placeholder={`1\n00:00:00,500 --> 00:00:02,500\n你好，${brandName}`}
                         className="w-full resize-y rounded-md border border-[var(--previs-sequencer-border)] bg-[var(--previs-control-hover)] px-2 py-1.5 font-mono text-[11px] leading-relaxed text-[var(--previs-dock-fg-strong)] outline-none focus:border-[var(--workspace-accent)]/60"
                     />
                 </label>

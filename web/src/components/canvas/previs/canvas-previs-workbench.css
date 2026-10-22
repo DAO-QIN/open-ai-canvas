@@ -163,7 +163,9 @@
 .previs-desk-logo {
     display: grid;
     place-items: center;
-    width: 40px;
+    min-width: 40px;
+    padding: 0 8px;
+    white-space: nowrap;
     height: 26px;
     border-radius: var(--pd-r-sm);
     background: linear-gradient(135deg, oklch(0.92 0.04 240), oklch(0.98 0.01 240));
@@ -171,7 +173,7 @@
     font-weight: 900;
     font-size: 15px;
     letter-spacing: -0.02em;
-    flex: 0 0 40px;
+    flex: 0 0 auto;
     box-shadow: 0 1px 3px oklch(0 0 0 / 0.3);
 }
 
