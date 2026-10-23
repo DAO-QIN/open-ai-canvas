@@ -650,6 +650,10 @@ func applyChannelCapabilityDefaults(config map[string]any, capability string, pr
 		}
 	}
 	switch normalizeCapability(capability) {
+	case "audio":
+		if profile != nil && profile.Audio != nil && profile.Audio.Music != nil && profile.Audio.Music.InstrumentalSupported {
+			setDefault("audioInstrumental", profile.Audio.Music.DefaultInstrumental)
+		}
 	case "image":
 		if profile == nil || profile.Image == nil {
 			return

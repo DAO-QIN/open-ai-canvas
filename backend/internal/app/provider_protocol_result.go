@@ -57,8 +57,10 @@ func finishProtocolResult(ctx context.Context, config providerConfig, mode strin
 	if len(references) == 0 {
 		return nil, errors.New("声明式协议已完成但没有返回媒体地址")
 	}
-	if mode == "audio" && config.InterfaceType == "kacang-suno" && len(references) != 2 {
-		return nil, errors.New("卡藏 Suno 未返回完整的两首音乐，未标记为生成成功")
+	if mode == "audio" && config.InterfaceType == "kacang-suno" && config.CapabilityConfig != nil && config.CapabilityConfig.Audio != nil {
+		if expected := config.CapabilityConfig.Audio.OutputCount; expected > 0 && len(references) != expected {
+			return nil, fmt.Errorf("音乐生成返回数量不完整，预期 %d 首，实际 %d 首", expected, len(references))
+		}
 	}
 	if output, handled, err := recoverProtocolMedia(ctx, config, mode, references); handled {
 		if err == nil {

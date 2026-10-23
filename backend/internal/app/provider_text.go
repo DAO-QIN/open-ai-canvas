@@ -31,6 +31,13 @@ func runTextTask(ctx context.Context, input canvasGenerationInput) (map[string]i
 // Known text protocols keep the plugin's request mapping and host transport,
 // while sharing the SSE parser used by text generation and Agent requests.
 func executeProtocolCreateRequest(ctx context.Context, input canvasGenerationInput, spec protocol.RequestSpec) ([]byte, *protocol.Result, error) {
+	if input.Mode == "audio" {
+		if timeout := musicRequestTimeout(input.Config); timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, timeout)
+			defer cancel()
+		}
+	}
 	wire := input.Config.InterfaceType
 	if wire == string(model.ChannelInterfaceOpenAIResponse) {
 		wire = "responses"

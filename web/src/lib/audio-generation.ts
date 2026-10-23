@@ -2,6 +2,7 @@ import { doubaoAudioVoiceOptions, doubaoDefaultAudioVoice } from "@/lib/doubao-a
 import { resolveModelRequestConfig } from "@/stores/use-config-store";
 import type { AiConfig } from "@/stores/use-config-store";
 import { geminiAudioVoices, geminiDefaultAudioVoice } from "./gemini-audio";
+import { defaultAudioCapabilityConfig, modelCapabilityConfigFor } from "./model-capabilities";
 
 export { doubaoAudioVoiceOptions, doubaoDefaultAudioVoice };
 
@@ -90,6 +91,16 @@ export function isDoubaoAudioConfig(config: AiConfig) {
 
 export function isMusicAudioConfig(config: AiConfig) {
     return resolveModelRequestConfig(config, config.model || config.audioModel).interfaceType === "kacang-suno";
+}
+
+export function musicCapabilityForConfig(config: AiConfig) {
+    const profile = modelCapabilityConfigFor(config, config.model || config.audioModel).audio;
+    return profile?.music || defaultAudioCapabilityConfig("kacang-suno")!.music!;
+}
+
+export function musicInstrumentalForConfig(config: AiConfig) {
+    const profile = musicCapabilityForConfig(config);
+    return profile.instrumentalSupported && (!config.audioInstrumental ? profile.defaultInstrumental : config.audioInstrumental === "true");
 }
 
 export function isGeminiTTSAudioConfig(config: AiConfig) {

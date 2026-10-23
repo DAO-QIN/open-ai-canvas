@@ -21,6 +21,7 @@ export type Options = {
     audioLanguage?: string;
     audioDialect?: string;
     audioInstructions?: string;
+    audioInstrumental?: boolean;
 };
 
 export type ReferenceBinding = {
@@ -189,5 +190,14 @@ export const GENERATION_OPTION_FIELDS = [
         "name": "audioInstructions",
         "node": "audioInstructions",
         "task": "audioInstructions"
+    },
+    {
+        "kind": "boolean",
+        "modes": [
+            "audio"
+        ],
+        "name": "audioInstrumental",
+        "node": "audioInstrumental",
+        "task": "audioInstrumental"
     }
 ] as const;

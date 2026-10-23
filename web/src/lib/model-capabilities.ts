@@ -46,11 +46,12 @@ export type AudioCapabilityConfig = {
     taskCount: number;
     outputCount: number;
     streaming: boolean;
+    music?: { promptMaxChars: number; instrumentalSupported: boolean; defaultInstrumental: boolean; requestTimeoutSeconds: number };
     speech?: { voices: string[]; defaultVoice: string; defaultInstructions: string; outputFormat: string; sampleRate: number; channels: number; inputMaxTokens: number; outputMaxTokens: number };
 };
 
 export function defaultAudioCapabilityConfig(protocol?: ModelProtocol): AudioCapabilityConfig | undefined {
-    if (protocol === "kacang-suno") return { generationType: "music", taskCount: 1, outputCount: 2, streaming: false };
+    if (protocol === "kacang-suno") return { generationType: "music", taskCount: 1, outputCount: 0, streaming: false, music: { promptMaxChars: 3000, instrumentalSupported: true, defaultInstrumental: false, requestTimeoutSeconds: 600 } };
     if (protocol === "kacang-gemini-tts")
         return {
             generationType: "speech",

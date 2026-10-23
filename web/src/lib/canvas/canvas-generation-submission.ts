@@ -22,6 +22,7 @@ export type CanvasGenerationRequestFingerprintInput = {
     audioLanguage?: string;
     audioDialect?: string;
     audioInstructions?: string;
+    audioInstrumental?: string;
     audioEmotionControlMethod?: string;
     audioEmotionRandom?: string;
     audioEmotionHappy?: string;
@@ -59,6 +60,7 @@ export function canvasGenerationRequestFingerprint(input: CanvasGenerationReques
         audioLanguage: input.audioLanguage,
         audioDialect: input.audioDialect,
         audioInstructions: input.audioInstructions,
+        audioInstrumental: input.audioInstrumental,
         audioEmotionControlMethod: input.audioEmotionControlMethod,
         audioEmotionRandom: input.audioEmotionRandom,
         audioEmotionHappy: input.audioEmotionHappy,

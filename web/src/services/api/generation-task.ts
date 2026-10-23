@@ -428,6 +428,7 @@ export function backendProviderConfig(config: AiConfig, mode: BackendGenerationM
         audioLanguage: config.audioLanguage,
         audioDialect: config.audioDialect,
         audioInstructions: config.audioInstructions,
+        audioInstrumental: config.audioInstrumental,
         systemPrompt: config.systemPrompt,
     };
     if (logicalModelIDForConfig(config)) return generationOptions;
@@ -472,6 +473,7 @@ function workflowProviderConfig(config: AiConfig, requestConfig: ReturnType<type
         audioLanguage: config.audioLanguage,
         audioDialect: config.audioDialect,
         audioInstructions: config.audioInstructions,
+        audioInstrumental: config.audioInstrumental,
         workflowId: workflow.workflowId,
         webappId: workflow.webappId,
         workflowJson: workflow.workflowJson,
@@ -507,7 +509,7 @@ function logicalCapabilityOptions(config: AiConfig, mode: BackendGenerationMode)
         : mode === "video"
             ? { size: config.size, videoSeconds: Number(config.videoSeconds), vquality: config.vquality, videoGenerateAudio: config.videoGenerateAudio === "true", videoWatermark: config.videoWatermark === "true" }
             : mode === "audio"
-                ? { audioVoice: config.audioVoice, audioFormat: config.audioFormat, audioSpeed: Number(config.audioSpeed), audioLanguage: config.audioLanguage, audioDialect: config.audioDialect }
+                ? { audioVoice: config.audioVoice, audioFormat: config.audioFormat, audioSpeed: Number(config.audioSpeed), audioLanguage: config.audioLanguage, audioDialect: config.audioDialect, audioInstrumental: config.audioInstrumental === "true" }
                 : {};
     const filtered = Object.fromEntries(Object.entries(candidates).filter(([key]) => Boolean(spec?.options?.[key])));
     // 只把前台模型声明过的参数送进能力匹配。未声明的 quality 不能因为画布选了 4K 档位

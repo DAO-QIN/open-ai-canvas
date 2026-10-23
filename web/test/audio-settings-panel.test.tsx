@@ -51,7 +51,12 @@ describe("canvas audio settings", () => {
     test("keeps Suno music settings separate from speech controls", () => {
         const suno = { ...defaultConfig, model: "suno", audioModel: "suno", channels: [createModelChannel({ id: "suno", models: ["suno"], interfaceType: "kacang-suno" })] };
         const html = renderToStaticMarkup(<AudioSettingsPanel config={suno} theme={theme} onConfigChange={() => {}} />);
-        expect(html).toContain("每次生成 2 首音乐");
+        expect(html).toContain('aria-label="音乐类型"');
+        expect(html).toContain("歌曲");
+        expect(html).toContain("纯音乐");
+        expect(html).not.toContain("2 首音乐");
+        expect(html).not.toContain("卡藏");
+        expect(html).not.toContain("渠道");
         expect(html).not.toContain('aria-label="渠道音色 ID"');
         expect(html).not.toContain('aria-label="自定义语速"');
         expect(html).not.toContain('aria-label="声音指令"');

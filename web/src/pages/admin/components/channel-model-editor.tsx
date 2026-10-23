@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Alert, App, AutoComplete, Button, Descriptions, Form, Input, Segmented, Switch, Tabs } from "antd";
+import { Alert, App, AutoComplete, Button, Descriptions, Form, Input, InputNumber, Segmented, Switch, Tabs } from "antd";
 import { useAdminContext } from "../admin-context";
 import { AdminModal } from "@/pages/admin/ui/overlays";
 import { FlaskConical, Plus } from "lucide-react";
@@ -418,12 +418,19 @@ export function ChannelModelEditor({
                                             <Descriptions title="音乐生成默认参数" bordered size="small" column={2} items={[
                                                 { key: "input", label: "输入", children: "纯文本音乐描述" },
                                                 { key: "tasks", label: "任务数（n）", children: capabilityConfig.audio.taskCount },
-                                                { key: "outputs", label: "每次返回", children: `${capabilityConfig.audio.outputCount} 首音乐` },
+                                                { key: "outputs", label: "每次返回", children: capabilityConfig.audio.outputCount ? `${capabilityConfig.audio.outputCount} 首音乐` : "随模型返回，全部保存" },
                                                 { key: "streaming", label: "流式输出（stream）", children: "关闭" },
                                                 { key: "references", label: "参考素材", children: "不支持" },
                                                 { key: "parameters", label: "音色、语速、时长、格式", children: "由上游生成，不提供独立参数" },
                                             ]} />
-                                            <Alert type="info" title="按供应商合同自动配置" description="曲风、情绪、乐器及无人声要求请写入提示词。一次任务返回两首音乐，按次计费；结果链接会及时保存。" />
+                                            {capabilityConfig.audio.music && <div className="grid gap-3 sm:grid-cols-2">
+                                                <label className="flex flex-col gap-2 text-sm">请求等待上限（秒）<InputNumber aria-label="音乐请求等待上限" min={1} max={3600} precision={0} value={capabilityConfig.audio.music.requestTimeoutSeconds} onChange={(value) => { if (value !== null) { dirtyRef.current = true; form.setFieldValue("capabilityConfig", { ...capabilityConfig, audio: { ...capabilityConfig.audio, music: { ...capabilityConfig.audio!.music, requestTimeoutSeconds: value } } }); } }} /></label>
+                                                <label className="flex flex-col gap-2 text-sm">输入上限（UTF-16 单元）<InputNumber aria-label="音乐输入上限" min={1} max={1000000} precision={0} value={capabilityConfig.audio.music.promptMaxChars} onChange={(value) => { if (value !== null) { dirtyRef.current = true; form.setFieldValue("capabilityConfig", { ...capabilityConfig, audio: { ...capabilityConfig.audio, music: { ...capabilityConfig.audio!.music, promptMaxChars: value } } }); } }} /></label>
+                                                <label className="flex flex-col gap-2 text-sm">返回首数（0 表示随模型）<InputNumber aria-label="音乐返回首数" min={0} max={32} precision={0} value={capabilityConfig.audio.outputCount} onChange={(value) => { if (value !== null) { dirtyRef.current = true; form.setFieldValue("capabilityConfig", { ...capabilityConfig, audio: { ...capabilityConfig.audio, outputCount: value } }); } }} /></label>
+                                                <div className="flex items-center gap-2 text-sm"><Switch aria-label="支持纯音乐选项" checked={capabilityConfig.audio.music.instrumentalSupported} onChange={(checked) => { dirtyRef.current = true; form.setFieldValue("capabilityConfig", { ...capabilityConfig, audio: { ...capabilityConfig.audio, music: { ...capabilityConfig.audio!.music, instrumentalSupported: checked, defaultInstrumental: checked && capabilityConfig.audio!.music!.defaultInstrumental } } }); }} />支持纯音乐选项</div>
+                                                {capabilityConfig.audio.music.instrumentalSupported && <div className="flex items-center gap-2 text-sm"><Switch aria-label="默认纯音乐" checked={capabilityConfig.audio.music.defaultInstrumental} onChange={(checked) => { dirtyRef.current = true; form.setFieldValue("capabilityConfig", { ...capabilityConfig, audio: { ...capabilityConfig.audio, music: { ...capabilityConfig.audio!.music, defaultInstrumental: checked } } }); }} />默认纯音乐</div>}
+                                            </div>}
+                                            <Alert type="info" title="已填入音乐默认参数" description="相同接口的模型可复用本协议，按该模型文档调整以上选项。每次创建一个任务并按次计费；用户只需描述音乐并选择歌曲或纯音乐。" />
                                         </> : <Alert type="info" title="音频模型无需额外配置引用与参数" description="调用协议和积分定价仍需在对应分组中配置。" />)}
                                 </div>
                             ),

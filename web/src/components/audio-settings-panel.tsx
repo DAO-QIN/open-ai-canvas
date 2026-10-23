@@ -8,6 +8,8 @@ import {
     isDoubaoAudioConfig,
     isGeminiTTSAudioConfig,
     isMusicAudioConfig,
+    musicCapabilityForConfig,
+    musicInstrumentalForConfig,
     normalizeAudioFormatForConfig,
     normalizeAudioSpeedValue,
     normalizeAudioVoiceForConfig,
@@ -28,9 +30,9 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
             <ImageSettingsTheme theme={theme}>
                 <section className={className} style={{ color: theme.node.text }} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} aria-label="音频生成参数">
                     {showTitle ? <h3 className="text-base font-semibold">音乐设置</h3> : null}
-                    <p className="text-sm">每次生成 2 首音乐</p>
+                    {musicCapabilityForConfig(config).instrumentalSupported && <Radio.Group aria-label="音乐类型" value={musicInstrumentalForConfig(config) ? "true" : "false"} options={[{ value: "false", label: "歌曲" }, { value: "true", label: "纯音乐" }]} onChange={(event) => onConfigChange("audioInstrumental", event.target.value)} />}
                     <p className="text-xs leading-5" style={{ color: theme.node.muted }}>
-                        在提示词中描述曲风、情绪、乐器和人声要求。仅支持纯文本，音乐时长与格式由模型决定。
+                        写下你想要的曲风、心情和乐器，歌曲也可以描述演唱方式。生成需要几分钟。
                     </p>
                 </section>
             </ImageSettingsTheme>

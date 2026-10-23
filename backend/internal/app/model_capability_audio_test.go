@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 	"yingce/backend/internal/model"
 	"yingce/backend/internal/protocol"
 )
@@ -98,7 +100,7 @@ func TestKacangSunoStoresTwoTracksWithoutDuplicatePrimary(t *testing.T) {
 
 func TestKacangSunoAudioCapabilities(t *testing.T) {
 	profile := DefaultModelCapabilityConfigForModel("kacang-suno", "suno")
-	if profile.Audio == nil || profile.Audio.TaskCount != 1 || profile.Audio.OutputCount != 2 || profile.Audio.Streaming {
+	if profile.Audio == nil || profile.Audio.TaskCount != 1 || profile.Audio.OutputCount != 0 || profile.Audio.Streaming || profile.Audio.Music == nil || profile.Audio.Music.RequestTimeoutSeconds != 600 {
 		t.Fatalf("default profile = %#v", profile)
 	}
 	normalized, err := NormalizeModelCapabilityConfigForModel("audio", "kacang-suno", "suno", nil)
@@ -117,7 +119,7 @@ func TestKacangSunoAudioCapabilities(t *testing.T) {
 		}
 	}
 	spec, err := CapabilitySpecFromModelCapabilityConfig(normalized, "audio")
-	if err != nil || len(spec.Inputs) != 3 || len(spec.Options) != 0 {
+	if err != nil || len(spec.Inputs) != 3 || len(spec.Options) != 1 {
 		t.Fatal("music reference/option constraints missing")
 	}
 	for _, kind := range []string{"image", "video", "audio"} {
@@ -128,8 +130,72 @@ func TestKacangSunoAudioCapabilities(t *testing.T) {
 }
 
 func TestKacangSunoIncompleteOutputsFailBeforeDownload(t *testing.T) {
-	_, err := finishProtocolResult(context.Background(), providerConfig{InterfaceType: "kacang-suno"}, "audio", "", &protocol.Result{Audios: []protocol.MediaReference{{URL: "https://media.example/one.mp3"}}}, defaultVideoPollPolicy())
+	profile := DefaultModelCapabilityConfigForModel("kacang-suno", "suno")
+	profile.Audio.OutputCount = 2
+	_, err := finishProtocolResult(context.Background(), providerConfig{InterfaceType: "kacang-suno", CapabilityConfig: profile}, "audio", "", &protocol.Result{Audios: []protocol.MediaReference{{URL: "https://media.example/one.mp3"}}}, defaultVideoPollPolicy())
 	if err == nil {
 		t.Fatal("one track incorrectly accepted as complete music result")
+	}
+}
+
+func TestMusicDefaultsSwitchAndExecutionDeadline(t *testing.T) {
+	profile := DefaultModelCapabilityConfigForModel("kacang-suno", "suno-v6")
+	input := canvasGenerationInput{Mode: "audio", Config: providerConfig{InterfaceType: "kacang-suno", Model: "suno-v6", CapabilityConfig: profile}, Prompt: "开心的中文歌曲"}
+	for _, tc := range []struct {
+		value string
+		want  bool
+	}{{"", false}, {"false", false}, {"true", true}} {
+		input.Config.AudioInstrumental = tc.value
+		r := protocolRequestFromInput(input)
+		if r.Extra["audioInstrumental"] != tc.want || r.Extra["audioPromptMaxChars"] != 3000 {
+			t.Fatalf("music params = %#v", r.Extra)
+		}
+	}
+	profile.Audio.Music.DefaultInstrumental = true
+	input.Config.AudioInstrumental = ""
+	if protocolRequestFromInput(input).Extra["audioInstrumental"] != true {
+		t.Fatal("model default ignored")
+	}
+	profile.Audio.Music.DefaultInstrumental = false
+	profile.Audio.Music.InstrumentalSupported = false
+	if _, ok := protocolRequestFromInput(input).Extra["audioInstrumental"]; ok {
+		t.Fatal("unsupported switch sent")
+	}
+	profile.Audio.Music.PromptMaxChars = 5000
+	profile.Audio.Music.RequestTimeoutSeconds = 900
+	if _, err := normalizeAudioCapabilityConfig("kacang-suno", profile); err != nil {
+		t.Fatal("compatible model configuration rejected", err)
+	}
+	encoded, _ := json.Marshal(input)
+	if got := taskExecutionTimeout(&model.Task{Type: "canvas_audio", InputJSON: string(encoded)}, defaultRuntimePolicy().Task); got != 18*time.Minute {
+		t.Fatalf("music deadline=%v", got)
+	}
+	if got := taskExecutionTimeout(&model.Task{Type: "canvas_audio", InputJSON: `{"config":{"interfaceType":"openai-audio"}}`}, defaultRuntimePolicy().Task); got != 8*time.Minute {
+		t.Fatalf("other speech deadline changed: %v", got)
+	}
+}
+
+func TestMusicVariableTrackCountAndInvalidAudio(t *testing.T) {
+	for _, count := range []int{1, 2, 3} {
+		t.Run(string(rune('0'+count)), func(t *testing.T) {
+			refs := make([]protocol.MediaReference, count)
+			for i := range refs {
+				refs[i].DataURL = "data:audio/mpeg;base64," + base64.StdEncoding.EncodeToString(append([]byte("ID3"), byte(i), 0, 0, 0, 0, 0, 0))
+			}
+			result, err := finishProtocolResult(context.Background(), providerConfig{InterfaceType: "kacang-suno"}, "audio", "", &protocol.Result{Audios: refs}, defaultVideoPollPolicy())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if count == 1 && result["audio"] == nil {
+				t.Fatal("single track missing")
+			}
+			if count > 1 && len(result["audios"].([]interface{})) != count {
+				t.Fatal("tracks dropped")
+			}
+		})
+	}
+	_, err := finishProtocolResult(context.Background(), providerConfig{InterfaceType: "kacang-suno"}, "audio", "", &protocol.Result{Audios: []protocol.MediaReference{{DataURL: "data:audio/mpeg;base64," + base64.StdEncoding.EncodeToString([]byte("<html>failed</html>"))}}}, defaultVideoPollPolicy())
+	if err == nil {
+		t.Fatal("fake audio accepted")
 	}
 }

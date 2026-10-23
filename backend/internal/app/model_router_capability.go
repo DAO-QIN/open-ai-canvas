@@ -531,6 +531,8 @@ func capabilityOptionLabel(name string) string {
 		return "语速"
 	case "audioInstructions":
 		return "朗读指令"
+	case "audioInstrumental":
+		return "纯音乐"
 	default:
 		return name
 	}
@@ -658,7 +660,7 @@ func isCapabilityOptionFor(capability string, name string) bool {
 	case "video":
 		return name == "size" || name == "videoSeconds" || name == "vquality" || name == "videoGenerateAudio" || name == "videoWatermark" || name == "fpsBand"
 	case "audio":
-		return name == "audioVoice" || name == "audioFormat" || name == "audioSpeed" || name == "audioInstructions"
+		return name == "audioVoice" || name == "audioFormat" || name == "audioSpeed" || name == "audioInstructions" || name == "audioInstrumental"
 	case "text":
 		// systemPrompt 是请求内容，不是供应线路能力维度，不能参与路由匹配。
 		return false

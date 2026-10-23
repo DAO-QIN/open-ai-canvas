@@ -63,14 +63,14 @@ description: 从产品功能快速定位主要代码入口
 - `web/src/pages/admin/components/feature-availability-panel.tsx` 的「邀请有礼」开关复用版本化返利规则；`web/src/lib/promotion-policy.ts` 严格校验配置，避免缺失或异常值变成可保存的默认配置。
 - `web/src/hooks/use-promotion-overview.ts` 为用户页、账户菜单和面包屑共享按账号隔离的概览，并同步活动开关；`web/src/lib/promotion-display.ts` 区分新邀请展示与历史返利访问，关闭或暂停时不展示分享内容，无历史且无未确认转入时隐藏账户菜单入口。
 
-## 卡藏音乐
+## 文本音乐生成
 
 - `plugin-packages/kacang-audio/`：Suno 请求、错误、临时媒体链接合同；`build.py` 生成完整接口文档与可安装包。
 - `backend/internal/protocol/manifest_adapter.go`：音频 URL 及 Markdown 音乐链接解析，保持顺序并去重。
-- `backend/internal/app/model_capability_audio.go`、`channel_models.go`：音乐能力默认值、固定合同校验与保存。
-- `backend/internal/app/provider_protocol_result.go`、`resource_generated.go`：双音频结果校验、保存及兼容单音频字段，避免重复入库。
+- `backend/internal/app/model_capability_audio.go`、`channel_models.go`：音乐能力默认值、按模型配置输入上限/纯音乐/返回数量/请求等待时间及保存。
+- `backend/internal/app/provider_protocol_result.go`、`resource_generated.go`：实际多音频结果校验、保存及兼容单音频字段，避免重复入库。
 - `web/src/pages/admin/components/channel-model-editor*`：选择协议默认填充“能力与参数”。
-- `web/src/components/audio-settings-panel.tsx`、`web/src/lib/canvas/canvas-generation-task-sync.ts`：音乐参数展示与双音频画布节点同步。
+- `web/src/components/audio-settings-panel.tsx`、`web/src/lib/canvas/canvas-generation-task-sync.ts`：歌曲/纯音乐选择与实际多音频画布节点同步。
 - `backend/internal/protocol/kacang_audio_test.go`、`backend/internal/app/model_capability_audio_test.go`、`web/test/kacang-audio.test.ts`：请求/响应、能力与入库、重复同步专项回归。
 
 ## 卡藏视频

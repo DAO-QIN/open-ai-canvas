@@ -400,6 +400,9 @@ func applyModelSpecificVideoCapability(profile *VideoCapabilityConfig, protocol 
 func CapabilitySpecFromModelCapabilityConfig(config *ModelCapabilityConfig, capability string) (CapabilitySpec, error) {
 	spec := CapabilitySpec{Version: 1, Capability: capability, Inputs: map[string]InputConstraint{}, Options: map[string]OptionConstraint{}}
 	if capability == "audio" {
+		if config != nil && config.Audio != nil && config.Audio.Music != nil && config.Audio.Music.InstrumentalSupported {
+			spec.Options["audioInstrumental"] = boolValues(true)
+		}
 		if config != nil && config.Audio != nil && (config.Audio.GenerationType == "music" || config.Audio.GenerationType == "speech") {
 			for _, kind := range []string{"image", "video", "audio"} {
 				spec.Inputs[kind] = InputConstraint{Min: 0, Max: 0}

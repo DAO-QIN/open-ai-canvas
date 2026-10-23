@@ -341,6 +341,7 @@ export type CanvasNodeMetadata = {
     audioLanguage?: string;
     audioDialect?: string;
     audioInstructions?: string;
+    audioInstrumental?: string;
     audioEmotionControlMethod?: string;
     audioEmotionRandom?: string;
     audioEmotionHappy?: string;

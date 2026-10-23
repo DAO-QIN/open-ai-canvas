@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 )
 
 // Manifest expressions are JSON values with a deliberately small set of
@@ -233,7 +234,7 @@ func evaluateManifestOperator(operator string, operand any, env map[string]any) 
 			return nil, nil
 		}
 		return items[index], nil
-	case "$len":
+	case "$len", "$utf16len":
 		value, err := evaluateManifestValue(operand, env)
 		if err != nil {
 			return nil, err
@@ -244,6 +245,9 @@ func evaluateManifestOperator(operator string, operand any, env map[string]any) 
 		case map[string]any:
 			return len(typed), nil
 		case string:
+			if operator == "$utf16len" {
+				return len(utf16.Encode([]rune(typed))), nil
+			}
 			return len([]rune(typed)), nil
 		default:
 			return 0, nil

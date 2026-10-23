@@ -4,23 +4,58 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 )
 
 func TestKacangSunoRequestAndReferences(t *testing.T) {
 	a := officialPackageAdapter(t, "kacang-audio.yingce-plugin", "kacang-suno")
-	r := GenerationRequest{Capability: CapabilityAudio, Model: "suno", Prompt: "温柔钢琴和轻柔弦乐，舒缓，纯器乐无人声", Extra: map[string]any{"audioVoice": "alloy", "audioSpeed": 1.5, "audioFormat": "wav", "temperature": 0.7}}
+	r := GenerationRequest{Capability: CapabilityAudio, Model: "suno-v6", Prompt: "温柔钢琴和轻柔弦乐，舒缓，纯器乐无人声", Extra: map[string]any{"audioInstrumental": true, "audioVoice": "alloy", "audioSpeed": 1.5, "audioFormat": "wav", "temperature": 0.7}}
 	spec, err := a.BuildCreate(context.Background(), RequestContext{Request: r})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]any{"model": "suno", "messages": []any{map[string]any{"role": "user", "content": r.Prompt}}, "n": float64(1), "stream": false}
+	want := map[string]any{"model": "suno-v6", "messages": []any{map[string]any{"role": "user", "content": r.Prompt}}, "instrumental": true, "n": float64(1), "stream": false}
 	if spec.Path != "/v1/chat/completions" || spec.Auth.Type != "bearer" || !reflect.DeepEqual(manifestTestBody(t, spec), want) {
 		t.Fatalf("request differs from supplier contract: %#v", spec)
 	}
-	for _, invalid := range []GenerationRequest{{Model: "suno", Prompt: "  "}, {Model: "other", Prompt: "music"}, {Model: "suno", Prompt: "music", Images: []MediaReference{{URL: "https://media.example/a.png"}}}, {Model: "suno", Prompt: "music", Videos: []MediaReference{{URL: "https://media.example/a.mp4"}}}, {Model: "suno", Prompt: "music", Audios: []MediaReference{{URL: "https://media.example/a.mp3"}}}} {
+	for _, invalid := range []GenerationRequest{{Model: "suno", Prompt: "  "}, {Model: "", Prompt: "music"}, {Model: "suno", Prompt: "music", Images: []MediaReference{{URL: "https://media.example/a.png"}}}, {Model: "suno", Prompt: "music", Videos: []MediaReference{{URL: "https://media.example/a.mp4"}}}, {Model: "suno", Prompt: "music", Audios: []MediaReference{{URL: "https://media.example/a.mp3"}}}} {
 		if _, err := a.BuildCreate(context.Background(), RequestContext{Request: invalid}); err == nil {
 			t.Fatalf("accepted unsupported input: %#v", invalid)
+		}
+	}
+}
+
+func TestMusicProtocolReusableModelsAndUTF16Limit(t *testing.T) {
+	a := officialPackageAdapter(t, "kacang-audio.yingce-plugin", "kacang-suno")
+	for _, name := range []string{"suno", "suno-v5", "suno-v5.5", "suno-v6", "suno-v6-mini", "suno-v6-wild", "compatible-music-model"} {
+		for _, instrumental := range []any{nil, false, true} {
+			extra := map[string]any{}
+			if instrumental != nil {
+				extra["audioInstrumental"] = instrumental
+			}
+			spec, err := a.BuildCreate(context.Background(), RequestContext{Request: GenerationRequest{Model: name, Prompt: "music", Extra: extra}})
+			if err != nil {
+				t.Fatal(name, err)
+			}
+			body := manifestTestBody(t, spec)
+			if body["model"] != name || body["instrumental"] != instrumental {
+				t.Fatalf("model or optional switch changed: %#v", body)
+			}
+		}
+	}
+	for _, tc := range []struct {
+		prompt string
+		limit  int
+		valid  bool
+	}{
+		{strings.Repeat("你", 3000), 3000, true}, {strings.Repeat("你", 3001), 3000, false},
+		{strings.Repeat("🎵", 1500), 3000, true}, {strings.Repeat("🎵", 1501), 3000, false},
+		{strings.Repeat("你", 4000), 5000, true},
+	} {
+		_, err := a.BuildCreate(context.Background(), RequestContext{Request: GenerationRequest{Model: "suno-v6", Prompt: tc.prompt, Extra: map[string]any{"audioPromptMaxChars": tc.limit}}})
+		if (err == nil) != tc.valid {
+			t.Fatalf("UTF-16 limit %d accepted=%v, want %v", tc.limit, err == nil, tc.valid)
 		}
 	}
 }

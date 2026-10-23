@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
+import { defaultAudioCapabilityConfig, defaultModelCapabilityConfig } from "@/lib/model-capabilities";
+import { musicInstrumentalForConfig } from "@/lib/audio-generation";
+import { modelPromptLengthError } from "@/lib/model-selection";
+import { createModelChannel, defaultConfig, type AiConfig } from "@/stores/use-config-store";
+import { buildNodeConfig } from "@/components/canvas/canvas-node-prompt-config";
+import { generationSpecMetadata, specFromConfig } from "@/lib/canvas/generation-contract";
 import { audioChannelCapabilityConfig, channelModelCapabilityConfigForSave, changeChannelModelCapability, initialChannelModelValues } from "@/pages/admin/components/channel-model-editor-form";
 import type { ModelProtocolDefinition } from "@/lib/model-protocols";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
@@ -17,12 +22,34 @@ const { resetGenerationTaskMetadata } = await import("@/lib/canvas/canvas-task-s
 const protocols: ModelProtocolDefinition[] = [{ value: "kacang-suno", capability: "audio", label: "卡藏 Suno 音乐", create: "POST /v1/chat/completions", contentType: "application/json", media: "url" }];
 
 describe("Kacang Suno music", () => {
+    test("song and instrumental choices survive canonical node save and reopen", () => {
+        const model = "music::suno-v6";
+        const profile = defaultModelCapabilityConfig("kacang-suno", "suno-v6");
+        const config: AiConfig = { ...defaultConfig, model, audioModel: model, channels: [createModelChannel({ id: "music", scope: "system", models: ["suno-v6"], interfaceType: "kacang-suno", modelCosts: [{ model: "suno-v6", capability: "audio", protocol: "kacang-suno", billingMode: "fixed_request", unitPriceMicrocredits: 20_000_000, capabilityConfig: profile }] })] };
+        expect(musicInstrumentalForConfig(config)).toBe(false);
+        profile.audio!.music!.defaultInstrumental = true;
+        expect(musicInstrumentalForConfig(config)).toBe(true);
+        for (const value of ["true", "false"]) {
+            const selected = { ...config, audioInstrumental: value };
+            const spec = specFromConfig("audio", "祝你今天心情愉快", selected);
+            expect(spec.options.audioInstrumental).toBe(value === "true");
+            const node: CanvasNodeData = { id: "music", type: CanvasNodeType.Audio, title: "开心音乐", position: { x: 0, y: 0 }, width: 420, height: 180, metadata: generationSpecMetadata(spec) };
+            const reopened = buildNodeConfig(config, node, "audio", { capability: "audio" });
+            expect(reopened.audioInstrumental).toBe(value);
+            expect(musicInstrumentalForConfig(reopened)).toBe(value === "true");
+        }
+        expect(modelPromptLengthError(config, model, "audio", "🎵".repeat(1500))).toBe("");
+        expect(modelPromptLengthError(config, model, "audio", "🎵".repeat(1501))).toContain("3000");
+        profile.audio!.music!.instrumentalSupported = false;
+        expect(musicInstrumentalForConfig({ ...config, audioInstrumental: "true" })).toBe(false);
+    });
+
     test("protocol selection fills music defaults and keeps prices and disabled state", () => {
         const initial = initialChannelModelValues(null, protocols);
         initial.enabled = false;
         initial.priceTiers[0].unitPrice = 23;
         const selected = changeChannelModelCapability({ ...initial, capability: "audio", protocol: "kacang-suno", modelKey: "suno" }, protocols);
-        expect(selected.capabilityConfig).toEqual({ version: 1, audio: { generationType: "music", taskCount: 1, outputCount: 2, streaming: false } });
+        expect(selected.capabilityConfig).toEqual({ version: 1, audio: defaultAudioCapabilityConfig("kacang-suno") });
         expect(selected.enabled).toBe(false);
         expect(selected.priceTiers[0].unitPrice).toBe(23);
         expect(channelModelCapabilityConfigForSave(selected)).toEqual(selected.capabilityConfig);
@@ -53,7 +80,7 @@ describe("Kacang Suno music", () => {
         selected.priceTiers[0].priceConfigured = false;
         selected.priceTiers[0].enabled = false;
         const profile = channelModelCapabilityConfigForSave(selected);
-        expect(profile?.audio).toEqual({ generationType: "music", taskCount: 1, outputCount: 2, streaming: false });
+        expect(profile?.audio).toEqual(defaultAudioCapabilityConfig("kacang-suno"));
         expect(selected.enabled).toBe(false);
         expect(selected.priceTiers[0].priceConfigured).toBe(false);
         expect(selected.priceTiers[0].enabled).toBe(false);

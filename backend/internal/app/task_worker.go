@@ -378,6 +378,15 @@ func taskExecutionTimeout(task *model.Task, policy RuntimeTaskPolicy) time.Durat
 	if task == nil {
 		return time.Duration(policy.DefaultTimeoutMinutes) * time.Minute
 	}
+	if task.Type == "canvas_audio" {
+		var input canvasGenerationInput
+		if json.Unmarshal([]byte(task.InputJSON), &input) == nil {
+			if timeout := musicRequestTimeout(input.Config); timeout > 0 {
+				// Music generation occupies one request; leave time to save its short-lived links.
+				return max(taskExecutionTimeoutWithPolicy(task.Type, policy), timeout+3*time.Minute)
+			}
+		}
+	}
 	return taskExecutionTimeoutWithPolicy(task.Type, policy)
 }
 

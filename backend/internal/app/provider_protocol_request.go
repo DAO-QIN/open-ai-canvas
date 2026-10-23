@@ -60,6 +60,16 @@ func protocolRequestFromInput(input canvasGenerationInput) protocol.GenerationRe
 			"count":             input.Config.Count,
 		},
 	}
+	if input.Mode == "audio" && input.Config.InterfaceType == "kacang-suno" {
+		music := defaultAudioCapabilityConfig(input.Config.InterfaceType).Music
+		if input.Config.CapabilityConfig != nil && input.Config.CapabilityConfig.Audio != nil && input.Config.CapabilityConfig.Audio.Music != nil {
+			music = input.Config.CapabilityConfig.Audio.Music
+		}
+		request.Extra["audioPromptMaxChars"] = music.PromptMaxChars
+		if music.InstrumentalSupported {
+			request.Extra["audioInstrumental"] = parseBool(input.Config.AudioInstrumental, music.DefaultInstrumental)
+		}
+	}
 	for _, message := range input.TextHistory {
 		role := strings.ToLower(strings.TrimSpace(message.Role))
 		if role != "user" && role != "assistant" && role != "system" {

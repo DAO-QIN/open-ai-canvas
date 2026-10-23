@@ -266,6 +266,7 @@ export function useCanvasGenerationExecutor({
                                 : undefined,
                         operation: sourceNode?.metadata?.videoEditOperation,
                         audioInstructions: generationConfig.audioInstructions,
+                        audioInstrumental: generationConfig.audioInstrumental,
                         audioEmotionControlMethod: generationConfig.audioEmotionControlMethod,
                         audioEmotionRandom: generationConfig.audioEmotionRandom,
                         audioEmotionHappy: generationConfig.audioEmotionHappy,

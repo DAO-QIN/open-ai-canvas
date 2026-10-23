@@ -16,7 +16,31 @@ import (
 	"yingce/backend/internal/model"
 )
 
+func musicRequestTimeout(config providerConfig) time.Duration {
+	if config.InterfaceType != "kacang-suno" {
+		return 0
+	}
+	profile, err := normalizeAudioCapabilityConfig(config.InterfaceType, config.CapabilityConfig)
+	if err != nil {
+		return 0
+	}
+	return time.Duration(profile.Audio.Music.RequestTimeoutSeconds) * time.Second
+}
+
 func runAudioTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
+	if input.Config.InterfaceType == "kacang-suno" {
+		profile, err := normalizeAudioCapabilityConfig(input.Config.InterfaceType, input.Config.CapabilityConfig)
+		if err != nil {
+			return nil, err
+		}
+		input.Config.CapabilityConfig = profile
+		if value := input.Config.AudioInstrumental; value != "" && value != "true" && value != "false" {
+			return nil, errors.New("请选择歌曲或纯音乐")
+		}
+		if !profile.Audio.Music.InstrumentalSupported && input.Config.AudioInstrumental == "true" {
+			return nil, errors.New("当前模型不支持纯音乐选项")
+		}
+	}
 	if _, ok := declarativeProtocolAdapterForContext(ctx, input.Config.InterfaceType); ok {
 		return runDeclarativeProtocolTask(ctx, input)
 	}
