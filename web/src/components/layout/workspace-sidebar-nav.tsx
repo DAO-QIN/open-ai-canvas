@@ -44,11 +44,7 @@ function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
 function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
     const groups: WorkspaceNavGroup[] = [
         {
-            items: [
-                { ...toolItem("create", "/"), id: "home", title: "创作" },
-                toolItem("projects", "/projects"),
-                toolItem("canvas", "/canvas"),
-            ],
+            items: [{ ...toolItem("create", "/"), id: "home", title: "创作" }, ...(features.shortDramaEnabled ? [{ ...toolItem("projects", "/projects"), title: "项目" }] : []), { ...toolItem("canvas", "/canvas"), title: "画布" }],
         },
         {
             heading: "工具",
@@ -261,16 +257,7 @@ function NavItem({
                     {rowContent}
                 </Link>
             ) : (
-                <button
-                    type="button"
-                    className={rowClassName}
-                    data-nav-id={item.id}
-                    style={rowStyle}
-                    aria-label={item.fullTitle || item.title}
-                    title={item.fullTitle || item.title}
-                    onClick={handleClick}
-                    aria-expanded={hasChildren ? isOpen : undefined}
-                >
+                <button type="button" className={rowClassName} data-nav-id={item.id} style={rowStyle} aria-label={item.fullTitle || item.title} title={item.fullTitle || item.title} onClick={handleClick} aria-expanded={hasChildren ? isOpen : undefined}>
                     {activePill}
                     {rowContent}
                 </button>

@@ -458,7 +458,7 @@ export function useCanvasMediaTools({
                 try {
                     const result = await ensureCanvasNodeAsset({ canvasId: projectId, domainProjectId, node: audioNode, source: "canvas-manual" });
                     setNodes((current) => current.map((item) => (item.id === audioNodeId ? { ...item, metadata: { ...item.metadata, assetId: result.assetId } } : item)));
-                    progress.done(result.linkedToProject ? "声音已提取并加入素材库与项目资产" : "声音已提取并加入素材库");
+                    progress.done(result.syncPending ? (domainProjectId ? "声音已保存到本地，云端项目资产正在自动同步" : "声音已保存到本地，云端素材正在自动同步") : result.linkedToProject ? "声音已提取并加入素材库与项目资产" : "声音已提取并加入素材库");
                 } catch (assetError) {
                     progress.done(`声音已提取并生成音频节点，素材库写入失败：${assetError instanceof Error ? assetError.message : "未知错误"}`);
                 }
@@ -2028,58 +2028,80 @@ export function useCanvasMediaTools({
         ],
     );
 
-    const openVideoEnhance = useCallback((node: CanvasNodeData) => {
-        if (!node.metadata?.storageKey && !node.metadata?.content) {
-            message.warning("视频节点为空，无法画质增强");
-            return;
-        }
-        if (!listVideoEnhanceModels(effectiveConfig).length) {
-            message.warning("管理员尚未配置可用的画质增强模型");
-            return;
-        }
-        setHoveredNodeId(null);
-        setToolbarNodeId(null);
-        setEnhanceDialogNodeId(node.id);
-    }, [effectiveConfig, message, setHoveredNodeId, setToolbarNodeId]);
+    const openVideoEnhance = useCallback(
+        (node: CanvasNodeData) => {
+            if (!node.metadata?.storageKey && !node.metadata?.content) {
+                message.warning("视频节点为空，无法画质增强");
+                return;
+            }
+            if (!listVideoEnhanceModels(effectiveConfig).length) {
+                message.warning("管理员尚未配置可用的画质增强模型");
+                return;
+            }
+            setHoveredNodeId(null);
+            setToolbarNodeId(null);
+            setEnhanceDialogNodeId(node.id);
+        },
+        [effectiveConfig, message, setHoveredNodeId, setToolbarNodeId],
+    );
 
     // 画质增强：在源节点右侧创建 loading 视频节点并连线，后端任务完成后由统一结果回写填充。
-    const enhanceVideoNode = useCallback(async (node: CanvasNodeData, params: VideoEnhanceParams) => {
-        setEnhanceDialogNodeId(null);
-        const source = videoEnhanceSourceReference(node);
-        const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
-        const childId = nanoid();
-        const videoEnhance = { sourceNodeId: node.id, model: params.model, resolution: params.resolution, fps: params.fps, bitrateLevel: params.bitrateLevel, bitrate: params.bitrate };
-        setRunningNodeId(childId);
-        setNodes((current) => [...current, {
-            id: childId,
-            type: CanvasNodeType.Video,
-            title: `${node.title || "视频"} · 画质增强 ${params.resolution.toUpperCase()}`,
-            position: { x: node.position.x + node.width + 96, y: node.position.y },
-            width: spec.width,
-            height: spec.height,
-            metadata: { prompt: `画质增强（${params.resolution}）`, status: NODE_STATUS_LOADING, generationMode: "video", model: params.model, vquality: params.resolution, videoEditOperation: VIDEO_ENHANCE_OPERATION, videoEnhance, taskCreatedAt: new Date().toISOString() },
-        }]);
-        setConnections((current) => [...current, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-        setSelectedNodeIds(new Set([childId]));
-        setSelectedConnectionId(null);
-        const controller = startGenerationRequest(childId, node.id, childId);
-        let taskId: string | undefined;
-        try {
-            await runCanvasGenerationTaskToConsumer(
-                videoEnhanceTaskInput({ config: effectiveConfig, params, source, sourceNodeId: node.id, projectId, nodeId: childId, signal: controller.signal }),
-                { bindTask: (task) => { taskId = task.id; bindGenerationTask(childId, task); }, consumeTask: (task) => applyGenerationTaskResult(childId, task) },
-            );
-        } catch (error) {
-            if (!controller.signal.aborted && !isGenerationCanceled(error)) {
-                const details = generationErrorMessage(error);
-                message.error(details);
-                if (!isCanvasGenerationDurableAckError(error)) setNodes((current) => current.map((item) => item.id === childId && item.metadata?.taskId === taskId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: details } } : item));
+    const enhanceVideoNode = useCallback(
+        async (node: CanvasNodeData, params: VideoEnhanceParams) => {
+            setEnhanceDialogNodeId(null);
+            const source = videoEnhanceSourceReference(node);
+            const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
+            const childId = nanoid();
+            const videoEnhance = { sourceNodeId: node.id, model: params.model, resolution: params.resolution, fps: params.fps, bitrateLevel: params.bitrateLevel, bitrate: params.bitrate };
+            setRunningNodeId(childId);
+            setNodes((current) => [
+                ...current,
+                {
+                    id: childId,
+                    type: CanvasNodeType.Video,
+                    title: `${node.title || "视频"} · 画质增强 ${params.resolution.toUpperCase()}`,
+                    position: { x: node.position.x + node.width + 96, y: node.position.y },
+                    width: spec.width,
+                    height: spec.height,
+                    metadata: {
+                        prompt: `画质增强（${params.resolution}）`,
+                        status: NODE_STATUS_LOADING,
+                        generationMode: "video",
+                        model: params.model,
+                        vquality: params.resolution,
+                        videoEditOperation: VIDEO_ENHANCE_OPERATION,
+                        videoEnhance,
+                        taskCreatedAt: new Date().toISOString(),
+                    },
+                },
+            ]);
+            setConnections((current) => [...current, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
+            setSelectedNodeIds(new Set([childId]));
+            setSelectedConnectionId(null);
+            const controller = startGenerationRequest(childId, node.id, childId);
+            let taskId: string | undefined;
+            try {
+                await runCanvasGenerationTaskToConsumer(videoEnhanceTaskInput({ config: effectiveConfig, params, source, sourceNodeId: node.id, projectId, nodeId: childId, signal: controller.signal }), {
+                    bindTask: (task) => {
+                        taskId = task.id;
+                        bindGenerationTask(childId, task);
+                    },
+                    consumeTask: (task) => applyGenerationTaskResult(childId, task),
+                });
+            } catch (error) {
+                if (!controller.signal.aborted && !isGenerationCanceled(error)) {
+                    const details = generationErrorMessage(error);
+                    message.error(details);
+                    if (!isCanvasGenerationDurableAckError(error))
+                        setNodes((current) => current.map((item) => (item.id === childId && item.metadata?.taskId === taskId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: details } } : item)));
+                }
+            } finally {
+                finishGenerationRequest(childId, controller);
+                setRunningNodeId(null);
             }
-        } finally {
-            finishGenerationRequest(childId, controller);
-            setRunningNodeId(null);
-        }
-    }, [applyGenerationTaskResult, bindGenerationTask, effectiveConfig, finishGenerationRequest, message, projectId, setConnections, setNodes, setRunningNodeId, setSelectedConnectionId, setSelectedNodeIds, startGenerationRequest]);
+        },
+        [applyGenerationTaskResult, bindGenerationTask, effectiveConfig, finishGenerationRequest, message, projectId, setConnections, setNodes, setRunningNodeId, setSelectedConnectionId, setSelectedNodeIds, startGenerationRequest],
+    );
 
     return {
         enhanceDialogNodeId,

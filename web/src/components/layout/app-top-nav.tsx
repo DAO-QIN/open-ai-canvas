@@ -10,6 +10,7 @@ import { WorkspaceTopBar } from "@/components/layout/workspace-top-bar";
 import { WorkspaceTopBarExtensionProvider } from "@/components/layout/workspace-top-bar-extension";
 import { WorkspaceWalletHost } from "@/components/layout/workspace-wallet-modal";
 import { WorkspaceMobileNav } from "@/components/layout/workspace-mobile-nav";
+import { FloatingFeedbackWidget } from "@/components/feedback/floating-feedback-widget";
 import { cn } from "@/lib/utils";
 import { isSpatialWorkbenchPath } from "@/lib/workspace-routes";
 
@@ -142,13 +143,11 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
                                 aria-modal={mobileViewport && mobileSidebarExpanded ? true : undefined}
                                 aria-label="导航"
                                 inert={mobileViewport && !mobileSidebarExpanded ? true : undefined}
-                                className={cn(
-                                    "app-workspace-sidebar flex h-full shrink-0 flex-col overflow-hidden",
-                                    mobileSidebarExpanded && "is-mobile-expanded",
-                                    sidebarCollapsed && "is-collapsed",
-                                )}
+                                className={cn("app-workspace-sidebar flex h-full shrink-0 flex-col overflow-hidden", mobileSidebarExpanded && "is-mobile-expanded", sidebarCollapsed && "is-collapsed")}
                             >
-                                <button type="button" className="app-workspace-sidebar-mobile-close" aria-label="关闭导航" onClick={() => setMobileSidebarExpanded(false)}><X aria-hidden="true" /></button>
+                                <button type="button" className="app-workspace-sidebar-mobile-close" aria-label="关闭导航" onClick={() => setMobileSidebarExpanded(false)}>
+                                    <X aria-hidden="true" />
+                                </button>
                                 <WorkspaceSidebarNav
                                     collapsed={sidebarCollapsed}
                                     onNavigate={handleNavClick}
@@ -166,11 +165,16 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
                     </div>
 
                     {!hideChrome ? <WorkspaceMobileNav hidden={mobileSidebarExpanded} /> : null}
-                    {paletteOpen ? <Suspense fallback={null}><WorkspaceCommandPalette open onClose={() => setPaletteOpen(false)} /></Suspense> : null}
+                    {paletteOpen ? (
+                        <Suspense fallback={null}>
+                            <WorkspaceCommandPalette open onClose={() => setPaletteOpen(false)} />
+                        </Suspense>
+                    ) : null}
                 </div>
             </WorkspaceTopBarExtensionProvider>
             <WorkspaceWalletHost />
             <ModelSetupGuide hidden={pathname === "/login" || pathname === "/register" || pathname.startsWith("/admin")} />
+            {!hideChrome && pathname !== "/login" && pathname !== "/register" ? <FloatingFeedbackWidget /> : null}
         </>
     );
 }

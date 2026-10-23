@@ -54,7 +54,7 @@ func TestAgentMemoryProposalMigrationPreservesExistingMemories(t *testing.T) {
 		t.Fatal("upgrade changed the existing migration ledger")
 	}
 	status, err := ReadSchemaStatus(db)
-	if err != nil || !status.Ready || status.Current != 62 {
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
 		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
 	}
 	for _, table := range []any{&model.AgentMemoryProposal{}, &model.AgentMemoryRevision{}} {
