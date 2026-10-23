@@ -17,8 +17,8 @@ test("运行中不再锁死输入框，发送走插话而不是新建轮次", as
     expect(panel).toContain('interjection: "sent"');
 
     // 连接或记录未确认仅禁止发送，不冻结消息草稿输入。
-    expect(panel).toContain("submitDisabled={otherAgentRunning && !pendingSubmission.current?.request");
-    const composer = panel.match(/<AgentChatComposer[\s\S]*?submitDisabled=\{([^\n]+)\}/)?.[1];
+    expect(panel).toMatch(/submitDisabled=\{\s*\(?otherAgentRunning && !pendingSubmission\.current\?\.request/);
+    const composer = panel.match(/<AgentChatComposer[\s\S]*?submitDisabled=\{([\s\S]*?)\}/)?.[1];
     expect(composer).toBeDefined();
     expect(composer).not.toMatch(/\bbusy\b|\brunning\b/);
     // 停止按钮由 running 驱动，发送按钮由我们自己的请求驱动，两者不再互斥

@@ -60,7 +60,7 @@ describe("Agent submission sync preflight contract", () => {
         expect(source).toContain('if (decision === "approve" && run.canvasId) {');
         expect(source).toContain("await prepareCanvasForCloudAction(run.canvasId);");
         expect(source).not.toContain("cloudNodeIds");
-        expect(source).toContain("submitDisabled={otherAgentRunning");
+        expect(source).toMatch(/submitDisabled=\{\s*\(?otherAgentRunning/);
         expect(source).toContain("重新读取记录");
         expect(source).toContain("requestSent = true;\n            const result = submission.parentRunId ? await sendAgentMessage");
         expect(source).toContain("agentSubmissionErrorTitle(cause, accepted, requestSent)");
@@ -73,7 +73,7 @@ describe("Agent submission sync preflight contract", () => {
 
     it("syncs project assets without syncing any canvas", () => {
         const source = readFileSync(resolve(import.meta.dir, "../src/services/project-asset-sync.ts"), "utf8");
-        expect(source).toContain("await saveRemoteAssetsNow([assetId]);");
+        expect(source).toContain("await saveRemoteAssetsNow([job.assetId]);");
         expect(source).not.toContain("await saveRemoteUserDataNow();");
     });
 });
