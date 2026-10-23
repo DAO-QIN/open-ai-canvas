@@ -260,12 +260,12 @@ export function ModelPicker({
                                         <strong className="truncate">{group.label}</strong>
                                         {group.scope === "我的模型" ? (
                                             <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium leading-none bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
-                                                个人渠道
+                                                个人模型
                                             </span>
                                         ) : null}
                                     </span>
                                     <small className="canvas-model-picker-brand-meta">
-                                        <span className="canvas-model-picker-brand-subtext">{group.models.length} 个{group.kind === "product" ? "渠道" : "模型"}{group.scope ? ` · ${group.scope}` : ""}</span>
+                                        <span className="canvas-model-picker-brand-subtext">{group.models.length} 个模型{group.scope ? ` · ${group.scope}` : ""}</span>
                                         <ModelRecentHealthTrack availability={groupAvailability(config, group)} />
                                     </small>
                                 </span>
@@ -283,12 +283,12 @@ export function ModelPicker({
                                         <strong className="truncate">{group.label}</strong>
                                         {group.scope === "我的模型" ? (
                                             <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium leading-none bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
-                                                个人渠道
+                                                个人模型
                                             </span>
                                         ) : null}
                                     </span>
                                     <small className="canvas-model-picker-brand-meta">
-                                        <span className="canvas-model-picker-brand-subtext">{group.models.length} 个{group.kind === "product" ? "渠道" : "模型"}{group.scope ? ` · ${group.scope}` : ""}</span>
+                                        <span className="canvas-model-picker-brand-subtext">{group.models.length} 个模型{group.scope ? ` · ${group.scope}` : ""}</span>
                                         <ModelRecentHealthTrack availability={groupAvailability(config, group)} />
                                     </small>
                                 </span>
@@ -373,13 +373,13 @@ export function ModelPicker({
                     </div>
                     <label className="model-picker-mobile-search">
                         <Search size={18} aria-hidden="true" />
-                        <input type="search" aria-label="搜索模型或渠道" placeholder="搜索模型或渠道" value={query} onChange={(event) => setQuery(event.target.value)} />
+                        <input type="search" aria-label="搜索模型" placeholder="搜索模型" value={query} onChange={(event) => setQuery(event.target.value)} />
                         {query && <button type="button" aria-label="清空模型搜索" onClick={() => setQuery("")}><X size={18} /></button>}
                     </label>
                     <p className="model-picker-mobile-count" role="status">{query ? "找到" : "全部"} {mobileOptionCount} 个选项 · {mobileGroups.length} 个分组</p>
                     <div ref={compact ? menuRef : undefined} className="model-picker-mobile-list" role="listbox" aria-label={placeholder} onKeyDown={handleMenuKeyDown}>
                         {mobileGroups.map((group) => <section key={group.key} role="group" aria-label={group.label} className="model-picker-mobile-group">
-                            <h3>{group.label}<small>{group.models.length} 个{group.kind === "product" ? "渠道" : "模型"}</small></h3>
+                            <h3>{group.label}<small>{group.models.length} 个模型</small></h3>
                             {renderModelOptions(group)}
                         </section>)}
                         {!mobileGroups.length && <div className="model-picker-mobile-empty">{query ? "没有匹配的模型，试试其他名称" : emptyModelLabel(config, capability)}</div>}
@@ -554,7 +554,7 @@ function modelMenuPrice(config: AiConfig, model: string, capability?: ModelCapab
         const tiers = cost.logicalPriceTiers || [];
         if (!tiers.length) return null;
         const matched = summary ? tiers : priceTiersForCurrentSelection(tiers, capability, config, requirements);
-        if (!summary && !matched.length) return { kind: "tiers", label: "当前规格无报价", compactLabel: "当前规格无报价", title: "请调整参数，或选择支持当前规格的渠道" };
+        if (!summary && !matched.length) return { kind: "tiers", label: "当前规格无报价", compactLabel: "当前规格无报价", title: "请调整参数，或选择支持当前规格的模型" };
         return channelTierPriceSummary(matched.length ? matched : tiers, tiers, capability);
     }
     if (cost.billingMode === "token") {
