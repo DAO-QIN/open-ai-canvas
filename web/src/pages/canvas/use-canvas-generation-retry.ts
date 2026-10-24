@@ -6,6 +6,7 @@ import { nodeGenerationPrompt } from "@/lib/canvas/generation-contract";
 import { imageLayerProviderMetadata, layerDecompositionConfig, supportsExperimentalLayerExtraction, supportsLayerDecomposition } from "@/lib/canvas/canvas-image-layers";
 import { imageLayerOutputSize, imageLayerRemovalPrompt } from "@/lib/canvas/canvas-image-layer-plan";
 import { extractImageLayerFromSource } from "@/services/canvas-image-layer-source";
+import { prepareImageLayerRequest } from "@/services/canvas-image-layer-adaptation";
 import { buildSourceImageLayerNodeResult } from "@/lib/canvas/canvas-generation-task-sync";
 import { isCanvasGenerationDurableAckError, prepareCanvasMediaNodeAsset } from "@/services/canvas-generation-consumer";
 import { runGenerationConsumer } from "@/services/generation-consumer-lifecycle";
@@ -154,7 +155,8 @@ export function useCanvasGenerationRetry({
                 if ((!source?.metadata?.content && (removing || !extraction.source)) || !extraction.canvas) { message.error("本层源图或画布尺寸已丢失，无法单独重试"); return; }
                 const model = removing ? extraction.backgroundRemovalModel || node.metadata.model : node.metadata.model;
                 if (!model) { message.error("本层未保存可用模型，请重新从源图规划"); return; }
-                const config = layerDecompositionConfig(buildGenerationConfig(effectiveConfig, node, "image"), model, { size: imageLayerOutputSize(effectiveConfig, model, extraction.canvas) });
+                const baseConfig = buildGenerationConfig(effectiveConfig, node, "image");
+                const config = layerDecompositionConfig(baseConfig, model, { size: imageLayerOutputSize(baseConfig, model, extraction.canvas) });
                 config.transparentBackground = extraction.index > 0 ? "true" : "false";
                 if (!config.size || !supportsExperimentalLayerExtraction(config, model) || !isAiConfigReady(config, model)) { message.error("本层模型无法接收源图或不支持原图比例，请重新选择模型规划"); return; }
                 try {
@@ -176,9 +178,11 @@ export function useCanvasGenerationRetry({
                         return;
                     }
                     retryTaskId = undefined;
-                    setNodes((current) => current.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, ...buildImageGenerationMetadata("edit", config, 1, [reference]), prompt, status: "loading", errorDetails: undefined, taskId: undefined, layerExtraction: { ...extraction, phase: removing ? "remove-background" : "extract", rejectedTaskId: undefined } } } : item));
+                    const prepared = await prepareImageLayerRequest(reference, config, extraction.canvas, prompt, controller.signal);
+                    if (!nodesRef.current.some((item) => item.id === node.id)) throw new DOMException("图层节点已删除", "AbortError");
+                    setNodes((current) => current.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, ...buildImageGenerationMetadata("edit", config, 1, [reference]), prompt, status: "loading", errorDetails: undefined, taskId: undefined, layerExtraction: { ...extraction, phase: removing ? "remove-background" : "extract", canvasTransform: prepared.transform, rejectedTaskId: undefined } } } : item));
                     const retryContext = sourceTask ? await createGenerationRetryContext(sourceTask.id, node.metadata.attemptGroupId) : {};
-                    await runCanvasGenerationTaskToConsumer({ projectId, nodeId: node.id, mode: "image", prompt, config, referenceImages: [reference], signal: controller.signal, ...retryContext, metadata: { retry: true, sourceNodeId: extraction.sourceNodeId, edit: removing ? "layer-background-removal" : "layer-extraction", ...imageLayerProviderMetadata(config, extraction.index) } }, { bindTask: (task) => { retryTaskId = task.id; bindGenerationTask(node.id, task); }, consumeTask: (task) => applyGenerationTaskResult(node.id, task) });
+                    await runCanvasGenerationTaskToConsumer({ projectId, nodeId: node.id, mode: "image", prompt: prepared.prompt, config, referenceImages: [prepared.reference], signal: controller.signal, ...retryContext, metadata: { retry: true, sourceNodeId: extraction.sourceNodeId, edit: removing ? "layer-background-removal" : "layer-extraction", layerCanvasTransform: prepared.transform, ...imageLayerProviderMetadata(config, extraction.index) } }, { bindTask: (task) => { retryTaskId = task.id; bindGenerationTask(node.id, task); }, consumeTask: (task) => applyGenerationTaskResult(node.id, task) });
                     // 刷新后的手动恢复一次只发起一项付费调用，后续去背景由用户继续。
                     setNodes((current) => current.map((item) => item.id === node.id && item.metadata?.layerExtraction?.phase === "background-removal-required" ? { ...item, metadata: { ...item.metadata, status: "error", errorDetails: "提取已完成，需要去背景；点击重新生成只调用本层去背景模型" } } : item));
                 } catch (error) {

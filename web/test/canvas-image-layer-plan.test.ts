@@ -312,14 +312,14 @@ describe("通用图层规划", () => {
         const profile = { ...image, image: { ...image.image!, size: { parameter: "size" as const, values: ["1:1", "16:9", "auto"], default: "1:1", allowCustom: false } } };
         const outputConfig = { ...config, channels: [{ ...channel, modelCosts: channel.modelCosts!.map((cost) => (cost.model === "editor" ? { ...cost, capabilityConfig: profile } : cost)) }] };
         expect(imageLayerOutputSize(outputConfig, "models::editor", { width: 731, height: 412 })).toBe("16:9");
-        expect(imageLayerOutputSize(outputConfig, "models::editor", { width: 997, height: 700 })).toBe("auto");
+        expect(imageLayerOutputSize(outputConfig, "models::editor", { width: 997, height: 700 })).toBe("16:9");
         const fixed = {
             ...outputConfig,
             channels: [
                 { ...outputConfig.channels[0], modelCosts: outputConfig.channels[0].modelCosts!.map((cost) => ({ ...cost, capabilityConfig: { ...profile, image: { ...profile.image, size: { ...profile.image.size, values: ["1:1", "16:9"] } } } })) },
             ],
         };
-        expect(imageLayerOutputSize(fixed, "models::editor", { width: 997, height: 700 })).toBe("");
+        expect(imageLayerOutputSize(fixed, "models::editor", { width: 997, height: 700 })).toBe("16:9");
         expect(imageLayerOutputSize(outputConfig, "models::editor")).toBe("");
         const custom = {
             ...outputConfig,

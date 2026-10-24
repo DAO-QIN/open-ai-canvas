@@ -64,6 +64,7 @@ import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
 import { isCanvasGenerationDurableAckError, prepareCanvasMediaNodeAsset } from "@/services/canvas-generation-consumer";
 import { runGenerationConsumer } from "@/services/generation-consumer-lifecycle";
 import { runImageLayerExtraction } from "@/services/canvas-image-layer-extraction";
+import { prepareImageLayerRequest } from "@/services/canvas-image-layer-adaptation";
 import { inspectImageLayer } from "@/services/canvas-image-layer-compositor";
 import { calibrateImageLayerPlan } from "@/services/canvas-image-layer-source";
 import { prepareImageLayerPlanningReference, readImageLayerPlanningHistory } from "@/services/canvas-image-layer-planning";
@@ -1375,16 +1376,14 @@ export function useCanvasMediaTools({
                 if (controller.signal.aborted || !nodesRef.current.some((item) => item.id === taskNodeId)) throw new DOMException("Aborted", "AbortError");
                 const liveSource = nodesRef.current.find((item) => item.id === node.id);
                 if (!liveSource || liveSource.metadata?.content !== node.metadata.content || liveSource.metadata?.storageKey !== node.metadata.storageKey) throw new Error("源图已更改或删除，请重新发起拆层");
+                const removalBaseConfig = payload.backgroundRemovalModel ? { ...baseGenerationConfig, ...defaultImageParamsForModel(baseGenerationConfig, payload.backgroundRemovalModel) } : undefined;
                 const removalConfig =
                     hasGeneratedObjects && payload.backgroundRemovalModel
                         ? layerDecompositionConfig(
-                              {
-                                  ...baseGenerationConfig,
-                                  ...defaultImageParamsForModel(baseGenerationConfig, payload.backgroundRemovalModel),
-                              },
+                              removalBaseConfig!,
                               payload.backgroundRemovalModel,
                               {
-                                  size: imageLayerOutputSize(baseGenerationConfig, payload.backgroundRemovalModel, sourceCanvas),
+                                  size: imageLayerOutputSize(removalBaseConfig!, payload.backgroundRemovalModel, sourceCanvas),
                               },
                           )
                         : undefined;
@@ -1586,6 +1585,8 @@ export function useCanvasMediaTools({
                         },
                         runStage: async ({ index, stage, prompt: stagePrompt, config: stageConfig, reference, canvas }) => {
                             const targetId = requests[index].nodeId;
+                            const prepared = await prepareImageLayerRequest(reference, stageConfig, canvas!, stagePrompt, controller.signal);
+                            if (!nodesRef.current.some((item) => item.id === targetId) || !nodesRef.current.some((item) => item.id === taskNodeId)) throw new DOMException("拆层节点已删除", "AbortError");
                             setNodes((current) =>
                                 current.map((item) => {
                                     if (item.id !== targetId) return item;
@@ -1599,6 +1600,7 @@ export function useCanvasMediaTools({
                                                 ...item.metadata!.layerExtraction!,
                                                 phase: stage,
                                                 canvas,
+                                                canvasTransform: prepared.transform,
                                                 rejectedTaskId: undefined,
                                             },
                                         },
@@ -1608,18 +1610,19 @@ export function useCanvasMediaTools({
                             startGenerationRequest(targetId, node.id, taskNodeId, controller);
                             let stageTaskId: string | undefined;
                             try {
-                                return await runCanvasGenerationTaskToConsumer(
+                                const result = await runCanvasGenerationTaskToConsumer(
                                     {
                                         projectId,
                                         nodeId: targetId,
                                         mode: "image",
-                                        prompt: stagePrompt,
+                                        prompt: prepared.prompt,
                                         config: stageConfig,
-                                        referenceImages: [reference],
+                                        referenceImages: [prepared.reference],
                                         signal: controller.signal,
                                         metadata: {
                                             sourceNodeId: node.id,
                                             edit: stage === "extract" ? "layer-extraction" : "layer-background-removal",
+                                            layerCanvasTransform: prepared.transform,
                                             ...imageLayerProviderMetadata(stageConfig, index),
                                         },
                                     },
@@ -1631,6 +1634,7 @@ export function useCanvasMediaTools({
                                         consumeTask: (task) => applyGenerationTaskResult(targetId, task),
                                     },
                                 );
+                                return { ...result, canvasTransform: prepared.transform };
                             } catch (error) {
                                 if (controller.signal.aborted || isGenerationCanceled(error) || isCanvasGenerationDurableAckError(error)) throw error;
                                 setNodes((current) =>
@@ -1659,19 +1663,23 @@ export function useCanvasMediaTools({
                     });
                     return;
                 }
+                const prepared = await prepareImageLayerRequest(source, generationConfig, sourceCanvas, prompt, controller.signal);
+                if (!nodesRef.current.some((item) => item.id === taskNodeId)) throw new DOMException("拆层节点已删除", "AbortError");
+                setNodes((current) => current.map((item) => item.id === taskNodeId && item.metadata?.layerDecomposition ? { ...item, metadata: { ...item.metadata, layerDecomposition: { ...item.metadata.layerDecomposition, canvasTransform: prepared.transform } } } : item));
                 await runCanvasGenerationTaskToConsumer(
                     {
                         projectId,
                         nodeId: taskNodeId,
                         mode: "image",
-                        prompt,
+                        prompt: prepared.prompt,
                         config: generationConfig,
-                        referenceImages: [source],
+                        referenceImages: [prepared.reference],
                         signal: controller.signal,
                         metadata: {
                             sourceNodeId: node.id,
                             edit: "layer-decomposition",
                             layerDecomposition: true,
+                            layerCanvasTransform: prepared.transform,
                         },
                     },
                     {

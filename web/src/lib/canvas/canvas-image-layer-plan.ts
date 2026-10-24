@@ -200,18 +200,25 @@ export function imageLayerPlanTargets(plan: ImageLayerPlan) {
 
 /** 尺寸来自源图，不能把未支持的比例静默回退成模型默认方图。 */
 export function imageLayerOutputSize(config: AiConfig, model: string, source?: { width: number; height: number }) {
-    const size = modelCapabilityConfigFor(config, model).image?.size;
+    const profile = modelCapabilityConfigFor(config, model).image;
+    const size = profile?.size;
     if (!source || !Number.isSafeInteger(source.width) || !Number.isSafeInteger(source.height) || source.width <= 0 || source.height <= 0) return "";
     if (!size || size.parameter === "none") return "auto";
     if (source && source.width > 0 && source.height > 0) {
         const exact = `${source.width}x${source.height}`;
-        if (size.values.includes(exact)) return exact;
         if (size.allowCustom) return `${source.width}:${source.height}`;
-        const match = size.values.find((value) => {
+        const tierAliases: Record<string, string> = { low: "1k", medium: "2k", high: "4k" };
+        const tier = (profile?.resolutionUsesQuality ? tierAliases[config.quality] || config.quality : "") || size.presets?.find((preset) => preset.size === config.size)?.tier || size.defaultTier || size.presets?.find((preset) => preset.size === size.default)?.tier;
+        const tierValues = tier && size.presets?.filter((preset) => preset.tier === tier).map((preset) => size.parameter === "aspect_ratio" ? preset.ratio : preset.size);
+        const values = tierValues?.length ? size.values.filter((value) => tierValues.includes(value)) : size.values;
+        if (values.includes(exact)) return exact;
+        const candidates = values.flatMap((value, order) => {
             const pair = value.match(/^(\d+)(?::|x)(\d+)$/);
-            return pair && Math.abs(Number(pair[1]) / Number(pair[2]) / (source.width / source.height) - 1) < 0.01;
-        });
-        if (match) return match;
+            if (!pair || Number(pair[1]) <= 0 || Number(pair[2]) <= 0) return [];
+            const difference = Math.abs(Math.log(Number(pair[1]) / Number(pair[2]) / (source.width / source.height)));
+            return [{ value, difference, order }];
+        }).sort((a, b) => a.difference - b.difference || a.order - b.order);
+        if (candidates[0] && Math.exp(-candidates[0].difference) >= 0.4) return candidates[0].value;
     }
     return size.values.includes("auto") ? "auto" : "";
 }

@@ -69,7 +69,7 @@ export function CanvasNodeLayerDecompositionDialog({
     const selectedModel = generationConfig.imageModel || generationConfig.model;
     const supported = supportsLayerDecomposition(config, selectedModel) || supportsExperimentalLayerExtraction(config, selectedModel);
     const plannerError = imageLayerPlannerError(config, plannerModel);
-    const outputSize = imageLayerOutputSize(config, selectedModel, sourceSize || measuredSize);
+    const outputSize = imageLayerOutputSize(generationConfig, selectedModel, measuredSize || sourceSize);
     const outputSizeError = supported && !outputSize ? "所选模型没有支持原图比例的尺寸，或源图尺寸尚未读取；请更换模型或重新打开图片" : "";
 
     const point = (event: ReactPointerEvent<HTMLDivElement>) => {

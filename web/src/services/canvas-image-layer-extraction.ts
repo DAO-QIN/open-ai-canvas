@@ -5,6 +5,7 @@ import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import { resolveImageLayerExtractions, type ImageLayerExtraction } from "@/lib/canvas/canvas-image-layer-strategy";
 import { extractImageLayerFromSource } from "@/services/canvas-image-layer-source";
+import type { ImageLayerCanvasTransform } from "@/lib/canvas/canvas-image-layer-geometry";
 
 export type ImageLayerStage = "extract" | "remove-background";
 type LayerImage = { dataUrl: string; storageKey?: string; width?: number; height?: number; bytes?: number; mimeType?: string };
@@ -42,7 +43,7 @@ export async function runImageLayerExtraction({
     removalConfig?: AiConfig;
     signal: AbortSignal;
     assertActive(index: number): void;
-    runStage(request: ImageLayerStageRequest): Promise<{ images?: LayerImage[] }>;
+    runStage(request: ImageLayerStageRequest): Promise<{ images?: LayerImage[]; canvasTransform?: ImageLayerCanvasTransform }>;
     onProgress?(index: number, phase: ImageLayerStage | "complete" | "error"): void;
     onLocalResult?(index: number, image: LayerImage): Promise<void>;
     onLayerError?(index: number, error: unknown): void;
@@ -61,9 +62,9 @@ export async function runImageLayerExtraction({
         if (signal.aborted) throw new DOMException("拆层已停止", "AbortError");
         assertActive(index);
     };
-    const inspect = async (images: LayerImage[] | undefined) => {
+    const inspect = async ({images, canvasTransform}: {images?: LayerImage[]; canvasTransform?: ImageLayerCanvasTransform}) => {
         if (images?.length !== 1) throw new Error("逐层提取必须返回一张独立图片，不能返回拼版或多张候选图");
-        const { image, info } = await normalizeImageLayerCanvas(images[0], canvas);
+        const { image, info } = await normalizeImageLayerCanvas(images[0], canvas, canvasTransform);
         if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
         return { image, info };
     };
@@ -80,22 +81,20 @@ export async function runImageLayerExtraction({
                     onProgress?.(index, "complete");
                     return;
                 }
-                let result = await inspect((await runStage({ index, stage: "extract", prompt: layerGenerations[index].prompt, config: imageLayerGenerationConfig(config, layerGenerations[index], index), reference: source, canvas })).images);
+                let result = await inspect(await runStage({ index, stage: "extract", prompt: layerGenerations[index].prompt, config: imageLayerGenerationConfig(config, layerGenerations[index], index), reference: source, canvas }));
                 check(index);
                 if (index > 0 && !hasUsableLayerTransparency(result.info) && removalConfig) {
                     check(index);
                     onProgress?.(index, "remove-background");
                     result = await inspect(
-                        (
-                            await runStage({
+                        await runStage({
                                 index,
                                 stage: "remove-background",
                                 prompt: imageLayerRemovalPrompt(targets[index]),
                                 config: { ...removalConfig, count: "1", transparentBackground: "true" },
                                 canvas,
                                 reference: { id: `${source.id}-layer-${index}`, name: `${targets[index].slice(0, 60)}.png`, type: result.image.mimeType || "image/png", ...result.image },
-                            })
-                        ).images,
+                            }),
                     );
                     check(index);
                 }

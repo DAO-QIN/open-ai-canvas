@@ -22,13 +22,14 @@ import { experimentalLayerSignature, hasUsableLayerTransparency, imageLayerCompo
 import { composeCanvasImageLayerGroup, decodeAndComposeImageLayers, inspectImageLayer, normalizeImageLayerCanvas } from "@/services/canvas-image-layer-compositor";
 import { patchImageLayerBackground } from "@/services/canvas-image-layer-source";
 import { imageLayerTargetName } from "@/lib/canvas/canvas-image-layer-plan";
+import type { ImageLayerCanvasTransform } from "@/lib/canvas/canvas-image-layer-geometry";
 import { resetGenerationTaskMetadata } from "@/lib/canvas/canvas-task-state";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData, type CanvasNodeMetadata } from "@/types/canvas";
 
 export function generationTaskInput(task: GenerationTask) {
     if (!task.inputJson) return null;
     try {
-        return JSON.parse(task.inputJson) as { mode?: CanvasGenerationMode; metadata?: { nodeId?: string; sourceNodeId?: string; domainProjectId?: string; layerDecomposition?: boolean; edit?: string }; prompt?: string };
+        return JSON.parse(task.inputJson) as { mode?: CanvasGenerationMode; metadata?: { nodeId?: string; sourceNodeId?: string; domainProjectId?: string; layerDecomposition?: boolean; layerCanvasTransform?: ImageLayerCanvasTransform; edit?: string }; prompt?: string };
     } catch {
         return null;
     }
@@ -183,7 +184,7 @@ export async function buildGenerationTaskNodeResult(node: CanvasNodeData, task: 
         let needsRemoval = false;
         if (node.metadata?.layerExtraction) {
             if (result.images?.length !== 1) throw new Error("逐层提取必须返回一张独立图片，不能返回拼版或多张候选图");
-            const normalized = await normalizeImageLayerCanvas(result.images[0], extraction?.canvas);
+            const normalized = await normalizeImageLayerCanvas(result.images[0], extraction?.canvas, generationTaskInput(task)?.metadata?.layerCanvasTransform || extraction?.canvasTransform);
             const info = normalized.info;
             result.images[0] = normalized.image;
             if (!info.nonempty) throw new Error("提取结果是完全透明的空图层");
@@ -523,7 +524,7 @@ export async function buildImageLayerTaskResult(node: CanvasNodeData, task: Gene
             additionalNodes: [] as CanvasNodeData[],
         };
     const layerImages = [];
-    for (const image of images) layerImages.push((await normalizeImageLayerCanvas(image, node.metadata?.layerDecomposition?.canvas)).image);
+    for (const image of images) layerImages.push((await normalizeImageLayerCanvas(image, node.metadata?.layerDecomposition?.canvas, generationTaskInput(task)?.metadata?.layerCanvasTransform || node.metadata?.layerDecomposition?.canvasTransform)).image);
     const decoded = await decodeAndComposeImageLayers(layerImages);
     const size = fitImageNodeSize(decoded.width, decoded.height);
     const firstPosition = imageGenerationChildPosition(node.position, size.width, size, 0);
