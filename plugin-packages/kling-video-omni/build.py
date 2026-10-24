@@ -14,7 +14,7 @@ def select(kind, roles): return {'$filter': {'from': ordered(kind), 'as': 'media
 def urls(items): return {'$map': {'from': items, 'as': 'media', 'in': ref('media.value')}}
 def omit(value): return {'$omitEmpty': value}
 
-duration = choose({'$gt': [ref('request.output.duration'), 0]}, ref('request.output.duration'), 5)
+duration = choose({'$gt': [ref('request.output.duration'), 0]}, ref('request.output.duration'), 6)
 ratio = fallback(ref('request.output.aspectRatio'), '16:9')
 resolution = {'$lower': fallback(ref('request.output.resolution'), '720p')}
 explicit_frames = select('images', ['first_frame'])
@@ -48,8 +48,8 @@ checks.append(({'$eq': [count(unknown_duration), 0]}, '请先读取参考视频�
 output_url = {'$coalesce': [ref('response.outputs.0.content_url'), ref('response.video_url'), ref('response.url'), ref('response.result_url')]}
 absolute_output = choose({'$in': [{'$first': {'$split': [output_url, ':']}}, ['http', 'https']]}, output_url)
 provider = {
-    'id': 'kling-video-omni', 'label': '可灵全能视频',
-    'description': '文本、首帧和多素材参考视频；默认 5 秒、720p、16:9，适用于相同接口与能力范围的模型。',
+    'id': 'kling-video-omni', 'label': '卡藏 可灵视频 4.0',
+    'description': '文本、首帧和多素材参考视频；默认 6 秒、720p、16:9，适用于相同接口与能力范围的模型。',
     'capabilities': ['video'], 'scopes': ['admin.system-channel', 'user.custom-channel', 'canvas', 'creation', 'agent'],
     'requiresPublicMediaUrls': True, 'auth': {'type': 'bearer', 'field': 'apiKey'},
     'parameters': [
@@ -57,7 +57,7 @@ provider = {
         for name, typ, required, mapping, description in [
             ('model', 'string', True, 'model', '由模型配置提供，不限制模型名称；须使用相同接口和能力范围。'),
             ('prompt', 'string', True, 'prompt', '视频描述不能为空；默认宿主上限 8000 字符，管理员可调整。'),
-            ('duration', 'integer', False, 'duration_seconds', '3–30 秒，默认 5 秒。'),
+            ('duration', 'integer', False, 'duration_seconds', '3–30 秒，平台默认 6 秒；上游省略该字段时默认 5 秒。'),
             ('aspectRatio', 'string', False, 'aspect_ratio', '16:9、9:16、1:1、21:9，默认 16:9。'),
             ('resolution', 'string', False, 'resolution', '720p、1080p，默认 720p。'),
             ('images', 'media[]', False, 'first_frame_url/reference_images', '最多 10 张，首帧最多一张；单张空角色作为首帧，其他普通图片作为参考图。不支持尾帧。'),
@@ -81,15 +81,15 @@ provider = {
                  'message': fallback(ref('response.error.message'), ref('response.message')),
                  'errorPaths': ['error.code'], 'videos': absolute_output, 'resultEphemeral': True},
 }
-manifest = {'apiVersion': 'yingce.plugin/v2', 'id': 'kling-video-omni', 'name': '可灵全能视频', 'version': '1.0.0',
+manifest = {'apiVersion': 'yingce.plugin/v2', 'id': 'kling-video-omni', 'name': '卡藏 可灵视频 4.0', 'version': '1.0.1',
             'author': '影绘', 'description': provider['description'], 'permissions': ['generation.run', 'media.read'],
             'configuration': {'fields': [{'name': 'apiKey', 'type': 'secret', 'label': 'API Key', 'required': True}]},
             'contributes': {'providers': [provider]}}
-readme = '''# 可灵全能视频
+readme = '''# 卡藏 可灵视频 4.0
 
 标准 `yingce.plugin/v2` 声明式插件，无可执行运行时，仅使用 generation.run、media.read。
 协议不限制模型名，默认能力针对可灵 v4；其他模型须先核对相同接口和能力范围，不能仅按品牌套用。
-选择协议会自动填好“能力与参数”，不自动改价格、成本或启用状态。默认 5 秒、720p、16:9；支持 3–30 秒逐秒选择、720p/1080p、16:9/9:16/1:1/21:9。
+选择协议会自动填好“能力与参数”，不自动改价格、成本或启用状态。按用户选择的平台默认 6 秒、720p、16:9（上游省略时长时为 5 秒）；支持 3–30 秒逐秒选择、720p/1080p、16:9/9:16/1:1/21:9。
 最多 10 张图片（含首帧）、5 段视频、3 段音频，合计最多 15 项；参考视频逐条声明时长，合计最多 30 秒。不支持尾帧，不发送未公开的音轨、水印或其他参数。
 
 接口依据：[可灵 v4 文档](https://console.prompt-hubs.com/docs/model/kling-video-v4)。
@@ -106,6 +106,7 @@ interface = '''# 接口合同
 - 签名结果链接有效期按当前文档为 30 小时；过期重新查询取得链接。宿主下载使用实际 Content-Type，不伪造格式。
 - 不发送 n、Extra、未知 providerOptions、凭证或未声明的字段。没有公开取消接口，不声明取消。
 - 参考视频有额外成本，插件不推断售价或汇率；管理员应确认价格规则后再开放相应能力。
+- 可灵 3.0 Omni 的创建/查询/下载结构相同，但最多 15 秒、9 图/3 视频/无音频、视频合计 15 秒且另支持 4k，不能直接套用本 v4 的全部默认参数。本包不锁模型名称，相同范围的兼容模型可复用；不同范围需独立能力画像及协议范围，未做真实调用就不宣称通用实测通过。
 - 提示词最大长度与素材文件大小没有文档硬上限；8000 字符是宿主默认值，字节上限 0 表示未单独限制，仍受宿主策略约束。
 
 <!-- YINGCE_MANIFEST_CONTRACT_START -->

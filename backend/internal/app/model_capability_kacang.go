@@ -16,7 +16,7 @@ func kacangVideoCapability(profile *VideoCapabilityConfig, protocol string) *Vid
 		value.References.MaxTotalItems, value.References.MaxTotalVideoDuration = 15, 30
 		value.References.MaxImages, value.References.MaxVideos, value.References.MaxAudios = 10, 5, 3
 		value.References.MaxVideoDuration = 30
-		value.Duration = VideoDurationConfig{Selection: "range", Min: 3, Max: 30, Step: 1, Default: 5}
+		value.Duration = VideoDurationConfig{Selection: "range", Min: 3, Max: 30, Step: 1, Default: 6}
 		value.Ratios = []string{"16:9", "9:16", "1:1", "21:9"}
 		value.Resolutions = []string{"720p", "1080p"}
 		value.Operations = append(value.Operations, "reference_to_video", "audio_to_video")

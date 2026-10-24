@@ -312,8 +312,8 @@ export function importAdminChannelModels(channelId: string, models: string[]) {
     return http.post<{ models: string[]; added: number }>(`/admin/channels/${encodeURIComponent(channelId)}/models/import`, { models });
 }
 
-export function testAdminChannelModel(channelId: string, input: Pick<ChannelModel, "modelKey" | "providerModelKey" | "capability" | "protocol"> & { capabilityConfig?: ChannelModel["capabilityConfig"] }) {
-    return http.post<{ durationMs: number }>(`/admin/channels/${encodeURIComponent(channelId)}/models/test`, input, { timeout: 10 * 60 * 1000 });
+export function testAdminChannelModel(channelId: string, input: Pick<ChannelModel, "modelKey" | "providerModelKey" | "capability" | "protocol"> & { capabilityConfig?: ChannelModel["capabilityConfig"]; prompt?: string }) {
+    return http.post<{ durationMs: number; videoUrl?: string; resourceId?: string }>(`/admin/channels/${encodeURIComponent(channelId)}/models/test`, input, { timeout: 11 * 60 * 1000 });
 }
 
 export function createAdminChannelModel(channelId: string, input: ChannelModelMutation) {

@@ -14,7 +14,7 @@ func TestKlingOmniRequestsAndReferenceOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]any{"model": r.Model, "prompt": r.Prompt, "duration_seconds": float64(5), "aspect_ratio": "16:9", "resolution": "720p"}
+	want := map[string]any{"model": r.Model, "prompt": r.Prompt, "duration_seconds": float64(6), "aspect_ratio": "16:9", "resolution": "720p"}
 	if spec.Method != "POST" || spec.Path != "/v1/videos" || spec.Auth.Type != "bearer" || !reflect.DeepEqual(manifestTestBody(t, spec), want) {
 		t.Fatalf("create=%#v body=%#v", spec, manifestTestBody(t, spec))
 	}

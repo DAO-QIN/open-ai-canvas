@@ -35,7 +35,7 @@ describe("Kling omni", () => {
         expect(selected.enabled).toBe(false);
         expect(selected.priceTiers[0].unitPrice).toBe(12);
         expect(profile()).toMatchObject({
-            duration: { min: 3, max: 30, step: 1, default: 5 },
+            duration: { min: 3, max: 30, step: 1, default: 6 },
             defaultRatio: "16:9",
             ratios: ["16:9", "9:16", "1:1", "21:9"],
             resolutions: ["720p", "1080p"],

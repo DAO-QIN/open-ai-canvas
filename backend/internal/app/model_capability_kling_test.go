@@ -5,7 +5,7 @@ import "testing"
 func TestKlingOmniDefaultsAndPreflight(t *testing.T) {
 	config := DefaultModelCapabilityConfigForModel("kling-video-omni", "kling-video-v4")
 	v := config.Video
-	if v.Duration.Min != 3 || v.Duration.Max != 30 || v.Duration.Default != 5 || v.DefaultResolution != "720p" || v.DefaultRatio != "16:9" || v.References.MaxImages != 10 || v.References.MaxVideos != 5 || v.References.MaxAudios != 3 || v.References.MaxTotalItems != 15 || v.References.MaxTotalVideoDuration != 30 || v.References.LastFrameSupported == nil || *v.References.LastFrameSupported {
+	if v.Duration.Min != 3 || v.Duration.Max != 30 || v.Duration.Default != 6 || v.DefaultResolution != "720p" || v.DefaultRatio != "16:9" || v.References.MaxImages != 10 || v.References.MaxVideos != 5 || v.References.MaxAudios != 3 || v.References.MaxTotalItems != 15 || v.References.MaxTotalVideoDuration != 30 || v.References.LastFrameSupported == nil || *v.References.LastFrameSupported {
 		t.Fatalf("defaults=%#v", v)
 	}
 	if _, err := NormalizeModelCapabilityConfig("video", "kling-video-omni", config); err != nil {

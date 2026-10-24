@@ -46,6 +46,7 @@ type (
 	AdminChannelModelFetchResult           = app.AdminChannelModelFetchResult
 	AdminChannelModelImportRequest         = app.AdminChannelModelImportRequest
 	AdminChannelModelTestResult            = app.AdminChannelModelTestResult
+	AdminChannelModelTestRequest           = app.AdminChannelModelTestRequest
 	AdminChannelPage                       = app.AdminChannelPage
 	AdminChannelReference                  = app.AdminChannelReference
 	AdminCreditAdjustmentRequest           = app.AdminCreditAdjustmentRequest

@@ -616,7 +616,7 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
     }
     if (protocol === "kling-video-omni") {
         video.references = { promptMaxChars: DEFAULT_VIDEO_PROMPT_MAX_CHARS, minImages: 0, maxImages: 10, maxImageBytes: 0, maxVideos: 5, maxVideoBytes: 0, maxVideoDurationSeconds: 30, maxAudios: 3, maxAudioBytes: 0, maxAudioDurationSeconds: 0 };
-        video.duration = { selection: "range", min: 3, max: 30, step: 1, default: 5 };
+        video.duration = { selection: "range", min: 3, max: 30, step: 1, default: 6 };
         video.references.maxTotalItems = 15;
         video.references.maxReferenceImages = 10;
         video.references.maxTotalVideoDurationSeconds = 30;

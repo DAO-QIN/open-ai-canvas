@@ -9,6 +9,7 @@
 - 签名结果链接有效期按当前文档为 30 小时；过期重新查询取得链接。宿主下载使用实际 Content-Type，不伪造格式。
 - 不发送 n、Extra、未知 providerOptions、凭证或未声明的字段。没有公开取消接口，不声明取消。
 - 参考视频有额外成本，插件不推断售价或汇率；管理员应确认价格规则后再开放相应能力。
+- 可灵 3.0 Omni 的创建/查询/下载结构相同，但最多 15 秒、9 图/3 视频/无音频、视频合计 15 秒且另支持 4k，不能直接套用本 v4 的全部默认参数。本包不锁模型名称，相同范围的兼容模型可复用；不同范围需独立能力画像及协议范围，未做真实调用就不宣称通用实测通过。
 - 提示词最大长度与素材文件大小没有文档硬上限；8000 字符是宿主默认值，字节上限 0 表示未单独限制，仍受宿主策略约束。
 
 <!-- YINGCE_MANIFEST_CONTRACT_START -->
@@ -20,10 +21,10 @@
 {
   "apiVersion": "yingce.plugin/v2",
   "id": "kling-video-omni",
-  "name": "可灵全能视频",
-  "version": "1.0.0",
+  "name": "卡藏 可灵视频 4.0",
+  "version": "1.0.1",
   "author": "影绘",
-  "description": "文本、首帧和多素材参考视频；默认 5 秒、720p、16:9，适用于相同接口与能力范围的模型。",
+  "description": "文本、首帧和多素材参考视频；默认 6 秒、720p、16:9，适用于相同接口与能力范围的模型。",
   "permissions": [
     "generation.run",
     "media.read"
@@ -42,8 +43,8 @@
     "providers": [
       {
         "id": "kling-video-omni",
-        "label": "可灵全能视频",
-        "description": "文本、首帧和多素材参考视频；默认 5 秒、720p、16:9，适用于相同接口与能力范围的模型。",
+        "label": "卡藏 可灵视频 4.0",
+        "description": "文本、首帧和多素材参考视频；默认 6 秒、720p、16:9，适用于相同接口与能力范围的模型。",
         "capabilities": [
           "video"
         ],
@@ -79,7 +80,7 @@
             "type": "integer",
             "required": false,
             "mapping": "duration_seconds",
-            "description": "3–30 秒，默认 5 秒。"
+            "description": "3–30 秒，平台默认 6 秒；上游省略该字段时默认 5 秒。"
           },
           {
             "name": "aspectRatio",
@@ -177,7 +178,7 @@
                         "then": {
                           "$ref": "request.output.duration"
                         },
-                        "else": 5
+                        "else": 6
                       }
                     },
                     3
@@ -198,7 +199,7 @@
                         "then": {
                           "$ref": "request.output.duration"
                         },
-                        "else": 5
+                        "else": 6
                       }
                     },
                     30
@@ -703,7 +704,7 @@
                 "then": {
                   "$ref": "request.output.duration"
                 },
-                "else": 5
+                "else": 6
               }
             },
             "aspect_ratio": {

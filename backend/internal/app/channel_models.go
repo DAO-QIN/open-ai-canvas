@@ -65,7 +65,14 @@ type AdminChannelModelImportRequest struct {
 }
 
 type AdminChannelModelTestResult struct {
-	DurationMs int64 `json:"durationMs"`
+	DurationMs int64  `json:"durationMs"`
+	VideoURL   string `json:"videoUrl,omitempty"`
+	ResourceID string `json:"resourceId,omitempty"`
+}
+
+type AdminChannelModelTestRequest struct {
+	ChannelModelRequest
+	Prompt string `json:"prompt,omitempty"`
 }
 
 func (s *Service) EnsureSystemChannelModels() error {

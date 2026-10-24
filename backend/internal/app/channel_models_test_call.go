@@ -13,7 +13,7 @@ import (
 	"yingce/backend/internal/model"
 )
 
-func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, channelID string, req ChannelModelRequest) (*AdminChannelModelTestResult, error) {
+func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, channelID string, req AdminChannelModelTestRequest) (*AdminChannelModelTestResult, error) {
 	if err := s.RequireAdmin(actor); err != nil {
 		return nil, err
 	}
@@ -21,7 +21,7 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 	if err != nil {
 		return nil, err
 	}
-	modelKey, providerModelKey, capability, protocol, err := s.normalizeChannelModelContract(channel, req)
+	modelKey, providerModelKey, capability, protocol, err := s.normalizeChannelModelContract(channel, req.ChannelModelRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +47,12 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 		"video": "A static gray circle on a white background.",
 		"audio": "Model test.",
 	}[capability]
+	if customPrompt := strings.TrimSpace(req.Prompt); customPrompt != "" {
+		if err := validateModelPromptLength("测试", customPrompt, DefaultVideoPromptMaxChars); err != nil {
+			return nil, err
+		}
+		prompt = customPrompt
+	}
 	videoSeconds := "6"
 	videoSecondsValue := 6
 	if protocol == model.ChannelInterfaceVolcengineJiMengVideo {
@@ -120,6 +126,9 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 	}
 	if capability == "video" {
 		input.VideoCapability = videoProfile
+		if err := validateVideoTask(videoProfile, input); err != nil {
+			return nil, err
+		}
 	}
 	if profile := defaultAudioCapabilityConfig(string(protocol)); capability == "audio" && profile != nil && profile.Speech != nil {
 		input.Config.AudioVoice = profile.Speech.DefaultVoice
@@ -136,13 +145,14 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 	})
 	testCtx = withProtocolRegistry(testCtx, s.protocolRegistry())
 	startedAt := time.Now()
+	var videoResult map[string]interface{}
 	switch capability {
 	case "text":
 		_, err = runTextTask(testCtx, input)
 	case "image":
 		_, err = runImageTask(testCtx, input)
 	case "video":
-		_, err = runVideoTask(testCtx, input)
+		videoResult, err = runVideoTask(testCtx, input)
 	case "audio":
 		_, err = runAudioTask(testCtx, input)
 	}
@@ -153,7 +163,20 @@ func (s *Service) TestAdminChannelModel(ctx context.Context, actor *model.User, 
 		}
 		return nil, WrapAppError(status, "模型测试失败："+providerUserFacingErrorMessage(err), err)
 	}
-	return &AdminChannelModelTestResult{DurationMs: time.Since(startedAt).Milliseconds()}, nil
+	result := &AdminChannelModelTestResult{DurationMs: time.Since(startedAt).Milliseconds()}
+	if videoResult != nil {
+		stored, err := s.persistGeneratedMediaResult(actor.ID, videoResult)
+		if err != nil {
+			return nil, WrapAppError(http.StatusBadGateway, "测试视频已生成，但保存失败，请勿重复提交测试", err)
+		}
+		video, _ := stored["video"].(map[string]interface{})
+		result.VideoURL, _ = video["url"].(string)
+		result.ResourceID, _ = video["resourceId"].(string)
+		if result.VideoURL == "" || result.ResourceID == "" {
+			return nil, WrapAppError(http.StatusBadGateway, "测试视频已生成，但预览结果不完整，请勿重复提交测试", errors.New("missing persisted video URL or resource ID"))
+		}
+	}
+	return result, nil
 }
 
 // 模型测试必须使用当前模型声明的默认参数，避免固定分辨率 SKU 被通用 1K 测试值误伤。

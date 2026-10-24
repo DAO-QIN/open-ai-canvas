@@ -3,6 +3,7 @@ import { Alert, App, AutoComplete, Button, Descriptions, Form, Input, InputNumbe
 import { useAdminContext } from "../admin-context";
 import { AdminModal } from "@/pages/admin/ui/overlays";
 import { FlaskConical, Plus } from "lucide-react";
+import { saveAs } from "file-saver";
 import { ModelIconPicker } from "@/components/model-logo";
 import { ModelIcon } from "@/components/model-picker";
 import { ModelProtocolBrowser } from "@/components/model-protocol-browser";
@@ -152,7 +153,7 @@ export function ChannelModelEditor({
         }
     };
 
-    const testModel = async () => {
+    const testModel = async (prompt?: string) => {
         if (busyRef.current) return;
         const values = await validateEditor(["modelKey", "providerModelKey", "capability", "protocol", "capabilityConfig"]);
         if (!values) return;
@@ -167,8 +168,22 @@ export function ChannelModelEditor({
                 capability: values.capability,
                 protocol: values.protocol,
                 capabilityConfig,
+                prompt: prompt?.trim() || undefined,
             });
             message.success(`模型测试通过，耗时 ${(result.durationMs / 1000).toFixed(2)} 秒`);
+            if (result.videoUrl) {
+                const url = result.videoUrl;
+                modal.info({
+                    title: "测试视频",
+                    width: 760,
+                    content: (
+                        <div className="space-y-3">
+                            <video src={url} controls playsInline preload="metadata" className="w-full rounded-lg bg-black" />
+                            <Button onClick={() => saveAs(url, "模型测试视频.mp4")}>下载测试视频</Button>
+                        </div>
+                    ),
+                });
+            }
         } catch (error) {
             message.error(error instanceof Error ? error.message : "模型测试失败");
         } finally {
@@ -219,7 +234,21 @@ export function ChannelModelEditor({
                             icon={<FlaskConical className="size-4" />}
                             loading={testing}
                             disabled={saving || protocolLoading || Boolean(protocolError)}
-                            onClick={() => modal.confirm({ title: "测试模型连接？", content: "测试会向上游发送真实请求，可能产生供应商费用；不会保存当前修改。", okText: "开始测试", cancelText: "取消", onOk: testModel })}
+                            onClick={() => {
+                                let prompt = "";
+                                modal.confirm({
+                                    title: "测试模型连接？",
+                                    content: (
+                                        <div className="space-y-3">
+                                            <p>测试会发送真实请求，可能产生供应商费用；不会保存模型配置或扣除站内积分。视频结果会保存到当前账号，便于预览和下载。</p>
+                                            <Input.TextArea aria-label="测试提示词" placeholder="填写测试内容；留空使用通用测试内容" maxLength={8000} rows={3} onChange={(event) => { prompt = event.target.value; }} />
+                                        </div>
+                                    ),
+                                    okText: "开始测试",
+                                    cancelText: "取消",
+                                    onOk: () => testModel(prompt),
+                                });
+                            }}
                         >
                             测试模型
                         </Button>

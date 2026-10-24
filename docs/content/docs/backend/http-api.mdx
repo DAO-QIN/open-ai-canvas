@@ -5,6 +5,12 @@ description: 信封、错误码与 OpenAPI
 
 # HTTP API 合同
 
+## 管理端模型测试
+
+`POST /api/admin/channels/:id/models/test` 仅管理员可调用，沿用模型协议与能力配置请求，可选 `prompt`（最多 8000 字符），留空使用通用测试内容。视频使用能力画像中的默认时长、比例与分辨率。测试不要求模型已启用或已有价格规格，不保存模型配置，不创建用户任务或站内计费订单，但会真实调用上游并可能产生费用。
+
+成功返回 `{durationMs,videoUrl?,resourceId?}`。视频经现有生成资源存储及额度校验保存到当前管理员账号，预览地址沿用资源接口的归属校验，不向浏览器返回上游密钥。视频保存失败会提示不要重复提交，避免再次付费。接口保留每分钟 5 次限流和 10 分钟请求超时。
+
 ## 宠物形象库与个人偏好
 
 `GET/PUT /api/me/pet-preference` 需要登录，账号由服务器解析，客户端不提交 userId。返回 `{preference:{modelId,scale,locked,hidden,revision}}`，modelId 为 `system` 或已发布形象 ID，scale 为50–150且步长5。PUT 提交完整偏好和读取到的 revision，版本冲突返回409；未发布形象不能选用。GET 设置 private/no-store。
