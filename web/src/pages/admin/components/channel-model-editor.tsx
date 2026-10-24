@@ -3,7 +3,7 @@ import { Alert, App, AutoComplete, Button, Descriptions, Form, Input, InputNumbe
 import { useAdminContext } from "../admin-context";
 import { AdminModal } from "@/pages/admin/ui/overlays";
 import { FlaskConical, Plus } from "lucide-react";
-import { saveAs } from "file-saver";
+import { downloadBrowserMedia } from "@/services/browser-download";
 import { ModelIconPicker } from "@/components/model-logo";
 import { ModelIcon } from "@/components/model-picker";
 import { ModelProtocolBrowser } from "@/components/model-protocol-browser";
@@ -171,15 +171,16 @@ export function ChannelModelEditor({
                 prompt: prompt?.trim() || undefined,
             });
             message.success(`模型测试通过，耗时 ${(result.durationMs / 1000).toFixed(2)} 秒`);
-            if (result.videoUrl) {
+            if (result.videoUrl && result.resourceId) {
                 const url = result.videoUrl;
+                const storageKey = `resource:${result.resourceId}`;
                 modal.info({
                     title: "测试视频",
                     width: 760,
                     content: (
                         <div className="space-y-3">
                             <video src={url} controls playsInline preload="metadata" className="w-full rounded-lg bg-black" />
-                            <Button onClick={() => saveAs(url, "模型测试视频.mp4")}>下载测试视频</Button>
+                            <Button onClick={() => void downloadBrowserMedia({ storageKey, fileName: "模型测试视频.mp4" }).catch((error: unknown) => message.error(error instanceof Error ? error.message : "下载测试视频失败"))}>下载测试视频</Button>
                         </div>
                     ),
                 });
