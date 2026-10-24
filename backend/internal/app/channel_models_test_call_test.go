@@ -49,7 +49,7 @@ func TestAdminVideoTestUsesDraftDefaultsAndStoresOwnedPreviewWithoutBilling(t *t
 	if err := db.Create(&channel).Error; err != nil {
 		t.Fatal(err)
 	}
-	req := AdminChannelModelTestRequest{ChannelModelRequest: ChannelModelRequest{ModelKey: "kling-video-v4", Capability: "video", Protocol: "kling-video-omni"}, Prompt: " 海边日落 "}
+	req := AdminChannelModelTestRequest{ChannelModelRequest: ChannelModelRequest{ModelKey: "kling-video-v4", Capability: "video", Protocol: "kling-video-omni", CapabilityConfig: DefaultModelCapabilityConfigForModel("kling-video-omni", "kling-video-v4")}, Prompt: " 海边日落 "}
 	// Test authorization and validation must fail before any paid request.
 	if _, err := svc.TestAdminChannelModel(context.Background(), &model.User{ID: "ordinary-user"}, channel.ID, req); err == nil {
 		t.Fatal("non-admin test was allowed")
