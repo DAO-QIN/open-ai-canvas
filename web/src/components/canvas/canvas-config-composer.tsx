@@ -9,6 +9,8 @@ import type { CanvasGenerationMode, CanvasNodeMetadata, CanvasWorkspaceMode } fr
 import { normalizeGenerationNodeMentionTokens, type NodeGenerationInput } from "./canvas-node-generation";
 import { CanvasPresetPicker, type CanvasPromptPreset } from "./canvas-preset-picker";
 import { CanvasVideoPromptTools } from "./canvas-video-prompt-tools";
+import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
+import { useEffectiveConfig } from "@/stores/use-config-store";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { getEditableSelection, setEditableSelection } from "./canvas-mention-editable";
 import { composerReferences, insertComposerPreset } from "./canvas-composer-references";
@@ -23,6 +25,7 @@ type ComposerProps = {
 
 export function CanvasConfigComposer({ nodeId, canvasId, value, inputs, skillReferences = [], generationMode = "image", metadata, onChange, onMetadataChange, onClose, workspaceMode = "professional" }: ComposerProps) {
     const readOnly = Boolean(metadata?.locked);
+    const config = useEffectiveConfig();
     const theme = canvasThemes[useActiveTheme()];
     const container = useRef<HTMLDivElement>(null);
     const caret = useRef<{ start: number; end: number } | null>(null);
@@ -68,7 +71,7 @@ export function CanvasConfigComposer({ nodeId, canvasId, value, inputs, skillRef
                 </div>
             </header>
             {generationMode === "video" && onMetadataChange && !simple ? <div className="mb-3">
-                <CanvasVideoPromptTools metadata={metadata} frameOptions={frameOptions} referenceMode={workflow ? "all" : "frames"}
+                <CanvasVideoPromptTools metadata={metadata} frameOptions={frameOptions} lastFrameSupported={modelCapabilityConfigFor(config, metadata?.model || config.videoModel).video?.references.lastFrameSupported} referenceMode={workflow ? "all" : "frames"}
                     referenceSummary={{ imageCount: inputs.filter((input) => input.type === "image" || input.type === "character").length, videoCount: inputs.filter((input) => input.type === "video").length, audioCount: inputs.filter((input) => input.type === "audio").length }} onMetadataChange={onMetadataChange} />
             </div> : null}
             <div ref={container} className="canvas-config-composer-editor rounded-lg" style={{ background: theme.node.fill }} onBlurCapture={rememberCaret} onKeyUpCapture={rememberCaret} onPointerUpCapture={rememberCaret}>

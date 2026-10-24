@@ -170,6 +170,9 @@ func validateVideoCapabilityConfig(value *VideoCapabilityConfig) error {
 	if value.References.MinImages > value.References.MaxImages {
 		return BadAuthRequest("最少图片引用数不能超过最大图片引用数")
 	}
+	if value.References.MaxTotalItems < 0 || value.References.MaxTotalItems > 300 || value.References.MaxTotalVideoDuration < 0 || value.References.MaxTotalVideoDuration > 86400 {
+		return BadAuthRequest("参考素材合计限制无效")
+	}
 	if limit := value.References.MaxReferenceImages; limit != nil && (*limit < 0 || *limit > value.References.MaxImages) {
 		return BadAuthRequest("普通参考图上限必须在 0 与最大图片引用数之间")
 	}
@@ -404,6 +407,26 @@ func applyFixedVideoResolution(input *canvasGenerationInput, profile *VideoCapab
 func validateVideoTask(profile *VideoCapabilityConfig, input canvasGenerationInput) error {
 	if profile == nil {
 		return BadAuthRequest("当前视频模型能力参数无效")
+	}
+	if limit := profile.References.MaxTotalItems; limit > 0 && len(input.ReferenceImages)+len(input.ReferenceVideos)+len(input.ReferenceAudios) > limit {
+		return newModelCapabilityArgumentError("referenceNodeIds", "item_count", BadAuthRequest(fmt.Sprintf("参考素材合计最多 %d 项", limit)))
+	}
+	if supported := profile.References.LastFrameSupported; supported != nil && !*supported {
+		input.VideoCapability = profile
+		for _, image := range protocolVideoImageReferences(input) {
+			if image.Role == "last_frame" {
+				return newModelCapabilityArgumentError("referenceNodeIds", "unsupported_value", BadAuthRequest("当前模型不支持尾帧"))
+			}
+		}
+	}
+	if limit := profile.References.MaxTotalVideoDuration; limit > 0 {
+		remaining := int64(limit) * 1000
+		for _, video := range input.ReferenceVideos {
+			if video.DurationMs <= 0 || video.DurationMs > remaining {
+				return newModelCapabilityArgumentError("referenceNodeIds", "unsupported_value", BadAuthRequest(fmt.Sprintf("请先读取视频时长，参考视频合计不能超过 %d 秒", limit)))
+			}
+			remaining -= video.DurationMs
+		}
 	}
 	if err := validateModelPromptLength("视频", input.Prompt, profile.References.PromptMaxChars); err != nil {
 		return err

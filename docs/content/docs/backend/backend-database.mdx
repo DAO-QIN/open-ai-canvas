@@ -41,6 +41,8 @@ Schema 63 新增 `user_feedbacks`，保存用户 ID、用户名/邮箱快照、�
 
 ## 视频普通参考图限制
 
+`video.references` 另支持可选 `maxTotalItems`（图片、视频、音频的总项数）、`maxTotalVideoDurationSeconds`（全部参考视频的总秒数）与 `lastFrameSupported`。总数/总时长为 0 或省略表示不额外限制；总时长有限制时必须已读取每段时长；显式 `lastFrameSupported=false` 禁止尾帧并隐藏用户端选项，省略保持原行为。可灵全能协议默认 15 项、30 秒、false。均只扩展既有 JSON，不新增表或迁移。
+
 `channel_models.capability_config_json` 的 `video.references` 新增可选 `maxReferenceImages`，限定不含首尾帧的普通图片数；`maxImages` 仍限制包括首尾帧的总图片数。省略该字段时沿用原总数校验；显式 `0` 表示不接受普通参考图。保存校验要求该值介于 0 和总图片上限之间，生成前按同一素材角色映射计数。此变化只扩展现有 JSON，不新增表或 Schema 迁移。
 
 文本音乐的同一 JSON 中，`audio.music` 保存 `promptMaxChars`（UTF-16 单元）、`instrumentalSupported`、`defaultInstrumental` 和 `requestTimeoutSeconds`；选择音乐协议默认分别为 3000、true、false、600。`audio.outputCount=0` 表示随模型返回，正数表示管理员确认的固定首数。画布公开生成合同 `options.audioInstrumental` 为可选布尔值，服务端投影为字符串配置；歌曲和纯音乐选择随节点持久化。仅扩展既有 JSON，无表或 Schema 迁移，不改写历史价格和任务。

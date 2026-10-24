@@ -8,6 +8,18 @@ func kacangVideoCapability(profile *VideoCapabilityConfig, protocol string) *Vid
 	value.GenerateAudio, value.Watermark = VideoBooleanConfig{}, VideoBooleanConfig{}
 	value.Operations, value.DefaultOperation = []string{"text_to_video", "image_to_video"}, "text_to_video"
 	switch protocol {
+	case "kling-video-omni":
+		lastFrame := false
+		ordinaryImages := 10
+		value.References.MaxReferenceImages = &ordinaryImages
+		value.References.LastFrameSupported = &lastFrame
+		value.References.MaxTotalItems, value.References.MaxTotalVideoDuration = 15, 30
+		value.References.MaxImages, value.References.MaxVideos, value.References.MaxAudios = 10, 5, 3
+		value.References.MaxVideoDuration = 30
+		value.Duration = VideoDurationConfig{Selection: "range", Min: 3, Max: 30, Step: 1, Default: 5}
+		value.Ratios = []string{"16:9", "9:16", "1:1", "21:9"}
+		value.Resolutions = []string{"720p", "1080p"}
+		value.Operations = append(value.Operations, "reference_to_video", "audio_to_video")
 	case "kacang-gemini-omni-video":
 		value.References.MaxImages, value.References.MaxVideos = 4, 1
 		value.Duration = VideoDurationConfig{Selection: "range", Min: 3, Max: 10, Step: 1, Default: 3}

@@ -129,6 +129,9 @@ export type VideoCapabilityConfig = {
         minImages: number;
         maxImages: number;
         maxReferenceImages?: number;
+        maxTotalItems?: number;
+        maxTotalVideoDurationSeconds?: number;
+        lastFrameSupported?: boolean;
         maxImageBytes: number;
         maxVideos: number;
         maxVideoBytes: number;
@@ -610,6 +613,22 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.generateAudio = { supported: false, default: false };
         video.watermark = { supported: false, default: false };
         video.operations = ["text_to_video", "image_to_video", "reference_to_video", ...(maxAudios > 0 ? ["audio_to_video"] : [])];
+    }
+    if (protocol === "kling-video-omni") {
+        video.references = { promptMaxChars: DEFAULT_VIDEO_PROMPT_MAX_CHARS, minImages: 0, maxImages: 10, maxImageBytes: 0, maxVideos: 5, maxVideoBytes: 0, maxVideoDurationSeconds: 30, maxAudios: 3, maxAudioBytes: 0, maxAudioDurationSeconds: 0 };
+        video.duration = { selection: "range", min: 3, max: 30, step: 1, default: 5 };
+        video.references.maxTotalItems = 15;
+        video.references.maxReferenceImages = 10;
+        video.references.maxTotalVideoDurationSeconds = 30;
+        video.references.lastFrameSupported = false;
+        video.ratios = ["16:9", "9:16", "1:1", "21:9"];
+        video.defaultRatio = "16:9";
+        video.resolutions = ["720p", "1080p"];
+        video.defaultResolution = "720p";
+        video.generateAudio = { supported: false, default: false };
+        video.watermark = { supported: false, default: false };
+        video.operations = ["text_to_video", "image_to_video", "reference_to_video", "audio_to_video"];
+        video.defaultOperation = "text_to_video";
     }
     if (["kacang-gemini-omni-video", "kacang-grok-video-15", "kacang-kling-video-30", "kacang-grok-video-15-fast", "kacang-grok-video-15-route8"].includes(protocol || "")) {
         const gemini = protocol === "kacang-gemini-omni-video";

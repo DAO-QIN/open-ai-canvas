@@ -5,6 +5,12 @@ description: 从产品功能快速定位主要代码入口
 
 # 代码功能地图
 
+## 可灵全能视频协议
+
+- `plugin-packages/kling-video-omni/`：独立声明式协议、完整接口文档和确定性安装包构建，处理任务查询、鉴权成片获取和媒体顺序映射。
+- `backend/internal/app/model_capability_kacang.go`、`web/src/lib/model-capabilities.ts`：v4 默认参数；统一能力校验限制素材合计数量、视频总时长和尾帧。
+- `web/src/components/canvas/canvas-video-prompt-tools.tsx`：按模型能力显示首尾帧，未声明能力的原模型行为保持。
+
 ## 用户头像
 
 - `web/src/lib/default-user-avatars.ts`、`components/layout/user-avatar.tsx`：48款静态头像目录、统一渲染与旧图标兼容。

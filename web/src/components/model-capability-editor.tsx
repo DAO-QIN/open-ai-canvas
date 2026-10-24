@@ -358,6 +358,8 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                     <CapabilityBlock title="视频引用">
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             <NumberField label="最大视频引用" value={profile.references.maxVideos} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideos: value || 0 })} />
+                            <NumberField label="参考素材合计上限" value={profile.references.maxTotalItems || 0} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxTotalItems: value || 0 })} />
+                            <NumberField label="参考视频合计秒数" value={profile.references.maxTotalVideoDurationSeconds || 0} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxTotalVideoDurationSeconds: value || 0 })} />
                             <NumberField label="单个视频上限 MB" value={bytesToMB(profile.references.maxVideoBytes)} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideoBytes: mbToBytes(value) })} />
                             <NumberField label="单个视频最长秒数" value={profile.references.maxVideoDurationSeconds} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideoDurationSeconds: value || 0 })} />
                         </div>
