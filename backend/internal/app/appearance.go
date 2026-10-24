@@ -94,6 +94,8 @@ type PublicAppearanceSetting struct {
 	CreationDescription       string              `json:"creationDescription"`
 	LogoURL                   string              `json:"logoUrl"`
 	DarkLogoURL               string              `json:"darkLogoUrl"`
+	FaviconURL                string              `json:"faviconUrl"`
+	AppleTouchIconURL         string              `json:"appleTouchIconUrl"`
 	LogoFrameEnabled          bool                `json:"logoFrameEnabled"`
 	AuthVideoURL              string              `json:"authVideoUrl"`
 	AuthVideoPosterURL        string              `json:"authVideoPosterUrl"`
@@ -799,6 +801,8 @@ func publicAppearanceSetting(setting *model.SystemSetting, value AppearanceSetti
 		CreationDescription: value.CreationDescription,
 		LogoURL:             defaultAppearanceLogoURL,
 		DarkLogoURL:         defaultAppearanceLogoURL,
+		FaviconURL:          appearanceIconURL(value, "favicon.ico"),
+		AppleTouchIconURL:   appearanceIconURL(value, "apple-touch-icon.png"),
 		LogoFrameEnabled:    value.LogoFrameEnabled,
 		AuthVideoURL:        defaultAppearanceVideoURL,
 		AuthVideoPosterURL:  defaultAppearancePosterURL,

@@ -17,6 +17,8 @@ export type PublicAppearance = {
     creationDescription: string;
     logoUrl: string;
     darkLogoUrl: string;
+    faviconUrl: string;
+    appleTouchIconUrl: string;
     logoFrameEnabled: boolean;
     authVideoUrl: string;
     authVideoPosterUrl: string;

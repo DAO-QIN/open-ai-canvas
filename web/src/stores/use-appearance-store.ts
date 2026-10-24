@@ -7,10 +7,12 @@ import type { PublicAppearance } from "@/services/api/appearance";
 import { apiBaseURL } from "@/services/api/request";
 import { applySkinTheme, DEFAULT_CLASSIC_SKIN, normalizeSkinDefinition } from "@/lib/skin-themes";
 
+export const PUBLIC_APPEARANCE_SCHEMA_VERSION = 11;
+
 export const DEFAULT_PUBLIC_APPEARANCE: PublicAppearance = {
     updates: DEFAULT_UPDATE_ANNOUNCEMENT,
     canvas: DEFAULT_CANVAS_APPEARANCE,
-    schemaVersion: 10,
+    schemaVersion: PUBLIC_APPEARANCE_SCHEMA_VERSION,
     brandName: "影策",
     brandSlug: "open-ai-canvas",
     authHeroTitle: "让一个故事，\n从文字走向银幕。",
@@ -19,6 +21,8 @@ export const DEFAULT_PUBLIC_APPEARANCE: PublicAppearance = {
     creationDescription: DEFAULT_CREATION_DESCRIPTION,
     logoUrl: "/logo.svg",
     darkLogoUrl: "/logo.svg",
+    faviconUrl: `${apiBaseURL.replace(/\/$/, "")}/public/appearance/icon/favicon.ico`,
+    appleTouchIconUrl: `${apiBaseURL.replace(/\/$/, "")}/public/appearance/icon/apple-touch-icon.png`,
     logoFrameEnabled: true,
     authVideoUrl: "https://boss-shjd.biliapi.net/updream/aniforge/video/video_bbcb00bd-650d-4249-9346-5cd21fd2484c_m1hc-u0-1pu13x-3v1s.mp4",
     authVideoPosterUrl: "https://i0.hdslb.com/bfs/aitool/aniforge/image/02933f26-5f1b-49ff-a811-b7f95ee5e5b8_m1hc-u0-sau.jpg",
@@ -72,7 +76,7 @@ export function normalizePublicAppearance(value?: Partial<PublicAppearance> | nu
     return {
         ...DEFAULT_PUBLIC_APPEARANCE,
         ...value,
-        schemaVersion: 10,
+        schemaVersion: PUBLIC_APPEARANCE_SCHEMA_VERSION,
         updates: normalizeUpdateAnnouncement(value?.updates),
         canvas: { ...DEFAULT_CANVAS_APPEARANCE, ...value?.canvas },
         brandName: resolvedBrandName,
@@ -83,6 +87,8 @@ export function normalizePublicAppearance(value?: Partial<PublicAppearance> | nu
         creationDescription: normalizeAppearanceCopy(value?.creationDescription, DEFAULT_CREATION_DESCRIPTION, true),
         logoUrl,
         darkLogoUrl,
+        faviconUrl: safeAppearanceURL(value?.faviconUrl, DEFAULT_PUBLIC_APPEARANCE.faviconUrl),
+        appleTouchIconUrl: safeAppearanceURL(value?.appleTouchIconUrl, DEFAULT_PUBLIC_APPEARANCE.appleTouchIconUrl),
         logoFrameEnabled: value?.logoFrameEnabled !== false,
         authVideoUrl: safeAppearanceURL(value?.authVideoUrl, DEFAULT_PUBLIC_APPEARANCE.authVideoUrl),
         authVideoPosterUrl: safeAppearanceURL(value?.authVideoPosterUrl, customVideo ? "" : DEFAULT_PUBLIC_APPEARANCE.authVideoPosterUrl),
@@ -119,7 +125,7 @@ export function readConfirmedAppearance(): PublicAppearance | undefined {
         const raw = window.localStorage.getItem(appearanceCacheKey);
         if (!raw) return undefined;
         const cached = JSON.parse(raw) as { version?: number; appearance?: PublicAppearance };
-        if (cached.version !== 1 || cached.appearance?.schemaVersion !== 10 || !cached.appearance.brandName?.trim() || !cached.appearance.revision) return undefined;
+        if (cached.version !== 1 || cached.appearance?.schemaVersion !== PUBLIC_APPEARANCE_SCHEMA_VERSION || !cached.appearance.brandName?.trim() || !cached.appearance.revision) return undefined;
         return normalizePublicAppearance(cached.appearance);
     } catch {
         return undefined;
@@ -131,7 +137,7 @@ export function commitPublicAppearance(value?: Partial<PublicAppearance> | null)
     useAppearanceStore.getState().setAppearance(appearance);
     applySkinTheme(appearance.activeSkin, typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light");
     applyAppearanceMetadata(appearance);
-    if (typeof window !== "undefined" && value?.schemaVersion === 10 && value.revision) {
+    if (typeof window !== "undefined" && value?.schemaVersion === PUBLIC_APPEARANCE_SCHEMA_VERSION && value.revision) {
         try {
             window.localStorage.setItem(appearanceCacheKey, JSON.stringify({ version: 1, appearance }));
         } catch {
@@ -161,7 +167,17 @@ export function applyAppearanceMetadata(appearance: PublicAppearance, targetDocu
         favicon.rel = "icon";
         targetDocument.head.appendChild(favicon);
     }
-    favicon.href = appearanceLogoURL(appearance, targetDocument.documentElement.classList.contains("dark") ? "dark" : "light");
+    favicon.type = "image/x-icon";
+    favicon.setAttribute("sizes", "16x16 32x32 48x48");
+    if (favicon.getAttribute("href") !== appearance.faviconUrl) favicon.href = appearance.faviconUrl;
+    let touchIcon = targetDocument.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    if (!touchIcon) {
+        touchIcon = targetDocument.createElement("link");
+        touchIcon.rel = "apple-touch-icon";
+        targetDocument.head.appendChild(touchIcon);
+    }
+    touchIcon.setAttribute("sizes", "180x180");
+    if (touchIcon.getAttribute("href") !== appearance.appleTouchIconUrl) touchIcon.href = appearance.appleTouchIconUrl;
 
     const location = targetDocument.defaultView?.location;
     if (location && (location.protocol === "http:" || location.protocol === "https:")) {

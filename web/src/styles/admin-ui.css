@@ -192,6 +192,36 @@
     gap: 10px;
 }
 
+.admin-appearance-favicon-preview > p {
+    margin: 6px 0 12px;
+    color: var(--admin-text-muted);
+}
+
+.admin-appearance-favicon-tab {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--admin-card-border);
+    border-radius: var(--r-md);
+    background: var(--color-neutral-50);
+    color: var(--color-neutral-900);
+}
+
+.admin-appearance-favicon-tab.is-dark {
+    background: var(--color-neutral-900);
+    color: var(--color-neutral-50);
+}
+
+.admin-appearance-favicon-tab > img {
+    flex: none;
+}
+
+.admin-appearance-favicon-tab > span {
+    flex: 1;
+}
+
 .admin-appearance-logo-preview {
     display: grid;
     min-height: 104px;

@@ -4,9 +4,9 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
         <meta name="description" content="AI 影视与短剧创作工作台" />
-        <!-- 不写内置品牌资源：首屏必须品牌中性，favicon 由 use-appearance-store 解析出外观后写入。
-             空 data URL 只是为了不让浏览器去请求 /favicon.ico（那会是一条 404）。 -->
-        <link rel="icon" href="data:," />
+        <!-- 同源入口直接提供当前部署的图标，首屏无需等待应用或外观 JSON。 -->
+        <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="/api/public/appearance/icon/favicon.ico" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/api/public/appearance/icon/apple-touch-icon.png" />
         <title>正在加载</title>
         <style>
             /* Fix layer order before production chunks can register utilities ahead of base. */

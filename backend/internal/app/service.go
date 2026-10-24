@@ -35,6 +35,9 @@ type Service struct {
 	redeemBatchMu            sync.Mutex
 	storageMu                sync.Mutex
 	spriteCacheMu            sync.Mutex
+	appearanceIconMu         sync.Mutex
+	appearanceIconVersion    string
+	appearanceIconFiles      map[string][]byte
 	storageTestMu            sync.Mutex
 	workerRuntimeMu          sync.Mutex
 	agentSchedulerMu         sync.Mutex

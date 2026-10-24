@@ -631,3 +631,12 @@ CSV 使用中文表头、UTF-8 BOM、CRLF；金额按整数分精确转换为两
 | POST | `/admin/provider-catalog/:id/install` | `{ name, apiKey, markupPercent, models: [{ modelKey, markupPercent? }], enabled }`，一次事务创建渠道、模型和规格档，返回 `{ channel }`                                                   |
 
 install 的 Base URL、协议、能力和成本全部从服务端快照读取，不信任请求体。售价 = 成本 × (1 + 加价率)，向上取整到微积分；加价率 0–1000%，最多两位小数。推广期已过返回 404。API Key 只加密存入渠道，不写日志。
+
+## 站点浏览器图标
+
+公开外观合同版本为 11，前端确认缓存必须使用同一版本。`GET /public/appearance` 额外返回 `faviconUrl`、`appleTouchIconUrl`。图标独立于网页和画布主题，以当前已发布浅色 Logo 为来源，缺省时使用深色 Logo；无品牌图时使用中性几何标记。服务器裁去透明留白、添加固定不透明底色和边界，生成 16/32/48 像素 ICO、64 像素 PNG 和 180 像素 Apple Touch Icon，不改原始 Logo，不新增数据表或持久外观字段。
+
+- `GET /public/appearance/icon/:file`：首屏可直接访问的当前图标，支持 `favicon.ico`、`favicon.png`、`apple-touch-icon.png`，使用重新验证缓存。
+- `GET /public/appearance/icons/:version/:file`：来源资源和渲染器版本确定的图标地址，支持一年不可变缓存与 ETag/304；外观其他文案变化不改变地址。仅允许当前发布的来源，旧版本或未知文件返回 404，错误不缓存。
+
+上传资源 ID 对应的文件必须保持不可变。反向代理需保留图标响应的 Content-Type、ETag 与缓存策略；不得将不存在的图标回退成 SPA HTML。前端初始 HTML 使用同源图标入口，解析外观后换为版本地址；后台展示当前已保存图标在浅色、深色标签中的小尺寸效果。

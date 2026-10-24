@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -11,6 +13,34 @@ import (
 )
 
 func RegisterAppearanceRoutes(r *gin.RouterGroup, svc *service.Service) {
+	serveIcon := func(versioned bool) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			version := ""
+			if versioned {
+				version = c.Param("version")
+			}
+			data, mime, err := svc.AppearanceIcon(version, c.Param("file"))
+			if err != nil {
+				c.Header("Cache-Control", "no-store")
+				failService(c, err)
+				return
+			}
+			c.Header("X-Content-Type-Options", "nosniff")
+			c.Header("Cache-Control", "public, no-cache")
+			if versioned {
+				c.Header("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			etag := fmt.Sprintf(`"%x"`, sha256.Sum256(data))
+			c.Header("ETag", etag)
+			if c.GetHeader("If-None-Match") == etag {
+				c.Status(http.StatusNotModified)
+				return
+			}
+			c.Data(http.StatusOK, mime, data)
+		}
+	}
+	r.GET("/public/appearance/icon/:file", serveIcon(false))
+	r.GET("/public/appearance/icons/:version/:file", serveIcon(true))
 	registerPetPreferenceRoutes(r, svc)
 	registerLive2DRoutes(r, svc)
 	registerSpriteRoutes(r, svc)

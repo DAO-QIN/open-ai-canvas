@@ -97,6 +97,24 @@ export function LogoThemePreview({ label, icon, src, dark, frameEnabled }: { lab
     );
 }
 
+export function FaviconPreview({ src }: { src: string }) {
+    return (
+        <div className="admin-appearance-favicon-preview" aria-label="浏览器标签图标预览">
+            <strong>浏览器标签图标</strong>
+            <p>自动使用当前品牌标记生成，保持清晰底色。更换 Logo 并保存后更新。</p>
+            <div className="admin-appearance-logo-preview-grid">
+                {[false, true].map((dark) => (
+                    <div key={String(dark)} className={cn("admin-appearance-favicon-tab", dark && "is-dark")}>
+                        <img src={src} width={16} height={16} alt="" />
+                        <span>{dark ? "深色标签" : "浅色标签"}</span>
+                        <img src={src} width={32} height={32} alt="" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export function useObjectURL(file: File | null) {
     const url = useMemo(() => (file ? URL.createObjectURL(file) : ""), [file]);
     useEffect(
