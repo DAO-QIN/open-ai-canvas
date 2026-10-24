@@ -123,11 +123,14 @@ export function ModelCapabilityEditor({ value, onChange, protocol, capability = 
                         {generateAudioField}
                     </ReferenceCard>
                     <ReferenceCard title="视频引用" description="视频数量、大小与时长限制">
+                        {profile.references.maxTotalVideoDurationSeconds !== undefined ? <NumberField label="参考视频合计秒数" value={profile.references.maxTotalVideoDurationSeconds} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxTotalVideoDurationSeconds: value || 0 })} /> : null}
                         <NumberField label="最大视频引用" value={profile.references.maxVideos} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideos: value || 0 })} />
                         <NumberField label="单个视频上限 MB" value={bytesToMB(profile.references.maxVideoBytes)} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideoBytes: mbToBytes(value) })} />
                         <NumberField label="单个视频最长秒数" value={profile.references.maxVideoDurationSeconds} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxVideoDurationSeconds: value || 0 })} />
                     </ReferenceCard>
                     <ReferenceCard title="通用限制" description="所有视频请求共用的基础约束">
+                        {profile.references.maxTotalItems !== undefined ? <NumberField label="参考素材合计上限" value={profile.references.maxTotalItems} min={0} disabled={disabled} onChange={(value) => updateReferences({ maxTotalItems: value || 0 })} /> : null}
+                        {profile.references.lastFrameSupported === false ? <p className="text-[var(--fs-label)] leading-relaxed text-foreground/60">当前模型不支持尾帧。</p> : null}
                         <NumberField label="提示词最大字符数" value={profile.references.promptMaxChars} min={1} disabled={disabled} onChange={(value) => updateReferences({ promptMaxChars: value || 1 })} />
                         <BooleanField label="水印" value={profile.watermark} disabled={disabled} onChange={(watermark) => update({ watermark })} />
                     </ReferenceCard>

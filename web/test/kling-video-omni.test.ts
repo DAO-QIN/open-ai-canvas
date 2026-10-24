@@ -7,8 +7,16 @@ import type { ReferenceVideo } from "../src/types/media";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CanvasVideoPromptTools } from "../src/components/canvas/canvas-video-prompt-tools";
+import { ModelCapabilityEditor } from "../src/components/model-capability-editor";
 
 describe("Kling omni", () => {
+    test("the actual references section exposes combined limits", () => {
+        const html = renderToStaticMarkup(createElement(ModelCapabilityEditor, { protocol: "kling-video-omni", capability: "video", section: "references", value: defaultModelCapabilityConfig("kling-video-omni") }));
+        expect(html).toContain("参考素材合计上限");
+        expect(html).toContain('value="15"');
+        expect(html).toContain("参考视频合计秒数");
+        expect(html).toContain("当前模型不支持尾帧");
+    });
     test("hides unsupported tail frames while keeping legacy controls", () => {
         const props = { frameOptions: [{ nodeId: "image", label: "参考图", title: "海面" }], onMetadataChange: () => {} };
         const current = renderToStaticMarkup(createElement(CanvasVideoPromptTools, { ...props, lastFrameSupported: false }));
