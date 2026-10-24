@@ -14,7 +14,7 @@ import (
 	"golang.org/x/image/draw"
 )
 
-const appearanceIconRendererVersion = "icon-v1"
+const appearanceIconRendererVersion = "icon-v2-transparent"
 
 func appearanceIconSource(value AppearanceSetting) (string, string) {
 	if value.LogoResourceID != "" {
@@ -129,19 +129,13 @@ func renderAppearanceIcons(source image.Image) (map[string][]byte, error) {
 	if crop.Empty() {
 		return nil, BadAuthRequest("站点图标来源没有可见内容")
 	}
-	background := color.NRGBA{250, 250, 250, 255}
+	outline := color.NRGBA{255, 255, 255, 255}
 	if luminance/weight > 150 {
-		background = color.NRGBA{32, 33, 36, 255}
+		outline = color.NRGBA{24, 24, 24, 255}
 	}
 	pngs := make(map[int][]byte)
 	for _, size := range []int{16, 32, 48, 64, 180} {
 		out := image.NewNRGBA(image.Rect(0, 0, size, size))
-		draw.Draw(out, out.Bounds(), image.NewUniform(background), image.Point{}, draw.Src)
-		// An opaque tile with a quiet outline remains visible on either tab color.
-		border := image.NewUniform(color.NRGBA{128, 128, 128, 255})
-		for _, r := range []image.Rectangle{image.Rect(0, 0, size, 1), image.Rect(0, size-1, size, size), image.Rect(0, 0, 1, size), image.Rect(size-1, 0, size, size)} {
-			draw.Draw(out, r, border, image.Point{}, draw.Src)
-		}
 		padding := max(2, size/8)
 		available := size - 2*padding
 		w, h := available, available
@@ -151,7 +145,26 @@ func renderAppearanceIcons(source image.Image) (map[string][]byte, error) {
 			w = max(1, available*crop.Dx()/crop.Dy())
 		}
 		x, y := (size-w)/2, (size-h)/2
-		draw.CatmullRom.Scale(out, image.Rect(x, y, x+w, y+h), source, crop, draw.Over, nil)
+		mark := image.NewNRGBA(out.Bounds())
+		draw.CatmullRom.Scale(mark, image.Rect(x, y, x+w, y+h), source, crop, draw.Src, nil)
+		// Contrast follows the mark's silhouette, never a rectangular tile.
+		radius := max(1, size/64)
+		for y := 0; y < size; y++ {
+			for x := 0; x < size; x++ {
+				alpha := uint8(0)
+				for dy := -radius; dy <= radius; dy++ {
+					for dx := -radius; dx <= radius; dx++ {
+						if dx*dx+dy*dy <= radius*radius {
+							alpha = max(alpha, mark.NRGBAAt(x+dx, y+dy).A)
+						}
+					}
+				}
+				c := outline
+				c.A = alpha
+				out.SetNRGBA(x, y, c)
+			}
+		}
+		draw.Draw(out, out.Bounds(), mark, image.Point{}, draw.Over)
 		var encoded bytes.Buffer
 		if err := png.Encode(&encoded, out); err != nil {
 			return nil, err

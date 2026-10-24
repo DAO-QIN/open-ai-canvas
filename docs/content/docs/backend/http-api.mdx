@@ -634,7 +634,7 @@ install 的 Base URL、协议、能力和成本全部从服务端快照读取，
 
 ## 站点浏览器图标
 
-公开外观合同版本为 11，前端确认缓存必须使用同一版本。`GET /public/appearance` 额外返回 `faviconUrl`、`appleTouchIconUrl`。图标独立于网页和画布主题，以当前已发布浅色 Logo 为来源，缺省时使用深色 Logo；无品牌图时使用中性几何标记。服务器裁去透明留白、添加固定不透明底色和边界，生成 16/32/48 像素 ICO、64 像素 PNG 和 180 像素 Apple Touch Icon，不改原始 Logo，不新增数据表或持久外观字段。
+公开外观合同版本为 11，前端确认缓存必须使用同一版本。`GET /public/appearance` 额外返回 `faviconUrl`、`appleTouchIconUrl`。图标独立于网页和画布主题，以当前已发布浅色 Logo 为来源，缺省时使用深色 Logo；无品牌图时使用中性几何标记。服务器裁去透明留白，保留透明背景并仅在品牌轮廓添加细微反色描边，不添加方形底板或边框，生成 16/32/48 像素 ICO、64 像素 PNG 和 180 像素 Apple Touch Icon，不改原始 Logo，不新增数据表或持久外观字段。
 
 - `GET /public/appearance/icon/:file`：首屏可直接访问的当前图标，支持 `favicon.ico`、`favicon.png`、`apple-touch-icon.png`，使用重新验证缓存。
 - `GET /public/appearance/icons/:version/:file`：来源资源和渲染器版本确定的图标地址，支持一年不可变缓存与 ETag/304；外观其他文案变化不改变地址。仅允许当前发布的来源，旧版本或未知文件返回 404，错误不缓存。

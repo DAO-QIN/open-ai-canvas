@@ -13,7 +13,7 @@ import (
 	"yingce/backend/internal/model"
 )
 
-func TestAppearanceIconsOpaqueAndSmallAcrossLogoColors(t *testing.T) {
+func TestAppearanceIconsTransparentAndSmallAcrossLogoColors(t *testing.T) {
 	for _, foreground := range []color.NRGBA{{0, 0, 0, 255}, {255, 255, 255, 255}} {
 		source := image.NewNRGBA(image.Rect(0, 0, 128, 128))
 		for y := 40; y < 88; y++ {
@@ -30,19 +30,30 @@ func TestAppearanceIconsOpaqueAndSmallAcrossLogoColors(t *testing.T) {
 			if e != nil || img.Bounds().Dx() != size || img.Bounds().Dy() != size {
 				t.Fatalf("%s decode/size: %v", file, e)
 			}
-			for y := 0; y < size; y++ {
-				for x := 0; x < size; x++ {
-					_, _, _, alpha := img.At(x, y).RGBA()
-					if alpha != 65535 {
-						t.Fatalf("%s has transparent background", file)
+			for edge := 0; edge < size; edge++ {
+				for _, point := range []image.Point{{edge, 0}, {edge, size - 1}, {0, edge}, {size - 1, edge}} {
+					_, _, _, alpha := img.At(point.X, point.Y).RGBA()
+					if alpha != 0 {
+						t.Fatalf("%s has a visible frame", file)
 					}
 				}
 			}
 			center := color.NRGBAModel.Convert(img.At(size/2, size/2)).(color.NRGBA)
-			background := color.NRGBAModel.Convert(img.At(2, 2)).(color.NRGBA)
-			delta := int(center.R) - int(background.R)
-			if delta > -150 && delta < 150 {
-				t.Fatalf("%s lacks contrast: %v / %v", file, center, background)
+			if center != foreground {
+				t.Fatalf("%s changed the mark color: %v", file, center)
+			}
+			hasContrastOutline := false
+			for y := 1; y < size-1; y++ {
+				for x := 1; x < size-1; x++ {
+					c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+					delta := int(c.R) - int(foreground.R)
+					if c.A > 200 && (delta < -150 || delta > 150) {
+						hasContrastOutline = true
+					}
+				}
+			}
+			if !hasContrastOutline {
+				t.Fatalf("%s lacks silhouette contrast", file)
 			}
 		}
 		ico := files["favicon.ico"]

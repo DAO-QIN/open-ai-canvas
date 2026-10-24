@@ -101,7 +101,7 @@ export function FaviconPreview({ src }: { src: string }) {
     return (
         <div className="admin-appearance-favicon-preview" aria-label="浏览器标签图标预览">
             <strong>浏览器标签图标</strong>
-            <p>自动使用当前品牌标记生成，保持清晰底色。更换 Logo 并保存后更新。</p>
+            <p>透明背景，只显示品牌标记。更换 Logo 并保存后更新。</p>
             <div className="admin-appearance-logo-preview-grid">
                 {[false, true].map((dark) => (
                     <div key={String(dark)} className={cn("admin-appearance-favicon-tab", dark && "is-dark")}>
