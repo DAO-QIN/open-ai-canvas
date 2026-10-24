@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"yingce/backend/internal/model"
+	"yingce/backend/internal/platform"
 )
 
 func TestAdminVideoTestUsesDraftDefaultsAndStoresOwnedPreviewWithoutBilling(t *testing.T) {
@@ -41,7 +42,8 @@ func TestAdminVideoTestUsesDraftDefaultsAndStoresOwnedPreviewWithoutBilling(t *t
 	defer upstream.Close()
 	svc, db := newChannelModelTestService(t)
 	svc.dataDir = t.TempDir()
-	if err := db.AutoMigrate(&model.SystemSetting{}, &model.UserOSSSetting{}, &model.StorageLocation{}, &model.UserDailyUploadUsage{}, &model.Resource{}, &model.UploadReservation{}, &model.BillingOrder{}); err != nil {
+	svc.coordinator = platform.NewCoordinatorWithRedis(nil, "video-preview-test")
+	if err := db.AutoMigrate(&model.SystemSetting{}, &model.UserOSSSetting{}, &model.StorageLocation{}, &model.UserDailyUploadUsage{}, &model.UserDailyActivity{}, &model.Resource{}, &model.UploadReservation{}, &model.BillingOrder{}, &model.ApiCallLog{}); err != nil {
 		t.Fatal(err)
 	}
 	admin := &model.User{ID: "preview-admin", Role: model.UserRoleAdmin}
