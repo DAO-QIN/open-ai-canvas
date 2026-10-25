@@ -15,7 +15,7 @@ import (
 )
 
 func TestAppearanceIconsTransparentAndSmallAcrossLogoColors(t *testing.T) {
-	for _, foreground := range []color.NRGBA{{0, 0, 0, 255}, {255, 255, 255, 255}} {
+	for _, foreground := range []color.NRGBA{{0, 0, 0, 255}, {255, 255, 255, 255}, {255, 255, 0, 255}} {
 		source := image.NewNRGBA(image.Rect(0, 0, 128, 128))
 		for y := 40; y < 88; y++ {
 			for x := 48; x < 80; x++ {

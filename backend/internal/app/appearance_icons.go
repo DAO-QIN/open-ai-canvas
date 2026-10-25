@@ -136,8 +136,9 @@ func renderAppearanceIcons(source image.Image) (map[string][]byte, error) {
 	if luminance/weight > 150 {
 		outline = color.NRGBA{24, 24, 24, 255}
 	}
-	// Colorful marks supply their own contrast; a white silhouette blurs small details.
-	needsOutline := chromaticWeight/weight < 0.1
+	// Midtone colorful marks supply contrast; very pale/dark marks still need an edge.
+	meanLuminance := luminance / weight
+	needsOutline := chromaticWeight/weight < 0.1 || meanLuminance > 210 || meanLuminance < 32
 	pngs := make(map[int][]byte)
 	for _, size := range []int{16, 32, 48, 64, 180} {
 		const sampleScale = 4
