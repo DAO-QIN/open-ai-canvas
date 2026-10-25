@@ -26,7 +26,9 @@ func RegisterAppearanceRoutes(r *gin.RouterGroup, svc *service.Service) {
 				return
 			}
 			c.Header("X-Content-Type-Options", "nosniff")
-			c.Header("Cache-Control", "public, no-cache")
+			// CDN browser TTL rules can turn no-cache into a positive cache lifetime.
+			// Only content-versioned URLs are safe to store across logo updates.
+			c.Header("Cache-Control", "no-store")
 			if versioned {
 				c.Header("Cache-Control", "public, max-age=31536000, immutable")
 			}

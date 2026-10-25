@@ -42,6 +42,9 @@ func TestAppearanceIconRoutesBootstrapVersionCacheAndInvalidFiles(t *testing.T) 
 		if strings.Contains(path, "/icons/") && !strings.Contains(rec.Header().Get("Cache-Control"), "immutable") {
 			t.Fatal("content version must be immutable")
 		}
+		if strings.Contains(path, "/icon/") && rec.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("mutable bootstrap must not be stored by browsers or CDNs")
+		}
 		if strings.HasSuffix(path, ".png") {
 			size := 180
 			for _, candidate := range []int{16, 32, 48} {

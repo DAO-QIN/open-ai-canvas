@@ -640,7 +640,7 @@ install 的 Base URL、协议、能力和成本全部从服务端快照读取，
 
 公开外观合同版本为 11，前端确认缓存必须使用同一版本。`GET /public/appearance` 额外返回 `faviconUrl`、`appleTouchIconUrl`。图标独立于网页和画布主题，以当前已发布浅色 Logo 为来源，缺省时使用深色 Logo；无品牌图时使用中性几何标记。服务器裁去透明留白，保留透明背景并仅在品牌轮廓添加细微反色描边，不添加方形底板或边框，生成 16/32/48 像素 ICO、64 像素 PNG 和 180 像素 Apple Touch Icon，不改原始 Logo，不新增数据表或持久外观字段。
 
-- `GET /public/appearance/icon/:file`：首屏可直接访问的当前图标，支持 `favicon.ico`、`favicon.png`、`favicon-16.png`、`favicon-32.png`、`favicon-48.png`、`apple-touch-icon.png`，使用重新验证缓存。原生尺寸 PNG 与 ICO 对应帧完全一致，供后台真实尺寸预览使用。
+- `GET /public/appearance/icon/:file`：首屏可直接访问的当前图标，支持 `favicon.ico`、`favicon.png`、`favicon-16.png`、`favicon-32.png`、`favicon-48.png`、`apple-touch-icon.png`，返回 `Cache-Control: no-store`，避免 CDN 将当前图标的缓存时间提高到固定时长；版本化地址继续长期缓存。原生尺寸 PNG 与 ICO 对应帧完全一致，供后台真实尺寸预览使用。
 - `GET /public/appearance/icons/:version/:file`：来源资源和渲染器版本确定的图标地址，支持一年不可变缓存与 ETag/304；外观其他文案变化不改变地址。仅允许当前发布的来源，旧版本或未知文件返回 404，错误不缓存。
 
 上传资源 ID 对应的文件必须保持不可变。反向代理需保留图标响应的 Content-Type、ETag 与缓存策略；不得将不存在的图标回退成 SPA HTML。前端初始 HTML 使用同源图标入口，解析外观后换为版本地址；后台展示当前已保存图标在浅色、深色标签中的小尺寸效果。
