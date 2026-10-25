@@ -1,4 +1,4 @@
-import { lazy, Suspense, useLayoutEffect, type ReactNode } from "react";
+import { lazy, Suspense, useLayoutEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { ConfigProvider } from "antd";
 
@@ -8,11 +8,14 @@ import { isSpatialWorkbenchPath } from "@/lib/workspace-routes";
 import { getWorkspaceAntThemeConfig } from "@/lib/app-theme";
 import { useWorkspaceButtonFeedback } from "@/hooks/use-workspace-button-feedback";
 import { useUserStore } from "@/stores/use-user-store";
+import { useLoginModalStore } from "@/stores/use-login-modal-store";
 import "@/styles/workspace-product.css";
 import "@/styles/workspace-menus.css";
 
 const workspaceTheme = getWorkspaceAntThemeConfig();
 // 平台唯一的 Agent 面板按需加载，不拖慢首屏；画布编辑器只发布画布上下文，不再自己渲染面板。
+// 登录弹窗只在游客打开时才需要，按需加载。
+const LoginModal = lazy(() => import("@/components/auth/login-modal").then((module) => ({ default: module.LoginModal })));
 const GlobalAgentPanel = lazy(() => import("@/components/canvas/canvas-cloud-agent-panel").then((module) => ({ default: module.CanvasCloudAgentPanel })));
 
 export default function UserLayout({ children }: { children: ReactNode }) {
@@ -22,6 +25,9 @@ export default function UserLayout({ children }: { children: ReactNode }) {
     const canvasEditor = /^\/canvas\/[^/]+(?:\/|$)/.test(pathname);
     const productWorkspace = !adminWorkspace && !canvasEditor;
     const userId = useUserStore((state) => state.user?.id);
+    const loginModalRequested = useLoginModalStore((state) => state.open);
+    const [loginModalMounted, setLoginModalMounted] = useState(false);
+    if (loginModalRequested && !loginModalMounted) setLoginModalMounted(true);
     useWorkspaceButtonFeedback(productWorkspace);
 
     useLayoutEffect(() => {
@@ -40,6 +46,11 @@ export default function UserLayout({ children }: { children: ReactNode }) {
     const globalAgent = userId ? (
         <Suspense fallback={null}>
             <GlobalAgentPanel key={userId} />
+        </Suspense>
+    ) : null;
+    const loginModal = loginModalMounted ? (
+        <Suspense fallback={null}>
+            <LoginModal />
         </Suspense>
     ) : null;
 
@@ -62,6 +73,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
                 <AppWorkspaceShell>{children}</AppWorkspaceShell>
             </div>
             {globalAgent}
+            {loginModal}
         </ConfigProvider>
     );
 }

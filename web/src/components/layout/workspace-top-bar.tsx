@@ -15,6 +15,7 @@ import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { usePromotionOverview } from "@/hooks/use-promotion-overview";
 import { promotionDisplay } from "@/lib/promotion-display";
 import { openWorkspaceWallet } from "@/lib/workspace-wallet";
+import { interceptLoginLinkClick } from "@/stores/use-login-modal-store";
 
 export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef }: { sidebarOpen: boolean; onToggleSidebar: () => void; sidebarToggleRef?: Ref<HTMLButtonElement> }) {
     const brandName = useAppearanceStore((state) => state.appearance.brandName);
@@ -39,7 +40,7 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
             </nav>
             <WorkspaceTopBarExtensionSlot />
             <div className="app-workspace-topbar-actions">
-                {creditsEnabled && !user ? <Link to="/login" className="app-workspace-topbar-credit-pill">登录领积分</Link> : creditsEnabled ? <button type="button" className="app-workspace-topbar-credit-pill" aria-label={`打开积分中心，可用 ${balance} 积分`} onClick={() => openWorkspaceWallet()}>
+                {creditsEnabled && !user ? <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className="app-workspace-topbar-credit-pill">登录领积分</Link> : creditsEnabled ? <button type="button" className="app-workspace-topbar-credit-pill" aria-label={`打开积分中心，可用 ${balance} 积分`} onClick={() => openWorkspaceWallet()}>
                     <WorkspaceCreditGiftMark />
                     <span>积分</span>
                     <strong>{balance}</strong>

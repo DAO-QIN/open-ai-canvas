@@ -42,7 +42,7 @@ import { CreationRecentCanvases } from "./creation-recent-canvases";
 import { CreationAgentEntry } from "./creation-agent-entry";
 import { createCreationSubmitGate } from "./creation-submit-gate";
 import { creationVideoConfig } from "./creation-generation-config";
-import { CreationLoginDialog } from "./creation-login-dialog";
+import { openLoginModal } from "@/stores/use-login-modal-store";
 
 const AssetLibraryPickerModal = lazy(() => import("@/components/assets/asset-library-picker-modal").then((module) => ({ default: module.AssetLibraryPickerModal })));
 const InspirationHall = lazy(() => import("@/pages/inspirations"));
@@ -120,7 +120,6 @@ export default function CreatePage() {
     const [busy, setBusy] = useState(false);
     const [referenceReplacementBusy, setReferenceReplacementBusy] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
-    const [loginDialogOpen, setLoginDialogOpen] = useState(false);
     const [libraryOpen, setLibraryOpen] = useState(false);
     const externalAssetSources = useExternalAssetSources(libraryOpen);
     const abortRef = useRef<AbortController | null>(null);
@@ -590,7 +589,7 @@ export default function CreatePage() {
             return;
         }
         if (!useUserStore.getState().user) {
-            setLoginDialogOpen(true);
+            openLoginModal({ description: "你的创作内容会保留，登录后即可继续创作或创建画布" });
             releaseRetryLock();
             releaseSubmitGate();
             return;
@@ -1092,7 +1091,7 @@ export default function CreatePage() {
                         onOpenLibrary={() => { setAgentMode(false); selectMode("image"); setLibraryOpen(true); }}
                     />
                 </section>
-                <CreationRecentCanvases onRequireLogin={() => setLoginDialogOpen(true)} />
+                <CreationRecentCanvases onRequireLogin={() => openLoginModal({ description: "你的创作内容会保留，登录后即可继续创作或创建画布" })} />
                 <Suspense fallback={<div className="creation-hall-loading" role="status">正在准备灵感大厅…</div>}>
                     <InspirationHall onUse={(item) => startPrompt(item.mode, fillablePrompt(item))} />
                 </Suspense>
@@ -1132,7 +1131,6 @@ export default function CreatePage() {
             </div>}
         </div>
         <CreationHistoryDrawer open={historyOpen} conversations={historyConversations} activeId={activeConversation.id} onNew={startNewConversation} onClose={() => setHistoryOpen(false)} onSelect={selectConversation} onDelete={confirmDeleteConversation} onRename={renameConversationTitle} />
-        <CreationLoginDialog open={loginDialogOpen} onClose={() => setLoginDialogOpen(false)} />
         {libraryOpen ? <Suspense fallback={null}><AssetLibraryPickerModal
             remoteLibrary
             acceptRemoteItems

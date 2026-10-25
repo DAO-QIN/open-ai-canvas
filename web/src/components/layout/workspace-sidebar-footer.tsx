@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { logout } from "@/services/api/auth";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore, type LocalUser } from "@/stores/use-user-store";
+import { interceptLoginLinkClick } from "@/stores/use-login-modal-store";
 
 type WorkspaceSidebarFooterProps = {
     expandedClassName: string;
@@ -106,7 +107,7 @@ export function WorkspaceSidebarFooter({ expandedClassName, collapsedClassName, 
                     </button>
                 </Popover>
             ) : (
-                <Link to="/login" className={cn("flex h-10 items-center rounded-md text-xs text-foreground/65 hover:bg-surface-hover hover:text-foreground", collapsedClassName)} title="登录">
+                <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className={cn("flex h-10 items-center rounded-md text-xs text-foreground/65 hover:bg-surface-hover hover:text-foreground", collapsedClassName)} title="登录">
                     <LogIn className="size-4 shrink-0" /><span className={expandedClassName}>登录</span>
                 </Link>
             )}

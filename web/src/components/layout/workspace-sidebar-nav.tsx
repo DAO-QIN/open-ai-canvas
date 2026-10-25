@@ -18,6 +18,7 @@ import { WorkspaceAccountCard } from "./workspace-account-card";
 import { WorkspaceSidebarCheckin } from "./workspace-sidebar-checkin";
 import { WorkspaceSidebarStorageMeter } from "./workspace-sidebar-storage-meter";
 import { openWorkspaceWallet } from "@/lib/workspace-wallet";
+import { interceptLoginLinkClick } from "@/stores/use-login-modal-store";
 
 export type WorkspaceNavItem = {
     id: string;
@@ -73,7 +74,7 @@ function WorkspaceSidebarProfile({ collapsed, user, onExpand, onCollapse }: { co
 
     if (!user) {
         return (
-            <Link to="/login" className={cn("app-workspace-sidebar-profile", collapsed && "is-collapsed")} aria-label="登录" title="登录">
+            <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className={cn("app-workspace-sidebar-profile", collapsed && "is-collapsed")} aria-label="登录" title="登录">
                 <span className="app-workspace-sidebar-profile-avatar">
                     <CircleUserRound aria-hidden />
                 </span>
