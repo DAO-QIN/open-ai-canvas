@@ -178,7 +178,10 @@ func renderAppearanceIcons(source image.Image) (map[string][]byte, error) {
 		}
 		draw.Draw(out, out.Bounds(), mark, image.Point{}, draw.Over)
 		frame := image.NewNRGBA(image.Rect(0, 0, size, size))
-		draw.BiLinear.Scale(frame, frame.Bounds(), out, out.Bounds(), draw.Src, nil)
+		// Keep the outer pixel transparent instead of letting the filter bleed into it.
+		inner := image.Rect(1, 1, size-1, size-1)
+		sampledInner := image.Rect(sampleScale, sampleScale, (size-1)*sampleScale, (size-1)*sampleScale)
+		draw.BiLinear.Scale(frame, inner, out, sampledInner, draw.Src, nil)
 		var encoded bytes.Buffer
 		if err := png.Encode(&encoded, frame); err != nil {
 			return nil, err
