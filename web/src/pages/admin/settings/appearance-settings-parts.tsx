@@ -105,9 +105,9 @@ export function FaviconPreview({ src }: { src: string }) {
             <div className="admin-appearance-logo-preview-grid">
                 {[false, true].map((dark) => (
                     <div key={String(dark)} className={cn("admin-appearance-favicon-tab", dark && "is-dark")}>
-                        <img src={src} width={16} height={16} alt="" />
+                        <img src={src.replace(/favicon\.png$/, "favicon-16.png")} width={16} height={16} alt="" />
                         <span>{dark ? "深色标签" : "浅色标签"}</span>
-                        <img src={src} width={32} height={32} alt="" />
+                        <img src={src.replace(/favicon\.png$/, "favicon-32.png")} width={32} height={32} alt="" />
                     </div>
                 ))}
             </div>

@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -47,7 +48,7 @@ func TestAppearanceIconsTransparentAndSmallAcrossLogoColors(t *testing.T) {
 				for x := 1; x < size-1; x++ {
 					c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
 					delta := int(c.R) - int(foreground.R)
-					if c.A > 200 && (delta < -150 || delta > 150) {
+					if c.A > 32 && (delta < -150 || delta > 150) {
 						hasContrastOutline = true
 					}
 				}
@@ -67,10 +68,45 @@ func TestAppearanceIconsTransparentAndSmallAcrossLogoColors(t *testing.T) {
 			if e != nil || img.Bounds().Dx() != size || int(entry[0]) != size {
 				t.Fatalf("invalid ICO frame %d: %v", size, e)
 			}
+			if !bytes.Equal(ico[offset:offset+n], files[fmt.Sprintf("favicon-%d.png", size)]) {
+				t.Fatalf("preview differs from the native %dpx frame", size)
+			}
 		}
 	}
 	if _, err := renderAppearanceIcons(image.NewNRGBA(image.Rect(0, 0, 32, 32))); err == nil {
 		t.Fatal("transparent source should be rejected")
+	}
+}
+
+func TestAppearanceIconsColorfulMarkHasNoWhiteHaloAndUsesSmallCanvas(t *testing.T) {
+	source := image.NewNRGBA(image.Rect(0, 0, 96, 64))
+	for y := 0; y < 64; y++ {
+		for x := 0; x < 96; x++ {
+			source.SetNRGBA(x, y, color.NRGBA{24, 72, 224, 255})
+		}
+	}
+	files, err := renderAppearanceIcons(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := png.Decode(bytes.NewReader(files["favicon-16.png"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	visible := image.Rectangle{}
+	for y := 0; y < 16; y++ {
+		for x := 0; x < 16; x++ {
+			c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+			if c.A > 32 {
+				visible = visible.Union(image.Rect(x, y, x+1, y+1))
+				if c.R > 35 || c.G > 85 || c.B < 210 {
+					t.Fatalf("colorful mark acquired a neutral halo: %v", c)
+				}
+			}
+		}
+	}
+	if visible.Dx() < 14 || visible.Min.X < 1 || visible.Max.X > 15 {
+		t.Fatalf("small mark should use 14px with transparent margins: %v", visible)
 	}
 }
 

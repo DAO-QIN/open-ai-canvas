@@ -14,7 +14,7 @@ import (
 	"golang.org/x/image/draw"
 )
 
-const appearanceIconRendererVersion = "icon-v2-transparent"
+const appearanceIconRendererVersion = "icon-v3-small-mark"
 
 func appearanceIconSource(value AppearanceSetting) (string, string) {
 	if value.LogoResourceID != "" {
@@ -38,7 +38,7 @@ func appearanceIconURL(value AppearanceSetting, file string) string {
 // Only the installation's currently published brand mark may be rendered publicly.
 // The URL identifies both the source and renderer; page themes never participate.
 func (s *Service) AppearanceIcon(version, file string) ([]byte, string, error) {
-	if file != "favicon.png" && file != "favicon.ico" && file != "apple-touch-icon.png" {
+	if file != "favicon.png" && file != "favicon.ico" && file != "favicon-16.png" && file != "favicon-32.png" && file != "favicon-48.png" && file != "apple-touch-icon.png" {
 		return nil, "", NotFound("站点图标不存在")
 	}
 	_, value, err := s.readAppearance()
@@ -112,7 +112,7 @@ func renderAppearanceIcons(source image.Image) (map[string][]byte, error) {
 	}
 	bounds := source.Bounds()
 	crop := image.Rectangle{}
-	var luminance, weight float64
+	var luminance, weight, chromaticWeight float64
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			c := color.NRGBAModel.Convert(source.At(x, y)).(color.NRGBA)
@@ -124,6 +124,9 @@ func renderAppearanceIcons(source image.Image) (map[string][]byte, error) {
 			w := float64(c.A)
 			luminance += (0.2126*float64(c.R) + 0.7152*float64(c.G) + 0.0722*float64(c.B)) * w
 			weight += w
+			if int(max(c.R, c.G, c.B))-int(min(c.R, c.G, c.B)) >= 48 {
+				chromaticWeight += w
+			}
 		}
 	}
 	if crop.Empty() {
@@ -133,40 +136,50 @@ func renderAppearanceIcons(source image.Image) (map[string][]byte, error) {
 	if luminance/weight > 150 {
 		outline = color.NRGBA{24, 24, 24, 255}
 	}
+	// Colorful marks supply their own contrast; a white silhouette blurs small details.
+	needsOutline := chromaticWeight/weight < 0.1
 	pngs := make(map[int][]byte)
 	for _, size := range []int{16, 32, 48, 64, 180} {
-		out := image.NewNRGBA(image.Rect(0, 0, size, size))
-		padding := max(2, size/8)
-		available := size - 2*padding
+		const sampleScale = 4
+		out := image.NewNRGBA(image.Rect(0, 0, size*sampleScale, size*sampleScale))
+		padding := max(1, size/16)
+		if needsOutline {
+			padding++
+		}
+		available := (size - 2*padding) * sampleScale
 		w, h := available, available
 		if crop.Dx() > crop.Dy() {
 			h = max(1, available*crop.Dy()/crop.Dx())
 		} else {
 			w = max(1, available*crop.Dx()/crop.Dy())
 		}
-		x, y := (size-w)/2, (size-h)/2
+		x, y := (size*sampleScale-w)/2, (size*sampleScale-h)/2
 		mark := image.NewNRGBA(out.Bounds())
 		draw.CatmullRom.Scale(mark, image.Rect(x, y, x+w, y+h), source, crop, draw.Src, nil)
-		// Contrast follows the mark's silhouette, never a rectangular tile.
-		radius := max(1, size/64)
-		for y := 0; y < size; y++ {
-			for x := 0; x < size; x++ {
-				alpha := uint8(0)
-				for dy := -radius; dy <= radius; dy++ {
-					for dx := -radius; dx <= radius; dx++ {
-						if dx*dx+dy*dy <= radius*radius {
-							alpha = max(alpha, mark.NRGBAAt(x+dx, y+dy).A)
+		// Monochrome marks keep a subpixel contrast edge, never a rectangular tile.
+		if needsOutline {
+			radius := max(2, size/32)
+			for y := 0; y < out.Bounds().Dy(); y++ {
+				for x := 0; x < out.Bounds().Dx(); x++ {
+					alpha := uint8(0)
+					for dy := -radius; dy <= radius; dy++ {
+						for dx := -radius; dx <= radius; dx++ {
+							if dx*dx+dy*dy <= radius*radius {
+								alpha = max(alpha, mark.NRGBAAt(x+dx, y+dy).A)
+							}
 						}
 					}
+					c := outline
+					c.A = alpha
+					out.SetNRGBA(x, y, c)
 				}
-				c := outline
-				c.A = alpha
-				out.SetNRGBA(x, y, c)
 			}
 		}
 		draw.Draw(out, out.Bounds(), mark, image.Point{}, draw.Over)
+		frame := image.NewNRGBA(image.Rect(0, 0, size, size))
+		draw.BiLinear.Scale(frame, frame.Bounds(), out, out.Bounds(), draw.Src, nil)
 		var encoded bytes.Buffer
-		if err := png.Encode(&encoded, out); err != nil {
+		if err := png.Encode(&encoded, frame); err != nil {
 			return nil, err
 		}
 		pngs[size] = encoded.Bytes()
@@ -188,5 +201,5 @@ func renderAppearanceIcons(source image.Image) (map[string][]byte, error) {
 	for _, size := range []int{16, 32, 48} {
 		ico.Write(pngs[size])
 	}
-	return map[string][]byte{"favicon.png": pngs[64], "favicon.ico": ico.Bytes(), "apple-touch-icon.png": pngs[180]}, nil
+	return map[string][]byte{"favicon.png": pngs[64], "favicon.ico": ico.Bytes(), "favicon-16.png": pngs[16], "favicon-32.png": pngs[32], "favicon-48.png": pngs[48], "apple-touch-icon.png": pngs[180]}, nil
 }

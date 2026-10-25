@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"fmt"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +33,7 @@ func TestAppearanceIconRoutesBootstrapVersionCacheAndInvalidFiles(t *testing.T) 
 	}
 	router := gin.New()
 	RegisterAppearanceRoutes(router.Group("/api"), svc)
-	for _, path := range []string{"/api/public/appearance/icon/favicon.ico", appearance.FaviconURL, appearance.AppleTouchIconURL} {
+	for _, path := range []string{"/api/public/appearance/icon/favicon.ico", appearance.FaviconURL, appearance.AppleTouchIconURL, "/api/public/appearance/icon/favicon-16.png", strings.Replace(appearance.FaviconURL, "favicon.ico", "favicon-32.png", 1), strings.Replace(appearance.FaviconURL, "favicon.ico", "favicon-48.png", 1)} {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusOK || rec.Header().Get("ETag") == "" || rec.Header().Get("X-Content-Type-Options") != "nosniff" {
@@ -42,9 +43,15 @@ func TestAppearanceIconRoutesBootstrapVersionCacheAndInvalidFiles(t *testing.T) 
 			t.Fatal("content version must be immutable")
 		}
 		if strings.HasSuffix(path, ".png") {
+			size := 180
+			for _, candidate := range []int{16, 32, 48} {
+				if strings.HasSuffix(path, fmt.Sprintf("favicon-%d.png", candidate)) {
+					size = candidate
+				}
+			}
 			img, e := png.Decode(bytes.NewReader(rec.Body.Bytes()))
-			if e != nil || img.Bounds().Dx() != 180 {
-				t.Fatalf("touch icon: %v", e)
+			if e != nil || img.Bounds().Dx() != size || img.Bounds().Dy() != size {
+				t.Fatalf("PNG icon %s: %v", path, e)
 			}
 		}
 		req := httptest.NewRequest(http.MethodGet, path, nil)
