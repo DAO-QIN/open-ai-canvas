@@ -13,7 +13,7 @@ describe("workspace route loading", () => {
 
         expect(deferred).toContain("<WorkspaceRouteLoader />");
         expect(deferred).not.toContain("FullScreenLoader");
-        expect(router).toContain("fullScreenDeferred(<LoginPage />)");
+        expect(router).toContain('<AuthRouteRedirect view="login" />');
         expect(router).toContain("fullScreenDeferred(<SharedCanvasPage />)");
     });
 

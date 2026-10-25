@@ -173,8 +173,8 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
                 </div>
             </WorkspaceTopBarExtensionProvider>
             <WorkspaceWalletHost />
-            <ModelSetupGuide hidden={pathname === "/login" || pathname === "/register" || pathname.startsWith("/admin")} />
-            {!hideChrome && pathname !== "/login" && pathname !== "/register" ? <FloatingFeedbackWidget /> : null}
+            <ModelSetupGuide hidden={pathname.startsWith("/admin")} />
+            {!hideChrome ? <FloatingFeedbackWidget /> : null}
         </>
     );
 }

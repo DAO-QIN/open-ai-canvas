@@ -21,7 +21,7 @@ export function useWorkspaceLogout() {
             await logout();
             await applyUserSession({ user: null });
             message.success("已退出登录");
-            navigate("/login", { replace: true });
+            navigate("/", { replace: true });
         } catch (error) {
             message.error(error instanceof Error ? error.message : "退出失败");
         } finally {

@@ -68,17 +68,15 @@ test("appearance selects theme logos and falls back to the single configured log
     expect(single.logoFrameEnabled).toBe(true);
 });
 
-test("auth scene consumes resolved appearance instead of hardcoded media constants", async () => {
-    const source = await Bun.file(new URL("../src/pages/auth/auth-scene.tsx", import.meta.url)).text();
+test("auth modal showcase consumes resolved appearance instead of hardcoded media constants", async () => {
+    const source = await Bun.file(new URL("../src/components/auth/login-modal.tsx", import.meta.url)).text();
 
     expect(source).toContain("appearance.authVideoUrl");
     expect(source).toContain("appearance.authVideoAutoplay");
-    expect(source).toContain("appearance.authVideoPosterUrl || undefined");
+    expect(source).toContain("poster={posterURL || undefined}");
     expect(source).toContain("appearance.brandName");
     expect(source).toContain("appearance.authHeroTitle");
     expect(source).toContain("appearance.authHeroDescription");
-    expect(source).toContain("useThemeStore((state) => state.theme)");
-    expect(source).toContain("theme={theme}");
     expect(source).not.toContain("让一个故事，");
     expect(source).not.toContain("AUTH_VIDEO_URL");
     expect(source).not.toContain("AUTH_VIDEO_POSTER");

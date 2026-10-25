@@ -1,8 +1,12 @@
-/* 全站登录弹窗：左侧作品轮播 + 右侧登录面板，窄屏只保留右侧。 */
+/* 全站登录弹窗：左侧品牌影片 + 右侧登录/注册/找回密码，窄屏只保留右侧。 */
+
+.login-modal-root {
+    --login-modal-bg: var(--workspace-surface-strong, var(--background));
+}
 
 .login-modal-root .ant-modal-container {
     border-radius: 28px !important;
-    background: var(--workspace-surface-strong, var(--background)) !important;
+    background: var(--login-modal-bg) !important;
     box-shadow: 0 32px 90px -24px rgb(0 0 0 / 0.45) !important;
 }
 
@@ -14,7 +18,7 @@
 .login-modal-shell {
     display: grid;
     grid-template-columns: minmax(0, 1.18fr) minmax(360px, 1fr);
-    height: min(640px, calc(100dvh - 48px));
+    height: min(680px, calc(100dvh - 48px));
     min-height: 520px;
     padding: 10px;
     gap: 10px;
@@ -28,6 +32,37 @@
     border-radius: 20px;
     background: #0b1220;
     isolation: isolate;
+}
+
+.login-modal-media {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.login-modal-play {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid rgb(255 255 255 / 0.26);
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.32);
+    backdrop-filter: blur(12px);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.login-modal-play:hover {
+    background: rgb(0 0 0 / 0.48);
 }
 
 .login-modal-slide {
@@ -66,71 +101,36 @@
     position: absolute;
     inset: auto 0 0 0;
     z-index: 2;
-    padding: 0 32px 30px;
+    padding: 0 32px 32px;
     color: #fff;
+    pointer-events: none;
 }
 
-.login-modal-chip {
-    display: inline-flex;
-    align-items: center;
-    height: 22px;
-    padding: 0 9px;
-    border-radius: 999px;
-    border: 1px solid rgb(255 255 255 / 0.28);
-    background: rgb(255 255 255 / 0.12);
-    backdrop-filter: blur(10px);
+.login-modal-eyebrow {
+    margin: 0;
+    color: rgb(255 255 255 / 0.66);
     font-size: 11px;
-    letter-spacing: 0.04em;
+    font-weight: 600;
+    letter-spacing: 0.18em;
 }
 
 .login-modal-showcase-copy h3 {
-    margin: 12px 0 0;
+    margin: 10px 0 0;
     color: #fff;
-    font-size: 28px;
+    font-size: 30px;
     font-weight: 700;
-    line-height: 1.25;
-    letter-spacing: 0.01em;
+    line-height: 1.3;
+    white-space: pre-line;
 }
 
-.login-modal-showcase-copy p {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    margin: 8px 0 0;
+.login-modal-hero-desc {
+    margin: 10px 0 0;
     color: rgb(255 255 255 / 0.78);
     font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-line;
 }
 
-.login-modal-divider {
-    width: 1px;
-    height: 12px;
-    background: rgb(255 255 255 / 0.4);
-}
-
-.login-modal-dots {
-    display: flex;
-    gap: 6px;
-    margin-top: 18px;
-}
-
-.login-modal-dots button {
-    width: 6px;
-    height: 6px;
-    padding: 0;
-    border: 0;
-    border-radius: 999px;
-    background: rgb(255 255 255 / 0.4);
-    cursor: pointer;
-    transition:
-        width 300ms ease,
-        background 300ms ease;
-}
-
-.login-modal-dots button[data-active="true"] {
-    width: 20px;
-    background: #fff;
-}
 
 /* ---------- 右侧登录面板 ---------- */
 
@@ -168,17 +168,76 @@
 
 .login-modal-main {
     display: flex;
-    flex: 1;
+    flex: 0 0 auto;
     flex-direction: column;
-    justify-content: center;
     width: 100%;
-    max-width: 340px;
+    max-width: 360px;
     margin: 0 auto;
-    padding: 48px 4px 20px;
+    padding: 12px 4px 20px;
+}
+
+/* 品牌 + 表单整体在面板中垂直居中；登录视图的底部入口贴底。 */
+.login-modal-main:last-child {
+    margin-bottom: auto;
+    padding-bottom: 28px;
+}
+
+.login-modal-pane[data-view="register"] .login-modal-brand {
+    padding-top: 28px;
+}
+
+.login-modal-main[data-dense="true"] .login-modal-form {
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.login-modal-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.login-modal-inline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+}
+
+.login-modal-inline .ant-btn {
+    border-radius: 12px;
+}
+
+.login-modal-switch {
+    margin: 18px 0 0;
+    text-align: center;
+    font-size: 13px;
+    color: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+
+.login-modal-switch button {
+    margin-left: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--foreground);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.login-modal-switch button:hover {
+    text-decoration: underline;
+}
+
+.login-modal-form .auth-agreement-row {
+    margin-top: 2px;
 }
 
 .login-modal-brand {
     display: flex;
+    flex-shrink: 0;
+    margin-top: auto;
+    padding-top: 40px;
     align-items: center;
     justify-content: center;
     gap: 8px;
@@ -222,6 +281,10 @@
 }
 
 .login-modal-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
     font-size: 12px;
     color: color-mix(in srgb, var(--foreground) 55%, transparent);
     transition: color 160ms ease;
@@ -262,6 +325,7 @@
 .login-modal-alts {
     display: grid;
     flex-shrink: 0;
+    margin-top: auto;
     padding: 6px 0 14px;
 }
 
@@ -328,8 +392,16 @@
         display: none;
     }
 
+    .login-modal-brand {
+        padding-top: 36px;
+    }
+
     .login-modal-main {
-        padding: 44px 12px 12px;
+        padding: 10px 12px 12px;
+    }
+
+    .login-modal-pair {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .login-modal-title {

@@ -16,7 +16,7 @@ describe("authentication follows the application theme", () => {
             ["dark", "#08090c", "#0b0c10", "#121318"],
         ] as const) {
             const variables = skinCSSVariables(DEFAULT_CLASSIC_SKIN, mode);
-            const modeCSS = mode === "dark" ? dark : css.slice(0, css.indexOf(".auth-scene {"));
+            const modeCSS = mode === "dark" ? dark : css.slice(0, css.indexOf(".auth-scene-muted {"));
             expect(variables["--auth-page-bg"]).toBe(background);
             expect(variables["--auth-panel-bg"]).toBe(panel);
             expect(variables["--auth-card-bg"]).toBe(card);
@@ -26,35 +26,32 @@ describe("authentication follows the application theme", () => {
         }
     });
 
-    test("auth inherits the global Ant Design provider instead of forcing dark controls", () => {
-        const scene = source("pages/auth/auth-scene.tsx");
-        expect(scene).not.toContain("ConfigProvider");
-        expect(scene).not.toContain("getAntThemeConfig");
-        expect(scene).not.toContain("auth-card-dark");
-        expect(scene.match(/<main className="([^"]+)"/)?.[1]).not.toContain("text-white");
-        expect(scene).toContain("auth-scene-hero");
-        expect(scene).toContain("<BrandLogo theme={theme}");
+    test("auth modal inherits the global Ant Design provider and brand logo", () => {
+        const modal = source("components/auth/login-modal.tsx");
+        expect(modal).not.toContain("ConfigProvider");
+        expect(modal).not.toContain("getAntThemeConfig");
+        expect(modal).toContain("<BrandLogo");
         expect(source("components/layout/app-providers.tsx")).toContain("getAntThemeConfig(dark, appearance.activeSkin)");
     });
 
-    test("form labels, links and notices do not assume white text", () => {
-        for (const page of ["login", "register", "forgot-password"]) {
-            const form = source(`pages/auth/${page}.tsx`);
+    test("modal forms, links and notices do not assume white text", () => {
+        for (const view of ["login", "register", "forgot"]) {
+            const form = source(`components/auth/auth-modal-${view}.tsx`);
             expect(form).not.toMatch(/(?:text|border|bg)-white/);
             expect(form).not.toMatch(/text-(?:blue|amber)-[123]00/);
-            expect(form).toContain("auth-scene-label");
             expect(form).toContain("auth-scene-icon");
         }
-        expect(source("pages/auth/register.tsx")).toContain("auth-scene-notice");
-        expect(source("pages/auth/forgot-password.tsx")).toContain("auth-scene-notice");
+        expect(source("components/auth/auth-modal-register.tsx")).toContain("auth-scene-notice");
+        expect(source("components/auth/auth-modal-forgot.tsx")).toContain("<Notice");
     });
 
     test("focus and autofill keep theme-aware foregrounds and visible focus", () => {
         const css = source("styles/globals.css");
         expect(css).not.toContain(".auth-card-dark");
-        expect(css).toContain(".auth-scene-card input:-webkit-autofill");
+        expect(css).not.toContain(".auth-scene-hero");
+        expect(css).toContain(".login-modal-pane input:-webkit-autofill");
         expect(css).toContain("-webkit-text-fill-color: var(--foreground) !important");
-        expect(css).toContain("box-shadow: 0 0 0 1000px var(--auth-card-bg) inset !important");
+        expect(css).toContain("box-shadow: 0 0 0 1000px var(--login-modal-bg, var(--background)) inset !important");
         expect(css).toContain(".auth-scene-link:focus-visible");
         expect(css).toContain("box-shadow: 0 0 0 var(--focus-ring-width) color-mix(in srgb, var(--ring) 18%, transparent)");
     });

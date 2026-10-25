@@ -5,7 +5,7 @@ import { RequireAuth } from "@/components/auth/require-auth";
 import { FullScreenLoader, WorkspaceRouteLoader } from "@/components/ui/aceternity/full-screen-loader";
 import { loadAssetsPage, loadCanvasPage, loadCanvasProjectPage, loadCreatePage, loadProjectDetailPage, loadProjectsPage } from "@/lib/workspace-route-modules";
 import { CanvasRefreshShell } from "@/pages/canvas/canvas-refresh-shell";
-import { AuthScene } from "@/pages/auth/auth-scene";
+import { AuthRouteRedirect } from "@/components/auth/auth-route-redirect";
 import RouteErrorPage from "@/pages/route-error";
 import { isGuestWorkspacePath } from "@/lib/guest-workspace";
 
@@ -43,9 +43,6 @@ const StoryboardPromptsPage = lazy(() => import("@/pages/admin/storyboard-prompt
 const AdminFeedbacksPage = lazy(() => import("@/pages/admin/feedbacks/feedbacks-page"));
 const UsersPage = lazy(() => import("@/pages/admin/users/users-page"));
 const AssetsPage = lazy(loadAssetsPage);
-const LoginPage = lazy(() => import("@/pages/auth/login"));
-const RegisterPage = lazy(() => import("@/pages/auth/register"));
-const ForgotPasswordPage = lazy(() => import("@/pages/auth/forgot-password"));
 const CanvasPage = lazy(loadCanvasPage);
 const CanvasProjectPage = lazy(loadCanvasProjectPage);
 const SharedCanvasPage = lazy(() => import("@/pages/canvas/shared"));
@@ -105,15 +102,10 @@ function devRoutes() {
 }
 
 export const router = createBrowserRouter([
-    {
-        element: <AuthScene />,
-        errorElement: <RouteErrorPage />,
-        children: [
-            { path: "/login", element: fullScreenDeferred(<LoginPage />) },
-            { path: "/register", element: fullScreenDeferred(<RegisterPage />) },
-            { path: "/forgot-password", element: fullScreenDeferred(<ForgotPasswordPage />) },
-        ],
-    },
+    // 登录、注册、找回密码统一在工作台弹窗里完成；旧地址只负责打开对应视图。
+    { path: "/login", element: <AuthRouteRedirect view="login" />, errorElement: <RouteErrorPage /> },
+    { path: "/register", element: <AuthRouteRedirect view="register" />, errorElement: <RouteErrorPage /> },
+    { path: "/forgot-password", element: <AuthRouteRedirect view="forgot" />, errorElement: <RouteErrorPage /> },
     { path: "/share/canvas/:token", element: fullScreenDeferred(<SharedCanvasPage />), errorElement: <RouteErrorPage /> },
     ...(import.meta.env.DEV ? devRoutes() : []),
     {
