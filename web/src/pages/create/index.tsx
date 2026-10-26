@@ -42,7 +42,7 @@ import { CreationComposer, CreationEmptySuggest, CreationHistoryDrawer, Creation
 import { declaredInspirationSources } from "@/lib/inspirations/catalog";
 import { fillablePrompt } from "@/lib/inspirations/resolve";
 import { CreationRecentCanvases } from "./creation-recent-canvases";
-import { CreationAgentEntry } from "./creation-agent-entry";
+import { CreationAgentWorkspace } from "./creation-agent-workspace";
 import { createCreationSubmitGate } from "./creation-submit-gate";
 import { creationEntryAttachmentConfig, creationImportPayload, isLocalConversationId, mergeCreationMessages, mergeCreationSessions } from "./creation-session-sync";
 import { creationVideoConfig } from "./creation-generation-config";
@@ -1254,6 +1254,34 @@ export default function CreatePage() {
     };
 
 
+    // Agent 模式与普通模式共用同一个创作会话；首次发送时才在服务端建会话。
+    const ensureAgentSession = async (title: string) => {
+        const current = conversationsRef.current.find((item) => item.id === activeIdRef.current) || activeConversation;
+        if (current.serverBacked) return current.id;
+        const session = await createCreationSession({ title, mode: "agent" });
+        const replaced = conversationsRef.current.map((item) => item.id === current.id ? { ...item, id: session.id, title: session.title, serverBacked: true, updatedAt: session.updatedAt } : item);
+        conversationsRef.current = replaced.some((item) => item.id === session.id) ? replaced : [serverConversation(session), ...replaced];
+        setConversations(conversationsRef.current);
+        loadedEntriesRef.current.add(session.id);
+        activeIdRef.current = session.id;
+        setActiveId(session.id);
+        navigate(creationPath(session.id, "agent"), { replace: true });
+        return session.id;
+    };
+
+    if (agentMode) return <>
+        <div className="creation-home relative flex h-full min-h-0 flex-col overflow-hidden">
+            <CreationAgentWorkspace
+                sessionId={activeConversation.serverBacked ? activeConversation.id : undefined}
+                ensureSession={ensureAgentSession}
+                onNewConversation={startNewConversation}
+                onOpenHistory={() => setHistoryOpen(true)}
+                onExit={() => setAgentMode(false)}
+            />
+        </div>
+        <CreationHistoryDrawer open={historyOpen} conversations={historyConversations} activeId={activeConversation.id} onNew={startNewConversation} onClose={() => setHistoryOpen(false)} onSelect={selectConversation} onDelete={confirmDeleteConversation} onRename={renameConversationTitle} hasMore={Boolean(sessionCursor)} loadingMore={loadingMoreSessions} onLoadMore={() => void loadMoreSessions()} />
+    </>;
+
     return <>
         <div className="creation-home relative flex h-full min-h-0 flex-col overflow-hidden">
             {isEmpty ? <>
@@ -1281,7 +1309,7 @@ export default function CreatePage() {
                     </header>
                     <div className={cn("creation-composer-stage is-home-mode", agentMode && "is-agent-mode")}>
                         <CreationModeTabs mode={mode} agentActive={agentMode} onAgentSelect={() => setAgentMode(true)} onModeChange={(next) => { setAgentMode(false); selectMode(next); }} />
-                        {agentMode ? <CreationAgentEntry /> : <div className="creation-empty-composer"><CreationComposer {...composerProps} variant="empty" /></div>}
+                        <div className="creation-empty-composer"><CreationComposer {...composerProps} variant="empty" /></div>
                     </div>
                     <CreationEmptySuggest
                         onStartPrompt={startPrompt}

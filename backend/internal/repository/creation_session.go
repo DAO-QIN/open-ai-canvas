@@ -594,3 +594,34 @@ func (r *Repository) SetCreationSessionActivity(userID, id string, at time.Time)
 		Where("id = ? AND user_id = ? AND deleted_at IS NULL", id, userID).
 		UpdateColumn("updated_at", at).Error
 }
+
+// LatestCreationAgentItem 返回某条公开内容的最新版本；不存在时返回 nil。
+func (r *Repository) LatestCreationAgentItem(userID, sessionID, itemID string) (*model.CreationAgentEvent, error) {
+	var event model.CreationAgentEvent
+	err := r.db.Where("session_id = ? AND user_id = ? AND item_id = ?", sessionID, userID, itemID).Order("seq DESC").First(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &event, nil
+}
+
+// CreationAgentRequestEvent 返回同一会话内带该 requestId 的公开事件；不存在时返回 nil。
+func (r *Repository) CreationAgentRequestEvent(sessionID, requestID string) (*model.CreationAgentEvent, error) {
+	return findCreationAgentRequest(r.db, sessionID, []CreationAgentEventInput{{RequestID: requestID}})
+}
+
+// LatestCreationAgentItemForRun 返回某轮次某类型最新的公开事件；不存在时返回 nil。
+func (r *Repository) LatestCreationAgentItemForRun(userID, sessionID, runID, eventType string) (*model.CreationAgentEvent, error) {
+	var event model.CreationAgentEvent
+	err := r.db.Where("session_id = ? AND user_id = ? AND run_id = ? AND type = ?", sessionID, userID, runID, eventType).Order("seq DESC").First(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &event, nil
+}

@@ -12,6 +12,11 @@ import (
 	"yingce/backend/internal/model"
 )
 
+// CloudAgentJournalAppended 在追加 Agent 事件的同一事务里被调用，records 只含本次新增的事件。
+// 首页创作会话用它把内部事件整理成会话级公开事件（docs/design/home-agent.md §5.4），
+// 保证公开事件与运行状态同时提交或同时回滚。为空时不做任何事。
+var CloudAgentJournalAppended func(tx *Repository, run *model.CloudAgentExecution, records []model.CloudAgentEventRecord) error
+
 func (r *Repository) CloudAgentPiSession(userID, runID string) (*model.CloudAgentPiSession, error) {
 	var session model.CloudAgentPiSession
 	err := r.db.First(&session, "run_id = ? AND user_id = ?", runID, userID).Error
@@ -58,8 +63,14 @@ func (r *Repository) EnsureCloudAgent(run *model.CloudAgentExecution) error {
 		}
 	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(run).Error; err != nil {
-			return err
+		created := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(run)
+		if created.Error != nil {
+			return created.Error
+		}
+		if created.RowsAffected == 1 && CloudAgentJournalAppended != nil && len(run.Journal) > 0 {
+			if err := CloudAgentJournalAppended(New(tx), run, run.Journal); err != nil {
+				return err
+			}
 		}
 		// The marker excludes completed Pi carriers (still text_replay) from
 		// reservation scans. It is not a cached busy/idle or permission flag.
@@ -290,11 +301,18 @@ func (r *Repository) MutateCloudAgent(userID, id string, revision int64, fn func
 		if err = tx.Omit("Journal", "Transcript").Save(run).Error; err != nil {
 			return err
 		}
+		appended := make([]model.CloudAgentEventRecord, 0, 4)
 		for _, event := range run.Journal {
 			if event.Sequence <= previousEvents {
 				continue
 			}
 			if err = tx.Create(&event).Error; err != nil {
+				return err
+			}
+			appended = append(appended, event)
+		}
+		if len(appended) > 0 && CloudAgentJournalAppended != nil {
+			if err = CloudAgentJournalAppended(New(tx), run, appended); err != nil {
 				return err
 			}
 		}

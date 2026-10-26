@@ -15,3 +15,14 @@ type CreationResultResource = app.CreationResultResource
 type SubmitCreationEntryRequest = app.SubmitCreationEntryRequest
 type ImportCreationSessionsRequest = app.ImportCreationSessionsRequest
 type ImportCreationSessionsResult = app.ImportCreationSessionsResult
+
+// 首页创作会话的 Agent。
+type CreationAgentItem = app.CreationAgentItem
+type CreationAgentSnapshotView = app.CreationAgentSnapshotView
+type CreationAgentHistoryView = app.CreationAgentHistoryView
+type CreationAgentEventsView = app.CreationAgentEventsView
+type CreationAgentMessageRequest = app.CreationAgentMessageRequest
+type CreationAgentMessageResult = app.CreationAgentMessageResult
+type CreationAgentAnswerRequest = app.CreationAgentAnswerRequest
+type CreationAgentDecisionRequest = app.CreationAgentDecisionRequest
+type CreationAgentDecisionResult = app.CreationAgentDecisionResult
