@@ -50,6 +50,9 @@ const (
 	ReasonCreationSessionNotFound ErrorReason = "creation_session_not_found"
 	ReasonCreationSessionBusy     ErrorReason = "creation_session_busy"
 	ReasonCreationEntryNotFound   ErrorReason = "creation_entry_not_found"
+	ReasonQuestionAnswered        ErrorReason = "question_answered"
+	ReasonProposalNotPending      ErrorReason = "proposal_not_pending"
+	ReasonQuoteChanged            ErrorReason = "quote_changed"
 )
 
 func ReasonForStatus(status int) ErrorReason {

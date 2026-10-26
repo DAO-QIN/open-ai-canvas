@@ -41,6 +41,9 @@ const (
 	ReasonCreationSessionNotFound = kernel.ReasonCreationSessionNotFound
 	ReasonCreationSessionBusy     = kernel.ReasonCreationSessionBusy
 	ReasonCreationEntryNotFound   = kernel.ReasonCreationEntryNotFound
+	ReasonQuestionAnswered        = kernel.ReasonQuestionAnswered
+	ReasonProposalNotPending      = kernel.ReasonProposalNotPending
+	ReasonQuoteChanged            = kernel.ReasonQuoteChanged
 )
 
 func ReasonForStatus(status int) ErrorReason {

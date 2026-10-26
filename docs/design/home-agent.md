@@ -410,6 +410,13 @@ data:{"id":"<itemId>","seq":12,"position":10,"type":"output","turnId":"<runId>",
 - 自动继续：关闭时生成完成即结束本轮；开启时失败续跑一轮说明原因，成功只在计划还有 `pending` 步骤时续跑，否则直接结束本轮（不额外花一次模型调用）。
 - 系统提示词：`agent-system-policy.md` v19 增加“首页创作会话”一节；执行上下文在首页会话里带 `target: "creation"`。
 
+### 8.3.2 PR5–PR7 实现说明
+
+- 公开事件：仓储层在追加运行日志的同一事务里回调整理器（`repository.CloudAgentJournalAppended`），把 `target=creation` 运行的内部事件整理成 §7.2 的公开事件。方案卡、结果卡等同一条内容的每个版本都是完整内容，快照只取最新版本。
+- 流式正文不落库：事件流每秒检查一次，把当前步骤的草稿正文作为 `event:live` 帧附带。
+- 方案决定：`decision` 转调画布审批决定；`expectedCreditsMicrocredits` 与当前报价不符时 `409 quote_changed`。方案卡编辑提示词、数量和实时报价（原 PR6 的其余部分）尚未实现，审批时可改模型和规格。
+- 首页界面：Agent 模式下首页切换为 Agent 工作区（时间线、计划浮条、选择题、方案卡、结果卡、用量行、停止），复用画布 Agent 的正文、计划与选择题组件；右下角的画布助手入口在首页 Agent 模式下隐藏。
+
 ### 8.4 预算
 
 - 沿用运行预算 `Budget.MaxCredits`，并新增会话级累计上限（默认取运行时策略配置）。

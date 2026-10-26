@@ -19,7 +19,9 @@ const LoginModal = lazy(() => import("@/components/auth/login-modal").then((modu
 const GlobalAgentPanel = lazy(() => import("@/components/canvas/canvas-cloud-agent-panel").then((module) => ({ default: module.CanvasCloudAgentPanel })));
 
 export default function UserLayout({ children }: { children: ReactNode }) {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
+    // 首页 Agent 模式自带对话区：隐藏右下角的画布助手入口，避免两个 Agent 同屏。
+    const homeAgent = (pathname === "/create" || pathname.startsWith("/create/")) && new URLSearchParams(search).get("mode") === "agent";
     const adminWorkspace = pathname === "/admin" || pathname.startsWith("/admin/");
     const spatialWorkbench = isSpatialWorkbenchPath(pathname);
     const canvasEditor = /^\/canvas\/[^/]+(?:\/|$)/.test(pathname);
@@ -35,12 +37,14 @@ export default function UserLayout({ children }: { children: ReactNode }) {
         document.body.classList.toggle("app-user-overlays", !adminWorkspace);
         document.body.classList.toggle("app-spatial-overlays", spatialWorkbench);
         document.body.classList.toggle("app-product-overlays", productWorkspace);
+        document.body.classList.toggle("app-home-agent", homeAgent);
         return () => {
             document.body.classList.remove("app-user-overlays");
             document.body.classList.remove("app-spatial-overlays");
             document.body.classList.remove("app-product-overlays");
+            document.body.classList.remove("app-home-agent");
         };
-    }, [adminWorkspace, spatialWorkbench, productWorkspace]);
+    }, [adminWorkspace, spatialWorkbench, productWorkspace, homeAgent]);
 
     // 所有登录页面共用同一个面板实例：跨路由不卸载，对话、运行和事件流都不中断。
     const globalAgent = userId ? (
