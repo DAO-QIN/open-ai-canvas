@@ -571,7 +571,11 @@ describe("LibTV creation page featured canvases", () => {
         expect(create.indexOf("<CreationFeaturedCanvases />")).toBeLessThan(create.indexOf("<InspirationHall"));
         // 做同款预填 effect 必须在创作页提前 return 之前，否则 hooks 数量会随水合状态变化而报错。
         expect(create.indexOf("灵感广场「做同款」")).toBeGreaterThan(0);
-        expect(create.indexOf("灵感广场「做同款」")).toBeLessThan(create.indexOf("if (!hydrated || !activeConversation)"));
+        // 创作页所有提前 return（会话加载中、会话出错、未水合）都必须在这个 effect 之后。
+        const effectAt = create.indexOf("灵感广场「做同款」");
+        for (const earlyReturn of ["if (conversationRoute.loading)", "if (conversationRoute.error)", "if (!hydrated || !activeConversation)"]) {
+            expect(create.indexOf(earlyReturn)).toBeGreaterThan(effectAt);
+        }
     });
 
     test("failure offers a retry and an empty list hides the section", () => {
