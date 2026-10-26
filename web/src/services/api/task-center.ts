@@ -129,12 +129,17 @@ export type CreateTaskInput = {
 };
 export function createGenerationTask(input: CreateTaskInput) {
     return http.post<GenerationTask>("/tasks", input).then((task) => {
-        recordDiagnosticEvent({ level: "info", category: "task", message: "任务已创建", taskId: task.id, projectId: task.projectId });
-        notifyCanvasTaskCreated(task);
-        // 创建任务时积分已被预占，不能等任务结束后才刷新可用余额。
-        window.dispatchEvent(new CustomEvent("wallet:updated"));
+        announceGenerationTaskCreated(task);
         return task;
     });
+}
+
+/** 任务由服务端创建后的统一收尾：诊断记录、画布通知和钱包刷新。首页生成记录建出的任务也要走这里。 */
+export function announceGenerationTaskCreated(task: GenerationTask) {
+    recordDiagnosticEvent({ level: "info", category: "task", message: "任务已创建", taskId: task.id, projectId: task.projectId });
+    notifyCanvasTaskCreated(task);
+    // 创建任务时积分已被预占，不能等任务结束后才刷新可用余额。
+    window.dispatchEvent(new CustomEvent("wallet:updated"));
 }
 
 export type GenerationTaskPageRequest = {

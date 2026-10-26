@@ -435,6 +435,14 @@ data:{"id":"<itemId>","seq":12,"position":10,"type":"output","turnId":"<runId>",
 - `requestId`：对 `{sessionId, text, references, skillIds(排序)}` 做 SHA-256 指纹，存 `sessionStorage`（键含用户与会话），相同指纹复用；成功后删除。服务端同样按 `requestId` 去重。
 - 本地历史导入：首次进入时后台调用导入接口；失败不阻塞，保留本地副本。
 
+普通模式接入（PR3，已实现）：
+
+- 生成流程只替换建任务这一步：`createCreationEntryTaskCreator` 收齐一次生成的全部任务输入后提交一条生成记录，再按槽位把服务端建好的任务交还；参考上传、流式文本、等待、结果物化和重试上下文不变。生成记录的 `config` 保存模型、参数和已上传附件的展示信息，`references` 只放已上传的资源。
+- 会话列表以服务端为准，浏览器 localforage 只做缓存；打开服务端会话时读取它的生成记录，与缓存消息合并（按 `entryId`、`clientOperationId` 或导入键 `import:<会话>:<消息ID>` 对上，本地正在生成的消息保留本地版本）。
+- 本地新会话 ID 带 `local:` 前缀，第一次提交时才在服务端创建会话并换成服务端 ID，地址随之变为 `/create/:id?mode=`。
+- 打开 `/create` 时从空白会话开始（原先会自动打开最近一次的会话），历史会话从抽屉或 `/create/:id` 进入；会话不存在时提示并回到 `/create`。
+- 重试失败消息时调用 `clear-failed` 隐藏旧的失败记录，刷新或换设备后不再出现。
+
 ## 10. 计费与安全
 
 - 所有生成必须经方案确认；首页第一版不提供“免确认生成”。

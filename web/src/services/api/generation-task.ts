@@ -60,7 +60,7 @@ export type GenerationTaskDependencies = {
     createId: () => string;
 };
 
-const defaultDependencies: GenerationTaskDependencies = {
+export const defaultGenerationTaskDependencies: GenerationTaskDependencies = {
     createTask: createGenerationTask,
     waitTask: waitForGenerationTask,
     createId: () => createClientUUID(),
@@ -95,7 +95,7 @@ export async function runBackendGenerationTask(
         retryOf,
         attemptGroupId,
     }: BackendGenerationTaskOptions,
-    dependencies: GenerationTaskDependencies = defaultDependencies,
+    dependencies: GenerationTaskDependencies = defaultGenerationTaskDependencies,
 ) {
     throwIfAborted(signal);
     assertClientPromptLimit(mode, prompt, config, metadata);
@@ -109,7 +109,7 @@ export async function runBackendGenerationTask(
 // 后端自动回填负责，不能让页面 mutation 一直等待供应商完成。
 export async function submitBackendGenerationTask(
     options: BackendGenerationTaskOptions,
-    dependencies: GenerationTaskDependencies = defaultDependencies,
+    dependencies: GenerationTaskDependencies = defaultGenerationTaskDependencies,
 ): Promise<GenerationTask> {
     throwIfAborted(options.signal);
     assertClientPromptLimit(options.mode, options.prompt, options.config, options.metadata);
@@ -183,7 +183,7 @@ export async function runBackendToolGenerationTask(options: BackendToolGeneratio
     };
 }
 
-export async function runBackendGenerationTaskBatch(options: BackendGenerationTaskOptions & { count: number }, dependencies: GenerationTaskDependencies = defaultDependencies) {
+export async function runBackendGenerationTaskBatch(options: BackendGenerationTaskOptions & { count: number }, dependencies: GenerationTaskDependencies = defaultGenerationTaskDependencies) {
     const count = Math.max(1, Math.min(15, Math.floor(Number(options.count)) || 1));
     throwIfAborted(options.signal);
     assertClientPromptLimit(options.mode, options.prompt, options.config, options.metadata);

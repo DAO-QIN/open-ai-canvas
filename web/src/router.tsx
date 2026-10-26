@@ -114,6 +114,7 @@ export const router = createBrowserRouter([
         children: [
             { path: "/", element: deferred(<CreatePage />) },
             { path: "/create", element: deferred(<CreatePage />) },
+            { path: "/create/:sessionId", element: deferred(<CreatePage />) },
             {
                 path: "/toolbox/image",
                 element: (

@@ -36,6 +36,9 @@ export function CreationHistoryDrawer({
     onSelect,
     onDelete,
     onRename,
+    hasMore = false,
+    loadingMore = false,
+    onLoadMore,
 }: {
     open: boolean;
     conversations: CreationConversation[];
@@ -45,6 +48,10 @@ export function CreationHistoryDrawer({
     onSelect: (conversation: CreationConversation) => void;
     onDelete: (conversation: CreationConversation) => void;
     onRename: (conversation: CreationConversation, title: string) => void;
+    /** 服务端会话按游标分页；hasMore 时在列表末尾提供“加载更多”。 */
+    hasMore?: boolean;
+    loadingMore?: boolean;
+    onLoadMore?: () => void;
 }) {
     const [keyword, setKeyword] = useState("");
     const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -117,7 +124,10 @@ export function CreationHistoryDrawer({
             title={
                 <div className="creation-history-title">
                     <span>历史对话</span>
-                    <small>{conversations.length} 个对话</small>
+                    <small>
+                        {conversations.length}
+                        {hasMore ? "+" : ""} 个对话
+                    </small>
                 </div>
             }
         >
@@ -195,7 +205,7 @@ export function CreationHistoryDrawer({
                                                         ) : (
                                                             <>
                                                                 <em>创作</em>
-                                                                <span>还没有开始创作</span>
+                                                                <span>{conversation.entryCount ? `${conversation.entryCount} 条创作记录` : "还没有开始创作"}</span>
                                                             </>
                                                         )}
                                                     </span>
@@ -247,6 +257,14 @@ export function CreationHistoryDrawer({
                 ) : (
                     <div className="creation-history-empty">{keyword.trim() ? "没有找到匹配的对话" : "暂无历史对话"}</div>
                 )}
+                {hasMore && onLoadMore ? (
+                    <div className="creation-history-more-footer">
+                        {keyword.trim() ? <small>只搜索了已加载的对话</small> : null}
+                        <button type="button" className="creation-history-load-more" disabled={loadingMore} aria-busy={loadingMore} onClick={onLoadMore}>
+                            {loadingMore ? "正在加载…" : "加载更多对话"}
+                        </button>
+                    </div>
+                ) : null}
             </div>
         </AppDrawer>
     );

@@ -35,8 +35,11 @@ export type CreationMessage = {
     attemptGroupId?: string;
     generationStage?: string;
     generationEffectKeys?: string[];
+    /** 对应的服务端生成记录；重试时据此隐藏旧的失败记录。 */
+    entryId?: string;
 };
-export type CreationConversation = { id: string; title: string; updatedAt: string; canvasId?: string; messages: CreationMessage[] };
+/** serverBacked 表示会话已在服务端创建；本地新会话在第一次提交时才创建服务端会话。 */
+export type CreationConversation = { id: string; title: string; updatedAt: string; canvasId?: string; messages: CreationMessage[]; serverBacked?: boolean; entryCount?: number };
 
 export const modeLabels: Record<CreationMode, string> = { text: "文本", image: "图片", video: "视频" };
 export const defaultCreationMode: CreationMode = "image";
