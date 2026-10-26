@@ -1013,9 +1013,6 @@ func jsonValuesEqual(left, right any) bool {
 	return leftErr == nil && rightErr == nil && string(leftJSON) == string(rightJSON)
 }
 
-// createCloudAgentMediaNode 为指定用户的画布保存计划中的媒体节点及引用连线。
-// task 为空时保存待审批草稿，否则绑定已创建任务；policy 校验配额，recorder 可记录撤销事件。
-// 返回保存错误；提交生成时由调用方放在任务、计费和 Agent 检查点的同一个事务中执行。
 // cloudAgentMediaNodeDimensions 按目标输出的宽高比给生成节点定框：横版以 720 为宽
 // 基准（与图片/视频节点默认 720x405 一致），竖版以 640 为高基准（沿用原 9:16 特判
 // 的 360x640），方形取 540。size 接受比例（9:16）与像素（1536x2752）两种写法——
@@ -1056,6 +1053,9 @@ func parseCloudAgentMediaAspectRatio(size string) (float64, float64, bool) {
 	return 0, 0, false
 }
 
+// createCloudAgentMediaNode 为指定用户的画布保存计划中的媒体节点及引用连线。
+// task 为空时保存待审批草稿，否则绑定已创建任务；policy 校验配额，recorder 可记录撤销事件。
+// 返回保存错误；提交生成时由调用方放在任务、计费和 Agent 检查点的同一个事务中执行。
 func createCloudAgentMediaNode(repo *repository.Repository, userID, canvasID string, plan *cloudAgentMediaPlan, task *model.Task, policy RuntimePolicySetting, recorder ...cloudAgentMutationRecorder) error {
 	a := plan.Args
 	canvas, doc, refs, err := cloudAgentMediaDocument(repo, userID, canvasID, a, plan.TransientReferences)

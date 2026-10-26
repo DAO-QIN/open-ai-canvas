@@ -335,8 +335,12 @@ func TestCloudAgentImageCreatesReferencedNode(t *testing.T) {
 	if nodes[a.NodeID]["type"] != "image" || len(creationMaps(doc["connections"])) != 2 {
 		t.Fatal("image node/references missing")
 	}
-	if width, _ := nodes[a.NodeID]["width"].(float64); width != 540 {
-		t.Fatalf("square draft frame width = %v, want 540", nodes[a.NodeID]["width"])
+	// 该测试模型不提供 1:1，准入把画幅规整为 4:3；节点框必须跟随规整后的比例。
+	if width, _ := nodes[a.NodeID]["width"].(float64); width != 720 {
+		t.Fatalf("4:3 draft frame width = %v, want 720", nodes[a.NodeID]["width"])
+	}
+	if height, _ := nodes[a.NodeID]["height"].(float64); height != 540 {
+		t.Fatalf("4:3 draft frame height = %v, want 540", nodes[a.NodeID]["height"])
 	}
 }
 
