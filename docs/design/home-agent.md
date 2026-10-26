@@ -167,7 +167,7 @@
 | `latest_entry_id` | `varchar(36)`，可空 | “刚才那张”的解析依据 |
 | `canvas_id` | `varchar(80)`，可空 | 转入画布后关联 |
 | `source` | `varchar(16)` | `server` / `local_import` |
-| `deleted_at` | `timestamp`，可空，索引 | 软删除，不删任务、账务和素材 |
+| `deleted_at` | `timestamp`，可空，索引 | 软删除，不删任务、账务和素材；用普通时间字段而非 `gorm.DeletedAt`，避免 SQLite → PostgreSQL 搬迁漏掉已删除行 |
 | `created_at`、`updated_at` | `timestamp` | `(user_id, updated_at, id)` 索引，游标分页 |
 
 ### 5.2 `creation_entries`
@@ -189,6 +189,7 @@
 | `status` | `varchar(16)` | `pending/running/succeeded/partial/failed/cancelled` |
 | `results_json` | `text` | 槽位数组：`{slot, status, taskId, assetId, storageKey, width, height, bytes, mimeType, durationMs, failure}`；不存签名 URL |
 | `hidden_failed` | `bool` | 清理失败后隐藏失败槽位 |
+| `revision` | `bigint` | 修订号；多个任务同时完成时按修订号 CAS 写回，避免互相覆盖结果 |
 | `created_at`、`updated_at` | `timestamp` | `(session_id, created_at, id)` 索引 |
 
 ### 5.3 `creation_entry_tasks`
@@ -214,6 +215,7 @@
 | `type` | `varchar(24)` | 公开事件类型，见 §7 |
 | `run_id` | `varchar(80)`，可空 | 来源内部轮次 |
 | `turn_id` | `varchar(80)`，可空 | 轮次 ID，用于 `usage` 与 `context` 配对 |
+| `request_id` | `varchar(80)`，可空 | 用户消息的 `requestId`；`(session_id, request_id)` 唯一，用于消息去重 |
 | `data_json` | `text` | 载荷 |
 | `user_id` | `varchar(36)` | |
 | `created_at` | `timestamp` | |
@@ -221,7 +223,8 @@
 - 与内部运行状态在**同一事务**写入（与 `cloud_agent_event_records` 的约定一致），避免公开事件与内部状态不一致。
 - 流式块按节流写入：同一块距上次写入超过 300 ms 或新增超过 200 字时写一条，块结束时必写终稿。
 - 快照只取每个 `item_id` 的最新一条；历史分页按 `position` 倒序。
-- 保留策略：终稿写入后，可清理同一 `item_id` 的中间版本（后台任务，不影响 `seq` 续读，因为续读只需大于游标的行）。
+- 序号由 `creation_sessions.last_seq` 在同一事务中原子递增分配，保证会话内连续。
+- 保留策略：后台只清理**一小时前**写入、且已被更新版本取代的中间版本。在线客户端早已越过这些序号，不会看到缺口；很久后才续读的客户端遇到缺口会按 §7.1 重读快照一次。
 
 ### 5.5 `cloud_agent_executions` 新增列
 

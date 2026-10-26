@@ -25,6 +25,25 @@ type CloudAgentExecution struct {
 	StateJSON      string `gorm:"type:text"`
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+
+	// Target 是产出目标，读取一律用 OutputTarget()：整行保存可能写入空值。
+	Target            string `gorm:"size:16;not null;default:'canvas'"`
+	CreationSessionID string `gorm:"size:36;not null;default:'';index"`
+}
+
+const (
+	// CloudAgentTargetCanvas 覆盖画布运行和不绑定画布的平台对话。
+	CloudAgentTargetCanvas = "canvas"
+	// CloudAgentTargetCreation 是首页创作会话，产出生成记录而不是画布节点。
+	CloudAgentTargetCreation = "creation"
+)
+
+// OutputTarget 返回运行的产出目标；升级前的旧运行和空值都视为画布。
+func (run CloudAgentExecution) OutputTarget() string {
+	if run.Target == CloudAgentTargetCreation {
+		return CloudAgentTargetCreation
+	}
+	return CloudAgentTargetCanvas
 }
 
 // CloudAgentPiSession stores Pi's native JSONL session independently from the
