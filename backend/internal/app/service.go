@@ -132,10 +132,12 @@ type CreateTaskRequest struct {
 	Prompt               string         `json:"prompt"`
 	Provider             string         `json:"provider"`
 	Model                string         `json:"model"`
+	IdempotencyKey       string         `json:"idempotencyKey,omitempty"`
 	LogicalModelID       string         `json:"logicalModelId"`
 	Input                map[string]any `json:"input"`
 	TraceID              string         `json:"-"`
 	RequestID            string         `json:"-"`
+	CreationSubmissionID string         `json:"-"`
 }
 
 type TaskListOptions struct {
@@ -196,6 +198,7 @@ func (s *Service) StartWorker() {
 	s.taskWorker().start(ctx)
 	s.startResourceDeletionWorker(ctx)
 	s.startResourceOffloadWorker()
+	s.startResourceTransferWorker(ctx)
 	s.startSkillSyncWorker(ctx)
 	s.startPaymentWorker(ctx)
 	s.startBillingAutoRefundWorker()
@@ -303,6 +306,9 @@ func (s *Service) Task(userID string, id string) (*model.Task, error) {
 		return nil, err
 	}
 	s.hydrateTaskProviderRequestID(task)
+	if err := s.reconcileRecordedTaskRejection(task); err != nil {
+		return nil, err
+	}
 	output := taskForOutput(*task)
 	output.Error = s.consumerModelError(output.Error)
 	output.ProviderCancelError = s.consumerModelError(output.ProviderCancelError)

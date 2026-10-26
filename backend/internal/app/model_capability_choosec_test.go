@@ -82,8 +82,12 @@ func TestChooseCImageParameterVisibilityInRouteProjection(t *testing.T) {
 	route := CapabilitySpec{Capability: "image", ImageParameters: []protocol.ImageParameter{field}}
 	spec := CapabilitySpec{Capability: "image", Options: map[string]OptionConstraint{"style": {Values: []any{"*"}}}}
 	projected := effectiveImageParameterSpec(spec, []CapabilitySpec{route, route})
-	if len(projected.ImageParameters) != 1 || projected.ImageParameters[0].UserVisible == nil || *projected.ImageParameters[0].UserVisible { t.Fatalf("hidden metadata lost: %#v", projected.ImageParameters) }
+	if len(projected.ImageParameters) != 1 || projected.ImageParameters[0].UserVisible == nil || *projected.ImageParameters[0].UserVisible {
+		t.Fatalf("hidden metadata lost: %#v", projected.ImageParameters)
+	}
 	route.ImageParameters = []protocol.ImageParameter{{Name: "style", Label: "画风", Type: "string", Default: "vivid", UserVisible: &visible}}
 	projected = effectiveImageParameterSpec(spec, []CapabilitySpec{{Capability: "image", ImageParameters: []protocol.ImageParameter{field}}, route})
-	if projected.ImageParameters[0].UserVisible != nil && !*projected.ImageParameters[0].UserVisible { t.Fatal("visible source lost during merge") }
+	if projected.ImageParameters[0].UserVisible != nil && !*projected.ImageParameters[0].UserVisible {
+		t.Fatal("visible source lost during merge")
+	}
 }

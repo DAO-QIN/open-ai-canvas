@@ -1,6 +1,6 @@
 import { createClientUUID } from "@/lib/client-id";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
-import { Button } from "antd";
+import { App, Button } from "antd";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { MoveDiagonal2 } from "lucide-react";
 import { saveAs } from "file-saver";
@@ -37,6 +37,7 @@ import { appendAgentPromptPrefill } from "@/lib/canvas/agent-prompt-prefill";
 import type { CanvasNodeData } from "@/types/canvas";
 import type { AgentMediaSettings } from "@/services/api/agent";
 import { addSkill, listAddedSkills, listSkillLibraryCategories, listSkills, listSkillPresets, type Skill, type SkillCategory, type SkillLibraryCategory, type SkillPreset } from "@/services/api/skills";
+import { reconcileSkillSelection } from "@/services/skill-runtime";
 import {
     clearCloudAgentPendingSubmission,
     cloudAgentConversationServerId,
@@ -129,7 +130,10 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileError, setProfileError] = useState<string>();
     const profileRequestRef = useRef(0);
+    const { message: appMessage } = App.useApp();
     const [skills, setSkills] = useState<Skill[]>([]);
+    // 读到技能库后才允许剔除失效技能；读失败保留已选。
+    const [skillCatalogReady, setSkillCatalogReady] = useState(false);
     const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
     const [marketSkills, setMarketSkills] = useState<Skill[]>([]);
     const [skillSearch, setSkillSearch] = useState("");
@@ -453,15 +457,19 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
     useEffect(() => {
         let active = true;
         setSkills([]);
+        setSkillCatalogReady(false);
         const refresh = () => {
             void listAddedSkills()
                 .then((result) => {
                     if (!active) return;
                     setSkills(result.skills);
+                    setSkillCatalogReady(true);
                     setMessages((current) => current.filter((message) => message.id !== "skills-load-error"));
                 })
                 .catch((cause) => {
-                    if (active) setMessages((current) => appendAgentError(current, "skills-load-error", cause, "技能库读取失败"));
+                    if (!active) return;
+                    setSkillCatalogReady(false);
+                    setMessages((current) => appendAgentError(current, "skills-load-error", cause, "技能库读取失败"));
                 });
         };
         refresh();
@@ -473,6 +481,15 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
             window.removeEventListener("focus", refresh);
         };
     }, [open, userId]);
+
+    // 本地对话会留着已删除技能的 ID，按当前技能库剔除，避免发送时整轮被拒。
+    useEffect(() => {
+        if (!skillCatalogReady) return;
+        const reconciled = reconcileSkillSelection(selectedSkillIds, skills);
+        if (!reconciled.removedSkillIds.length) return;
+        setSelectedSkillIds(reconciled.skillIds);
+        void appMessage.warning(`已取消 ${reconciled.removedSkillIds.length} 个已失效的技能：该技能已被删除或取消安装`);
+    }, [appMessage, selectedSkillIds, skillCatalogReady, skills]);
 
     useEffect(() => {
         if (view !== "settings" && !skillsOpen) return;
@@ -808,6 +825,14 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                 onError: (cause) => {
                     if (!accountIsCurrent() || currentScope.current !== conversationScope || cloudRunTransitionRef.current !== run.id) return;
                     canvasSyncRef.current?.reconcile();
+                    if ((cause as { status?: number }).status === 404) {
+                        // 运行记录已不存在：继续重连只会反复失败，交给任务中心核对结果。
+                        setMessages((current) => appendAgentError(current, `stream-error-${run.id}`, cause, "上一次 Agent 运行记录已失效，无法确认任务结果；请到任务中心或素材库核对"));
+                        setRun((current) => (current?.id === run.id ? null : current));
+                        setApproval(null);
+                        setConnectionStatus("disconnected");
+                        return;
+                    }
                     setMessages((current) => appendAgentError(current, `stream-error-${run.id}`, cause, "Agent 事件流已断开"));
                     // The observation channel failed, not the durable run. Keep
                     // identity and approval so reconnect/cancel/continue remain available.
@@ -837,6 +862,47 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
             document.removeEventListener("visibilitychange", wake);
         };
     }, [run?.id, connectionStatus, conversationScope, accountScope]);
+
+    // 手动重连先读取服务端快照，告诉用户上一次任务是否已经结束，再恢复事件监听。
+    const reconnectAgent = async () => {
+        const activeRun = run;
+        if (!activeRun?.id || !accountIsCurrent() || currentScope.current !== conversationScope) return;
+        const scope = conversationScope;
+        setConnectionStatus("connecting");
+        try {
+            const snapshot = (await getAgentRun(activeRun.id, AbortSignal.timeout(10_000))).run;
+            if (!accountIsCurrent() || currentScope.current !== scope) return;
+            setRun((current) => (current?.id === activeRun.id ? snapshot : current));
+            setApproval((previous) => {
+                const next = approvalStateFromRun(snapshot);
+                return previous?.approvalId && previous.approvalId === next?.approvalId ? { ...next, reason: previous.reason } : next;
+            });
+            const finished = !snapshot.cleanupPending && ["completed", "failed", "cancelled", "rejected"].includes(snapshot.status);
+            setMessages((current) =>
+                appendUniqueMessage(current, {
+                    id: `reconnect-${snapshot.id}-${snapshot.revision ?? snapshot.status}`,
+                    role: "system",
+                    text: finished
+                        ? snapshot.status === "completed"
+                            ? "上一次任务已处理完成，结果已同步。"
+                            : "上一次任务已结束，状态已同步。"
+                        : snapshot.status === "waiting_approval"
+                          ? "上一次任务正在等待你的确认，已恢复状态监听。"
+                          : "上一次任务仍在执行，已恢复状态监听，完成后会自动更新。",
+                }),
+            );
+            setConnectionEpoch((value) => value + 1);
+        } catch (cause) {
+            if (!accountIsCurrent() || currentScope.current !== scope) return;
+            setConnectionStatus("disconnected");
+            const notFound = (cause as { status?: number }).status === 404;
+            setMessages((current) => appendAgentError(current, `reconnect-error-${activeRun.id}`, cause, notFound ? "找不到上一次 Agent 运行记录，无法确认任务是否完成；请到任务中心或素材库核对" : "暂时无法获取上一次任务状态，请稍后重试"));
+            if (notFound) {
+                setRun((current) => (current?.id === activeRun.id ? null : current));
+                setApproval(null);
+            }
+        }
+    };
 
     const interject = async (value: string) => {
         if (!accountIsCurrent() || pendingSubmission.current) return;
@@ -909,6 +975,8 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
             const effectiveModel = options?.requiresVision ? selectImageInspectionModel(config, selectedModel) : selectedModel;
             if (options?.requiresVision && !effectiveModel) throw new Error("当前没有配置支持图片输入的文本模型，请在模型能力设置中为一个文本模型开启图片输入后重试");
             const pending = pendingSubmission.current;
+            // 目录已读到就以技能库为准，防止刷新与发送之间带出失效 ID。
+            const usableSkillIds = skillCatalogReady ? reconcileSkillSelection(selectedSkillIds, installedSkills).skillIds : selectedSkillIds;
             // An ambiguous previous POST owns its body/key until reconciled.
             // Editing model settings or prompt must not silently create a new charge.
             if (pending?.request && pending.request.prompt !== value) throw new Error("上一条请求结果待确认，请先原样重试上一条消息，再发送新要求");
@@ -932,7 +1000,7 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                     profileRevision: profileView.revision,
                     model: modelOptionName(effectiveModel) || undefined,
                     ...(logicalModelId ? { logicalModelId } : requestConfig.channelId ? { channelId: requestConfig.channelId, channelModelKey: modelOptionName(effectiveModel) || undefined } : {}),
-                    skillIds: [...new Set([...selectedSkillIds, ...resolveSkillMentions(value, installedSkills).map((skill) => skill.skillId)])],
+                    skillIds: [...new Set([...usableSkillIds, ...resolveSkillMentions(value, installedSkills).map((skill) => skill.skillId)])],
                     focusNodeIds: canvasId ? selectedNodeIds.slice(0, 8) : [],
                     focusNodeOmittedCount: canvasId ? Math.max(0, selectedNodeIds.length - 8) : 0,
                     permissionMode,
@@ -975,7 +1043,7 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                             run,
                             model: request.model || effectiveModel || undefined,
                             permissionMode,
-                            skillIds: selectedSkillIds,
+                            skillIds: usableSkillIds,
                             createdAt: existing?.createdAt || now,
                             updatedAt: now,
                         },
@@ -1465,9 +1533,15 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                                     ) : null}
                                     {run && connectionStatus !== "connected" ? (
                                         <div role="status" className="flex items-center justify-between gap-2 px-5 py-2 text-xs" style={{ color: theme.node.muted }}>
-                                            <span>{connectionStatus === "disconnected" ? "连接已断开，服务端任务可能仍在执行；运行记录已保留" : "正在连接并校准运行状态…"}</span>
+                                            <span>
+                                                {connectionStatus === "disconnected"
+                                                    ? ["queued", "running", "waiting_approval"].includes(run.status)
+                                                        ? "连接已断开，上一次任务可能仍在执行；输入内容会保留，点击“重新连接”查看状态"
+                                                        : "连接已断开，输入内容会保留；点击“重新连接”确认上一次任务状态"
+                                                    : "正在连接并校准运行状态…"}
+                                            </span>
                                             {connectionStatus === "disconnected" ? (
-                                                <Button size="small" onClick={() => setConnectionEpoch((value) => value + 1)}>
+                                                <Button size="small" onClick={() => void reconnectAgent()}>
                                                     重新连接
                                                 </Button>
                                             ) : null}
@@ -1485,7 +1559,8 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                                         approval={approval}
                                         approvalTargetGenerating={approval ? agentApprovalTargetGenerating(approval.detail, canvasNodes, runningNodeId) : undefined}
                                         nodeCount={canvasId ? nodeCount : null}
-                                        approvalSubmitting={otherAgentRunning || approvalSubmitting || connectionStatus !== "connected"}
+                                        approvalSubmitting={approvalSubmitting}
+                                        approvalBlocked={otherAgentRunning || connectionStatus !== "connected"}
                                         onChooseSkill={() => setSkillsOpen(true)}
                                         onDraftPrompt={(draft) => setPrompt((current) => (current.trim() ? `${current}\n\n${draft}` : draft))}
                                         onApprovalReasonChange={(reason) => setApproval((current) => (current ? { ...current, reason } : current))}

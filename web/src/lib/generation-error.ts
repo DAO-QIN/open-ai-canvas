@@ -8,6 +8,8 @@ const UPSTREAM_URL_PATTERN = /https?:\/\/[^\s<>"'，。；）]+/gi;
 const UPSTREAM_NETWORK_OPERATION_PATTERN = /\b(?:dial|read|write|proxyconnect)\s+tcp\s+\S+/gi;
 const UPSTREAM_IPV4_PATTERN = /\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b/g;
 const USER_VISIBLE_TASK_ID_PATTERN = /\btask[_-][a-z0-9][a-z0-9_-]{2,}\b/gi;
+const USER_VISIBLE_REQUEST_ID_PATTERN = /\b(?:request[_ -]?id|trace[_ -]?id)["']?\s*[:=]?\s*["']?[a-z0-9_-]{3,}["']?/gi;
+const USER_VISIBLE_CREDENTIAL_PATTERN = /\b(?:bearer\s+\S+|(?:api[_-]?key|token|secret|authorization|cookie)["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s，；。,}\]]+))/gi;
 
 const DEFAULT_GENERATION_ERROR_MESSAGE = "生成失败，请稍后重试。";
 const NETWORK_ERROR_MESSAGE = "网络异常。";
@@ -69,6 +71,16 @@ export function generationFailureMetadata(error: unknown, prompt: string): Gener
 
 export function generationErrorMessage(error: unknown) {
     const original = rawGenerationError(error);
+    if (error instanceof Error && error.cause && isTechnicalProviderMessage(original)) {
+        const seen = new Set<unknown>([error]);
+        let cause: unknown = error.cause;
+        while (cause && !seen.has(cause)) {
+            seen.add(cause);
+            const message = rawGenerationError(cause);
+            if (/[\u3400-\u9fff]/.test(message)) return generationErrorMessage(message);
+            cause = cause instanceof Error ? cause.cause : undefined;
+        }
+    }
     const upstreamIndex = original.indexOf("；上游：");
     if (upstreamIndex >= 0) {
         const prefix = original.slice(0, upstreamIndex).trim();
@@ -110,7 +122,7 @@ function contentModerationMessage(raw: string) {
     return CONTENT_MODERATION_MESSAGE;
 }
 
-function sanitizeUserVisibleError(value: string) {
+export function sanitizeUserVisibleError(value: string) {
     const redacted = redactUpstreamAddress(value);
     const marker = "；上游：";
     const index = redacted.indexOf(marker);
@@ -119,17 +131,23 @@ function sanitizeUserVisibleError(value: string) {
     const actionable = actionableUpstreamReason(detail);
     const result = actionable ? `${prefix}${prefix ? "；" : ""}${actionable}` : prefix;
     if (MODEL_CONFIGURATION_ERROR_PATTERN.test(result)) return MODEL_CONFIGURATION_ERROR_MESSAGE;
-    return result.replace(USER_VISIBLE_TASK_ID_PATTERN, "[任务标识已隐藏]");
+    return result.replace(USER_VISIBLE_CREDENTIAL_PATTERN, "[凭据已隐藏]").replace(USER_VISIBLE_REQUEST_ID_PATTERN, "[请求标识已隐藏]").replace(USER_VISIBLE_TASK_ID_PATTERN, "[任务标识已隐藏]");
 }
 
 function actionableUpstreamReason(value: string) {
     const lower = value.toLowerCase();
     const image = lower.includes("image") || lower.includes("图片") || lower.includes("file") || lower.includes("参考图");
+    if (/insufficient[_ ]quota|insufficient balance|quota exceeded|额度不足|余额不足/.test(lower)) return "模型服务额度不足，请更换模型或联系管理员。";
     const tooLarge = lower.includes("too large") || lower.includes("exceed") || lower.includes("超过") || lower.includes("25mb") || lower.includes("25 mb");
     if (image && tooLarge) return "参考图片超过模型支持的大小限制，请压缩图片后重试。";
     if (lower.includes("model_not_found") || lower.includes("model not found") || lower.includes("无可用渠道")) return "当前模型暂无可用渠道，请更换模型或联系管理员。";
+    if (/content_policy_violation|content filter|safety system|(?:违反|触发).{0,50}(?:内容|防护)|关于.{0,20}(?:色情|情色)/.test(lower)) return "请求内容触发模型内容限制，请修改提示词或参考素材后重试。";
     if (image && (lower.includes("unsupported size") || lower.includes("图片尺寸不支持") || lower.includes("unsupported format") || lower.includes("图片格式不支持"))) return "参考图片的尺寸或格式不符合模型要求，请调整图片后重试。";
-    return "";
+    const message = redactUpstreamAddress(extractStructuredProviderMessage(value) || value)
+        .replace(USER_VISIBLE_CREDENTIAL_PATTERN, "[凭据已隐藏]").replace(USER_VISIBLE_REQUEST_ID_PATTERN, "[请求标识已隐藏]").replace(USER_VISIBLE_TASK_ID_PATTERN, "[任务标识已隐藏]").trim();
+    const readable = message.replace(/\[(?:链接|地址|凭据|请求标识|任务标识)已隐藏\]/g, "");
+    if (!/[\u3400-\u9fff]/.test(readable) || /[\r\n\x00{}]/.test(message) || containsInfrastructureDetails(message) || isNetworkFailure(message) || /stack trace|traceback|sql:|sqlite|postgres|\/var\/|\/tmp\//i.test(message)) return "";
+    return Array.from(message).slice(0, 240).join("");
 }
 
 export function generationErrorCode(error: unknown) {

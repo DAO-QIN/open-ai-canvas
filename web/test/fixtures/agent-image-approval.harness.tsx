@@ -121,8 +121,8 @@ test("真实图片审批卡片可切换比例、分辨率、质量，提交值�
         selected("2K");
         selected("16:9");
         await submit(imagePresetForRatio("2k", "16:9").size, "2k", "auto");
-        await press("high");
-        selected("high");
+        await press("高");
+        selected("高");
         selected("16:9");
         await submit(imagePresetForRatio("2k", "16:9").size, "2k", "high");
         await press("9:16");

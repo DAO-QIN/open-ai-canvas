@@ -27,5 +27,10 @@
   "canvas_edit_batch_table",
   "canvas_apply_ops",
   "canvas_arrange_nodes",
-  "generate_media"
+  "generate_media",
+  "load_creation_workflow",
+  "creation_media_read",
+  "commerce_plan_submit",
+  "commerce_plan_wait",
+  "generate_image_batch"
 ]

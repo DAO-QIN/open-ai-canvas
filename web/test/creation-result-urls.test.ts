@@ -60,10 +60,11 @@ describe("MediaResult 不因地址变化重建或闪空态", () => {
     test("结果块与下载链接不以签名地址作为 React key", () => {
         expect(media).not.toContain("key={url}");
         expect(media).not.toContain("key={`${url}-download`}");
-        expect(media).toContain("resultEntries.map(({ key, url }) => ( <button key={key}");
+        expect(media).toContain("key={downloadImages[index].storageKey || index}");
     });
 
     test("首次解析中不显示「没有返回可预览结果」", () => {
-        expect(media).toContain("(!displayResultUrls.length && !resolving)");
+        expect(media).toContain("length: Math.max(alignedResultUrls.length, resultStorageKeys.length)");
+        expect(media).toContain("if (!expectedResultCount)");
     });
 });

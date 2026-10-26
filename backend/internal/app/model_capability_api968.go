@@ -36,11 +36,11 @@ func api968VideoCapability(profile *VideoCapabilityConfig, protocol string) *Vid
 }
 
 func videoDurationForResolution(profile *VideoCapabilityConfig, resolution string) VideoDurationConfig {
-	value := profile.Duration
 	resolution = videoResolutionNameRequest(profile, resolution)
 	if resolution == "" {
 		resolution = profile.DefaultResolution
 	}
+	value := videoDurationConfigForResolution(profile, resolution)
 	if maximum, ok := value.MaxByResolution[resolution]; ok {
 		value.Max = maximum
 	}

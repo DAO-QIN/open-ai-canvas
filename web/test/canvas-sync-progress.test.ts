@@ -53,6 +53,7 @@ export async function flushCanvasStorePersistence() { fixture.flushes++; const h
 export const flushAssetStorePersistence = async () => {};
 export const getGenerationAssetDefaults = () => undefined;
 export const appQueryClient = { invalidateQueries: async () => {} };
+export const invalidateAssetCatalogQueries = async () => {};
 export const repairMissingCanvasAssets = () => ({ createdAssets: 0, updatedProjects: 0 });
 export const rebindInconsistentCanvasAssets = () => ({ createdAssets: 0, updatedProjects: 0, reboundNodes: 0 });
 export const canvasPromptAssetMentionIds = text => [...new Set([...String(text).matchAll(/@\\[asset:([^\\]]+)\\]/g)].map(match => match[1]).filter(id => id === id.trim()))];

@@ -131,7 +131,7 @@ function WorkspaceSwitcher({ collapsed, onNavigate }: { collapsed: boolean; onNa
     if (collapsed) {
         return (
             <div className="app-workspace-sidebar-brand-row relative shrink-0">
-                <Link to="/" onClick={onNavigate} className="app-workspace-sidebar-brand-button group" aria-label={`${appearance.brandName}首页`}>
+                <Link to="/" state={{ creationHome: true }} onClick={onNavigate} className="app-workspace-sidebar-brand-button group" aria-label={`${appearance.brandName}首页`}>
                     <BrandLogoFrame
                         className="app-workspace-brand-mark grid size-8 shrink-0 place-items-center rounded-[var(--r-sm)] shadow-sm"
                         logoClassName="app-workspace-brand-logo object-contain"
@@ -145,7 +145,7 @@ function WorkspaceSwitcher({ collapsed, onNavigate }: { collapsed: boolean; onNa
 
     return (
         <div className="app-workspace-sidebar-brand-row relative shrink-0">
-            <Link to="/" onClick={onNavigate} className="app-workspace-sidebar-brand-button group" aria-label={`${appearance.brandName}首页`}>
+            <Link to="/" state={{ creationHome: true }} onClick={onNavigate} className="app-workspace-sidebar-brand-button group" aria-label={`${appearance.brandName}首页`}>
                 <span className="flex min-w-0 items-center gap-[var(--space-3)]">
                     <BrandLogoFrame
                         className="app-workspace-brand-mark grid size-8 shrink-0 place-items-center rounded-[var(--r-sm)] shadow-sm"
@@ -322,7 +322,7 @@ export function workspaceNavActiveId(pathname: string, section?: string | null) 
     const segments = pathname.split("/").filter(Boolean);
     if (segments[0] === "toolbox" && segments[1]) return `toolbox-${segments[1]}`;
     const slug = segments[0] || "home";
-    if (slug === "create") return "home";
+    if (slug === "create" || slug === "c") return "home";
     return slug === "settings" && section ? `settings:${section}` : slug;
 }
 

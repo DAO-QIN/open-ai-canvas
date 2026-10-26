@@ -45,7 +45,7 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
                 {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
             </button>
             <nav className="app-workspace-topbar-breadcrumb" aria-label="当前位置">
-                <span className="truncate font-semibold text-foreground">{pageTitle}</span>
+                <Link to="/" state={{ creationHome: true }} className="truncate font-semibold text-foreground">{pageTitle}</Link>
             </nav>
             <WorkspaceTopBarExtensionSlot />
             <div className="app-workspace-topbar-actions">

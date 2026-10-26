@@ -7,6 +7,15 @@ import (
 
 func cloudAgentToolHandlers() map[string]cloudAgentToolHandler {
 	return map[string]cloudAgentToolHandler{
+		"load_creation_workflow": {Read: func(repo *repository.Repository, userID string, state *cloudAgentRuntime, call cloudAgentCall, services ...*Service) (any, error) {
+			return cloudAgentLoadCreationWorkflow(state, call)
+		}},
+		"creation_media_read": {Read: func(repo *repository.Repository, userID string, state *cloudAgentRuntime, call cloudAgentCall, services ...*Service) (any, error) {
+			return cloudAgentCreationMediaRead(repo, userID, state, call)
+		}},
+		"commerce_plan_submit":           {Pipeline: cloudAgentToolMedia},
+		"commerce_plan_wait":             {Pipeline: cloudAgentToolMedia},
+		"generate_image_batch":           {Pipeline: cloudAgentToolMedia},
 		agenttool.AgentProfileRead:       {Read: cloudAgentHandleAgentProfileRead},
 		agenttool.PlanUpdate:             {Read: cloudAgentHandlePlanUpdate},
 		agenttool.AskUser:                {Read: cloudAgentHandleAskUser},

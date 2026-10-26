@@ -27,7 +27,7 @@ func cloudAgentCanonicalFor(system string, history []providerTextMessage, prompt
 
 const (
 	cloudAgentPromptCacheSchemaVersion = "cloud-agent-prompt-cache/v2"
-	cloudAgentToolSchemaVersion        = "cloud-agent-tools/v7"
+	cloudAgentToolSchemaVersion        = "cloud-agent-tools/v12"
 	cloudAgentMediaSizeDescription     = "默认省略；用户指定时填目录值；imageSize/image.size.parameter 是上游映射；仅 allowCustom=true 可自定"
 )
 
@@ -78,6 +78,9 @@ func cloudAgentTools(req CloudAgentRequest) []map[string]any {
 }
 
 func compileCloudAgentTools(req CloudAgentRequest, includeProfileTool bool) []map[string]any {
+	if req.Surface == "creation" {
+		return compileCreationAgentTools(req, false)
+	}
 	definitions := cloudAgentRegistry().Definitions(cloudAgentToolScope(req, includeProfileTool))
 	tools := make([]map[string]any, 0, len(definitions))
 	for _, definition := range definitions {
@@ -296,7 +299,7 @@ func cloudAgentAllToolSchemas() []map[string]any {
 		"snapshotHash": str("可省略；执行器取当前快照"), "nodeId": str("续用草稿时填真实ID；新建可省略，由执行器生成稳定ID"), "title": str("可省略；草稿保留原名，新节点使用默认名"), "sourceNodeId": str("文本/镜头提示词节点ID"), "referenceNodeIds": map[string]any{"type": "array", "maxItems": 16, "items": str("真实媒体参考ID，按引用顺序；无参考传[]")}, "referenceTransientIds": map[string]any{"type": "array", "maxItems": 4, "items": str("标注工具返回的临时参考ID")},
 	}, "mode", "prompt", "referenceNodeIds")
 	cloudAgentDeclareMediaModelSelection(tools[len(tools)-1], true)
-	return tools
+	return append(tools, cloudAgentCreationOnlyToolSchemas()...)
 }
 
 // Explicit choices stay complete and exclusive. The intent tool may also omit
@@ -357,6 +360,14 @@ func cloudAgentPatchSchema() map[string]any {
 }
 
 func cloudAgentToolAllowed(req CloudAgentRequest, name string) bool {
+	if req.Surface == "creation" {
+		for _, tool := range compileCreationAgentTools(req, false) {
+			if tool["function"].(map[string]any)["name"] == name {
+				return true
+			}
+		}
+		return false
+	}
 	policy, known := agenttool.Get(name)
 	return known && policy.Allowed(cloudAgentToolScope(req, true))
 }

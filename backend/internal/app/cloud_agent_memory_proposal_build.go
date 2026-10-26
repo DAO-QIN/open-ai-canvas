@@ -26,6 +26,9 @@ func (s *Service) buildAgentMemoryProposalChanges(userID string, input []model.A
 		seen := map[string]bool{}
 		for _, id := range ids {
 			current, exists := byID[id]
+			if (current.Category == "smart_creation") != (req.Category == "smart_creation") {
+				return false
+			}
 			if strings.TrimSpace(id) == "" || !exists || used[id] || seen[id] || current.Status != model.AgentLessonStatusApproved {
 				return false
 			}

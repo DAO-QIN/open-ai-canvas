@@ -53,6 +53,7 @@ export type RuntimeLimits = {
     resourceUploadMB: number;
     storedFileGB: number;
     recycleBinRetentionDays?: number;
+    conversationRetentionDays?: number;
 };
 
 export type ApiCallLog = {
@@ -334,6 +335,7 @@ export type RuntimeResourcePolicy = {
     taskCount: number;
     apiCallLogCount: number;
     recycleBinRetentionDays?: number;
+    conversationRetentionDays?: number;
 };
 
 export type RuntimeStoragePolicy = {

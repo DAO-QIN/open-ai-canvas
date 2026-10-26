@@ -26,7 +26,7 @@ func TestCloudAgentToolTableMatchesRuntimeDispatch(t *testing.T) {
 		h := binding.Handler
 		p := agenttool.Of(name)
 		switch {
-		case p.Media():
+		case p.Media() || (p.RequiresCreation && h.Pipeline == cloudAgentToolMedia):
 			if h.Pipeline != cloudAgentToolMedia {
 				t.Errorf("%s must use media approval pipeline", name)
 			}

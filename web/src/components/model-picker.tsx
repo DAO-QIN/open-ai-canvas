@@ -7,7 +7,7 @@ import { AppModal } from "@/components/ui/product/app-modal/app-modal";
 
 import { imageQualityLabel } from "@/lib/image-quality";
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
-import { modelCapabilityConfigFor, videoDurationOptions } from "@/lib/model-capabilities";
+import { modelCapabilityConfigFor, resolveVideoResolutionValue, videoDurationConfigForResolution, videoDurationOptions } from "@/lib/model-capabilities";
 import { formatPriceRange, modelQuoteDescription, modelQuoteRequest, normalizeTierResolution, priceTierSummaryLabel, priceTiersForCurrentSelection } from "@/lib/model-pricing";
 import { compatibleModelInGroup, configuredModelDisplayName, modelCompatibilityError, resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
 import { filterModelPickerGroups, groupModelsForPicker, isDirectSystemModel, modelChannelLabel, type ModelPickerGroup } from "@/lib/model-picker-groups";
@@ -466,7 +466,12 @@ export function ModelLabel({
     const videoSummary = videoProfile ? [videoProfile.durationSupported === false ? "" : formatDurationSummary(videoProfile), videoProfile.resolutions.map((item) => item.toUpperCase()).join("/")].filter(Boolean).join(" · ") : "";
     const capabilityTag = videoReferenceCapabilityTag(videoProfile?.references);
     const modelTags = capabilityTag ? [capabilityTag, ...(logicalCost?.tags || [])] : logicalCost?.tags;
-    const capabilitySummary = disabledReason || logicalCost?.description?.trim() || (isDirectSystemModel(config, model) ? "" : logicalSpec ? logicalCapabilitySummary(logicalSpec) : videoProfile ? videoSummary : meta.description);
+    const videoResolution = videoProfile ? resolveVideoResolutionValue(videoProfile, requirements?.vquality || String(requirements?.options?.vquality || requirements?.options?.resolution || config.vquality || "")) : "";
+    const videoResolutions = videoProfile?.durationByResolution ? [videoResolution] : videoProfile?.resolutions || [];
+    const capabilitySummary =
+        disabledReason ||
+        logicalCost?.description?.trim() ||
+        (isDirectSystemModel(config, model) ? "" : logicalSpec ? logicalCapabilitySummary(logicalSpec) : videoProfile ? `${formatDurationSummary(videoProfile, videoResolution)} · ${videoResolutions.map((item) => item.toUpperCase()).join("/")}` : meta.description);
     return (
         <span className="flex w-full min-w-0 items-center gap-2 overflow-hidden py-0">
             <span className="grid size-6 shrink-0 place-items-center rounded-md" style={{ background: theme.toolbar.itemHover }}>
@@ -556,10 +561,11 @@ function publicScalarLabel(value: unknown) {
     return String(value);
 }
 
-function formatDurationSummary(profile: NonNullable<ReturnType<typeof modelCapabilityConfigFor>["video"]>) {
-    const values = videoDurationOptions(profile);
-    if (profile.duration.selection === "enum") return values.map((item) => `${item}s`).join("/");
-    return `${profile.duration.min || values[0]}-${profile.duration.max || values[values.length - 1]}s`;
+function formatDurationSummary(profile: NonNullable<ReturnType<typeof modelCapabilityConfigFor>["video"]>, resolution = profile.defaultResolution) {
+    const duration = videoDurationConfigForResolution(profile, resolution);
+    const values = videoDurationOptions(profile, resolution);
+    if (duration.selection === "enum") return values.map((item) => `${item}s`).join("/");
+    return `${duration.min || values[0]}-${duration.max || values[values.length - 1]}s`;
 }
 
 type ModelMenuPrice = { kind: "tiers"; label: string; compactLabel: string; title: string } | { kind: "estimate"; label?: string; title?: string } | { kind: "fixed"; value: number; unit: "次" | "秒" };

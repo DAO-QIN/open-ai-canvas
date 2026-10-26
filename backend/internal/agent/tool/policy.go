@@ -54,6 +54,7 @@ type Policy struct {
 	RequiresCanvas    bool
 	RequiresSkills    bool
 	RequiresWriteMode bool
+	RequiresCreation  bool
 	// OutsideTransaction performs storage IO before the checkpoint transaction.
 	OutsideTransaction bool
 }
@@ -65,10 +66,12 @@ type Scope struct {
 	Vision         bool
 	ReadOnly       bool
 	IncludeProfile bool
+	Creation       bool
 }
 
 func (p Policy) Allowed(scope Scope) bool {
 	return p.Name != "" &&
+		(!p.RequiresCreation || scope.Creation) &&
 		(!p.RequiresCanvas || scope.Canvas) &&
 		(!p.RequiresSkills || scope.Skills) &&
 		(!p.Vision || scope.Vision) &&
@@ -145,6 +148,11 @@ func init() {
 
 func policies() []Policy {
 	return []Policy{
+		{Name: "load_creation_workflow", Kind: KindRead, RequiresCreation: true},
+		{Name: "creation_media_read", Kind: KindRead, RequiresCreation: true},
+		{Name: "commerce_plan_submit", Kind: KindWrite, RequiresCreation: true},
+		{Name: "commerce_plan_wait", Kind: KindRead, RequiresCreation: true, RequiresWriteMode: true},
+		{Name: "generate_image_batch", Kind: KindMedia, RequiresCreation: true},
 		{Name: AgentProfileRead, Kind: KindRead, Cacheable: true},
 		{Name: PlanUpdate, Kind: KindControl},
 		{Name: AskUser, Kind: KindControl},

@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 74
+const CurrentSchemaVersion int64 = 75
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -274,6 +274,7 @@ var schemaMigrations = []migration{
 		return tx.AutoMigrate(&model.ResourceOffloadJob{})
 	}},
 	{version: 74, name: "drama_segment_mode", checksum: "sha256:drama-segment-mode-v74-20261026", apply: migrateDramaSegmentMode},
+	{version: 75, name: "homepage_agent_workflow", checksum: "sha256:homepage-agent-workflow-v75", apply: migrateHomepageAgentWorkflow},
 }
 
 // migrateDramaSegmentMode 把旧的剧情段目标秒数改写为新的切段模式：大于 0 的是用户指定的固定时长，0 表示按模型上限，即智能。

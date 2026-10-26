@@ -19,7 +19,7 @@ var (
 func pick(pred func(Policy) bool) []string {
 	out := []string{}
 	for _, name := range Names() {
-		if pred(Of(name)) {
+		if !Of(name).RequiresCreation && pred(Of(name)) {
 			out = append(out, name)
 		}
 	}

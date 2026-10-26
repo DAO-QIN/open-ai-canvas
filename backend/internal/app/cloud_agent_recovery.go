@@ -16,6 +16,9 @@ func (s *Service) finishCloudAgentCleanup(ctx context.Context, run *model.CloudA
 		return nil
 	}
 	state, decodeErr := cloudAgentDecode(run)
+	// Stopping homepage orchestration does not revoke admitted media jobs.
+	// Their workers retain billing and delivery; only dialogue work is cancelled.
+	keepSubmittedMedia := run.Surface == "creation" && run.Status == "cancelled"
 	activeID, mediaID, canvasID := run.ActiveTaskID, run.MediaTaskID, run.CanvasID
 	if decodeErr == nil {
 		activeID, mediaID, canvasID = state.ActiveTaskID, state.MediaTaskID, state.Request.CanvasID
@@ -34,9 +37,14 @@ func (s *Service) finishCloudAgentCleanup(ctx context.Context, run *model.CloudA
 		}
 		run = refreshed
 	}
+	// 并行生图可能已经释放 MediaTaskID；用持久关联取消整轮仍在执行的子任务。
+	childIDs, err := s.repo.ActiveCloudAgentTaskIDs(run.UserID, run.ID)
+	if err != nil {
+		return err
+	}
 	seen := map[string]bool{}
 	awaitingMedia := false
-	for _, id := range []string{run.ID, activeID, mediaID} {
+	for _, id := range append([]string{run.ID, activeID, mediaID}, childIDs...) {
 		if id == "" || seen[id] {
 			continue
 		}
@@ -52,9 +60,10 @@ func (s *Service) finishCloudAgentCleanup(ctx context.Context, run *model.CloudA
 			return err
 		}
 		if id == mediaID && s.cloudAgentMediaContinuesAfterStop(run, task) {
-			// 用户停止本轮只停止 Agent 后续步骤。已提交上游的媒体任务可能已经计费，
-			// 取消也拿不回费用，所以保留它并等结果回写画布；调度器会重入这里完成收尾。
 			awaitingMedia = true
+			continue
+		}
+		if keepSubmittedMedia && (task.Type == "canvas_image" || task.Type == "canvas_video") {
 			continue
 		}
 		if task.Status == model.TaskStatusQueued || task.Status == model.TaskStatusRunning {
@@ -75,7 +84,7 @@ func (s *Service) finishCloudAgentCleanup(ctx context.Context, run *model.CloudA
 	if awaitingMedia {
 		return nil
 	}
-	if mediaID != "" && decodeErr == nil && state.CallIndex < len(state.Calls) {
+	if !keepSubmittedMedia && mediaID != "" && decodeErr == nil && state.CallIndex < len(state.Calls) {
 		err := s.advanceCloudAgentMedia(run, &state, state.Calls[state.CallIndex])
 		if err != nil && !errors.Is(err, errCloudAgentCheckpoint) {
 			return err

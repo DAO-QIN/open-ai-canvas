@@ -30,7 +30,7 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
     const hideChrome = pathname.startsWith("/admin") || /^\/canvas\/[^/]+/.test(pathname);
     const showGlobalTopBar = !hideChrome;
     const spatialWorkbench = isSpatialWorkbenchPath(pathname);
-    const creationWorkspace = pathname === "/" || pathname === "/create";
+    const creationWorkspace = pathname === "/" || pathname === "/create" || pathname.startsWith("/c/");
 
     useEffect(() => {
         setMobileSidebarExpanded(false);

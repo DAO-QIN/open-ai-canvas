@@ -64,7 +64,7 @@ func cloudAgentHandleAskUser(repo *repository.Repository, userID string, state *
 }
 
 func cloudAgentHandleRecallLessons(repo *repository.Repository, userID string, state *cloudAgentRuntime, call cloudAgentCall, services ...*Service) (any, error) {
-	return cloudAgentRecallLessons(repo, userID, call)
+	return cloudAgentRecallLessons(repo, userID, call, state.Request.Surface)
 }
 
 func cloudAgentHandleRememberLesson(repo *repository.Repository, userID string, state *cloudAgentRuntime, call cloudAgentCall, services ...*Service) (any, error) {
@@ -336,6 +336,11 @@ func cloudAgentHandleSkillSearch(repo *repository.Repository, userID string, sta
 	if err := decodeCloudAgentJSONObject(call.Function.Arguments, &args); err != nil {
 		return nil, cloudAgentJSONArgumentError(err)
 	}
+	for _, skill := range state.Skills {
+		if err := validateCloudAgentSkillSurface(skill, state.Request.Surface); err != nil {
+			return nil, err
+		}
+	}
 	return cloudAgentSearchSkills(state.Skills, args.Keyword, args.Limit)
 }
 
@@ -353,6 +358,9 @@ func cloudAgentHandleSkillReadFile(repo *repository.Repository, userID string, s
 	}
 	for _, skill := range state.Skills {
 		if skill.ID == args.SkillID {
+			if err := validateCloudAgentSkillSurface(skill, state.Request.Surface); err != nil {
+				return nil, err
+			}
 			if args.Path == "" {
 				return map[string]any{"version": skill.Version, "entryPath": cloudAgentSkillEntryPath, "files": cloudAgentSkillPaths(skill), "guidance": "先读取 SKILL.md，再只读取入口明确引用且当前任务需要的参考文件。只能读取 files 中列出的路径；不要重复列目录或猜测路径"}, nil
 			}
@@ -365,6 +373,7 @@ func cloudAgentHandleSkillReadFile(repo *repository.Repository, userID string, s
 					return nil, creationConflict("技能已更新或不可用，请重试")
 				}
 				if args.Path == cloudAgentSkillEntryPath {
+					cloudAgentCreationSkillRead(state, call)
 					return cloudAgentSkillPage(skill.Version, args.Path, detail.Instruction, args.Offset)
 				}
 				if _, ok := skill.Files[args.Path]; !ok {
@@ -387,6 +396,7 @@ func cloudAgentHandleSkillReadFile(repo *repository.Repository, userID string, s
 				return cloudAgentSkillPage(skill.Version, args.Path, file.Content, args.Offset)
 			}
 			if args.Path == cloudAgentSkillEntryPath && strings.TrimSpace(skill.Instruction) != "" {
+				cloudAgentCreationSkillRead(state, call)
 				return map[string]any{"version": skill.Version, "path": args.Path, "content": skill.Instruction}, nil
 			}
 			if content, ok := skill.Files[args.Path]; ok && content != "" {
@@ -407,7 +417,14 @@ func cloudAgentHandleTaskGet(repo *repository.Repository, userID string, state *
 	if err != nil {
 		return nil, err
 	}
-	if task.ProjectID != state.Request.CanvasID {
+	if state.Request.Surface == "creation" {
+		if !cloudAgentCreationContextAllowsTask(state.Request, task) {
+			task, err = cloudAgentCreationSessionTask(repo, userID, state, args.TaskID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else if task.ProjectID != state.Request.CanvasID {
 		return nil, BadAuthRequest("不能读取其他画布的任务")
 	}
 	result := cloudAgentTaskDiagnostic(repo, task)

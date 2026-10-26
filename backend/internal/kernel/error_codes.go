@@ -40,17 +40,17 @@ const (
 	// 账号文件容量不足：前端据此展示扩容入口，与每日上传量等其它额度区分。
 	ReasonStorageCapacityExceeded ErrorReason = "storage_capacity_exceeded"
 	// 账号超出文件容量且宽限期已过：只允许读取、删除和购买扩容。
-	ReasonStorageReadOnly   ErrorReason = "storage_read_only"
-	ReasonRateLimited            ErrorReason = "rate_limited"
-	ReasonUnavailable            ErrorReason = "unavailable"
-	ReasonTimeout                ErrorReason = "timeout"
-	ReasonInternal               ErrorReason = "internal"
-	ReasonBadGateway             ErrorReason = "bad_gateway"
-	ReasonUpstreamDNSFailed      ErrorReason = "upstream_dns_failed"
-	ReasonInvalidInviteCode      ErrorReason = "invalid_invite_code"
-	ReasonIdempotencyConflict    ErrorReason = "idempotency_conflict"
-	ReasonPromotionInsufficient  ErrorReason = "insufficient_promotion_balance"
-	ReasonCreditBalanceOverflow  ErrorReason = "credit_balance_overflow"
+	ReasonStorageReadOnly       ErrorReason = "storage_read_only"
+	ReasonRateLimited           ErrorReason = "rate_limited"
+	ReasonUnavailable           ErrorReason = "unavailable"
+	ReasonTimeout               ErrorReason = "timeout"
+	ReasonInternal              ErrorReason = "internal"
+	ReasonBadGateway            ErrorReason = "bad_gateway"
+	ReasonUpstreamDNSFailed     ErrorReason = "upstream_dns_failed"
+	ReasonInvalidInviteCode     ErrorReason = "invalid_invite_code"
+	ReasonIdempotencyConflict   ErrorReason = "idempotency_conflict"
+	ReasonPromotionInsufficient ErrorReason = "insufficient_promotion_balance"
+	ReasonCreditBalanceOverflow ErrorReason = "credit_balance_overflow"
 )
 
 func ReasonForStatus(status int) ErrorReason {

@@ -390,6 +390,7 @@ export function projectGenerationTaskResult(task: GenerationTask, result?: Backe
     const projectedResult = result ?? generationTaskResult(task);
     const outputs: GenerationTaskOutput[] = projectedResult.images?.length
         ? projectedResult.images.map((image, outputIndex) => ({
+              ...task.outputs?.find((output) => output.outputIndex === outputIndex && output.mediaType === "image"),
               outputIndex,
               mediaType: "image" as const,
               ...(image.storageKey ? { providerArtifactRef: image.storageKey } : {}),
@@ -428,7 +429,7 @@ async function storedGenerationImage(result: NonNullable<BackendGenerationResult
     if (result.storageKey) {
         const url = await resolveImageUrl(result.storageKey, result.dataUrl);
         if (!url) throw new Error("图片结果资源不可用");
-        const meta = result.width && result.height ? undefined : await readImageMeta(url, signal);
+        const meta = result.transferPending || (result.width && result.height) ? undefined : await readImageMeta(url, signal);
         throwIfAborted(signal);
         return {
             url,
@@ -495,10 +496,18 @@ async function storedGenerationMedia(dataUrl: string, effectKey: string, mediaTy
 async function cachedRemoteGenerationVideo(video: NonNullable<BackendGenerationResult["video"]>, signal?: AbortSignal) {
     if (!video.storageKey) throw new Error("生成视频缺少云端资源标识");
     throwIfAborted(signal);
-    const blob = await getCachedResourceBlob(video.storageKey);
-    throwIfAborted(signal);
-    if (!blob || !(await validGenerationMedia(blob, "video"))) throw new Error("生成视频资源缓存失败，未标记为成功");
-    const url = await resolveMediaUrl(video.storageKey, video.dataUrl);
+    // 资源访问即触发后台保存；整文件 Blob 缓存不能阻塞已完成视频的交付。
+    let url = "";
+    try {
+        url = await resolveMediaUrl(video.storageKey, video.dataUrl);
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
+        console.warn("生成视频资源访问地址解析失败，使用任务返回地址", { storageKey: video.storageKey, error });
+        url = video.dataUrl || "";
+    }
+    // 资源访问接口异常时，后端任务结果中的 dataUrl 仍是同一资源的受鉴权
+    // 文件地址；不要因为访问地址预取失败而覆盖成功状态。
+    if (!url) url = video.dataUrl || "";
     throwIfAborted(signal);
     if (!url) throw new Error("生成视频资源地址为空，未标记为成功");
     return {
@@ -507,8 +516,8 @@ async function cachedRemoteGenerationVideo(video: NonNullable<BackendGenerationR
         width: video.width || 0,
         height: video.height || 0,
         durationMs: video.durationMs,
-        bytes: video.bytes || blob.size,
-        mimeType: video.mimeType || blob.type || "video/mp4",
+        bytes: video.bytes || 0,
+        mimeType: video.mimeType || "video/mp4",
     };
 }
 

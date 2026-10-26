@@ -3815,7 +3815,6 @@
 
     .creation-results {
         width: 100%;
-        animation: creation-results-enter var(--motion-dur-base-calc) var(--motion-ease-out) both;
     }
 
     .creation-thread-composer {
@@ -18156,9 +18155,21 @@ html:not(.dark) .creation-media-preview-modal .ant-modal-container {
     gap: 8px;
 }
 
-.creation-parameter-menu .image-size-ratios {
+.creation-parameter-menu .image-size-ratios,
+.creation-parameter-menu .image-size-tiers {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-flow: row;
     gap: 4px;
+}
+
+.creation-parameter-menu :is(.image-size-ratios, .image-size-tiers, .creation-choice-grid) button,
+.creation-parameter-menu :is(.image-size-ratios, .image-size-tiers, .creation-choice-grid) button > span {
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .creation-parameter-menu .image-size-ratios button {
@@ -23329,6 +23340,7 @@ html.dark .ai-message-codeblock-pre .shiki span {
     position: relative;
     z-index: 20;
     bottom: auto;
+    flex: 0 0 auto;
     width: min(900px, calc(100% - 56px));
     margin: 0 auto;
     padding: var(--space-2) 0 var(--space-5);

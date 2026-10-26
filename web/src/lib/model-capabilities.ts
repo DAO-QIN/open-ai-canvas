@@ -123,6 +123,15 @@ export type ImageCapabilityConfig = {
     maxOutputs: number;
 };
 
+export type VideoDurationConfig = {
+    selection: "range" | "enum";
+    min?: number;
+    max?: number;
+    step?: number;
+    values?: number[];
+    default: number;
+};
+
 export type VideoCapabilityConfig = {
     references: {
         promptMaxChars: number;
@@ -150,6 +159,7 @@ export type VideoCapabilityConfig = {
         maxByResolution?: Record<string, number>;
     };
     durationSupported?: boolean;
+    durationByResolution?: Record<string, VideoDurationConfig>;
     ratios: string[];
     defaultRatio: string;
     resolutions: string[];
@@ -242,6 +252,7 @@ export function normalizeModelCapabilityConfig(config: ModelCapabilityConfig): M
                   defaultResolution: normalizeCapabilityString(config.video.defaultResolution),
                   operations: normalizeCapabilityStrings(config.video.operations),
                   defaultOperation: normalizeCapabilityString(config.video.defaultOperation),
+                  durationByResolution: config.video.durationByResolution ? Object.fromEntries(Object.entries(config.video.durationByResolution).map(([key, value]) => [normalizeVideoResolutionKey(key), value])) : undefined,
               })
             : undefined,
     };
@@ -317,12 +328,14 @@ const defaultImageSizes = [
     "2160x3840",
 ];
 
+export const IMAGE_QUALITY_CAPABILITY_OPTIONS = ["auto", "low", "medium", "high", "xhigh", "max"] as const;
+
 export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = ""): ImageCapabilityConfig {
     const image: ImageCapabilityConfig = {
         references: { promptMaxChars: 32000, maxImages: 16, maxImageBytes: 30 * 1024 * 1024, maskSupported: true },
         size: { parameter: "size", values: [...defaultImageSizes], default: "1:1", allowCustom: true },
         resolution: { supported: false, values: [], default: "auto" },
-        quality: { supported: true, values: ["auto", "low", "medium", "high"], default: "auto" },
+        quality: { supported: true, values: [...IMAGE_QUALITY_CAPABILITY_OPTIONS], default: "auto" },
         transparentBackground: { supported: true, default: false },
         responseFormat: { supported: true, default: "auto" },
         outputFormat: { supported: true },
@@ -368,7 +381,6 @@ export function defaultImageCapabilityConfig(protocol?: ModelProtocol, model = "
         // 卡藏未声明分辨率档。1K 预设只用于宿主比例选择，插件不发送 resolution。
         image.references = { ...image.references, maxImages: stable ? 5 : 1, maskSupported: false };
         image.size = { parameter: "aspect_ratio", values: [...(extendedRatios ? ["auto"] : []), ...ratios], default: stable ? "9:16" : "16:9", allowCustom: false, presets: ratios.map((ratio) => ({ ...imagePresetForRatio("1k", ratio), ratio })) };
-        // 稳定版的数值 quality 通过插件命名空间设置，避免与宿主分辨率档混用。
         image.quality = { supported: false, values: [], default: "auto" };
         image.transparentBackground = { supported: false, default: false };
         image.responseFormat = { supported: false };
@@ -512,7 +524,7 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         duration: { selection: "range", min: 1, max: 15, step: 1, default: 6 },
         ratios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
         defaultRatio: "16:9",
-        resolutions: ["480p", "720p", "1080p", "1440p", "2160p"],
+        resolutions: ["480p", "720p", "768p", "1080p", "1440p", "2160p"],
         defaultResolution: "720p",
         generateAudio: { supported: false, default: false },
         watermark: { supported: false, default: false },
@@ -576,6 +588,16 @@ export function defaultModelCapabilityConfig(protocol?: ModelProtocol, model = "
         video.resolutions = flash ? ["720P"] : ["720P", "960P", "2K"];
         video.defaultResolution = "720P";
         video.operations.push("reference_to_video", "audio_to_video");
+    }
+    if (protocol === "grsai-minimax-h3") {
+        video.references.maxImages = 9;
+        video.references.maxAudios = 3;
+        video.references.maxAudioBytes = 15 * 1024 * 1024;
+        video.references.maxAudioDurationSeconds = 15;
+        video.ratios = ["21:9", "16:9", "9:16", "4:3", "3:4", "1:1", "3:2", "2:3"];
+        video.defaultRatio = "16:9";
+        video.resolutions = ["480p", "768p", "1080p"];
+        video.defaultResolution = "768p";
     }
     if (["api968-sd20", "api968-sdc2", "api968-sd25", "api968-sd25-15", "api968-sdmini"].includes(protocol || "")) {
         const fixed = protocol === "api968-sd25";
@@ -855,12 +877,11 @@ export function imageSizeRequest(profile: ImageCapabilityConfig, value?: string)
 }
 
 export function normalizeVideoValue(profile: VideoCapabilityConfig, value: { seconds?: string; ratio?: string; resolution?: string }) {
-    const durationProfile = videoCapabilityForResolution(profile, value.resolution);
-    const duration =
-        durationProfile.duration.selection === "enum" ? ((durationProfile.duration.values || []).includes(Number(value.seconds)) ? Number(value.seconds) : durationProfile.duration.default) : normalizeRangeDuration(durationProfile, Number(value.seconds));
     const ratio = resolveVideoRatioValue(profile, value.ratio);
     // 前端状态历史上保存过 `720`，而能力配置和供应商通常使用 `720p`；统一按能力中的原始值返回，避免被误判为不支持。
     const resolution = resolveVideoResolutionValue(profile, value.resolution);
+    const durationProfile = videoDurationConfigForResolution(profile, resolution);
+    const duration = durationProfile.selection === "enum" ? ((durationProfile.values || []).includes(Number(value.seconds)) ? Number(value.seconds) : durationProfile.default) : normalizeRangeDuration(durationProfile, Number(value.seconds));
     return { seconds: String(duration), ratio, resolution };
 }
 
@@ -892,36 +913,58 @@ export function videoResolutionRequest(profile: VideoCapabilityConfig, value: st
     return undefined;
 }
 
-function normalizeRangeDuration(profile: VideoCapabilityConfig, value: number) {
-    const min = profile.duration.min || 1;
-    const max = profile.duration.max || min;
-    const step = profile.duration.step || 1;
-    const candidate = Number.isFinite(value) ? Math.floor(value) : profile.duration.default;
+function normalizeRangeDuration(profile: VideoCapabilityConfig["duration"], value: number) {
+    const min = profile.min || 1;
+    const max = profile.max || min;
+    const step = profile.step || 1;
+    if (!Number.isFinite(value)) return profile.default;
+    const candidate = Math.floor(value);
+    if (candidate < min) return min;
     const clamped = Math.min(max, Math.max(min, candidate));
     const maxStep = Math.max(0, Math.floor((max - min) / step));
     return min + Math.min(maxStep, Math.max(0, Math.round((clamped - min) / step))) * step;
 }
 
+export function videoDurationConfigForResolution(profile: VideoCapabilityConfig, resolution?: string) {
+    const key = normalizeVideoResolutionKey(resolution || "");
+    if (key && profile.durationByResolution) {
+        const match = Object.entries(profile.durationByResolution).find(([candidate]) => normalizeVideoResolutionKey(candidate) === key);
+        if (match) return match[1];
+    }
+    const selected = resolveVideoResolutionValue(profile, resolution);
+    const max = profile.duration.maxByResolution?.[selected];
+    return max === undefined ? profile.duration : { ...profile.duration, max, maxByResolution: undefined };
+}
+
 export function videoCapabilityForResolution(profile: VideoCapabilityConfig, resolution?: string): VideoCapabilityConfig {
-    const key = resolveVideoResolutionValue(profile, resolution);
-    const max = profile.duration.maxByResolution?.[key];
-    return max === undefined ? profile : { ...profile, duration: { ...profile.duration, max, maxByResolution: undefined } };
+    return { ...profile, duration: videoDurationConfigForResolution(profile, resolution) };
 }
 
 export function videoDurationOptions(profile: VideoCapabilityConfig, resolution?: string) {
-    profile = videoCapabilityForResolution(profile, resolution);
-    if (profile.duration.selection === "enum") return profile.duration.values || [];
-    const min = profile.duration.min || 1;
-    const max = profile.duration.max || min;
-    const step = profile.duration.step || 1;
+    const duration = videoDurationConfigForResolution(profile, resolution);
+    if (duration.selection === "enum") return duration.values || [];
+    const min = duration.min || 1;
+    const max = duration.max || min;
+    const step = duration.step || 1;
     return Array.from({ length: Math.floor((max - min) / step) + 1 }, (_, index) => min + index * step);
 }
 
 export function videoDurationAllowed(profile: VideoCapabilityConfig, value: number, resolution?: string) {
-    profile = videoCapabilityForResolution(profile, resolution);
-    if (profile.duration.selection === "enum") return (profile.duration.values || []).includes(value);
-    const min = profile.duration.min || 1;
-    const max = profile.duration.max || min;
-    const step = profile.duration.step || 1;
+    const duration = videoDurationConfigForResolution(profile, resolution);
+    if (duration.selection === "enum") return (duration.values || []).includes(value);
+    const min = duration.min || 1;
+    const max = duration.max || min;
+    const step = duration.step || 1;
     return value >= min && value <= max && (value - min) % step === 0;
+}
+
+export function normalizeVideoResolutionKey(value: string) {
+    const normalized = String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/p$/, "");
+    if (normalized === "2k") return "1440";
+    if (normalized === "4k") return "2160";
+    if (normalized === "low") return "480";
+    return normalized;
 }

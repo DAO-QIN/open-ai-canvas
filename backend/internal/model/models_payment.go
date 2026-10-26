@@ -51,12 +51,12 @@ const (
 // TopupProduct is the server-owned price and credit snapshot source. Clients
 // select a product ID and can never submit their own payable amount or credits.
 type TopupProduct struct {
-	ID                  string            `json:"id" gorm:"primaryKey;size:36"`
-	Name                string            `json:"name" gorm:"size:120"`
-	Description         string            `json:"description,omitempty" gorm:"size:500"`
+	ID                  string           `json:"id" gorm:"primaryKey;size:36"`
+	Name                string           `json:"name" gorm:"size:120"`
+	Description         string           `json:"description,omitempty" gorm:"size:500"`
 	Kind                TopupProductKind `json:"kind" gorm:"size:24;not null;default:credits;index"`
-	AmountFen           int64             `json:"amountFen" gorm:"index"`
-	CreditsMicrocredits int64             `json:"creditsMicrocredits"`
+	AmountFen           int64            `json:"amountFen" gorm:"index"`
+	CreditsMicrocredits int64            `json:"creditsMicrocredits"`
 	// StorageBytes / StorageDurationDays 只对 storage 商品有效；天数为 0 表示永久扩容。
 	StorageBytes        int64             `json:"storageBytes" gorm:"not null;default:0"`
 	StorageDurationDays int               `json:"storageDurationDays" gorm:"not null;default:0"`
@@ -101,9 +101,9 @@ type PaymentOrder struct {
 	MerchantOrderNo       string                    `json:"merchantOrderNo" gorm:"size:32;uniqueIndex"`
 	ProductID             string                    `json:"productId" gorm:"size:36;index"`
 	ProductName           string                    `json:"productName" gorm:"size:120"`
-	ProductKind           TopupProductKind   `json:"productKind" gorm:"size:24;not null;default:credits"`
-	StorageBytes          int64              `json:"storageBytes" gorm:"not null;default:0"`
-	StorageDurationDays   int                `json:"storageDurationDays" gorm:"not null;default:0"`
+	ProductKind           TopupProductKind          `json:"productKind" gorm:"size:24;not null;default:credits"`
+	StorageBytes          int64                     `json:"storageBytes" gorm:"not null;default:0"`
+	StorageDurationDays   int                       `json:"storageDurationDays" gorm:"not null;default:0"`
 	StockReserved         bool                      `json:"-" gorm:"not null;default:false"`
 	ProviderID            string                    `json:"providerId" gorm:"size:80;index;uniqueIndex:idx_payment_provider_trade,priority:1"`
 	PluginID              string                    `json:"pluginId" gorm:"size:120;index"`

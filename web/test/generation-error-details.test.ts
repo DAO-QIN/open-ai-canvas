@@ -8,13 +8,13 @@ describe("safe upstream error details", () => {
         }
     });
     const detail = "非常抱歉，生成的图片可能违反了关于裸露、色情或情色内容的防护限制。请重试或修改提示语。";
-    test("drops upstream detail from the card", () => {
+    test("replaces sensitive upstream detail with an actionable content hint", () => {
         const message = `模型服务拒绝了请求，请检查模型和参数；上游：${detail}`;
-        expect(generationErrorMessage(new Error(message))).toBe("模型服务拒绝了请求，请检查模型和参数");
+        expect(generationErrorMessage(new Error(message))).toBe("模型服务拒绝了请求，请检查模型和参数；请求内容触发模型内容限制，请修改提示词或参考素材后重试。");
     });
     test("does not replace a safe upstream message with a generic HTTP hint", () => {
         const message = `模型服务暂时不可用（HTTP 500）；上游：${detail}`;
-        expect(generationErrorMessage(message)).toBe("模型服务暂时不可用，请稍后再试。");
+        expect(generationErrorMessage(message)).toBe("模型服务暂时不可用（HTTP 500）；请求内容触发模型内容限制，请修改提示词或参考素材后重试。");
         expect(generationErrorMessage("模型服务暂时不可用（HTTP 500）")).toBe("模型服务暂时不可用，请稍后再试。");
     });
     test("keeps details when moderation metadata is stored", () => {

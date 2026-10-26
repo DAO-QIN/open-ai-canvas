@@ -75,12 +75,18 @@ func (r *Repository) requireCurrentCloudAgentParent(task *model.Task) error {
 	var input struct {
 		Agent struct {
 			ParentID string `json:"parentId"`
+			Request  struct {
+				Surface string `json:"surface"`
+			} `json:"request"`
 		} `json:"cloudAgent"`
 	}
 	if err := json.Unmarshal([]byte(task.InputJSON), &input); err != nil {
 		return err
 	}
 	parentID := input.Agent.ParentID
+	if input.Agent.Request.Surface == "creation" {
+		return nil
+	}
 	if parentID == "" {
 		return nil
 	}

@@ -74,7 +74,8 @@ func buildCloudAgentRegistry() *agenttool.Registry[cloudAgentToolHandler] {
 
 func cloudAgentToolScope(req CloudAgentRequest, profile bool) agenttool.Scope {
 	return agenttool.Scope{
-		Canvas: len(req.ContextScope) > 0, Skills: len(req.SkillIDs) > 0,
+		Creation: req.Surface == "creation",
+		Canvas:   len(req.ContextScope) > 0, Skills: len(req.SkillIDs) > 0,
 		Vision: req.VisionEnabled, ReadOnly: req.PermissionMode == "read_only", IncludeProfile: profile,
 	}
 }
