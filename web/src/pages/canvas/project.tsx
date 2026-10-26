@@ -8,6 +8,7 @@ import { isCanvasNodeGenerating } from "@/lib/canvas/canvas-node-task-state";
 import { createCanvasStateWriter } from "@/lib/canvas/canvas-editor-state";
 import { useCanvasImageWheelResize } from "./use-canvas-image-wheel-resize";
 import { canCancelGenerationTask } from "@/lib/generation-task-display";
+import { isCanvasStartNode, type CanvasStartNode } from "@/lib/canvas/canvas-start-node";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -194,6 +195,7 @@ const CanvasPrevisWorkbench = lazy(() => import("@/components/canvas/previs/canv
 const CanvasDrawingEditorModal = lazy(() => import("@/components/canvas/canvas-drawing-editor-modal").then((module) => ({ default: module.CanvasDrawingEditorModal })));
 
 const NODE_STATUS_SUCCESS = "success" as const;
+const canvasStartNodeTypes: Record<CanvasStartNode, CanvasNodeType> = { image: CanvasNodeType.Image, video: CanvasNodeType.Video, audio: CanvasNodeType.Audio, script: CanvasNodeType.Script, text: CanvasNodeType.Text };
 const EMPTY_RESOURCE_REFERENCES: CanvasResourceReference[] = [];
 
 function visibleGenerationBatch(node: CanvasNodeData) {
@@ -1066,6 +1068,19 @@ function CanvasViewportPage() {
         setDialogNodeId,
         onNodesDeleted: handleNodesDeleted,
     });
+
+    // 首页工具入口新建画布时带 ?start=，只在空画布上放一个起始节点，刷新或返回不会重复添加。
+    const startNodeHandledRef = useRef(false);
+    useEffect(() => {
+        const start = searchParams.get("start");
+        if (!projectLoaded || start === null) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete("start");
+        setSearchParams(next, { replace: true });
+        if (startNodeHandledRef.current || !isCanvasStartNode(start) || nodesRef.current.length) return;
+        startNodeHandledRef.current = true;
+        createNode(canvasStartNodeTypes[start]);
+    }, [createNode, nodesRef, projectLoaded, searchParams, setSearchParams]);
 
     const handleReplaceNodeReference = useCallback(
         (targetNodeId: string, oldReference: { id: string; nodeId?: string; label?: string; title?: string }, sourceNodeId: string) => {

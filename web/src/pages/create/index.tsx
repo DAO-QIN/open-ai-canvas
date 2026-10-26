@@ -140,6 +140,7 @@ import { declaredInspirationSources } from "@/lib/inspirations/catalog";
 import { fillablePrompt } from "@/lib/inspirations/resolve";
 import { CreationRecentCanvases } from "./creation-recent-canvases";
 import { CreationFeaturedCanvases } from "./creation-featured-canvases";
+import { CreationToolEntries } from "./creation-tool-entries";
 import { openLoginModal } from "@/stores/use-login-modal-store";
 import { expandSmartCreationPlan, projectSmartCreationBatch, runSmartCreationSchedule } from "./smart-creation-runtime";
 import { createCreationSubmitGate, createCreationSubmitGateRelease, withCreationSubmitGate } from "./creation-submit-gate";
@@ -2791,6 +2792,7 @@ export default function CreatePage() {
                                     }}
                                 />
                             </section>
+                            <CreationToolEntries onRequireLogin={() => setLoginDialogOpen(true)} />
                             <CreationRecentCanvases onRequireLogin={() => setLoginDialogOpen(true)} />
                             <CreationFeaturedCanvases />
                             <Suspense

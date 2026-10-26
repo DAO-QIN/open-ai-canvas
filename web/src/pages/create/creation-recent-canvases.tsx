@@ -1,29 +1,25 @@
-import { useMemo, useRef, useState } from "react";
-import { App } from "antd";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Clock3, LoaderCircle, PanelsTopLeft, Plus } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 
 import { ProjectPreview } from "@/components/canvas/canvas-project-card";
-import { getActiveUserScope } from "@/lib/user-scope";
 import { loadCanvasProjectPage } from "@/lib/workspace-route-modules";
 import { listRemoteCanvasProjectsPage, type CanvasLibrarySummary } from "@/services/api/user-data";
-import { createCanvasProjectWithRemoteSync } from "@/services/user-data-sync";
-import { flushCanvasStorePersistence, useCanvasStore } from "@/stores/canvas/use-canvas-store";
+import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { RelativeTime } from "@/components/ui/product/relative-time";
+import { useCreateBlankCanvas } from "./use-create-blank-canvas";
 
 const RECENT_COUNT = 4;
 
 export function CreationRecentCanvases({ onRequireLogin }: { onRequireLogin: () => void }) {
-    const { message } = App.useApp();
-    const navigate = useNavigate();
     const userId = useUserStore((state) => state.user?.id);
     const sessionHydrated = useUserStore((state) => state.hydrated);
     const canvasHydrated = useCanvasStore((state) => state.hydrated);
     const localProjects = useCanvasStore((state) => state.projects);
-    const [creating, setCreating] = useState(false);
-    const creatingRef = useRef(false);
+    const { createCanvas: createBlankCanvas, creating: creatingKind, ready } = useCreateBlankCanvas(onRequireLogin);
+    const creating = creatingKind !== null;
     const recentQuery = useQuery({
         queryKey: ["canvas-library", userId, "recent"],
         queryFn: ({ signal }) => listRemoteCanvasProjectsPage({ page: 1, pageSize: RECENT_COUNT, sort: "updated", signal }),
@@ -43,28 +39,7 @@ export function CreationRecentCanvases({ onRequireLogin }: { onRequireLogin: () 
     const preload = () => {
         void loadCanvasProjectPage();
     };
-    const createCanvas = async () => {
-        if (!userId) {
-            onRequireLogin();
-            return;
-        }
-        if (!canvasHydrated || creatingRef.current) return;
-        const scope = getActiveUserScope();
-        creatingRef.current = true;
-        setCreating(true);
-        try {
-            const { id, syncError } = await createCanvasProjectWithRemoteSync("未命名画布");
-            await flushCanvasStorePersistence();
-            if (getActiveUserScope() !== scope || useUserStore.getState().user?.id !== userId) return;
-            if (syncError) message.warning("画布已保存在本机，云端同步尚未完成，将自动重试。");
-            navigate(`/canvas/${id}`);
-        } catch (error) {
-            if (getActiveUserScope() === scope) message.error(error instanceof Error ? error.message : "创建画布失败，请重试");
-        } finally {
-            creatingRef.current = false;
-            setCreating(false);
-        }
-    };
+    const createCanvas = () => createBlankCanvas();
 
     return (
         <section className="creation-recent-canvases" aria-labelledby="creation-recent-title">
@@ -80,7 +55,7 @@ export function CreationRecentCanvases({ onRequireLogin }: { onRequireLogin: () 
             </header>
             <div className="creation-canvas-strip creation-scrollbar" role="list" aria-label="最近更新的画布" aria-busy={loading}>
                 <div className="creation-canvas-strip-item" role="listitem">
-                    <button type="button" className="creation-canvas-tile is-create" disabled={!sessionHydrated || !canvasHydrated || creating} onClick={() => void createCanvas()} onPointerEnter={preload} onFocus={preload}>
+                    <button type="button" className="creation-canvas-tile is-create" disabled={!ready || creating} onClick={() => void createCanvas()} onPointerEnter={preload} onFocus={preload}>
                         <span className="creation-canvas-thumbnail is-create">{creating ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}</span>
                         <span className="creation-canvas-copy">
                             <strong>{creating ? "正在创建…" : "创建画布"}</strong>

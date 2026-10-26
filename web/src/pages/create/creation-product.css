@@ -18,6 +18,20 @@
 .creation-history-sync { margin: 0; color: var(--user-ink-muted); font-size: var(--fs-caption); line-height: 1.6; }
 .creation-history-retention { margin: 0; color: var(--user-ink-muted); font-size: var(--fs-caption); line-height: 1.6; }
 .creation-history-retention a { display: inline-block; white-space: nowrap; color: var(--user-accent); text-decoration: underline; text-underline-offset: 3px; }
+.creation-tool-entries { margin-top: var(--space-6); }
+.creation-tool-entries ul { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.creation-tool-entries li { min-width: 0; }
+.creation-tool-entry { display: flex; width: 100%; min-width: 0; flex-direction: column; align-items: center; gap: var(--space-2); border: 0; border-radius: var(--user-radius-card); padding: var(--space-2) var(--space-1); background: transparent; color: var(--user-ink-muted); font-size: var(--fs-caption); cursor: pointer; transition: color var(--user-motion); }
+.creation-tool-entry-icon { display: grid; width: 100%; max-width: 116px; height: 64px; place-items: center; border-radius: var(--user-radius-card); background: var(--library-surface); color: var(--user-ink); transition: background var(--user-motion), transform var(--user-motion); }
+.creation-tool-entry-icon svg { width: 24px; height: 24px; }
+.creation-tool-entry-label { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
+.creation-tool-entry:hover:not(:disabled) { color: var(--user-ink); }
+.creation-tool-entry:hover:not(:disabled) .creation-tool-entry-icon { background: var(--library-surface-hover); transform: translateY(-2px); }
+.creation-tool-entry:focus-visible { outline: 2px solid var(--control-focus-ring); outline-offset: 2px; }
+.creation-tool-entry:disabled { cursor: wait; opacity: .6; }
+@media (max-width: 900px) { .creation-tool-entries ul { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); } }
+@media (max-width: 480px) { .creation-tool-entry-icon { height: 52px; } .creation-tool-entry-icon svg { width: 20px; height: 20px; } .creation-tool-entry { font-size: var(--fs-label); } }
+@media (prefers-reduced-motion: reduce) { .creation-tool-entry-icon { transition: none; } .creation-tool-entry:hover:not(:disabled) .creation-tool-entry-icon { transform: none; } }
 .creation-recent-canvases { margin-top: var(--space-6); }
 .creation-featured-canvases { margin-top: var(--space-6); }
 .creation-featured-canvas-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); }
