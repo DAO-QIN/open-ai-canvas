@@ -37,6 +37,10 @@ const (
 	ReasonInternal            = kernel.ReasonInternal
 	ReasonBadGateway          = kernel.ReasonBadGateway
 	ReasonUpstreamDNSFailed   = kernel.ReasonUpstreamDNSFailed
+
+	ReasonCreationSessionNotFound = kernel.ReasonCreationSessionNotFound
+	ReasonCreationSessionBusy     = kernel.ReasonCreationSessionBusy
+	ReasonCreationEntryNotFound   = kernel.ReasonCreationEntryNotFound
 )
 
 func ReasonForStatus(status int) ErrorReason {

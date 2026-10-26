@@ -115,6 +115,30 @@ description: 信封、错误码与 OpenAPI
 | `POST /api/admin/feedbacks/{id}/archive`、`POST /api/admin/feedbacks/{id}/unarchive` | 归档或恢复历史反馈，返回更新后的反馈记录 |
 | `DELETE /api/admin/feedbacks/{id}` | 删除反馈记录，返回 `data={ok:true}` |
 
+## 首页创作会话与生成记录
+
+首页（普通生成与首页 Agent）的会话和生成记录保存在服务端，设计见 `docs/design/home-agent.md` §6。所有接口使用登录 Cookie 和标准业务信封，service 层校验会话、记录、任务和资源均属于当前用户。与 `/api/creation-runs`（画布创意互动）无关。
+
+| 接口 | 入参与结果 |
+| --- | --- |
+| `GET /api/creation/sessions` | `cursor`、`limit`（1–100，默认 20）；按最近活动倒序。返回 `{ sessions, nextCursor }`，`nextCursor` 为空表示读完，不返回总数 |
+| `POST /api/creation/sessions` | `{ title?, mode? }`，会话 ID 由服务端生成；`mode` 为 `agent/image/video/text/audio` |
+| `GET /api/creation/sessions/{id}` | 会话详情：标题、最近模式、`agentStatus`、Agent 模型与思考档位、技能、`lastSeq`、记录数、最新记录 ID |
+| `PATCH /api/creation/sessions/{id}` | `{ title?, lastMode?, agentModel?, reasoningEffort?, skillIds? }`；修改设置不改变列表顺序 |
+| `DELETE /api/creation/sessions/{id}` | 软删除，不删除任务、账务和素材；有运行中的 Agent 时返回 409 / `creation_session_busy` |
+| `POST /api/creation/sessions/import` | `{ sessions: [{ id, title, updatedAt, messages }] }`，单次最多 50 个会话，每个最多 400 条消息。导入浏览器本地历史：按会话 ID 与消息 ID 去重，只保留本人的任务和资源，保留原有排序。返回 `{ imported, skipped, entries, sessions }`；会话 ID 已被占用或已删除的进入 `skipped` |
+| `GET /api/creation/sessions/{id}/entries` | `before`、`limit`；按创建时间倒序返回 `{ entries, nextBefore }`。未结束的记录先按关联任务的当前状态校准 |
+| `POST /api/creation/sessions/{id}/entries` | `{ clientOperationId, type, prompt, config?, references?, tasks }`。`tasks` 是 1–4 个与 `POST /api/tasks` 相同的任务输入，类型必须为 `canvas_<type>`，逐个交给任务入口校验与计费。每个槽位的任务 ID 由服务端推导；同一 `clientOperationId` 重复提交返回原记录并只补建缺失槽位，不会重复扣费。用于其他会话时返回 40901 / `idempotency_conflict`。所有槽位都未能建出任务时返回第一个准入错误（如积分不足），记录保留为失败 |
+| `GET /api/creation/entries/{id}` | 单条记录，未结束时先校准 |
+| `POST /api/creation/entries/{id}/retry` | 把失败或已取消槽位的原任务重新排队，沿用 `POST /api/tasks/{id}/retry` 的计费与校验；没有可重试槽位时返回 400。未能建出任务的槽位需重新提交 |
+| `POST /api/creation/entries/{id}/clear-failed` | 隐藏失败槽位，不删除任务和账务 |
+
+记录对象：`{ id, sessionId, origin, proposalId?, clientOperationId, type, prompt, config, references, creditsMicrocredits, status, results, hiddenFailed, revision, createdAt, updatedAt }`。`status` 为 `pending/running/succeeded/partial/failed/cancelled`；`creditsMicrocredits` 是关联计费单的预计或实际扣费（已退款部分扣除），为字符串。`results[]` 为 `{ slot, taskId?, status, resources?, text?, failure? }`，`resources[]` 为 `{ resourceId, storageKey, width?, height?, bytes?, mimeType?, durationMs? }`；没有 `taskId` 的失败槽位表示任务未能创建。参考 `references[]` 为 `{ kind: "resource" | "entry_result", resourceId, storageKey, entryId?, slot?, label? }`，只接受本人的资源或生成结果。
+
+任务进入终态（成功、失败、取消、文本回放完成）后，服务端回写引用它的生成记录；结算或退款后再同步一次扣费。未经过终态协调器的路径（如直接取消排队任务）由读取时校准兜底。生成记录引用的资源在会话未删除前会阻止素材删除，占用来源显示为“首页创作记录”。
+
+不存在、已删除或不属于当前用户的会话返回 404 / `creation_session_not_found`；生成记录返回 404 / `creation_entry_not_found`。
+
 
 
 ## Agent 画布权限与大事件

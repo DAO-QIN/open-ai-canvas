@@ -28,6 +28,7 @@ tags:
   - name: skills
   - name: promotion
   - name: workbench
+  - name: creation
 paths:
   /me/pet-preference:
     get:
@@ -2615,6 +2616,252 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /creation/sessions:
+    get:
+      tags: [creation]
+      summary: 按最近活动倒序分页列出首页创作会话
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        "200":
+          description: 成功信封，data 为会话分页；nextCursor 为空表示读完
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationSessionPage"}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+    post:
+      tags: [creation]
+      summary: 新建首页创作会话，ID 由服务端生成
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: {type: string, maxLength: 120}
+                mode: {type: string, enum: [agent, image, video, text, audio]}
+      responses:
+        "200":
+          description: 成功信封，data 为新会话
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationSession"}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+  /creation/sessions/import:
+    post:
+      tags: [creation]
+      summary: 导入浏览器本地的首页历史，按会话与消息 ID 去重
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessions]
+              properties:
+                sessions:
+                  type: array
+                  maxItems: 50
+                  items: {type: object, additionalProperties: true}
+      responses:
+        "200":
+          description: 成功信封，data 为导入结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationImportResult"}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "413": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+  /creation/sessions/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    get:
+      tags: [creation]
+      summary: 读取首页创作会话
+      responses:
+        "200":
+          description: 成功信封，data 为会话
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationSession"}
+        "401": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+    patch:
+      tags: [creation]
+      summary: 修改会话标题、模式与 Agent 设置，不改变列表顺序
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: {type: string, maxLength: 120}
+                lastMode: {type: string, enum: [agent, image, video, text, audio]}
+                agentModel: {type: string}
+                reasoningEffort: {type: string}
+                skillIds: {type: array, maxItems: 20, items: {type: string}}
+      responses:
+        "200":
+          description: 成功信封，data 为更新后的会话
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationSession"}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+    delete:
+      tags: [creation]
+      summary: 软删除会话，不删除任务、账务和素材；有运行中的 Agent 时返回 409 creation_session_busy
+      responses:
+        "200": {$ref: "#/components/responses/Envelope"}
+        "401": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+  /creation/sessions/{id}/entries:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    get:
+      tags: [creation]
+      summary: 按创建时间倒序分页读取会话内的生成记录，未结束的先按任务状态校准
+      parameters:
+        - {name: before, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+      responses:
+        "200":
+          description: 成功信封，data 为记录分页；nextBefore 为空表示读完
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationEntryPage"}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+    post:
+      tags: [creation]
+      summary: 提交一次普通生成；同一 clientOperationId 重复提交返回原记录，不重复扣费
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CreationEntrySubmission"}
+      responses:
+        "200":
+          description: 成功信封，data 为生成记录
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationEntry"}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "409": {$ref: "#/components/responses/Error"}
+        "413": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+  /creation/entries/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    get:
+      tags: [creation]
+      summary: 读取单条生成记录
+      responses:
+        "200":
+          description: 成功信封，data 为生成记录
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationEntry"}
+        "401": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+  /creation/entries/{id}/retry:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    post:
+      tags: [creation]
+      summary: 把失败或已取消槽位的原任务重新排队
+      responses:
+        "200":
+          description: 成功信封，data 为生成记录
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationEntry"}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
+  /creation/entries/{id}/clear-failed:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string}}
+    post:
+      tags: [creation]
+      summary: 隐藏失败槽位，不删除任务和账务
+      responses:
+        "200":
+          description: 成功信封，data 为生成记录
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - type: object
+                    properties:
+                      data: {$ref: "#/components/schemas/CreationEntry"}
+        "401": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "500": {$ref: "#/components/responses/Error"}
   /feedbacks:
     post:
       tags: [feedback]
@@ -2857,6 +3104,118 @@ components:
       in: cookie
       name: open_ai_canvas_session
   schemas:
+    CreationSession:
+      type: object
+      required: [id, title, lastMode, agentStatus, agentModel, reasoningEffort, skillIds, lastSeq, entryCount, createdAt, updatedAt]
+      properties:
+        id: {type: string}
+        title: {type: string}
+        lastMode: {type: string}
+        agentStatus: {type: string, enum: [idle, ready, running, input, approval, waiting, composing, stopped, error]}
+        agentModel: {type: string}
+        reasoningEffort: {type: string}
+        skillIds: {type: array, items: {type: string}}
+        activeRunId: {type: string}
+        lastSeq: {type: integer, format: int64}
+        entryCount: {type: integer}
+        latestEntryId: {type: string}
+        canvasId: {type: string}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    CreationSessionPage:
+      type: object
+      required: [sessions]
+      properties:
+        sessions: {type: array, items: {$ref: "#/components/schemas/CreationSession"}}
+        nextCursor: {type: string}
+    CreationReference:
+      type: object
+      required: [kind]
+      properties:
+        kind: {type: string, enum: [resource, entry_result]}
+        resourceId: {type: string}
+        storageKey: {type: string}
+        entryId: {type: string}
+        slot: {type: integer, minimum: 0}
+        label: {type: string}
+    CreationResultSlot:
+      type: object
+      required: [slot, status]
+      properties:
+        slot: {type: integer}
+        taskId: {type: string, description: 为空表示任务未能创建}
+        status: {type: string, enum: [pending, running, succeeded, failed, cancelled]}
+        resources:
+          type: array
+          items:
+            type: object
+            required: [resourceId, storageKey]
+            properties:
+              resourceId: {type: string}
+              storageKey: {type: string}
+              width: {type: integer}
+              height: {type: integer}
+              bytes: {type: integer, format: int64}
+              mimeType: {type: string}
+              durationMs: {type: integer, format: int64}
+        text: {type: string}
+        failure: {type: string}
+    CreationEntry:
+      type: object
+      required: [id, sessionId, origin, clientOperationId, type, prompt, config, references, creditsMicrocredits, status, results, hiddenFailed, revision, createdAt, updatedAt]
+      properties:
+        id: {type: string}
+        sessionId: {type: string}
+        origin: {type: string, enum: [manual, agent]}
+        proposalId: {type: string}
+        clientOperationId: {type: string}
+        retryOf: {type: string}
+        type: {type: string, enum: [image, video, text, audio]}
+        prompt: {type: string}
+        config: {type: object, additionalProperties: true}
+        references: {type: array, items: {$ref: "#/components/schemas/CreationReference"}}
+        creditsMicrocredits: {type: string, description: 预计或实际扣费（已扣除退款）}
+        status: {type: string, enum: [pending, running, succeeded, partial, failed, cancelled]}
+        results: {type: array, items: {$ref: "#/components/schemas/CreationResultSlot"}}
+        hiddenFailed: {type: boolean}
+        revision: {type: integer, format: int64}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    CreationEntryPage:
+      type: object
+      required: [entries]
+      properties:
+        entries: {type: array, items: {$ref: "#/components/schemas/CreationEntry"}}
+        nextBefore: {type: string}
+    CreationEntrySubmission:
+      type: object
+      required: [clientOperationId, type, prompt, tasks]
+      properties:
+        clientOperationId: {type: string, maxLength: 80}
+        type: {type: string, enum: [image, video, text, audio]}
+        prompt: {type: string, maxLength: 12000}
+        config: {type: object, additionalProperties: true}
+        references: {type: array, maxItems: 14, items: {$ref: "#/components/schemas/CreationReference"}}
+        tasks:
+          type: array
+          minItems: 1
+          maxItems: 4
+          description: 与 POST /tasks 相同的任务输入，类型必须为 canvas_<type>
+          items: {type: object, additionalProperties: true}
+    CreationImportResult:
+      type: object
+      required: [imported, skipped, entries, sessions]
+      properties:
+        imported: {type: array, items: {type: string}}
+        skipped:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              reason: {type: string}
+        entries: {type: object, additionalProperties: {type: integer}}
+        sessions: {type: array, items: {$ref: "#/components/schemas/CreationSession"}}
     PromotionMicrocredits:
       type: string
       pattern: "^[0-9]+$"

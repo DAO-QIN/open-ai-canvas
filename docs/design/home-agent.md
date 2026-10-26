@@ -258,12 +258,20 @@
 
 | 方法与路径 | 请求 | 响应与说明 |
 | --- | --- | --- |
-| `GET /api/creation/sessions/:id/entries?before=&limit=` | `limit` 默认 20 | `{entries, nextBefore}`；不返回总数 |
-| `POST /api/creation/sessions/:id/entries` | `{clientOperationId, type, prompt, config, references, count}` | 普通模式提交；同 `clientOperationId` 返回原记录 |
-| `POST /api/creation/entries/:id/retry` | `{clientOperationId, failedOnly}` | 用原参数重试，生成新记录并填 `retryOf` |
+| `GET /api/creation/sessions/:id/entries?before=&limit=` | `limit` 默认 20 | `{entries, nextBefore}`；不返回总数；未结束的记录先按任务状态校准 |
+| `POST /api/creation/sessions/:id/entries` | `{clientOperationId, type, prompt, config, references, tasks}` | 普通模式提交；`tasks` 是 1–4 个与 `POST /api/tasks` 相同的任务输入，每项一个槽位；同 `clientOperationId` 返回原记录并只补建缺失槽位 |
+| `GET /api/creation/entries/:id` | | 单条记录 |
+| `POST /api/creation/entries/:id/retry` | 无 | 把失败或已取消槽位的原任务重新排队（沿用 `POST /api/tasks/:id/retry`），记录回到进行中，不新建记录 |
 | `POST /api/creation/entries/:id/clear-failed` | | 隐藏失败槽位，不删任务和账务 |
 
-任务提交复用现有生成任务和计费逻辑。
+实现要点（PR2）：
+
+- **不在服务端重新组装供应商请求。** 客户端仍按现有方式准备任务输入（协议参数、参考上传、计费字段），服务端逐个交给 `CreateTask`，模型路由、能力校验、额度和计费都沿用任务入口。
+- **防重复扣费。** 任务创建本身没有服务端幂等。每个槽位的任务 ID 由服务端从 `(用户, 记录, 槽位)` 推导（`CreateTaskRequest` 的内部字段 `fixedTaskID`，客户端无法指定）；重试同一操作时先按该 ID 查任务，已存在就复用；并发撞主键时建任务与预扣积分的事务整体回滚，再复用先到者。文本回放任务同样使用该 ID。
+- **准入失败。** 某槽位建任务失败（如积分不足）时记录为没有 `taskId` 的失败槽位；所有槽位都失败时接口返回第一个准入错误，记录保留为失败。同一操作重放不再尝试这些槽位，需要客户端以新操作重新提交。
+- **回写。** 任务终态协调器在所有终态路径上同步引用该任务的记录，结算或退款后再同步一次扣费；文本回放完成也会同步。未经过协调器的路径（如直接取消排队任务）由读取时校准兜底。
+- **扣费汇总。** `creditsMicrocredits` 汇总关联计费单：已结算取实际金额，已退款扣除退款，其余取预扣金额。
+- **素材引用。** 生成记录的参考与结果纳入资源引用汇总，未删除会话中的记录会阻止素材删除，占用来源显示为“首页创作记录”。
 
 ### 6.3 Agent（会话级）
 
