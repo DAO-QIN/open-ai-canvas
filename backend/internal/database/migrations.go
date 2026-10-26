@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 63
+const CurrentSchemaVersion int64 = 64
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -222,6 +222,26 @@ var schemaMigrations = []migration{
 	{version: 63, name: "user_feedbacks", checksum: "sha256:user-feedbacks-v63-20261020", apply: func(tx *gorm.DB) error {
 		return tx.AutoMigrate(&model.UserFeedback{})
 	}},
+	{version: 64, name: "creation_sessions", checksum: "sha256:creation-sessions-v64-20261025", apply: migrateCreationSessions},
+}
+
+// migrateCreationSessions 创建首页创作会话相关表，并给 Agent 运行加产出目标列。
+// 旧运行的 target 由列默认值回填为 canvas，不改写 state_json。
+func migrateCreationSessions(tx *gorm.DB) error {
+	if err := tx.AutoMigrate(&model.CreationSession{}, &model.CreationEntry{}, &model.CreationEntryTask{}, &model.CreationAgentEvent{}); err != nil {
+		return err
+	}
+	for _, column := range []string{"Target", "CreationSessionID"} {
+		if !tx.Migrator().HasColumn(&model.CloudAgentExecution{}, column) {
+			if err := tx.Migrator().AddColumn(&model.CloudAgentExecution{}, column); err != nil {
+				return err
+			}
+		}
+	}
+	if !tx.Migrator().HasIndex(&model.CloudAgentExecution{}, "CreationSessionID") {
+		return tx.Migrator().CreateIndex(&model.CloudAgentExecution{}, "CreationSessionID")
+	}
+	return nil
 }
 
 func migrateChannelModelProtocolLength(tx *gorm.DB) error {

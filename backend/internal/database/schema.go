@@ -128,6 +128,10 @@ func Models() []any {
 		&model.TaskLog{},
 		&model.Result{},
 		&model.UserFeedback{},
+		&model.CreationSession{},
+		&model.CreationEntry{},
+		&model.CreationEntryTask{},
+		&model.CreationAgentEvent{},
 	}
 }
 
