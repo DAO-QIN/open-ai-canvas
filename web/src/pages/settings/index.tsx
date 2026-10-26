@@ -191,7 +191,7 @@ export default function SettingsPage() {
             ) : null}
             <div className="settings-library-frame flex min-h-0 flex-1 flex-col md:flex-row">
                 <aside className="settings-nav-panel w-full shrink-0 md:w-[200px]">
-                    <nav className="thin-scrollbar flex gap-1 overflow-x-auto p-2 md:block md:space-y-1 md:p-2" aria-label="配置分类">
+                    <nav className="thin-scrollbar flex gap-1 overflow-x-auto p-2 md:block md:space-y-1 md:overflow-x-hidden md:p-2" aria-label="配置分类">
                         {visibleConfigSections.map((item) => {
                             const selected = item.key === activeTab;
                             return (

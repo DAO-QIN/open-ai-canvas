@@ -1,5 +1,10 @@
 .workspace-account-popover .ant-popover-container {
-    padding: var(--space-2);
+    padding: 6px;
+    border: 1px solid var(--user-border, var(--border));
+    border-radius: 20px;
+    box-shadow:
+        0 18px 48px -18px rgba(0, 0, 0, 0.35),
+        0 2px 8px rgba(0, 0, 0, 0.08);
 }
 .workspace-account-popover .workspace-topbar-account-menu {
     width: auto;
@@ -7,144 +12,329 @@
     padding: 0;
 }
 .workspace-account-card {
-    width: min(304px, calc(100vw - 48px));
+    --account-row-height: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: min(296px, calc(100vw - 32px));
+    padding: 6px;
     color: var(--user-ink);
-    padding: 12px;
 }
+.workspace-account-card svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke-width: 1.8;
+}
+
+/* 身份：整行可点进入个人信息。 */
 .workspace-account-card-identity {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 4px 0 16px;
+    padding: 8px;
+    border-radius: 14px;
+    color: inherit;
+    transition: background var(--user-motion);
+}
+.workspace-account-card-identity:hover {
+    background: var(--user-surface-muted);
+    color: inherit;
 }
 .workspace-account-card-avatar {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 50%;
     background: var(--user-accent-soft);
     color: var(--user-accent);
-    padding: 8px;
-}
-.workspace-account-card-avatar[data-avatar-kind="spirit"] {
-    padding: 0;
-    border-radius: 50%;
-}
-.workspace-account-card-identity > div {
-    flex: 1;
-    min-width: 0;
-}
-.workspace-account-card-identity strong,
-.workspace-account-card-identity span {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.workspace-account-card-identity strong {
-    font-size: 14px;
-    line-height: 24px;
-}
-.workspace-account-card-identity span {
-    color: var(--user-ink-muted);
-    font-size: 12px;
-}
-.workspace-account-card-identity em {
-    font-style: normal;
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 999px;
-    background: var(--user-surface-muted);
-    color: var(--user-ink-muted);
-}
-.workspace-account-card-wallet {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
-    border-radius: var(--user-radius-card);
-    background: var(--user-surface-muted);
-}
-.workspace-account-card-balance > span {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--user-ink-muted);
-}
-.workspace-account-card-balance strong {
-    display: block;
-    margin-top: 4px;
-    font-size: 22px;
-    font-weight: 600;
-    letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
-}
-.workspace-account-card-wallet > button {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--user-accent);
-    white-space: nowrap;
-    padding: 8px 0;
-}
-.workspace-account-card svg {
-    width: 17px;
-    height: 17px;
-    flex-shrink: 0;
-    stroke-width: 1.7;
+    box-shadow:
+        0 0 0 2px var(--user-surface, transparent),
+        0 0 0 3px var(--user-border);
 }
 .workspace-account-card-avatar svg {
     width: 100%;
     height: 100%;
 }
-.workspace-account-card-actions {
-    display: grid;
-    gap: 4px;
+.workspace-account-card-identity-copy {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
 }
-.workspace-account-card-actions > a,
-.workspace-account-card-actions > button {
+.workspace-account-card-identity-copy > strong,
+.workspace-account-card-identity-copy > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.workspace-account-card-identity-copy > strong {
+    font-size: 15px;
+    font-weight: 650;
+    line-height: 20px;
+}
+.workspace-account-card-identity-copy > span {
+    color: var(--user-ink-soft);
+    font-size: 12px;
+    line-height: 16px;
+}
+.workspace-account-card-identity em {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--user-surface-muted);
+    color: var(--user-ink-muted);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 550;
+    line-height: 16px;
+}
+.workspace-account-card-identity em[data-role="admin"] {
+    background: var(--user-accent-soft);
+    color: var(--user-accent);
+}
+
+/* 积分：余额、刷新与充值聚合在一张卡里。 */
+.workspace-account-card-wallet {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 14px 12px;
+    overflow: hidden;
+    border: 1px solid var(--user-border);
+    border-radius: var(--user-radius-card, 16px);
+    background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--user-accent) 16%, transparent) 0%, transparent 60%), var(--user-surface-muted);
+}
+.workspace-account-card-wallet-head {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    min-height: 40px;
-    height: auto;
-    width: 100%;
-    padding: 8px;
-    border: 0;
-    border-radius: 12px;
-    font-size: 13px;
-    text-align: left;
-    justify-content: flex-start;
+}
+.workspace-account-card-wallet-head > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--user-ink-muted);
+    font-size: 12px;
+}
+.workspace-account-card-wallet-head > span svg {
+    width: 14px;
+    height: 14px;
+    color: var(--user-accent);
+}
+.workspace-account-card-refresh {
+    display: inline-grid;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--user-ink-soft);
     transition:
         background var(--user-motion),
-        transform var(--user-motion);
+        color var(--user-motion);
 }
-.workspace-account-card-actions > a {
+.workspace-account-card-refresh svg {
+    width: 14px;
+    height: 14px;
+}
+.workspace-account-card-refresh:hover:not(:disabled) {
+    background: var(--user-surface-hover);
     color: var(--user-ink);
 }
-.workspace-account-card-actions > a > span {
+.workspace-account-card-refresh:disabled {
+    cursor: progress;
+}
+.workspace-account-card .is-spinning svg,
+.workspace-account-card svg.is-spinning {
+    animation: workspace-account-spin 0.9s linear infinite;
+}
+.workspace-account-card-balance {
+    display: block;
+    min-height: 34px;
+    font-size: 28px;
+    font-weight: 680;
+    line-height: 34px;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+.workspace-account-card-balance-skeleton {
+    display: inline-block;
+    width: 96px;
+    height: 22px;
+    vertical-align: middle;
+    border-radius: 6px;
+    background: var(--user-surface-hover);
+    animation: workspace-account-pulse 1.2s ease-in-out infinite;
+}
+.workspace-account-card-wallet-error {
+    margin: 0;
+    color: var(--status-error);
+    font-size: 12px;
+}
+.workspace-account-card-topup {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 34px;
+    margin-top: 10px;
+    border-radius: 10px;
+    background: var(--user-ink);
+    color: var(--user-surface, #fff);
+    font-size: 13px;
+    font-weight: 600;
+    transition:
+        opacity var(--user-motion),
+        transform var(--user-motion);
+}
+.workspace-account-card-topup svg {
+    width: 14px;
+    height: 14px;
+}
+.workspace-account-card-topup:hover {
+    opacity: 0.88;
+}
+.workspace-account-card-topup:active {
+    transform: scale(0.98);
+}
+
+/* 导航与偏好：统一行高、统一右侧指示。 */
+.workspace-account-card-actions,
+.workspace-account-card-prefs {
+    display: grid;
+    gap: 2px;
+}
+.workspace-account-card-prefs,
+.workspace-account-card-footer {
+    padding-top: 6px;
+    border-top: 1px solid var(--user-border);
+}
+.workspace-account-card-actions > a,
+.workspace-account-card-changelog,
+.workspace-account-card-theme,
+.workspace-account-card-logout {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--account-row-height);
+    padding: 0 10px;
+    border-radius: 10px;
+    color: var(--user-ink);
+    font-size: 13px;
+    text-align: left;
+    transition:
+        background var(--user-motion),
+        color var(--user-motion);
+}
+.workspace-account-card-actions > a > span,
+.workspace-account-card-changelog > span:first-of-type {
     flex: 1;
+    min-width: 0;
+}
+.workspace-account-card-actions > a > svg:first-child,
+.workspace-account-card-changelog > svg:first-child {
+    color: var(--user-ink-muted);
 }
 .workspace-account-card-actions > a > svg:last-child {
-    color: var(--user-ink-soft);
     width: 14px;
+    height: 14px;
+    color: var(--user-ink-soft);
+    transition: transform var(--user-motion);
 }
-.workspace-account-card-actions > a:hover {
+.workspace-account-card-actions > a:hover,
+.workspace-account-card-changelog:hover {
+    background: var(--user-surface-muted);
+    color: var(--user-ink);
+}
+.workspace-account-card-actions > a:hover > svg:last-child {
+    transform: translateX(2px);
+}
+.workspace-account-card-changelog svg {
+    width: 16px !important;
+    height: 16px !important;
+}
+.workspace-account-card-version {
+    flex: 0 1 auto;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: var(--user-surface-muted);
+    color: var(--user-ink-soft);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+.workspace-account-card-theme {
+    justify-content: space-between;
+    cursor: default;
+}
+.workspace-account-card-theme > span {
+    color: var(--user-ink-muted);
+}
+.workspace-account-card-segmented {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 9px;
     background: var(--user-surface-muted);
 }
-.workspace-account-card-actions > a:active {
-    transform: scale(0.97);
+.workspace-account-card-segmented > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 7px;
+    color: var(--user-ink-soft);
+    font-size: 12px;
+    transition:
+        background var(--user-motion),
+        color var(--user-motion),
+        box-shadow var(--user-motion);
 }
-.workspace-account-card-actions > a:focus-visible,
-.workspace-account-card-wallet > button:focus-visible {
+.workspace-account-card-segmented > button svg {
+    width: 13px;
+    height: 13px;
+}
+.workspace-account-card-segmented > button:hover {
+    color: var(--user-ink);
+}
+.workspace-account-card-segmented > button.is-active {
+    background: var(--user-surface, #fff);
+    color: var(--user-ink);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+.workspace-account-card-logout {
+    color: var(--status-error);
+}
+.workspace-account-card-logout:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--status-error) 10%, transparent);
+}
+.workspace-account-card-logout:disabled {
+    cursor: progress;
+    opacity: 0.7;
+}
+.workspace-account-card a:focus-visible,
+.workspace-account-card button:focus-visible {
     outline: 2px solid var(--user-accent);
-    outline-offset: 2px;
+    outline-offset: 1px;
+}
+
+@keyframes workspace-account-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+@keyframes workspace-account-pulse {
+    50% {
+        opacity: 0.5;
+    }
 }
 @media (prefers-reduced-motion: reduce) {
-    .workspace-account-card-actions > a:active {
-        transform: none;
+    .workspace-account-card *,
+    .workspace-account-card *::before {
+        animation: none !important;
+        transition: none !important;
     }
 }

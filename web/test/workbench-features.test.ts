@@ -35,6 +35,10 @@ test("the account menu preserves invitation recovery and routes profile settings
     expect(card).toContain("usePromotionOverview(user?.id, active)");
     expect(card).toContain("promotion.showEntry");
     expect(card).toContain('to="/settings?section=profile"');
+    // 顶部与侧栏入口共用同一卡片，版本公告、外观切换和退出登录都在卡片内。
+    expect(card).toContain("AppChangelogButton");
+    expect(card).toContain('role="radiogroup"');
+    expect(card).toContain("workspace-account-card-logout");
     expect(sidebar).toContain("active={menuOpen}");
     expect(sidebar).toContain("features.promotionEnabled");
 });

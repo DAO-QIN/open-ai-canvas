@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Form, Input, Skeleton } from "antd";
-import { BadgeCheck, ImagePlus, KeyRound, Mail, RefreshCw, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Camera, Check, ImagePlus, KeyRound, Mail, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -16,7 +16,7 @@ import { invalidateAuthSessionCache, type LocalUser } from "@/services/api/auth"
 import { changeProfileEmail, changeProfilePassword, profileLinuxDOReauthURL, requestProfileEmailCode, selectDefaultProfileAvatar, uploadProfileAvatar, type UserProfile } from "@/services/api/profile";
 import { ApiError } from "@/services/api/request";
 import { useUserStore } from "@/stores/use-user-store";
-import { profileAvatarError, profilePasswordError, profileReauthReady, profileSecondsRemaining } from "./profile-validation";
+import { maskEmail, profileAvatarError, profilePasswordError, profilePasswordStrength, profileReauthReady, profileSecondsRemaining } from "./profile-validation";
 import "./profile-pane.css";
 
 type PasswordFields = { currentPassword: string; newPassword: string; confirmPassword: string };
@@ -24,6 +24,7 @@ type EmailFields = { currentPassword: string; email: string; emailCode: string }
 type PendingAction = "crop-avatar" | "avatar" | "reset-avatar" | "password" | "email-code" | "email";
 type AvatarTab = "upload" | "preset";
 type EmailTicket = { value: string; expiresAt: number };
+type SecurityDialog = "password" | "email";
 
 const errorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
@@ -49,6 +50,8 @@ export function ProfilePane() {
     const cropGeneration = useRef(0);
     const fileInput = useRef<HTMLInputElement>(null);
     const [emailTicket, setEmailTicket] = useState<EmailTicket | null>(null);
+    const [securityDialog, setSecurityDialog] = useState<SecurityDialog | null>(null);
+    const newPasswordValue = Form.useWatch("newPassword", passwordForm);
     const [retryAt, setRetryAt] = useState(0);
     const [now, setNow] = useState(Date.now());
     const oauthResult = searchParams.get("reauth");
@@ -274,19 +277,36 @@ export function ProfilePane() {
         }
     };
 
+    const openSecurityDialog = (dialog: SecurityDialog) => {
+        if (pendingRef.current) return;
+        passwordForm.resetFields();
+        emailForm.resetFields();
+        setErrors((current) => ({ ...current, password: "", email: "" }));
+        setEmailTicket(null);
+        setSecurityDialog(dialog);
+    };
+
+    const closeSecurityDialog = () => {
+        if (pendingRef.current) return;
+        setSecurityDialog(null);
+    };
+
+    const passwordStrength = profilePasswordStrength(newPasswordValue || "");
+    const emailStatus = profile?.user.email ? (profile.user.emailVerifiedAt ? "verified" : "unverified") : "none";
+
     return (
         <div className="profile-pane">
             <div className="settings-pane-header">
                 <div className="min-w-0">
                     <h2>个人信息</h2>
-                    <p>管理你的头像、登录密码与邮箱。</p>
+                    <p>管理你的头像、登录密码与绑定邮箱。</p>
                 </div>
                 <Button icon={<RefreshCw className="size-4" />} loading={profileQuery.isFetching} disabled={!!pending} onClick={() => void profileQuery.refetch()}>
                     刷新资料
                 </Button>
             </div>
             {profileQuery.isPending ? (
-                <Skeleton active paragraph={{ rows: 7 }} />
+                <Skeleton active avatar paragraph={{ rows: 6 }} />
             ) : profileQuery.isError ? (
                 <Callout
                     tone="error"
@@ -302,21 +322,34 @@ export function ProfilePane() {
                 </Callout>
             ) : profile ? (
                 <div className="profile-sections">
-                    <section className="profile-overview" aria-labelledby="profile-avatar-title">
-                        <div className="profile-overview-heading">
-                            <h3 id="profile-avatar-title">头像与账号</h3>
-                            <p>头像会同步显示在工作区和创作消息中。</p>
-                        </div>
-                        <div className="profile-overview-main">
+                    <section className="profile-hero" aria-labelledby="profile-avatar-title">
+                        <h3 id="profile-avatar-title" className="sr-only">
+                            头像与账号
+                        </h3>
+                        <button type="button" className="profile-hero-avatar" aria-label="更换头像图片" title="更换头像" disabled={!!pending} onClick={openAvatarDialog}>
                             <UserAvatar user={profile.user} className="profile-avatar-preview" />
-                            <div className="profile-overview-identity">
-                                <strong>{profile.user.displayName || profile.user.username}</strong>
-                                <span>账号 · {profile.user.username}</span>
+                            <span className="profile-hero-avatar-overlay" aria-hidden>
+                                <Camera className="size-5" />
+                            </span>
+                        </button>
+                        <div className="profile-hero-identity">
+                            <strong>{profile.user.displayName || profile.user.username}</strong>
+                            <span>@{profile.user.username}</span>
+                            <div className="profile-hero-chips">
+                                <span className="profile-chip">{profile.user.role === "admin" ? "管理员" : "创作者"}</span>
+                                <span className={`profile-chip${emailStatus === "verified" ? " is-success" : emailStatus === "unverified" ? " is-warning" : ""}`}>
+                                    {emailStatus === "verified" ? <BadgeCheck className="size-3.5" /> : <Mail className="size-3.5" />}
+                                    {emailStatus === "verified" ? "邮箱已验证" : emailStatus === "unverified" ? "邮箱未验证" : "未绑定邮箱"}
+                                </span>
+                                <span className={`profile-chip${profile.hasPassword ? " is-success" : " is-warning"}`}>
+                                    <KeyRound className="size-3.5" />
+                                    {profile.hasPassword ? "已设置密码" : "未设置密码"}
+                                </span>
                             </div>
-                            <Button type="primary" icon={<ImagePlus className="size-4" />} disabled={!!pending} onClick={openAvatarDialog}>
-                                更换头像
-                            </Button>
                         </div>
+                        <Button icon={<ImagePlus className="size-4" />} disabled={!!pending} onClick={openAvatarDialog}>
+                            更换头像
+                        </Button>
                     </section>
 
                     {!profile.hasPassword ? (
@@ -345,164 +378,227 @@ export function ProfilePane() {
                         </Callout>
                     ) : null}
 
-                    <div className="profile-security-heading">
-                        <h3>账户安全</h3>
-                        <p>密码与邮箱分别验证，修改成功后需要重新登录。</p>
-                    </div>
-                    <div className="profile-security-grid">
-                        <section className="profile-security-card" aria-labelledby="profile-password-title">
-                            <div className="profile-card-heading">
-                                <span className="profile-card-icon">
-                                    <KeyRound className="size-5" />
+                    <section className="profile-security" aria-labelledby="profile-security-title">
+                        <div className="profile-security-heading">
+                            <h3 id="profile-security-title">账户安全</h3>
+                            <p>修改密码或邮箱后，所有设备上的登录会话都会退出，需要重新登录。</p>
+                        </div>
+                        <div className="profile-security-list">
+                            <div className="profile-security-row">
+                                <span className="profile-card-icon" aria-hidden>
+                                    <KeyRound className="size-[18px]" />
                                 </span>
-                                <div>
-                                    <h4 id="profile-password-title">{profile.hasPassword ? "修改密码" : "设置登录密码"}</h4>
-                                    <p>更新后，所有设备上的登录会话都会退出。</p>
+                                <div className="profile-security-copy">
+                                    <h4 id="profile-password-title">登录密码</h4>
+                                    <p>{profile.hasPassword ? "已设置。建议定期更换，避免与其他网站使用相同密码。" : "尚未设置。设置后可使用账号与密码直接登录。"}</p>
                                 </div>
-                            </div>
-                            <Form
-                                form={passwordForm}
-                                name="profile-password"
-                                layout="vertical"
-                                requiredMark={false}
-                                className="profile-form"
-                                disabled={!!pending || !identityReady}
-                                onFinish={(values) => void savePassword(values)}
-                                onValuesChange={() => setError("password", "")}
-                            >
-                                {profile.hasPassword ? (
-                                    <Form.Item name="currentPassword" label="当前密码" rules={[{ required: true, message: "请输入当前密码" }]}>
-                                        <Input.Password autoComplete="current-password" />
-                                    </Form.Item>
-                                ) : null}
-                                <Form.Item
-                                    name="newPassword"
-                                    label="新密码"
-                                    rules={[
-                                        {
-                                            validator: async (_, value: string = "") => {
-                                                const error = profilePasswordError(value);
-                                                if (error) throw new Error(error);
-                                            },
-                                        },
-                                    ]}
-                                >
-                                    <Input.Password autoComplete="new-password" placeholder="至少 8 个字符" />
-                                </Form.Item>
-                                <Form.Item
-                                    name="confirmPassword"
-                                    label="确认新密码"
-                                    dependencies={["newPassword"]}
-                                    rules={[
-                                        { required: true, message: "请再次输入新密码" },
-                                        {
-                                            validator: async (_, value) => {
-                                                if (value && value !== passwordForm.getFieldValue("newPassword")) throw new Error("两次输入的密码不一致");
-                                            },
-                                        },
-                                    ]}
-                                >
-                                    <Input.Password autoComplete="new-password" />
-                                </Form.Item>
-                                {errors.password ? (
-                                    <Callout tone="error" role="alert" className="profile-feedback">
-                                        {errors.password}
-                                    </Callout>
-                                ) : null}
-                                <Button type="primary" htmlType="submit" loading={pending === "password"} disabled={!!pending || !identityReady}>
-                                    {profile.hasPassword ? "更新密码" : "设置密码"}
+                                <Button disabled={!!pending || !identityReady} onClick={() => openSecurityDialog("password")}>
+                                    {profile.hasPassword ? "修改密码" : "设置密码"}
                                 </Button>
-                            </Form>
-                        </section>
-
-                        <section className="profile-security-card" aria-labelledby="profile-email-title">
-                            <div className="profile-card-heading">
-                                <span className="profile-card-icon">
-                                    <Mail className="size-5" />
+                            </div>
+                            <div className="profile-security-row">
+                                <span className="profile-card-icon" aria-hidden>
+                                    <Mail className="size-[18px]" />
                                 </span>
-                                <div>
-                                    <h4 id="profile-email-title">更换邮箱</h4>
-                                    <p>验证新邮箱后生效，并退出所有登录会话。</p>
+                                <div className="profile-security-copy">
+                                    <h4 id="profile-email-title">绑定邮箱</h4>
+                                    <p className="profile-security-email">
+                                        <span title={profile.user.email || undefined}>{profile.user.email ? maskEmail(profile.user.email) : "尚未绑定邮箱"}</span>
+                                        {profile.user.email ? (
+                                            <span className={`profile-email-status${profile.user.emailVerifiedAt ? " is-verified" : ""}`}>
+                                                {profile.user.emailVerifiedAt ? <BadgeCheck className="size-3.5" /> : null}
+                                                {profile.user.emailVerifiedAt ? "已验证" : "未验证"}
+                                            </span>
+                                        ) : null}
+                                    </p>
+                                    {!profile.emailEnabled ? <p className="profile-security-note">邮件服务暂未开放，暂时无法更换邮箱。</p> : null}
                                 </div>
+                                <Button disabled={!!pending || !identityReady || !profile.emailEnabled} onClick={() => openSecurityDialog("email")}>
+                                    {profile.user.email ? "更换邮箱" : "绑定邮箱"}
+                                </Button>
                             </div>
-                            <div className="profile-current-email">
-                                <span>当前邮箱</span>
-                                <strong>{profile.user.email || "尚未绑定"}</strong>
-                                {profile.user.email ? (
-                                    <span className={`profile-email-status${profile.user.emailVerifiedAt ? " is-verified" : ""}`}>
-                                        {profile.user.emailVerifiedAt ? <BadgeCheck className="size-3.5" /> : null}
-                                        {profile.user.emailVerifiedAt ? "已验证" : "未验证"}
-                                    </span>
-                                ) : null}
-                            </div>
-                            {!profile.emailEnabled ? (
-                                <Callout tone="warning" title="邮件服务未启用">
-                                    管理员尚未配置可用的邮件服务，暂时无法更换邮箱。
-                                </Callout>
-                            ) : (
-                                <Form
-                                    form={emailForm}
-                                    name="profile-email"
-                                    layout="vertical"
-                                    requiredMark={false}
-                                    className="profile-form"
-                                    disabled={!!pending || !identityReady}
-                                    onValuesChange={resetEmailTicket}
-                                    onFinish={(values) => void saveEmail(values)}
-                                >
-                                    {profile.hasPassword ? (
-                                        <Form.Item name="currentPassword" label="当前密码" rules={[{ required: true, message: "请输入当前密码以验证身份" }]}>
-                                            <Input.Password autoComplete="current-password" />
-                                        </Form.Item>
-                                    ) : null}
-                                    <Form.Item
-                                        name="email"
-                                        label="新邮箱"
-                                        rules={[
-                                            { required: true, whitespace: true, message: "请输入新邮箱" },
-                                            { type: "email", transform: (value: string) => value?.trim(), message: "请输入有效的邮箱地址" },
-                                            {
-                                                validator: async (_, value: string = "") => {
-                                                    if (value.trim().toLowerCase() === profile.user.email?.toLowerCase()) throw new Error("新邮箱不能与当前邮箱相同");
-                                                },
-                                            },
-                                        ]}
-                                    >
-                                        <Input type="email" autoComplete="email" />
-                                    </Form.Item>
-                                    <div className="profile-code-row">
-                                        <Form.Item
-                                            name="emailCode"
-                                            label="邮箱验证码"
-                                            rules={[
-                                                { required: true, message: "请输入邮箱验证码" },
-                                                { pattern: /^\d{6}$/, message: "请输入 6 位数字验证码" },
-                                            ]}
-                                        >
-                                            <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} />
-                                        </Form.Item>
-                                        <Button loading={pending === "email-code"} disabled={!!pending || !identityReady || retrySeconds > 0} onClick={() => void sendEmailCode()}>
-                                            {retrySeconds ? `${retrySeconds} 秒后重发` : emailTicket ? "重新发送" : "发送验证码"}
-                                        </Button>
-                                    </div>
-                                    {emailTicket ? (
-                                        <p className="profile-hint" role="status">
-                                            {ticketSeconds ? `验证码已发送，${Math.ceil(ticketSeconds / 60)} 分钟内有效。` : "验证码已过期，请重新发送。"}
-                                        </p>
-                                    ) : null}
-                                    {errors.email ? (
-                                        <Callout tone="error" role="alert" className="profile-feedback">
-                                            {errors.email}
-                                        </Callout>
-                                    ) : null}
-                                    <Button type="primary" htmlType="submit" loading={pending === "email"} disabled={!!pending || !identityReady || !ticketSeconds}>
-                                        更换邮箱
-                                    </Button>
-                                </Form>
-                            )}
-                        </section>
-                    </div>
+                        </div>
+                    </section>
                 </div>
+            ) : null}
+            {profile ? (
+                <AppModal
+                    open={securityDialog === "password"}
+                    centered
+                    width={440}
+                    title={profile.hasPassword ? "修改登录密码" : "设置登录密码"}
+                    footer={null}
+                    closable={!pending}
+                    keyboard={!pending}
+                    mask={{ closable: !pending }}
+                    onCancel={closeSecurityDialog}
+                    destroyOnHidden
+                >
+                    <Form
+                        form={passwordForm}
+                        name="profile-password"
+                        layout="vertical"
+                        requiredMark={false}
+                        className="profile-form"
+                        disabled={!!pending || !identityReady}
+                        onFinish={(values) => void savePassword(values)}
+                        onValuesChange={() => setError("password", "")}
+                    >
+                        <p className="profile-dialog-lead">更新后，所有设备上的登录会话都会退出，需要使用新密码重新登录。</p>
+                        <input type="text" name="username" autoComplete="username" value={profile.user.username} readOnly hidden />
+                        {profile.hasPassword ? (
+                            <Form.Item name="currentPassword" label="当前密码" rules={[{ required: true, message: "请输入当前密码" }]}>
+                                <Input.Password autoComplete="current-password" placeholder="输入当前使用的密码" autoFocus />
+                            </Form.Item>
+                        ) : null}
+                        <Form.Item
+                            name="newPassword"
+                            label="新密码"
+                            extra={
+                                newPasswordValue ? (
+                                    <span className="profile-password-strength" data-level={passwordStrength.level}>
+                                        <span className="profile-password-strength-bar" aria-hidden>
+                                            <i />
+                                            <i />
+                                            <i />
+                                        </span>
+                                        密码强度：{passwordStrength.label}
+                                    </span>
+                                ) : (
+                                    "至少 8 个字符，建议混合字母、数字和符号"
+                                )
+                            }
+                            rules={[
+                                {
+                                    validator: async (_, value: string = "") => {
+                                        const error = profilePasswordError(value);
+                                        if (error) throw new Error(error);
+                                        if (profile.hasPassword && value === passwordForm.getFieldValue("currentPassword")) throw new Error("新密码不能与当前密码相同");
+                                    },
+                                },
+                            ]}
+                        >
+                            <Input.Password autoComplete="new-password" placeholder="至少 8 个字符" autoFocus={!profile.hasPassword} />
+                        </Form.Item>
+                        <Form.Item
+                            name="confirmPassword"
+                            label="确认新密码"
+                            dependencies={["newPassword"]}
+                            rules={[
+                                { required: true, message: "请再次输入新密码" },
+                                {
+                                    validator: async (_, value) => {
+                                        if (value && value !== passwordForm.getFieldValue("newPassword")) throw new Error("两次输入的密码不一致");
+                                    },
+                                },
+                            ]}
+                        >
+                            <Input.Password autoComplete="new-password" placeholder="再次输入新密码" />
+                        </Form.Item>
+                        {errors.password ? (
+                            <Callout tone="error" role="alert" className="profile-feedback">
+                                {errors.password}
+                            </Callout>
+                        ) : null}
+                        <div className="profile-dialog-actions">
+                            <Button onClick={closeSecurityDialog} disabled={!!pending}>
+                                取消
+                            </Button>
+                            <Button type="primary" htmlType="submit" loading={pending === "password"} disabled={!!pending || !identityReady}>
+                                {profile.hasPassword ? "更新密码" : "设置密码"}
+                            </Button>
+                        </div>
+                    </Form>
+                </AppModal>
+            ) : null}
+            {profile?.emailEnabled ? (
+                <AppModal
+                    open={securityDialog === "email"}
+                    centered
+                    width={460}
+                    title={profile.user.email ? "更换绑定邮箱" : "绑定邮箱"}
+                    footer={null}
+                    closable={!pending}
+                    keyboard={!pending}
+                    mask={{ closable: !pending }}
+                    onCancel={closeSecurityDialog}
+                    destroyOnHidden
+                >
+                    <Form form={emailForm} name="profile-email" layout="vertical" requiredMark={false} className="profile-form" disabled={!!pending || !identityReady} onValuesChange={resetEmailTicket} onFinish={(values) => void saveEmail(values)}>
+                        <ol className="profile-steps" aria-label="更换步骤">
+                            <li className={emailTicket ? "is-done" : "is-active"}>
+                                <span>{emailTicket ? <Check className="size-3" /> : 1}</span>
+                                填写新邮箱
+                            </li>
+                            <li className={emailTicket ? "is-active" : ""}>
+                                <span>2</span>
+                                输入验证码
+                            </li>
+                        </ol>
+                        {profile.user.email ? (
+                            <p className="profile-dialog-lead">
+                                当前邮箱 <strong>{maskEmail(profile.user.email)}</strong>。新邮箱验证通过后生效，并退出所有登录会话。
+                            </p>
+                        ) : (
+                            <p className="profile-dialog-lead">邮箱验证通过后生效，并退出所有登录会话。</p>
+                        )}
+                        <input type="text" name="username" autoComplete="username" value={profile.user.username} readOnly hidden />
+                        {profile.hasPassword ? (
+                            <Form.Item name="currentPassword" label="当前密码" rules={[{ required: true, message: "请输入当前密码以验证身份" }]}>
+                                <Input.Password autoComplete="current-password" placeholder="用于确认是你本人操作" autoFocus />
+                            </Form.Item>
+                        ) : null}
+                        <Form.Item
+                            name="email"
+                            label="新邮箱"
+                            validateTrigger={["onBlur", "onSubmit"]}
+                            rules={[
+                                { required: true, whitespace: true, message: "请输入新邮箱" },
+                                { type: "email", transform: (value: string) => value?.trim(), message: "请输入有效的邮箱地址" },
+                                {
+                                    validator: async (_, value: string = "") => {
+                                        if (value.trim().toLowerCase() === profile.user.email?.toLowerCase()) throw new Error("新邮箱不能与当前邮箱相同");
+                                    },
+                                },
+                            ]}
+                        >
+                            <Input type="email" name="new-email" autoComplete="off" placeholder="name@example.com" autoFocus={!profile.hasPassword} />
+                        </Form.Item>
+                        <div className="profile-code-row">
+                            <Form.Item
+                                name="emailCode"
+                                label="邮箱验证码"
+                                rules={[
+                                    { required: true, message: "请输入邮箱验证码" },
+                                    { pattern: /^\d{6}$/, message: "请输入 6 位数字验证码" },
+                                ]}
+                            >
+                                <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder={emailTicket ? "6 位数字" : "请先发送验证码"} disabled={!emailTicket} />
+                            </Form.Item>
+                            <Button loading={pending === "email-code"} disabled={!!pending || !identityReady || retrySeconds > 0} onClick={() => void sendEmailCode()}>
+                                {retrySeconds ? `${retrySeconds} 秒后重发` : emailTicket ? "重新发送" : "发送验证码"}
+                            </Button>
+                        </div>
+                        {emailTicket ? (
+                            <p className="profile-hint" role="status">
+                                {ticketSeconds ? `验证码已发送至新邮箱，${Math.ceil(ticketSeconds / 60)} 分钟内有效。没收到请检查垃圾邮件。` : "验证码已过期，请重新发送。"}
+                            </p>
+                        ) : null}
+                        {errors.email ? (
+                            <Callout tone="error" role="alert" className="profile-feedback">
+                                {errors.email}
+                            </Callout>
+                        ) : null}
+                        <div className="profile-dialog-actions">
+                            <Button onClick={closeSecurityDialog} disabled={!!pending}>
+                                取消
+                            </Button>
+                            <Button type="primary" htmlType="submit" loading={pending === "email"} disabled={!!pending || !identityReady || !ticketSeconds}>
+                                确认更换
+                            </Button>
+                        </div>
+                    </Form>
+                </AppModal>
             ) : null}
             {profile ? (
                 <AppModal

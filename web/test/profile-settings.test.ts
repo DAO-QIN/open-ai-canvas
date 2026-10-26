@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { profileAvatarError, PROFILE_AVATAR_MAX_BYTES, profilePasswordError, profileReauthReady, profileSecondsRemaining } from "../src/pages/settings/profile-validation";
+import { maskEmail, profileAvatarError, PROFILE_AVATAR_MAX_BYTES, profilePasswordError, profilePasswordStrength, profileReauthReady, profileSecondsRemaining } from "../src/pages/settings/profile-validation";
 import { settingsPath } from "../src/lib/settings-navigation";
 import { changeProfileEmail, changeProfilePassword, getUserProfile, profileLinuxDOReauthURL, requestProfileEmailCode, resetProfileAvatar, selectDefaultProfileAvatar, uploadProfileAvatar } from "../src/services/api/profile";
 import { ApiError, apiClient } from "../src/services/api/request";
@@ -29,6 +29,20 @@ describe("profile input and security expiry", () => {
         expect(profileReauthReady(undefined, timestamp)).toBe(false);
         expect(profileSecondsRemaining(timestamp, timestamp - 1001)).toBe(2);
         expect(profileSecondsRemaining(timestamp, timestamp + 1)).toBe(0);
+    });
+    test("masks the middle of the bound email for on-screen display", () => {
+        expect(maskEmail("3275573660@qq.com")).toBe("327****660@qq.com");
+        expect(maskEmail("abcd@x.com")).toBe("a**d@x.com");
+        expect(maskEmail("ab@x.com")).toBe("a*@x.com");
+        expect(maskEmail("a@x.com")).toBe("a*@x.com");
+        expect(maskEmail("not-an-email")).toBe("not-an-email");
+    });
+    test("rates password strength for UI hints only", () => {
+        expect(profilePasswordStrength("").level).toBe(0);
+        expect(profilePasswordStrength("abc").level).toBe(1);
+        expect(profilePasswordStrength("abcdefgh").level).toBe(1);
+        expect(profilePasswordStrength("abcd1234").level).toBe(2);
+        expect(profilePasswordStrength("Abcd1234!xyz").level).toBe(3);
     });
     test("account settings default to profile and creation continues to channels", () => {
         expect(settingsPath()).toBe("/settings?section=profile");

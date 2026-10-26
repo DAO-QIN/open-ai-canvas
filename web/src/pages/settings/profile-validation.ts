@@ -18,3 +18,27 @@ export function profileSecondsRemaining(until: number, now: number): number {
 export function profileReauthReady(until: string | undefined, now: number): boolean {
     return !!until && Date.parse(until) > now;
 }
+
+export type ProfilePasswordStrength = { level: 0 | 1 | 2 | 3; label: string };
+
+/** 仅用于界面提示，不改变服务端的密码规则。 */
+export function profilePasswordStrength(password: string): ProfilePasswordStrength {
+    const length = [...password].length;
+    if (!length) return { level: 0, label: "" };
+    if (length < 8) return { level: 1, label: "太短" };
+    const kinds = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((pattern) => pattern.test(password)).length;
+    if (length >= 12 && kinds >= 3) return { level: 3, label: "强" };
+    if (kinds >= 2) return { level: 2, label: "中" };
+    return { level: 1, label: "弱" };
+}
+
+/** 页面展示时隐藏邮箱中段，避免在截图或共享屏幕时泄露完整地址。 */
+export function maskEmail(email: string): string {
+    const at = email.lastIndexOf("@");
+    if (at <= 0) return email;
+    const name = email.slice(0, at);
+    const domain = email.slice(at);
+    if (name.length <= 2) return `${name[0]}*${domain}`;
+    const keep = name.length <= 5 ? 1 : 3;
+    return `${name.slice(0, keep)}${"*".repeat(Math.min(4, Math.max(2, name.length - keep * 2)))}${name.slice(-keep)}${domain}`;
+}
