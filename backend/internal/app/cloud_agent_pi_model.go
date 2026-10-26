@@ -272,6 +272,9 @@ func (s *Service) runCloudAgentModelStep(ctx context.Context, userID, runID stri
 		}
 		if !compactionSummary {
 			s.attachCloudAgentLessons(&canonical, userID, cloudAgentLessonTaskText(&state))
+			if err := s.attachCreationAgentFacts(&canonical, userID, &state); err != nil {
+				return nil, false, err
+			}
 			budget := s.cloudAgentContextBudgetForRequest(state.Request)
 			if err := fitCloudAgentModelContext(&canonical, budget.InputBudgetTokens); err != nil {
 				return nil, false, err

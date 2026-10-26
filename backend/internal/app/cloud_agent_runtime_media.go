@@ -279,6 +279,9 @@ func (s *Service) cloudAgentMediaError(run *model.CloudAgentExecution, state *cl
 }
 
 func (s *Service) advanceCloudAgentMedia(run *model.CloudAgentExecution, state *cloudAgentRuntime, call cloudAgentCall) error {
+	if call.Function.Name == cloudAgentCreationMediaToolName {
+		return s.advanceCreationAgentMedia(run, state, call)
+	}
 	if state.MediaTaskID != "" {
 		task, err := s.repo.TaskForUser(run.UserID, state.MediaTaskID)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -484,7 +487,11 @@ func (s *Service) DecideCloudAgentApproval(userID, id, approvalID, decision, rea
 				// follow-up model request may be produced from this decision.
 				rejectionText := "已拒绝本次操作，本次操作未执行。"
 				rejectionEndText := "本轮已结束：已拒绝本次操作"
-				if state.Approval != nil && cloudAgentMediaTool(state.Approval.Call.Function.Name) {
+				if state.Approval != nil && state.Approval.Call.Function.Name == cloudAgentCreationMediaToolName {
+					rejectionText = "已拒绝本次方案；未提交任务、未产生扣费。"
+					rejectionEndText = "本轮已结束：已拒绝本次方案"
+					state.decideCreationProposal(approvalID, "reject", "")
+				} else if state.Approval != nil && cloudAgentMediaTool(state.Approval.Call.Function.Name) {
 					rejectionText = "已拒绝本次生成，草稿节点仍保留在画布中；未提交任务、未产生扣费。你可以继续编辑后重新申请。"
 					rejectionEndText = "本轮已结束：已拒绝本次生成"
 				}
@@ -579,6 +586,9 @@ func (s *Service) finishApprovedCloudAgentMedia(ctx context.Context, userID, id,
 	state, err := cloudAgentDecode(latest)
 	if err != nil {
 		return err
+	}
+	if !cloudAgentCreationShouldContinue(&state, mediaTask) {
+		return s.finishCreationAgentRun(userID, id, mediaTask)
 	}
 	if mediaTask.Status != model.TaskStatusSucceeded {
 		state.PiResumePrompt = "用户已批准该操作，但媒体任务未成功完成。请根据工具结果告知用户，不要重复提交该操作。"

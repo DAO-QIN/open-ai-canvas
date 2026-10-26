@@ -32,6 +32,9 @@ func (s *Service) updateCloudAgentMediaApproval(repo *repository.Repository, run
 		return creationConflict("审批不存在或已过期")
 	}
 	call := state.Approval.Call
+	if call.Function.Name == cloudAgentCreationMediaToolName {
+		return s.updateCreationAgentMediaApproval(repo, run, state, settings)
+	}
 	if call.Function.Name != "generate_media" {
 		return BadAuthRequest("当前审批不是媒体生成，不能修改生成参数")
 	}

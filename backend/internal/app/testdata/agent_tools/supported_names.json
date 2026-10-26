@@ -27,5 +27,7 @@
   "canvas_edit_batch_table",
   "canvas_apply_ops",
   "canvas_arrange_nodes",
-  "generate_media"
+  "generate_media",
+  "creation_read_entries",
+  "creation_generate_media"
 ]

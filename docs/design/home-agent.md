@@ -368,9 +368,9 @@ data:{"id":"<itemId>","seq":12,"position":10,"type":"output","turnId":"<runId>",
 | --- | --- | --- |
 | `plan_update`、`ask_user` | 是 | `ask_user` 选项增加稳定 `id` |
 | `skill_search`、`recall_lessons`、`remember_lesson`、`model_list` | 是 | 不变 |
-| `generate_media`（首页变体） | 是 | 不要求 `snapshotHash`，不写画布；参数 `type, prompt, model, params, count, references`；只产生方案 |
+| `creation_generate_media`（首页版 `generate_media`） | 是 | 独立工具名，不改画布版契约；不要求 `snapshotHash`，不写画布；参数 `mode, prompt, title, 模型选择, 规格, references[{entryId,slot}|{resourceId}]`；每次一个方案、一个结果 |
 | `creation_read_entries` | 新增 | 分页读本会话生成记录摘要 |
-| `creation_inspect_result` | 新增，需视觉能力 | 按“记录 ID + 槽位”读真实图片，复用 `canvas_inspect_image` 的图片准备 |
+| `creation_inspect_result` | 新增，需视觉能力；推迟到 PR7 | 按“记录 ID + 槽位”读真实图片，复用 `canvas_inspect_image` 的图片准备 |
 | `canvas_*`、`previs_*`、`image_layer_split`、`image_annotation_render` | 否 | |
 | `compose_video` | 阶段 4 | |
 | `web_search`、`web_fetch` | 阶段 4 | 出站经 `internal/outbound` 的 SSRF 校验 |
@@ -400,6 +400,15 @@ data:{"id":"<itemId>","seq":12,"position":10,"type":"output","turnId":"<runId>",
 | 生成失败 | 继续一轮说明失败并给出选项，不自动重新提交收费生成 |
 
 每次自动继续写一条 `activity`（如“生成完成，继续下一步”），随后该轮的 `usage` 会显示本轮文本积分。会话设置里提供“生成完成后自动继续”开关，默认开。
+
+### 8.3.1 PR4 实现说明
+
+- 运行：`CloudAgentRequest.creationSessionId`（与 `canvasId` 互斥）、`autoContinue`（省略为开）。运行行写 `target=creation` 与 `creation_session_id`。同一会话同时只允许一轮，占用随运行结束自愈（下一轮创建时发现占用者已结束即释放）。续轮的 parent 必须属于同一会话。
+- 生成：方案先做不收费准入与报价，进入审批（预览 `kind=creation_generation`）。批准后在同一事务里创建任务与 `origin=agent` 的生成记录（`proposal_id` = 审批 ID，`client_operation_id` = `agent:<审批 ID>`，记录 ID 由用户和审批 ID 推导），任一失败整体回滚。任务终态由任务协调器回写记录，Agent 只把记录的槽位结果作为工具结果交给模型。
+- 拒绝：本轮结束且不产生任务或记录，方案在运行状态 `creationProposals` 里记为 `reject`，续轮继承（未决定的记为 `expired`）。“全部拒绝时继续一轮”随 PR6 的决定接口实现。
+- 事实帧：每次模型请求末尾附一条 `kind=creation_facts` 的运行状态消息，含最近 8 条生成记录（槽位、资源 ID、尺寸、失败原因）与方案决定；只用于本次请求，不写回对话历史。
+- 自动继续：关闭时生成完成即结束本轮；开启时失败续跑一轮说明原因，成功只在计划还有 `pending` 步骤时续跑，否则直接结束本轮（不额外花一次模型调用）。
+- 系统提示词：`agent-system-policy.md` v19 增加“首页创作会话”一节；执行上下文在首页会话里带 `target: "creation"`。
 
 ### 8.4 预算
 

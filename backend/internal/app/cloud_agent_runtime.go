@@ -145,24 +145,28 @@ type cloudAgentRuntime struct {
 	// AutoPreparedMedia is the durable admission checkpoint for permissionMode=auto.
 	// It prevents a worker restart between dry admission and billed submission from
 	// re-running admission or creating the draft node a second time.
-	AutoPreparedMedia              *cloudAgentPreparedMedia                `json:"autoPreparedMedia,omitempty"`
-	AutoPreparedCallHash           string                                  `json:"autoPreparedCallHash,omitempty"`
-	Decisions                      map[string]string                       `json:"decisions"`
-	DecisionSettings               map[string]string                       `json:"decisionSettings,omitempty"`
-	DecisionPreparedHashes         map[string]string                       `json:"decisionPreparedHashes,omitempty"`
-	ActionNudged                   bool                                    `json:"actionNudged,omitempty"`
-	EmptyOutputNudged              int                                     `json:"emptyOutputNudged,omitempty"`
-	InvalidArgumentSteps           int                                     `json:"invalidArgumentSteps,omitempty"`
-	StepSnapshotHash               string                                  `json:"stepSnapshotHash,omitempty"`
-	StoryboardTaskID               string                                  `json:"storyboardTaskId,omitempty"`
-	Plan                           []cloudAgentPlanItem                    `json:"plan,omitempty"`
-	ConfirmationRounds             int                                     `json:"confirmationRounds,omitempty"`
-	ConfirmationFingerprints       []string                                `json:"confirmationFingerprints,omitempty"`
-	PendingConfirmationFingerprint string                                  `json:"pendingConfirmationFingerprint,omitempty"`
-	PendingInterjections           []cloudAgentInterjection                `json:"pendingInterjections,omitempty"`
-	PiResumePrompt                 string                                  `json:"piResumePrompt,omitempty"`
-	TransientReferences            map[string]cloudAgentTransientReference `json:"transientReferences,omitempty"`
-	InterjectionIDs                []string                                `json:"interjectionIds,omitempty"`
+	AutoPreparedMedia              *cloudAgentPreparedMedia `json:"autoPreparedMedia,omitempty"`
+	AutoPreparedCallHash           string                   `json:"autoPreparedCallHash,omitempty"`
+	Decisions                      map[string]string        `json:"decisions"`
+	DecisionSettings               map[string]string        `json:"decisionSettings,omitempty"`
+	DecisionPreparedHashes         map[string]string        `json:"decisionPreparedHashes,omitempty"`
+	ActionNudged                   bool                     `json:"actionNudged,omitempty"`
+	EmptyOutputNudged              int                      `json:"emptyOutputNudged,omitempty"`
+	InvalidArgumentSteps           int                      `json:"invalidArgumentSteps,omitempty"`
+	StepSnapshotHash               string                   `json:"stepSnapshotHash,omitempty"`
+	StoryboardTaskID               string                   `json:"storyboardTaskId,omitempty"`
+	Plan                           []cloudAgentPlanItem     `json:"plan,omitempty"`
+	ConfirmationRounds             int                      `json:"confirmationRounds,omitempty"`
+	ConfirmationFingerprints       []string                 `json:"confirmationFingerprints,omitempty"`
+	PendingConfirmationFingerprint string                   `json:"pendingConfirmationFingerprint,omitempty"`
+	// CreationProposals 是首页会话本轮及继承的方案与用户决定，进入事实帧，防止重提已拒绝的方案。
+	CreationProposals []cloudAgentCreationProposal `json:"creationProposals,omitempty"`
+	// CreationEntryID 是已批准方案生成的记录，与 MediaTaskID 同生命周期。
+	CreationEntryID      string                                  `json:"creationEntryId,omitempty"`
+	PendingInterjections []cloudAgentInterjection                `json:"pendingInterjections,omitempty"`
+	PiResumePrompt       string                                  `json:"piResumePrompt,omitempty"`
+	TransientReferences  map[string]cloudAgentTransientReference `json:"transientReferences,omitempty"`
+	InterjectionIDs      []string                                `json:"interjectionIds,omitempty"`
 	// 已送达插话正文的 SHA-256 指纹（有界）。运行时投影回写 canonical 时不带
 	// 来源标记，模型步按指纹补回 user_interjection，见 cloud_agent_interjection_pi.go。
 	DeliveredInterjectionDigests []string          `json:"deliveredInterjectionDigests,omitempty"`
@@ -259,7 +263,7 @@ func (s *Service) ensureCloudAgentExecution(task *model.Task, initial cloudAgent
 	// not an active model task; validation and recovery use TaskIDs as the run's
 	// immutable task-history anchor. Leaving this nil makes every new Pi run
 	// fail its first checkpoint with "Agent runtime task history is invalid".
-	state := cloudAgentRuntime{Request: initial.Request, Policy: initial.Policy, ParentID: initial.ParentID, Fingerprint: initial.Fingerprint, CreativeAnchor: initial.CreativeAnchor, TextHistory: input.TextHistory, Skills: initial.Skills, Profile: initial.Profile, Canonical: canonical, ActiveTaskID: "", TaskIDs: []string{task.ID}, Step: 0, Decisions: map[string]string{}, Plan: initial.Plan, ConfirmationRounds: initial.ConfirmationRounds, ConfirmationFingerprints: append([]string(nil), initial.ConfirmationFingerprints...), PendingConfirmationFingerprint: "", Events: []CloudAgentEvent{}, StepLimits: limits}
+	state := cloudAgentRuntime{Request: initial.Request, Policy: initial.Policy, ParentID: initial.ParentID, Fingerprint: initial.Fingerprint, CreativeAnchor: initial.CreativeAnchor, TextHistory: input.TextHistory, Skills: initial.Skills, Profile: initial.Profile, Canonical: canonical, ActiveTaskID: "", TaskIDs: []string{task.ID}, Step: 0, Decisions: map[string]string{}, Plan: initial.Plan, ConfirmationRounds: initial.ConfirmationRounds, ConfirmationFingerprints: append([]string(nil), initial.ConfirmationFingerprints...), PendingConfirmationFingerprint: "", CreationProposals: append([]cloudAgentCreationProposal(nil), initial.CreationProposals...), Events: []CloudAgentEvent{}, StepLimits: limits}
 	if !carrier {
 		state.ActiveTaskID = task.ID
 		state.Step = 1
