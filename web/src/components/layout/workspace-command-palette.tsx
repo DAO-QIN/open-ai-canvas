@@ -35,6 +35,7 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
             { ...toolEntry("create", "/"), id: "home" },
             ...(features.shortDramaEnabled ? [toolEntry("projects", "/projects")] : []),
             toolEntry("canvas", "/canvas"),
+            toolEntry("inspiration", "/inspiration"),
             ...(features.imageWorkbenchEnabled ? [toolEntry("toolbox-image", "/toolbox/image")] : []),
             ...(features.videoWorkbenchEnabled ? [toolEntry("toolbox-video", "/toolbox/video")] : []),
             ...(features.taskCenterEnabled ? [toolEntry("tasks", "/tasks")] : []),

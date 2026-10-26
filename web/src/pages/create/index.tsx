@@ -139,6 +139,7 @@ import { CreationComposer, CreationEmptySuggest, CreationHistoryDrawer, Creation
 import { declaredInspirationSources } from "@/lib/inspirations/catalog";
 import { fillablePrompt } from "@/lib/inspirations/resolve";
 import { CreationRecentCanvases } from "./creation-recent-canvases";
+import { CreationFeaturedCanvases } from "./creation-featured-canvases";
 import { openLoginModal } from "@/stores/use-login-modal-store";
 import { expandSmartCreationPlan, projectSmartCreationBatch, runSmartCreationSchedule } from "./smart-creation-runtime";
 import { createCreationSubmitGate, createCreationSubmitGateRelease, withCreationSubmitGate } from "./creation-submit-gate";
@@ -2555,6 +2556,22 @@ export default function CreatePage() {
                 </button>
             </div>
         );
+    // 灵感广场「做同款」只带模式、比例和提示词过来：预填表单，不替换模型，也不自动生成。
+    useEffect(() => {
+        if (!composerPreferencesInitialized || !location.state) return;
+        const state = location.state as { mode?: CreationMode; ratio?: string; prompt?: string };
+        if (state.mode !== "image" && state.mode !== "video") return;
+        selectMode(state.mode);
+        if (typeof state.ratio === "string" && state.ratio) {
+            setRatio(state.ratio);
+            if (state.mode === "image") rememberImageSettings({ ratio: state.ratio });
+            else rememberVideoSettings({ ratio: state.ratio });
+        }
+        if (typeof state.prompt === "string") setPrompt(state.prompt);
+        navigate(location.pathname, { replace: true, state: null });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [composerPreferencesInitialized, location.state, location.pathname]);
+
     if (!hydrated || !activeConversation)
         return (
             <div className="grid h-full place-items-center">
@@ -2585,6 +2602,7 @@ export default function CreatePage() {
         threadScrollRef.current?.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
         window.requestAnimationFrame(() => composerFocusRef.current?.focus({ preventScroll: true }));
     };
+
 
     const composerProps = {
         mode,
@@ -2774,6 +2792,7 @@ export default function CreatePage() {
                                 />
                             </section>
                             <CreationRecentCanvases onRequireLogin={() => setLoginDialogOpen(true)} />
+                            <CreationFeaturedCanvases />
                             <Suspense
                                 fallback={
                                     <div className="creation-hall-loading" role="status">

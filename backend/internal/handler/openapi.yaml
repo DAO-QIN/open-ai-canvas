@@ -29,6 +29,66 @@ tags:
   - name: promotion
   - name: workbench
 paths:
+  /libtv/gallery:
+    get:
+      tags: [libtv]
+      summary: 读取 LibTV 公开作品列表
+      description: 游客与登录用户均可读取（按账号或 IP 限流），匿名读取已审核的公开作品，不发送管理员 LibTV Token。total 不作为全库数量；后续分页保留首次返回的 requestId，按 hasMore 判断是否继续。不存储媒体原件，不创建生成任务。
+      parameters:
+        - {in: query, name: page, schema: {type: integer, minimum: 1, maximum: 1000, default: 1}}
+        - {in: query, name: pageSize, schema: {type: integer, minimum: 1, maximum: 40, default: 20}}
+        - {in: query, name: keyword, schema: {type: string, maxLength: 100}}
+        - {in: query, name: tagId, schema: {type: integer, minimum: 0}}
+        - {in: query, name: requestId, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: 标准信封 data 为 items、page、pageSize、hasMore、requestId；每项包含 templateUuid、projectUuid、title、description、coverUrl、mediaUrl、mediaType、authorName、authorAvatar、likeCount、publishedAt、tags、sourceUrl。
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+        "502": {$ref: "#/components/responses/Error"}
+  /libtv/works/{uuid}:
+    get:
+      tags: [libtv]
+      summary: 读取 LibTV 已发布模板的制作步骤
+      description: uuid 为公开 templateUuid，不是原项目 projectUuid。仅接受已审核的公开快照；steps 是快照节点顺序，不保证为执行顺序。模型名称仅为来源信息，不自动映射本站模型或发起收费生成。
+      parameters:
+        - {in: path, name: uuid, required: true, schema: {type: string, pattern: '^[A-Fa-f0-9]{32}$'}}
+      responses:
+        "200":
+          description: 标准信封 data 为 work、steps、nodeCount、connectionCount、canImport、warnings。步骤包含 id、title、type、prompt、text、model、mediaUrls、aspectRatio、resolution、durationSeconds、referenceNodeIds。计数为来源总数，失效节点或连线通过 warnings 报告。
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+        "502": {$ref: "#/components/responses/Error"}
+  /canvas-projects/{id}/import/libtv-template:
+    post:
+      tags: [libtv, canvas]
+      summary: 预览并转换 LibTV 已发布模板
+      description: 先校验目标画布属于当前用户，再读取公开 templateUuid；无需管理员 Token，不读取原项目私有详情。只返回转换后的节点、连线和报告，不写入画布。前端确认后通过现有画布保存合同持久化；媒体保留外链，不上传原件。
+      parameters:
+        - {in: path, name: id, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [uuid]
+              properties:
+                uuid: {type: string, pattern: '^[A-Fa-f0-9]{32}$'}
+      responses:
+        "200":
+          description: '标准信封 data 与原 LibTV 导入结果一致，包含 batchId、batchCreatedAt、projectUuid、projectName、nodes、connections、计数及 skippedNodes、skippedConnections、warnings；节点增加可选 parentId、aspectRatio，来源 metadata 增加 templateUuid、snapshotId。媒体节点 results 为全部有效结果，项包含 sourceIndex（上游原数组零基索引）、content 及可选 naturalWidth、naturalHeight、durationMs、mimeType，顶层媒体为首个有效结果。multiResultNodeCount 统计有效结果超过一个的来源节点；importedNodeCount 不包含前端结果卡的展开数量。'
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+        "502": {$ref: "#/components/responses/Error"}
   /me/pet-preference:
     get:
       tags: [canvas]
@@ -1282,92 +1342,6 @@ paths:
       responses:
         "200":
           description: 信封 data 包含 version、permissionModes、surfaces、contextScopes、contextCompaction、maxRuntimeRequestBytes、skills、writeTools、billing、maxSteps、capabilitySetVersion、capabilitySetHash、nodeTypes、tools；surfaces 包含 canvas 与 creation，contextCompaction 为 pi_native，maxSteps 为 0 表示无固定模型调用上限
-  /agent/sessions:
-    get:
-      tags: [agent]
-      summary: 列出当前账号的 Agent 会话
-      parameters:
-        - in: query
-          name: canvasId
-          schema: { type: string, maxLength: 80 }
-        - in: query
-          name: surface
-          description: 按会话场景过滤，如 canvas 或 creation
-          schema: { type: string, maxLength: 64 }
-        - in: query
-          name: status
-          schema: { type: string, maxLength: 32 }
-        - $ref: "#/components/parameters/AgentSessionLimit"
-      responses:
-        "200":
-          description: 信封 data.sessions 为 CloudAgentSession 数组，仅包含当前账号的会话
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-    post:
-      tags: [agent]
-      summary: 创建当前账号的 Agent 会话
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CloudAgentSessionRequest"
-      responses:
-        "200":
-          description: 信封 data.session 为新建的 CloudAgentSession
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-  /agent/sessions/{id}:
-    parameters:
-      - $ref: "#/components/parameters/AgentSessionID"
-    get:
-      tags: [agent]
-      summary: 读取当前账号的会话及最近 50 轮历史
-      responses:
-        "200":
-          description: 信封 data 包含 session（CloudAgentSession）、runs 和 nextRunCursor；后续历史使用 runs 接口的 before 游标读取
-        "401":
-          $ref: "#/components/responses/Error"
-        "404":
-          description: 会话不存在、已删除或不属于当前账号
-    delete:
-      tags: [agent]
-      summary: 删除当前账号已结束的会话历史
-      description: 仅隐藏会话和历史入口，保留任务、计费和资源记录；不会隐式取消任务或退款。仍有运行、审批、收尾或媒体子任务时拒绝。
-      responses:
-        "200":
-          description: 信封 data 包含 id 与 deleted=true
-        "401":
-          $ref: "#/components/responses/Error"
-        "404":
-          description: 会话不存在或不属于当前账号
-        "409":
-          description: 会话仍有未完成工作，不能删除
-  /agent/sessions/{id}/runs:
-    parameters:
-      - $ref: "#/components/parameters/AgentSessionID"
-    get:
-      tags: [agent]
-      summary: 分页读取当前账号的会话运行历史
-      parameters:
-        - $ref: "#/components/parameters/AgentSessionLimit"
-        - in: query
-          name: before
-          description: 上一页 nextRunCursor；必须属于同一账号和会话
-          schema: { type: string }
-      responses:
-        "200":
-          description: 信封 data 包含 runs 与 nextRunCursor，空游标表示没有下一页
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
   /settings/creation-preferences:
     get:
       tags: [agent]

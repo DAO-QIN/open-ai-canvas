@@ -198,6 +198,12 @@ type (
 	LibTVImportIssue                       = app.LibTVImportIssue
 	LibTVImportMetadata                    = app.LibTVImportMetadata
 	LibTVImportWarning                     = app.LibTVImportWarning
+	LibTVGalleryRequest                    = app.LibTVGalleryRequest
+	LibTVGalleryResult                     = app.LibTVGalleryResult
+	LibTVGalleryItem                       = app.LibTVGalleryItem
+	LibTVGalleryTag                        = app.LibTVGalleryTag
+	LibTVWorkDetail                        = app.LibTVWorkDetail
+	LibTVWorkStep                          = app.LibTVWorkStep
 	LibTVSettingRequest                    = app.LibTVSettingRequest
 	LinkCanvasUnitRequest                  = app.LinkCanvasUnitRequest
 	LinkProjectAssetRequest                = app.LinkProjectAssetRequest

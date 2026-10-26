@@ -45,7 +45,7 @@ function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
 function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
     const groups: WorkspaceNavGroup[] = [
         {
-            items: [{ ...toolItem("create", "/"), id: "home", title: "创作" }, ...(features.shortDramaEnabled ? [{ ...toolItem("projects", "/projects"), title: "项目" }] : []), { ...toolItem("canvas", "/canvas"), title: "画布" }],
+            items: [{ ...toolItem("create", "/"), id: "home", title: "创作" }, ...(features.shortDramaEnabled ? [{ ...toolItem("projects", "/projects"), title: "项目" }] : []), { ...toolItem("canvas", "/canvas"), title: "画布" }, toolItem("inspiration", "/inspiration")],
         },
         {
             heading: "工具",

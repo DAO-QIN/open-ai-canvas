@@ -4,12 +4,67 @@ import (
 	"net/http"
 	"strings"
 
+	"yingce/backend/internal/model"
 	"yingce/backend/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
 func RegisterLibTVRoutes(r *gin.RouterGroup, svc *service.Service) {
+	r.GET("/libtv/gallery", func(c *gin.Context) {
+		user, err := libTVGalleryUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		var req service.LibTVGalleryRequest
+		if err := c.ShouldBindQuery(&req); err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
+		result, err := svc.LibTVGallery(c.Request.Context(), user, req)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, result)
+	})
+	r.GET("/libtv/works/:uuid", func(c *gin.Context) {
+		user, err := libTVGalleryUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		result, err := svc.LibTVWork(c.Request.Context(), user, c.Param("uuid"))
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, result)
+	})
+	r.POST("/canvas-projects/:id/import/libtv-template", func(c *gin.Context) {
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		if user == nil {
+			failService(c, service.Unauthorized("请先登录"))
+			return
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
+		var req service.LibTVImportRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
+		result, err := svc.ImportLibTVTemplate(c.Request.Context(), user.ID, c.Param("id"), req.UUID)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, result)
+	})
 	r.GET("/admin/settings/libtv", func(c *gin.Context) {
 		user, err := currentUser(c, svc)
 		if err != nil {
@@ -83,4 +138,23 @@ func RegisterLibTVRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		ok(c, result)
 	})
+}
+
+// libTVGalleryUser 只读浏览不强制登录：没有有效会话（含过期 Cookie）时按游客处理，
+// 避免首页因为旧 Cookie 把精选画布显示成错误。导入画布的接口仍单独要求登录。
+func libTVGalleryUser(c *gin.Context, svc *service.Service) (*model.User, error) {
+	var user *model.User
+	if strings.TrimSpace(sessionCookie(c)) != "" {
+		user, _ = currentUser(c, svc)
+	}
+	return libTVGalleryReader(c, user), nil
+}
+
+// libTVGalleryReader 让游客也能只读浏览公开作品：以 IP 作为限流身份，不代表真实账号。
+// 导入到画布仍要求登录并校验画布归属。
+func libTVGalleryReader(c *gin.Context, user *model.User) *model.User {
+	if user != nil {
+		return user
+	}
+	return &model.User{ID: "guest:" + c.ClientIP()}
 }

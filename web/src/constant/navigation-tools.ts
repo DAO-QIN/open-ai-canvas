@@ -1,4 +1,4 @@
-import { Blocks, CircleDollarSign, Clapperboard, Gift, History, Image, Images, LibraryBig, PanelsTopLeft, Settings, Video, WandSparkles } from "lucide-react";
+import { Blocks, CircleDollarSign, Clapperboard, Gift, History, Image, Images, LibraryBig, Lightbulb, PanelsTopLeft, Settings, Video, WandSparkles } from "lucide-react";
 
 export const navigationTools = [
     {
@@ -23,6 +23,14 @@ export const navigationTools = [
         fullLabel: "自由画布",
         keywords: [],
         icon: PanelsTopLeft,
+        section: "创作空间",
+    },
+    {
+        slug: "inspiration",
+        label: "灵感",
+        fullLabel: "灵感广场",
+        keywords: ["精选画布", "画布模板", "做同款", "LibTV"],
+        icon: Lightbulb,
         section: "创作空间",
     },
     {
