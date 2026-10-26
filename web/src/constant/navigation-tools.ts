@@ -1,11 +1,19 @@
-import { Blocks, CircleDollarSign, Clapperboard, Gift, History, Image, Images, LibraryBig, Lightbulb, PanelsTopLeft, Settings, Video, WandSparkles } from "lucide-react";
+import { Blocks, House, CircleDollarSign, Clapperboard, Gift, History, Image, Images, LibraryBig, Lightbulb, PanelsTopLeft, Settings, Video, WandSparkles } from "lucide-react";
 
 export const navigationTools = [
     {
+        slug: "home",
+        label: "首页",
+        fullLabel: "首页",
+        keywords: ["新建画布", "工具入口", "精选画布", "精选灵感"],
+        icon: House,
+        section: "创作空间",
+    },
+    {
         slug: "create",
         label: "创作",
-        fullLabel: "创作首页",
-        keywords: ["首页"],
+        fullLabel: "智能创作",
+        keywords: ["Agent", "对话"],
         icon: WandSparkles,
         section: "创作空间",
     },
@@ -30,6 +38,14 @@ export const navigationTools = [
         label: "灵感",
         fullLabel: "灵感广场",
         keywords: ["精选画布", "画布模板", "做同款", "LibTV"],
+        icon: Lightbulb,
+        section: "创作空间",
+    },
+    {
+        slug: "inspirations",
+        label: "灵感",
+        fullLabel: "灵感大厅",
+        keywords: ["精选灵感", "提示词灵感"],
         icon: Lightbulb,
         section: "创作空间",
     },
@@ -111,7 +127,7 @@ export type NavigationToolSlug = (typeof navigationTools)[number]["slug"];
 
 export function workspaceNavigationTool(pathname: string) {
     const [first, second] = pathname.split("/").filter(Boolean);
-    const slug = !first || first === "create" ? "create" : first === "toolbox" ? `toolbox-${second}` : first;
+    const slug = !first ? "home" : first === "create" || first === "c" ? "create" : first === "toolbox" ? `toolbox-${second}` : first;
     return navigationTools.find((tool) => tool.slug === slug);
 }
 

@@ -43,23 +43,29 @@ function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
 }
 
 function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
+    // 参考 leyi.my：首页 / 项目 / 创作 / 灵感，下面是可折叠的「资源与工具」与历史。
+    // 生图、视频工作台仍按后台开关出现在「资源与工具」里。
     const groups: WorkspaceNavGroup[] = [
         {
-            items: [{ ...toolItem("create", "/"), id: "home", title: "创作" }, ...(features.shortDramaEnabled ? [{ ...toolItem("projects", "/projects"), title: "项目" }] : []), { ...toolItem("canvas", "/canvas"), title: "画布" }, toolItem("inspiration", "/inspiration")],
+            items: [
+                toolItem("home", "/"),
+                ...(features.shortDramaEnabled ? [{ ...toolItem("projects", "/projects"), title: "项目" }] : []),
+                toolItem("canvas", "/canvas"),
+                toolItem("create", "/create"),
+                toolItem("inspiration", "/inspiration"),
+            ],
         },
         {
-            heading: "工具",
+            heading: "资源与工具",
             items: [
+                toolItem("assets", "/assets"),
                 ...(features.imageWorkbenchEnabled ? [toolItem("toolbox-image", "/toolbox/image")] : []),
                 ...(features.videoWorkbenchEnabled ? [toolItem("toolbox-video", "/toolbox/video")] : []),
                 toolItem("skills", "/skills"),
                 ...(features.pluginCenterEnabled ? [toolItem("plugins", "/plugins")] : []),
             ],
         },
-        {
-            heading: "管理",
-            items: [toolItem("assets", "/assets"), ...(features.taskCenterEnabled ? [toolItem("tasks", "/tasks")] : [])],
-        },
+        ...(features.taskCenterEnabled ? [{ items: [toolItem("tasks", "/tasks")] }] : []),
         ...(features.promotionEnabled ? [{ items: [toolItem("promotion", "/promotion")] }] : []),
     ];
 
@@ -322,7 +328,9 @@ export function workspaceNavActiveId(pathname: string, section?: string | null) 
     const segments = pathname.split("/").filter(Boolean);
     if (segments[0] === "toolbox" && segments[1]) return `toolbox-${segments[1]}`;
     const slug = segments[0] || "home";
-    if (slug === "create" || slug === "c") return "home";
+    if (slug === "create" || slug === "c") return "create";
+    // 灵感大厅与灵感广场共用侧栏「灵感」。
+    if (slug === "inspirations") return "inspiration";
     return slug === "settings" && section ? `settings:${section}` : slug;
 }
 

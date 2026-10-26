@@ -21,8 +21,9 @@ func TestLibTVGalleryOpenAPIParsesAndDescribesRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for path, method := range map[string]string{
-		"/libtv/gallery":                              "get",
-		"/libtv/works/{uuid}":                         "get",
+		"/libtv/gallery":      "get",
+		"/libtv/featured":     "get",
+		"/libtv/works/{uuid}": "get",
 		"/canvas-projects/{id}/import/libtv-template": "post",
 	} {
 		if spec.Paths[path][method] == nil {

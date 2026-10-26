@@ -1,0 +1,120 @@
+/* 首页：参考 leyi.my 的启动页布局，颜色全部走工作台主题变量，明暗主题自动跟随。 */
+.home-page { display: block; width: 100%; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.home-page-inner { display: flex; width: 100%; max-width: 1680px; flex-direction: column; gap: var(--space-8); margin-inline: auto; padding: var(--space-6) var(--space-10) var(--space-12); }
+
+/* 新建画布：点阵底的大卡片 */
+.home-new-canvas { position: relative; display: flex; width: 100%; min-height: 188px; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); overflow: hidden; border: 1px solid var(--user-border); border-radius: 18px; padding: var(--space-6); background-color: var(--library-surface); background-image: radial-gradient(color-mix(in srgb, var(--user-ink) 22%, transparent) 1px, transparent 1.2px); background-size: 22px 22px; background-position: center; color: var(--user-ink); cursor: pointer; transition: border-color var(--user-motion), background-color var(--user-motion); }
+.home-new-canvas:hover:not(:disabled) { border-color: color-mix(in srgb, var(--user-ink) 24%, transparent); background-color: var(--library-surface-hover); }
+.home-new-canvas:focus-visible { outline: 2px solid var(--control-focus-ring); outline-offset: 3px; }
+.home-new-canvas:disabled { cursor: wait; }
+.home-new-canvas-icon { display: grid; width: 100px; height: 60px; place-items: center; border-radius: 14px; background: var(--user-ink); color: var(--workspace-page, var(--user-surface)); box-shadow: 0 8px 24px color-mix(in srgb, var(--user-ink) 18%, transparent); transition: transform var(--user-motion); }
+.home-new-canvas:hover:not(:disabled) .home-new-canvas-icon { transform: translateY(-2px); }
+.home-new-canvas-icon svg { width: 28px; height: 28px; stroke-width: 2; }
+.home-new-canvas-label { font-size: var(--fs-body); font-weight: 650; letter-spacing: .02em; }
+
+/* 工具入口 */
+.home-tool-entries ul { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.home-tool-entries li { min-width: 0; }
+.home-tool-entry { display: flex; width: 100%; min-width: 0; flex-direction: column; align-items: center; gap: var(--space-3); border: 0; padding: 0; background: transparent; color: var(--user-ink); font-size: var(--fs-body); cursor: pointer; }
+.home-tool-entry-icon { display: grid; width: 100%; max-width: 116px; height: 66px; place-items: center; border: 1px solid var(--user-border); border-radius: 14px; background: var(--library-surface); color: var(--user-ink); transition: background var(--user-motion), border-color var(--user-motion), transform var(--user-motion); }
+.home-tool-entry-icon svg { width: 26px; height: 26px; }
+.home-tool-entry-label { overflow: hidden; max-width: 100%; color: color-mix(in srgb, var(--user-ink) 86%, transparent); text-overflow: ellipsis; white-space: nowrap; }
+.home-tool-entry:hover:not(:disabled) .home-tool-entry-icon { border-color: color-mix(in srgb, var(--user-ink) 22%, transparent); background: var(--library-surface-hover); transform: translateY(-2px); }
+.home-tool-entry:focus-visible { outline: none; }
+.home-tool-entry:focus-visible .home-tool-entry-icon { outline: 2px solid var(--control-focus-ring); outline-offset: 2px; }
+.home-tool-entry:disabled { cursor: wait; opacity: .6; }
+
+/* 分区标题 */
+.home-section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
+.home-section-heading-main { display: flex; min-width: 0; align-items: center; gap: var(--space-6); }
+.home-section-heading h2 { margin: 0; color: var(--user-ink); font-size: var(--typ-title-sm, 18px); font-weight: 700; white-space: nowrap; }
+.home-section-link { display: inline-flex; flex: 0 0 auto; align-items: center; gap: var(--space-1); color: var(--user-ink-muted); font-size: var(--fs-caption); }
+.home-section-link:hover { color: var(--user-ink); }
+.home-section-link svg { width: 14px; height: 14px; }
+.home-filter-tabs { display: flex; min-width: 0; gap: var(--space-1); overflow-x: auto; scrollbar-width: none; }
+.home-filter-tabs::-webkit-scrollbar { display: none; }
+.home-filter-tabs button { flex: 0 0 auto; border: 0; border-radius: 10px; padding: 6px 14px; background: transparent; color: var(--user-ink-muted); font-size: var(--fs-caption); cursor: pointer; transition: background var(--user-motion), color var(--user-motion); }
+.home-filter-tabs button:hover { color: var(--user-ink); }
+.home-filter-tabs button[aria-selected="true"] { background: var(--library-surface-hover); color: var(--user-ink); font-weight: 600; }
+.home-filter-tabs button:focus-visible { outline: 2px solid var(--control-focus-ring); outline-offset: 1px; }
+.home-section-state { display: flex; align-items: center; gap: var(--space-3); border-radius: var(--user-radius-card); padding: var(--space-5); background: var(--library-surface); color: var(--user-ink-muted); font-size: var(--fs-caption); }
+.home-section-state button { border: 0; border-radius: var(--user-radius-control); padding: 4px 12px; background: var(--library-surface-hover); color: var(--user-ink); cursor: pointer; }
+
+/* 卡片网格：精选画布与精选灵感共用 */
+.home-card-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-4) var(--space-4); margin: 0; padding: 0; list-style: none; }
+.home-card { min-width: 0; }
+.home-card-button { display: flex; width: 100%; min-width: 0; flex-direction: column; gap: 6px; border: 0; padding: 0; background: transparent; color: var(--user-ink); text-align: left; cursor: pointer; }
+.home-card-cover { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: var(--library-cover-surface); }
+.home-card-cover img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 400ms ease; }
+.home-card-button:hover .home-card-cover img { transform: scale(1.04); }
+.home-card-button:focus-visible { outline: 2px solid var(--control-focus-ring); outline-offset: 3px; border-radius: 12px; }
+.home-card-badge, .home-card-kind { position: absolute; display: inline-flex; align-items: center; gap: 4px; border-radius: 6px; padding: 2px 8px; background: rgb(0 0 0 / .55); color: #fff; font-size: var(--fs-label); line-height: 18px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.home-card-badge { top: 10px; left: 10px; }
+.home-card-kind { right: 10px; bottom: 10px; }
+.home-card-kind svg { width: 10px; height: 10px; fill: currentColor; }
+.home-card-overlay { position: absolute; inset: auto 10px 10px auto; display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 10px; background: rgb(255 255 255 / .92); color: #111; font-size: var(--fs-label); font-weight: 600; opacity: 0; transform: translateY(4px); transition: opacity var(--user-motion), transform var(--user-motion); }
+.home-card-overlay svg { width: 12px; height: 12px; }
+.home-card-button:hover .home-card-overlay, .home-card-button:focus-visible .home-card-overlay { opacity: 1; transform: none; }
+.home-card-button strong { overflow: hidden; margin-top: 6px; font-size: var(--fs-body); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.home-card-button small { overflow: hidden; color: var(--user-ink-muted); font-size: var(--fs-caption); text-overflow: ellipsis; white-space: nowrap; }
+.home-card.is-placeholder .home-card-cover, .home-card-line { animation: home-pulse 1.4s ease-in-out infinite; }
+.home-card-line { display: block; width: 60%; height: 14px; margin-top: var(--space-2); border-radius: 6px; background: var(--library-cover-surface); }
+@keyframes home-pulse { 50% { opacity: .55; } }
+
+/* 精选画布精简弹窗 */
+/* 只覆盖这一个弹窗的宽度，全局标准弹窗宽度不动。 */
+.workspace-modal.home-canvas-dialog { width: min(1080px, calc(100vw - 32px)) !important; max-width: calc(100vw - 32px); }
+.home-canvas-dialog .ant-modal-close { top: 18px; right: 18px; color: var(--user-ink-muted); }
+.home-canvas-dialog .ant-modal-close:hover { background: var(--surface-hover); color: var(--user-ink); }
+.home-canvas-dialog-body { padding: 24px 28px 28px; color: var(--user-ink); }
+.home-canvas-dialog-title { margin: 0 48px 18px 0; font-size: 20px; font-weight: 700; line-height: 1.4; }
+.home-canvas-dialog-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); align-items: start; gap: 36px; }
+.home-canvas-dialog-cover { width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 16px; background: var(--library-cover-surface); }
+.home-canvas-dialog-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.home-canvas-dialog-info { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 14px; font-size: 16px; line-height: 1.75; }
+.home-canvas-dialog-info p { margin: 0; }
+.home-canvas-dialog-author, .home-canvas-dialog-stats { color: var(--user-ink); }
+.home-canvas-dialog-stats.is-loading { color: var(--user-ink-muted); }
+.home-canvas-dialog-copy { color: color-mix(in srgb, var(--user-ink) 86%, transparent); }
+.home-canvas-dialog-retry { margin-left: 8px; border: 0; padding: 0; background: transparent; color: var(--user-accent); cursor: pointer; }
+.home-canvas-dialog-action.ant-btn { height: 52px; margin-top: 4px; border: 0; border-radius: 14px; padding-inline: 22px; background: linear-gradient(90deg, #6d5bea 0%, #3d7bd8 100%); color: #fff; font-size: 16px; font-weight: 650; box-shadow: 0 10px 24px rgb(80 100 230 / .28); }
+.home-canvas-dialog-action.ant-btn:not(:disabled):hover { background: linear-gradient(90deg, #7a69f2 0%, #4a88e2 100%) !important; color: #fff !important; }
+.home-canvas-dialog-action.ant-btn:disabled { background: var(--library-surface-hover); box-shadow: none; color: var(--user-ink-muted); }
+.home-canvas-dialog-note { color: var(--user-ink-muted); font-size: var(--fs-caption); }
+.home-canvas-dialog-source { width: 100%; color: var(--user-ink-muted); font-size: 15px; }
+.home-canvas-dialog-source summary { width: fit-content; cursor: pointer; }
+.home-canvas-dialog-source summary:hover { color: var(--user-ink); }
+.home-canvas-dialog-source dl { display: grid; gap: 4px; margin: 10px 0 0; font-size: var(--fs-caption); line-height: 1.6; }
+.home-canvas-dialog-source dl > div { display: flex; gap: 12px; }
+.home-canvas-dialog-source dt { flex: 0 0 auto; color: var(--user-ink-muted); }
+.home-canvas-dialog-source dd { margin: 0; color: var(--user-ink); }
+.home-canvas-dialog-links { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; font-size: var(--fs-caption); }
+.home-canvas-dialog-links a { display: inline-flex; align-items: center; gap: 2px; color: var(--user-accent); }
+.home-canvas-dialog-links svg { width: 14px; height: 14px; }
+
+@media (max-width: 1280px) { .home-page-inner { padding-inline: var(--space-6); } .home-tool-entries ul { gap: var(--space-3); } }
+@media (max-width: 1100px) {
+    .home-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .home-tool-entries ul { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: var(--space-5); }
+}
+@media (max-width: 760px) {
+    .home-canvas-dialog-grid { grid-template-columns: 1fr; gap: 20px; }
+    .home-canvas-dialog-body { padding: 20px 18px 22px; }
+    .home-canvas-dialog-info { font-size: 15px; gap: 10px; }
+}
+@media (max-width: 640px) {
+    .home-page-inner { gap: var(--space-6); padding: var(--space-4) var(--space-4) var(--space-10); }
+    .home-new-canvas { min-height: 148px; }
+    .home-new-canvas-icon { width: 80px; height: 50px; }
+    .home-tool-entries ul { gap: var(--space-3) var(--space-2); }
+    .home-tool-entry { font-size: var(--fs-caption); gap: var(--space-2); }
+    .home-tool-entry-icon { height: 54px; }
+    .home-tool-entry-icon svg { width: 22px; height: 22px; }
+    .home-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+    .home-section-heading { align-items: flex-start; }
+    .home-section-heading-main { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .home-card-cover img, .home-tool-entry-icon, .home-new-canvas-icon, .home-card-overlay { transition: none; }
+    .home-card.is-placeholder .home-card-cover, .home-card-line { animation: none; }
+}

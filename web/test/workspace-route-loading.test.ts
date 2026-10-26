@@ -31,19 +31,23 @@ describe("workspace route loading", () => {
         expect(navigation).toContain("onFocus={() => preloadWorkspaceRoute(linkTo)}");
     });
 
-    test("keeps the creation page at root and preserves the create compatibility route", () => {
+    test("serves the launcher home at root and keeps the Agent creation page at /create", () => {
         const router = source("../src/router.tsx");
         const navigation = source("../src/components/layout/workspace-sidebar-nav.tsx");
+        const guest = source("../src/lib/guest-workspace.ts");
 
-        expect(router).toContain('{ path: "/", element: deferred(<CreatePage />) }');
+        expect(router).toContain('{ path: "/", element: deferred(<HomePage />) }');
         expect(router).toContain('{ path: "/create", element: deferred(<CreatePage />) }');
+        expect(router).toContain('{ path: "/c/:conversationId", element: deferred(<CreatePage />) }');
+        expect(router).toContain('{ path: "/inspirations", element: deferred(<InspirationsPage />) }');
+        for (const path of ['"/"', '"/create"', '"/inspirations"', '"/inspiration"']) expect(guest).toContain(`pathname === ${path}`);
         expect(router).toContain("<RequireAuth allowAnonymous={isGuestWorkspacePath(pathname)}>");
         expect(router).toContain('{ path: "/assets", element: <RequireAuth>{deferred(<AssetsPage />)}</RequireAuth> }');
         expect(router).toMatch(/path: "\/canvas\/:id",\s+element: \(\s+<RequireAuth>\s+<CanvasProjectPage \/>\s+<\/RequireAuth>\s+\),/);
         expect(router).not.toContain('path: "/home"');
-        expect(router).not.toContain("HomePage");
-        expect(navigation).toContain('{ ...toolItem("create", "/"), id: "home", title: "创作" }');
-        expect(navigation).not.toContain('to: "/create"');
+        expect(navigation).toContain('toolItem("home", "/")');
+        expect(navigation).toContain('toolItem("create", "/create")');
+        expect(navigation).toContain('heading: "资源与工具"');
         expect(navigation).not.toContain('to: "/home"');
     });
 

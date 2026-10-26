@@ -29,6 +29,20 @@ func RegisterLibTVRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		ok(c, result)
 	})
+	// 首页精选画布：服务端缓存，游客同样可读。
+	r.GET("/libtv/featured", func(c *gin.Context) {
+		user, err := libTVGalleryUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		result, err := svc.LibTVFeatured(c.Request.Context(), user)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, result)
+	})
 	r.GET("/libtv/works/:uuid", func(c *gin.Context) {
 		user, err := libTVGalleryUser(c, svc)
 		if err != nil {

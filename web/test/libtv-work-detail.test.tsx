@@ -380,7 +380,8 @@ describe("LibTV replication options", () => {
         expect(handler).not.toContain("navigate(");
         expect(handler).toContain("复制并打开画布");
         const makeSame = detail.slice(detail.indexOf("const handleMakeSame"), detail.indexOf("const body = () =>"));
-        expect(makeSame).toContain("navigate(\"/\", { state: resolution.state })");
+        // 带 creationHome 进入创作页：先开新对话再预填，不会落进上一次的 Agent 会话。
+        expect(makeSame).toContain("navigate(\"/create\", { state: { creationHome: true, ...resolution.state } })");
         expect(makeSame).not.toContain("submit");
         expect(makeSame).not.toContain("自动付费");
     });
@@ -422,7 +423,9 @@ describe("LibTV copy-to-canvas remote draft", () => {
 
     test("work detail wires the explicit retry and never navigates on a failed sync", () => {
         const detail = source("../src/pages/inspiration/work-detail.tsx");
-        const handler = detail.slice(detail.indexOf("const handleCopyToCanvas"), detail.indexOf("const handleMakeSame"));
+        expect(detail).toContain("useLibTVCanvasCopy({ templateUuid, title: data?.work.title, canImport: Boolean(data?.canImport), messageApi, onClose })");
+        const hook = source("../src/pages/inspiration/use-libtv-canvas-copy.ts");
+        const handler = hook.slice(hook.indexOf("const copy = async"), hook.indexOf("return { copy, copying }"));
         expect(handler).toContain("retry: (projectId) => saveRemoteUserDataNow(projectId)");
         expect(handler).toContain("formatLocalSavedRemotePending(");
         expect(handler).not.toContain("已保存到云端");
@@ -505,27 +508,28 @@ describe("LibTV work detail liveness", () => {
     });
 
     test("copy-to-canvas re-checks after every await and drops stale results", () => {
-        const detail = source("../src/pages/inspiration/work-detail.tsx");
-        const handler = detail.slice(detail.indexOf("const handleCopyToCanvas"), detail.indexOf("const openStep"));
-        const guardStart = handler.indexOf("copyGuardRef.current.begin()");
+        const hook = source("../src/pages/inspiration/use-libtv-canvas-copy.ts");
+        const handler = hook.slice(hook.indexOf("const copy = async"), hook.indexOf("return { copy, copying }"));
+        const guardStart = handler.indexOf("guardRef.current.begin()");
         expect(guardStart).toBeGreaterThan(-1);
         // await 之后都确认仍然是最新这一次（成功路径与异常路径各一处），否则直接丢弃结果。
-        const checks = handler.split("copyGuardRef.current.isCurrent(guard)").length - 1;
+        const checks = handler.split("guardRef.current.isCurrent(guard)").length - 1;
         expect(checks).toBe(2);
-        for (const check of handler.split("copyGuardRef.current.isCurrent(guard)").slice(1)) {
+        for (const check of handler.split("guardRef.current.isCurrent(guard)").slice(1)) {
             expect(check).toContain("return;");
         }
         // 导航与提示都在检查之后。
-        expect(handler.indexOf("copyGuardRef.current.isCurrent(guard)")).toBeLessThan(handler.indexOf("navigate(`/canvas/"));
-        expect(handler.indexOf("copyGuardRef.current.isCurrent(guard)")).toBeLessThan(handler.indexOf("messageApi.warning("));
-        expect(handler.indexOf("copyGuardRef.current.isCurrent(guard)")).toBeLessThan(handler.indexOf("messageApi.error("));
+        expect(handler.indexOf("guardRef.current.isCurrent(guard)")).toBeLessThan(handler.indexOf("navigate(`/canvas/"));
+        expect(handler.indexOf("guardRef.current.isCurrent(guard)")).toBeLessThan(handler.indexOf("messageApi.warning("));
+        expect(handler.indexOf("guardRef.current.isCurrent(guard)")).toBeLessThan(handler.indexOf("messageApi.error("));
     });
 
     test("closing or switching a work clears the pending draft and invalidates the guard", () => {
         const detail = source("../src/pages/inspiration/work-detail.tsx");
-        const effect = detail.slice(detail.indexOf("// 关闭弹窗或切换作品时作废在途的创建请求"), detail.indexOf("const handleCopyToCanvas"));
+        const hook = source("../src/pages/inspiration/use-libtv-canvas-copy.ts");
+        const effect = hook.slice(hook.indexOf("// 关闭弹窗或切换作品时作废在途的创建请求"), hook.indexOf("const copy = async"));
         expect(effect).toContain("draftProjectIdRef.current = undefined;");
-        expect(effect).toContain("copyGuardRef.current.invalidate();");
+        expect(effect).toContain("guardRef.current.invalidate();");
         expect(effect).toContain("}, [templateUuid]);");
         // 直接链接页也逐条重置：弹窗按 key 重建，路由页靠这个 effect。
         const route = detail.slice(detail.indexOf("export default function WorkDetailPage"));
@@ -549,45 +553,52 @@ describe("LibTV work detail liveness", () => {
     });
 });
 
-describe("LibTV creation page featured canvases", () => {
-    test("精选画布 reads the shared gallery query and only shows the first few works", () => {
-        const featured = source("../src/pages/create/creation-featured-canvases.tsx");
-        expect(featured).toContain("useInfiniteQuery(libTVGalleryInfiniteQuery({ keyword: \"\" }, getLibTVGallery))");
+describe("LibTV home featured canvases", () => {
+    test("精选画布 reads the cached featured endpoint and shows node counts", () => {
+        const featured = source("../src/pages/home/home-featured-canvases.tsx");
+        expect(featured).toContain('queryKey: ["libtv-featured"], queryFn: getLibTVFeatured');
         expect(featured).toContain("const FEATURED_COUNT = 5;");
-        expect(featured).toContain("可编辑画布");
+        expect(featured).toContain("可编辑画布 · ${item.nodeCount} 节点");
         expect(featured).toContain('to="/inspiration"');
         expect(featured).not.toContain("mediaUrls");
+        expect(source("../src/services/api/libtv-gallery.ts")).toContain('http.get<LibTVFeaturedResponse>("/libtv/featured")');
     });
 
-    test("clicking a card only opens the work dialog and never fills a prompt or submits", () => {
-        const featured = source("../src/pages/create/creation-featured-canvases.tsx");
-        expect(featured).toContain("<LibTVWorkDetailDialog");
-        expect(featured).toContain("onOpen={() => setActiveTemplateUuid(item.templateUuid)}");
-        expect(featured).toContain("onClose={() => setActiveTemplateUuid(undefined)}");
+    test("clicking a card only opens the compact dialog and never fills a prompt or submits", () => {
+        const featured = source("../src/pages/home/home-featured-canvases.tsx");
+        expect(featured).toContain("<HomeFeaturedCanvasDialog item={active} onClose={() => setActive(undefined)} />");
+        expect(featured).toContain("onClick={() => setActive(item)}");
         for (const forbidden of ["onStartPrompt", "setPrompt", "selectMode", "submit"]) expect(featured).not.toContain(forbidden);
+        const dialog = source("../src/pages/home/home-featured-canvas-dialog.tsx");
+        // 精简弹窗复用详情查询缓存与同一套复制流程，按钮在读到可导入节点前不可点。
+        expect(dialog).toContain('queryKey: ["libtv-work-detail", item.templateUuid]');
+        expect(dialog).toContain("useLibTVCanvasCopy(");
+        expect(dialog).toContain("disabled={!data?.canImport}");
+        expect(dialog).toContain("复制并打开画布");
+        expect(dialog).toContain("<summary>来源信息</summary>");
+        expect(dialog).toContain("to={`/inspiration/${item.templateUuid}`}");
         const create = source("../src/pages/create/index.tsx");
-        expect(create).toContain("<CreationFeaturedCanvases />");
-        // 原有灵感大厅保留在精选画布之后。
-        expect(create.indexOf("<CreationFeaturedCanvases />")).toBeLessThan(create.indexOf("<InspirationHall"));
         // 做同款预填 effect 必须在创作页提前 return 之前，否则 hooks 数量会随水合状态变化而报错。
-        expect(create.indexOf("灵感广场「做同款」")).toBeGreaterThan(0);
-        // 创作页所有提前 return（会话加载中、会话出错、未水合）都必须在这个 effect 之后。
         const effectAt = create.indexOf("灵感广场「做同款」");
+        expect(effectAt).toBeGreaterThan(0);
         for (const earlyReturn of ["if (conversationRoute.loading)", "if (conversationRoute.error)", "if (!hydrated || !activeConversation)"]) {
             expect(create.indexOf(earlyReturn)).toBeGreaterThan(effectAt);
         }
+        // 先让「开新对话」处理 creationHome，再预填。
+        const effect = create.slice(effectAt, create.indexOf("const restoreMessageDraft"));
+        expect(effect).toContain("if (state.creationHome) return;");
     });
 
     test("failure offers a retry and an empty list hides the section", () => {
-        const featured = source("../src/pages/create/creation-featured-canvases.tsx");
+        const featured = source("../src/pages/home/home-featured-canvases.tsx");
         expect(featured).toContain("精选画布暂时无法读取");
         expect(featured).toContain("onClick={() => void refetch()}");
-        expect(featured).toContain("if (!isLoading && !items.length) return null;");
+        expect(featured).toContain("if (!isLoading && !isError && !items.length) return null;");
     });
 
     test("guests must log in before copying a canvas", () => {
-        const detail = source("../src/pages/inspiration/work-detail.tsx");
-        const handler = detail.slice(detail.indexOf("const handleCopyToCanvas"), detail.indexOf("const openStep"));
+        const hook = source("../src/pages/inspiration/use-libtv-canvas-copy.ts");
+        const handler = hook.slice(hook.indexOf("const copy = async"), hook.indexOf("return { copy, copying }"));
         expect(handler).toContain("if (!useUserStore.getState().user)");
         expect(handler).toContain("openLoginModal(");
         expect(handler.indexOf("openLoginModal(")).toBeLessThan(handler.indexOf("ensureRemoteLibTVCanvasDraft"));
@@ -597,8 +608,8 @@ describe("LibTV creation page featured canvases", () => {
 describe("LibTV inspiration navigation", () => {
     test("sidebar, title, command palette and route preload all know the inspiration page", () => {
         const sidebar = source("../src/components/layout/workspace-sidebar-nav.tsx");
-        // 灵感紧跟在主导航「画布」之后（参考站布局：首页、项目、画布、灵感）。
-        expect(sidebar).toContain('{ ...toolItem("canvas", "/canvas"), title: "画布" }, toolItem("inspiration", "/inspiration")');
+        // 参考站布局：首页、项目、画布、创作、灵感。
+        expect(sidebar.indexOf('toolItem("inspiration", "/inspiration")')).toBeGreaterThan(sidebar.indexOf('toolItem("create", "/create")'));
         const tools = source("../src/constant/navigation-tools.ts");
         expect(tools).toContain('slug: "inspiration"');
         expect(tools).toContain('label: "灵感"');

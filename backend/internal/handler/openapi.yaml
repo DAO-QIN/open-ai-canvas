@@ -48,6 +48,17 @@ paths:
         "404": {$ref: "#/components/responses/Error"}
         "429": {$ref: "#/components/responses/Error"}
         "502": {$ref: "#/components/responses/Error"}
+  /libtv/featured:
+    get:
+      tags: [libtv]
+      summary: 读取首页精选画布
+      description: 游客与登录用户均可读取（与作品列表共用限流）。服务端取公开作品流前 5 个有封面的作品并读取节点数，结果在进程内缓存 10 分钟，所有访客共用；上游失败时返回上一份结果并在 1 分钟后重试，没有旧结果时返回错误。
+      responses:
+        "200":
+          description: 标准信封 data 为 items、refreshedAt；每项字段同作品列表，另含 nodeCount、connectionCount（为 0 表示该作品详情暂时读不到）。
+        "401": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+        "502": {$ref: "#/components/responses/Error"}
   /libtv/works/{uuid}:
     get:
       tags: [libtv]

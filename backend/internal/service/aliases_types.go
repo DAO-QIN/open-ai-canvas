@@ -203,6 +203,7 @@ type (
 	LibTVGalleryItem                       = app.LibTVGalleryItem
 	LibTVGalleryTag                        = app.LibTVGalleryTag
 	LibTVWorkDetail                        = app.LibTVWorkDetail
+	LibTVFeaturedResult                    = app.LibTVFeaturedResult
 	LibTVWorkStep                          = app.LibTVWorkStep
 	LibTVSettingRequest                    = app.LibTVSettingRequest
 	LinkCanvasUnitRequest                  = app.LinkCanvasUnitRequest

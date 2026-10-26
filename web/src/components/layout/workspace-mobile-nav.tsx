@@ -1,10 +1,10 @@
-import { CircleUserRound, Images, PanelsTopLeft, WandSparkles } from "lucide-react";
+import { CircleUserRound, House, PanelsTopLeft, WandSparkles } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
 const items = [
-    { to: "/", label: "创作", icon: WandSparkles, matches: (path: string) => path === "/" || path === "/create" },
+    { to: "/", label: "首页", icon: House, matches: (path: string) => path === "/" },
+    { to: "/create", label: "创作", icon: WandSparkles, matches: (path: string) => path === "/create" || path.startsWith("/c/") },
     { to: "/canvas", label: "画布", icon: PanelsTopLeft, matches: (path: string) => path === "/canvas" },
-    { to: "/assets", label: "素材", icon: Images, matches: (path: string) => path === "/assets" },
     { to: "/settings?section=profile", label: "我的", icon: CircleUserRound, matches: (path: string) => path === "/settings" || path === "/promotion" },
 ];
 

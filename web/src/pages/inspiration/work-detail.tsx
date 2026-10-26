@@ -6,15 +6,12 @@ import { useNavigate, useParams } from "react-router";
 
 import { PageHeader, WorkspacePage } from "@/components/layout/workspace-page";
 import { summarizeLibTVImportWarnings } from "@/lib/canvas/libtv-import";
-import { collectLibTVStepPrompts, libTVCoverThumbnail, createLatestRequestGuard, ensureRemoteLibTVCanvasDraft, pickLibTVRecommendations, resolveLibTVMakeSame, resolveLibTVReplicationPlan } from "@/lib/libtv-gallery";
+import { collectLibTVStepPrompts, libTVCoverThumbnail, pickLibTVRecommendations, resolveLibTVMakeSame, resolveLibTVReplicationPlan } from "@/lib/libtv-gallery";
 import { getLibTVGallery, getLibTVWorkDetail } from "@/services/api/libtv-gallery";
-import { createCanvasProjectWithRemoteSync, formatLocalSavedRemotePending, localSavedRemotePendingMessage, saveRemoteUserDataNow } from "@/services/user-data-sync";
-import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
-import { openLoginModal } from "@/stores/use-login-modal-store";
-import { useUserStore } from "@/stores/use-user-store";
 import type { LibTVGalleryItem, LibTVWorkStep } from "@/types/libtv-gallery";
 
 import { LibTVStepMediaDialog } from "./step-media-dialog";
+import { useLibTVCanvasCopy } from "./use-libtv-canvas-copy";
 import { describeLibTVStepMedia } from "./step-media-preview";
 
 const STEP_TYPE_LABEL: Record<LibTVWorkStep["type"], string> = { image: "图像生成", video: "视频生成", audio: "音频生成", text: "文本" };
@@ -33,11 +30,7 @@ export function WorkDetailPane({
 }) {
     const navigate = useNavigate();
     const [messageApi, contextHolder] = message.useMessage();
-    const [copyingCanvas, setCopyingCanvas] = useState(false);
     const [previewStepId, setPreviewStepId] = useState<string>();
-    const draftProjectIdRef = useRef<string | undefined>(undefined);
-    // 异步创建草稿期间作品可能已关闭或切到别的作品：回来先确认这次请求仍是最新且仍是同一条作品。
-    const copyGuardRef = useRef(createLatestRequestGuard());
     const processRef = useRef<HTMLElement>(null);
     const mainVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -48,51 +41,11 @@ export function WorkDetailPane({
     });
     const previewStep = data?.steps.find((step) => step.id === previewStepId);
 
-    // 关闭弹窗或切换作品时作废在途的创建请求，并清掉上一条作品留下的待同步草稿。
     useEffect(() => {
-        draftProjectIdRef.current = undefined;
         setPreviewStepId(undefined);
-        copyGuardRef.current.invalidate();
-        return () => copyGuardRef.current.invalidate();
     }, [templateUuid]);
 
-    const handleCopyToCanvas = async () => {
-        if (!templateUuid || !data?.canImport || copyingCanvas) return;
-        // 游客可以浏览作品，复制需要先登录：画布要存进自己的账号里。
-        if (!useUserStore.getState().user) {
-            // 先关掉作品弹窗，登录弹窗才不会被压在下面。
-            onClose();
-            openLoginModal({ description: "登录后即可把这个画布复制到你的空间继续编辑" });
-            return;
-        }
-
-        const guard = copyGuardRef.current.begin();
-        setCopyingCanvas(true);
-        try {
-            const result = await ensureRemoteLibTVCanvasDraft(draftProjectIdRef.current, data.work.title.trim() || "未命名画布", {
-                create: (title) => createCanvasProjectWithRemoteSync(title),
-                retry: (projectId) => saveRemoteUserDataNow(projectId),
-                exists: (projectId) => useCanvasStore.getState().projects.some((project) => project.id === projectId),
-            });
-            // 作品已被关闭/切换：不写回草稿、不导航，也不弹已经过时的提示。
-            if (!copyGuardRef.current.isCurrent(guard)) return;
-            draftProjectIdRef.current = result.projectId;
-            if (!result.ok) {
-                // 只保留本地草稿，不进入需要归属校验的模板导入；创建失败时同步层已排队重试，手动重试失败时在此补排。
-                const warning = result.phase === "create" ? formatLocalSavedRemotePending("已创建本地草稿画布", result.error) : localSavedRemotePendingMessage("本地草稿画布已保留", result.error);
-                messageApi.warning(`${warning} 云端同步成功前不会导入模板，可再次点击「复制并打开画布」立即重试。`);
-                setCopyingCanvas(false);
-                return;
-            }
-            // 进入画布后由导入弹窗读取预览，用户确认后才写入节点。
-            onClose();
-            navigate(`/canvas/${result.projectId}?importTemplate=${encodeURIComponent(templateUuid)}`);
-        } catch (err) {
-            if (!copyGuardRef.current.isCurrent(guard)) return;
-            messageApi.error(err instanceof Error ? err.message : "创建画布失败");
-            setCopyingCanvas(false);
-        }
-    };
+    const { copy: handleCopyToCanvas, copying: copyingCanvas } = useLibTVCanvasCopy({ templateUuid, title: data?.work.title, canImport: Boolean(data?.canImport), messageApi, onClose });
 
     const openStep = (stepId: string) => {
         mainVideoRef.current?.pause();
@@ -125,7 +78,7 @@ export function WorkDetailPane({
         }
         // 只预填提示词与比例，模型沿用用户当前选择，不自动提交。
         onClose();
-        navigate("/", { state: resolution.state });
+        navigate("/create", { state: { creationHome: true, ...resolution.state } });
     };
 
     const body = () => {

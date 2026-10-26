@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router
 
 import { RequireAuth } from "@/components/auth/require-auth";
 import { FullScreenLoader, WorkspaceRouteLoader } from "@/components/ui/aceternity/full-screen-loader";
-import { loadAssetsPage, loadCanvasPage, loadCanvasProjectPage, loadCreatePage, loadInspirationPage, loadProjectCreatePage, loadProjectDetailPage, loadProjectsPage, loadSkillWorkbenchPage } from "@/lib/workspace-route-modules";
+import { loadAssetsPage, loadCanvasPage, loadCanvasProjectPage, loadCreatePage, loadHomePage, loadInspirationPage, loadInspirationsPage, loadProjectCreatePage, loadProjectDetailPage, loadProjectsPage, loadSkillWorkbenchPage } from "@/lib/workspace-route-modules";
 import { CanvasRefreshShell } from "@/pages/canvas/canvas-refresh-shell";
 import { AuthRouteRedirect } from "@/components/auth/auth-route-redirect";
 import RouteErrorPage from "@/pages/route-error";
@@ -49,6 +49,8 @@ const CanvasPage = lazy(loadCanvasPage);
 const CanvasProjectPage = lazy(loadCanvasProjectPage);
 const SharedCanvasPage = lazy(() => import("@/pages/canvas/shared"));
 const CreatePage = lazy(loadCreatePage);
+const HomePage = lazy(loadHomePage);
+const InspirationsPage = lazy(loadInspirationsPage);
 const ImageWorkbenchPage = lazy(() => import("@/pages/workbench/image-workbench-route"));
 const VideoWorkbenchPage = lazy(() => import("@/pages/workbench/video-workbench-page"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -116,7 +118,7 @@ export const router = createBrowserRouter([
         element: <AuthenticatedWorkspaceLayout />,
         errorElement: <RouteErrorPage />,
         children: [
-            { path: "/", element: deferred(<CreatePage />) },
+            { path: "/", element: deferred(<HomePage />) },
             { path: "/create", element: deferred(<CreatePage />) },
             { path: "/c/:conversationId", element: deferred(<CreatePage />) },
             {
@@ -135,7 +137,7 @@ export const router = createBrowserRouter([
                     </RequireAuth>
                 ),
             },
-            { path: "/inspirations", element: <Navigate to="/" replace /> },
+            { path: "/inspirations", element: deferred(<InspirationsPage />) },
             {
                 path: "/tasks",
                 element: (

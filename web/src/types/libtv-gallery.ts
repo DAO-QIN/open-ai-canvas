@@ -50,6 +50,14 @@ export type LibTVGalleryResponse = {
     requestId: string;
 };
 
+/** 首页精选画布：服务端缓存；nodeCount 为 0 表示该作品详情暂时读不到。 */
+export type LibTVFeaturedItem = LibTVGalleryItem & { nodeCount: number; connectionCount: number };
+
+export type LibTVFeaturedResponse = {
+    items: LibTVFeaturedItem[];
+    refreshedAt: string;
+};
+
 export type LibTVWorkDetailResponse = {
     work: LibTVGalleryItem;
     steps: LibTVWorkStep[];

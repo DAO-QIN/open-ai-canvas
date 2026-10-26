@@ -4,7 +4,7 @@ import { matchesNavigationQuery, navigationTools, workspaceNavigationTool } from
 describe("consumer workspace navigation", () => {
     test("resolves root, compatibility, detail and distinct workbench routes", () => {
         for (const [path, label] of [
-            ["/", "创作"], ["/create", "创作"], ["/projects/demo/workflow/unit/script", "短剧"],
+            ["/", "首页"], ["/create", "创作"], ["/c/demo", "创作"], ["/inspirations", "灵感"], ["/projects/demo/workflow/unit/script", "短剧"],
             ["/canvas/demo", "画布"], ["/toolbox/image", "图片"], ["/toolbox/video", "视频"],
             ["/assets", "素材"], ["/tasks", "历史"], ["/promotion", "邀请"],
         ]) expect(workspaceNavigationTool(path)?.label).toBe(label);

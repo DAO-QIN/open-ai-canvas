@@ -32,10 +32,12 @@ export function WorkspaceCommandPalette({ open, onClose }: { open: boolean; onCl
             return { id: slug, title: tool?.label ?? slug, fullLabel: tool?.fullLabel ?? slug, keywords: tool?.keywords ?? [], icon: tool?.icon ?? Home, to };
         };
         return [
-            { ...toolEntry("create", "/"), id: "home" },
+            toolEntry("home", "/"),
+            toolEntry("create", "/create"),
             ...(features.shortDramaEnabled ? [toolEntry("projects", "/projects")] : []),
             toolEntry("canvas", "/canvas"),
             toolEntry("inspiration", "/inspiration"),
+            toolEntry("inspirations", "/inspirations"),
             ...(features.imageWorkbenchEnabled ? [toolEntry("toolbox-image", "/toolbox/image")] : []),
             ...(features.videoWorkbenchEnabled ? [toolEntry("toolbox-video", "/toolbox/video")] : []),
             ...(features.taskCenterEnabled ? [toolEntry("tasks", "/tasks")] : []),

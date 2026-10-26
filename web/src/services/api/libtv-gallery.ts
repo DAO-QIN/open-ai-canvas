@@ -1,5 +1,5 @@
 import { http } from "@/services/api/request";
-import type { LibTVGalleryParams, LibTVGalleryResponse, LibTVWorkDetailResponse } from "@/types/libtv-gallery";
+import type { LibTVFeaturedResponse, LibTVGalleryParams, LibTVGalleryResponse, LibTVWorkDetailResponse } from "@/types/libtv-gallery";
 
 export const LIBTV_GALLERY_PAGE_SIZE = 20;
 
@@ -19,4 +19,8 @@ export function getLibTVGallery(params: LibTVGalleryParams) {
 
 export function getLibTVWorkDetail(templateUuid: string) {
     return http.get<LibTVWorkDetailResponse>(`/libtv/works/${encodeURIComponent(templateUuid)}`);
+}
+
+export function getLibTVFeatured() {
+    return http.get<LibTVFeaturedResponse>("/libtv/featured");
 }

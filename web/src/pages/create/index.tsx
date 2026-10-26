@@ -139,8 +139,6 @@ import { CreationComposer, CreationEmptySuggest, CreationHistoryDrawer, Creation
 import { declaredInspirationSources } from "@/lib/inspirations/catalog";
 import { fillablePrompt } from "@/lib/inspirations/resolve";
 import { CreationRecentCanvases } from "./creation-recent-canvases";
-import { CreationFeaturedCanvases } from "./creation-featured-canvases";
-import { CreationToolEntries } from "./creation-tool-entries";
 import { openLoginModal } from "@/stores/use-login-modal-store";
 import { expandSmartCreationPlan, projectSmartCreationBatch, runSmartCreationSchedule } from "./smart-creation-runtime";
 import { createCreationSubmitGate, createCreationSubmitGateRelease, withCreationSubmitGate } from "./creation-submit-gate";
@@ -2079,7 +2077,7 @@ export default function CreatePage() {
         setAttachments([]);
         setDraftReferences([]);
         setHistoryOpen(false);
-        void navigate("/", { replace: false });
+        void navigate("/create", { replace: false });
     };
 
     const continueOnCanvas = async (selectedAssetIds?: string[]) => {
@@ -2271,7 +2269,7 @@ export default function CreatePage() {
                         setAttachments([]);
                         setDraftReferences([]);
                         if (fallback.agentSessionId) conversationRoute.show(fallback.agentSessionId, true);
-                        else void navigate("/", { replace: true });
+                        else void navigate("/create", { replace: true });
                     }
                     await save;
                     void clearPendingCreationAgentSubmission(conversation.id, scope).catch(() => undefined);
@@ -2304,13 +2302,16 @@ export default function CreatePage() {
         void saved.catch((error) => toast.error(error instanceof Error ? error.message : "对话重命名保存失败"));
     };
 
-    // 灵感广场「做同款」只带模式、比例和提示词过来：预填表单，不替换模型，也不自动生成。
+    // 首页精选灵感、灵感大厅与灵感广场「做同款」只带模式、比例和提示词过来：预填表单，不替换模型，也不自动生成。
+    // 文本灵感进入 Agent 模式。
     useEffect(() => {
         if (!composerPreferencesInitialized || !location.state) return;
-        const state = location.state as { mode?: CreationMode; ratio?: string; prompt?: string };
-        if (state.mode !== "image" && state.mode !== "video") return;
+        const state = location.state as { mode?: CreationMode; ratio?: string; prompt?: string; creationHome?: boolean };
+        // 先等「开新对话」处理完（它会去掉 creationHome 并保留其余字段），再预填到新对话里。
+        if (state.creationHome) return;
+        if (state.mode !== "image" && state.mode !== "video" && state.mode !== "text") return;
         selectMode(state.mode);
-        if (typeof state.ratio === "string" && state.ratio) {
+        if (state.mode !== "text" && typeof state.ratio === "string" && state.ratio) {
             setRatio(state.ratio);
             if (state.mode === "image") rememberImageSettings({ ratio: state.ratio });
             else rememberVideoSettings({ ratio: state.ratio });
@@ -2792,9 +2793,7 @@ export default function CreatePage() {
                                     }}
                                 />
                             </section>
-                            <CreationToolEntries onRequireLogin={() => setLoginDialogOpen(true)} />
                             <CreationRecentCanvases onRequireLogin={() => setLoginDialogOpen(true)} />
-                            <CreationFeaturedCanvases />
                             <Suspense
                                 fallback={
                                     <div className="creation-hall-loading" role="status">

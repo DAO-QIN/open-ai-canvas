@@ -5,9 +5,9 @@ import { useNavigate } from "react-router";
 
 import { preloadWorkspaceRoute, loadCanvasProjectPage } from "@/lib/workspace-route-modules";
 import { useUserStore, type FeatureAvailability } from "@/stores/use-user-store";
-import { useCreateBlankCanvas, type CanvasStartNode } from "./use-create-blank-canvas";
+import { useCreateBlankCanvas, type CanvasStartNode } from "@/pages/create/use-create-blank-canvas";
 
-export type CreationToolEntry = {
+export type HomeToolEntry = {
     id: string;
     label: string;
     hint: string;
@@ -23,8 +23,8 @@ export type CreationToolEntry = {
  * - 生图 / 视频工作台关闭时退回到「新画布 + 对应节点」，入口不消失；
  * - 短剧项目关闭时隐藏「短剧 Agent」，避免点进去才提示不可用。
  */
-export function buildCreationToolEntries(features: Pick<FeatureAvailability, "shortDramaEnabled" | "imageWorkbenchEnabled" | "videoWorkbenchEnabled">): CreationToolEntry[] {
-    const entries: Array<CreationToolEntry | false> = [
+export function buildHomeToolEntries(features: Pick<FeatureAvailability, "shortDramaEnabled" | "imageWorkbenchEnabled" | "videoWorkbenchEnabled">): HomeToolEntry[] {
+    const entries: Array<HomeToolEntry | false> = [
         features.shortDramaEnabled && { id: "short-drama", label: "短剧 Agent", hint: "从剧本到分镜的短剧项目", icon: Clapperboard, to: "/projects" },
         features.videoWorkbenchEnabled ? { id: "video", label: "视频生成", hint: "文生视频、图生视频", icon: Film, to: "/toolbox/video" } : { id: "video", label: "视频生成", hint: "新建画布并放好视频节点", icon: Film, start: "video" },
         features.imageWorkbenchEnabled ? { id: "image", label: "图片生成", hint: "文生图、参考图生图", icon: ImageIcon, to: "/toolbox/image" } : { id: "image", label: "图片生成", hint: "新建画布并放好图片节点", icon: ImageIcon, start: "image" },
@@ -34,16 +34,16 @@ export function buildCreationToolEntries(features: Pick<FeatureAvailability, "sh
         { id: "skills", label: "提示词技能", hint: "常用提示词与创作技能", icon: Sparkles, to: "/skills" },
         { id: "models", label: "模型设置", hint: "按图片、视频、文本选默认模型", icon: SlidersHorizontal, to: "/settings?section=models" },
     ];
-    return entries.filter((entry): entry is CreationToolEntry => Boolean(entry));
+    return entries.filter((entry): entry is HomeToolEntry => Boolean(entry));
 }
 
-export function CreationToolEntries({ onRequireLogin }: { onRequireLogin: () => void }) {
+export function HomeToolEntries({ onRequireLogin }: { onRequireLogin: () => void }) {
     const navigate = useNavigate();
     const features = useUserStore((state) => state.features);
     const { createCanvas, creating, ready, signedIn } = useCreateBlankCanvas(onRequireLogin);
-    const entries = buildCreationToolEntries(features);
+    const entries = buildHomeToolEntries(features);
 
-    const open = (entry: CreationToolEntry) => {
+    const open = (entry: HomeToolEntry) => {
         // 所有入口都需要登录；游客统一在首页弹出登录框，而不是跳到登录页后丢失首页位置。
         if (!signedIn) {
             onRequireLogin();
@@ -52,13 +52,13 @@ export function CreationToolEntries({ onRequireLogin }: { onRequireLogin: () => 
         if (entry.start) void createCanvas(entry.start);
         else if (entry.to) navigate(entry.to);
     };
-    const preload = (entry: CreationToolEntry) => {
+    const preload = (entry: HomeToolEntry) => {
         if (entry.start) void loadCanvasProjectPage();
         else if (entry.to) preloadWorkspaceRoute(entry.to.split("?")[0]);
     };
 
     return (
-        <nav className="creation-tool-entries" aria-label="创作工具">
+        <nav className="home-tool-entries" aria-label="创作工具">
             <ul>
                 {entries.map((entry) => {
                     const Icon = entry.icon;
@@ -67,7 +67,7 @@ export function CreationToolEntries({ onRequireLogin }: { onRequireLogin: () => 
                         <li key={entry.id}>
                             <button
                                 type="button"
-                                className="creation-tool-entry"
+                                className="home-tool-entry"
                                 title={entry.hint}
                                 aria-busy={busy}
                                 disabled={Boolean(entry.start) && (!ready || creating !== null)}
@@ -75,10 +75,10 @@ export function CreationToolEntries({ onRequireLogin }: { onRequireLogin: () => 
                                 onPointerEnter={() => preload(entry)}
                                 onFocus={() => preload(entry)}
                             >
-                                <span className="creation-tool-entry-icon" aria-hidden="true">
-                                    {busy ? <LoaderCircle className="animate-spin" /> : <Icon strokeWidth={1.75} />}
+                                <span className="home-tool-entry-icon" aria-hidden="true">
+                                    {busy ? <LoaderCircle className="animate-spin" /> : <Icon strokeWidth={1.6} />}
                                 </span>
-                                <span className="creation-tool-entry-label">{busy ? "正在创建…" : entry.label}</span>
+                                <span className="home-tool-entry-label">{busy ? "正在创建…" : entry.label}</span>
                             </button>
                         </li>
                     );
