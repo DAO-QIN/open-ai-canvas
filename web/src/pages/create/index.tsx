@@ -2303,6 +2303,22 @@ export default function CreatePage() {
         void saved.catch((error) => toast.error(error instanceof Error ? error.message : "对话重命名保存失败"));
     };
 
+    // 灵感广场「做同款」只带模式、比例和提示词过来：预填表单，不替换模型，也不自动生成。
+    useEffect(() => {
+        if (!composerPreferencesInitialized || !location.state) return;
+        const state = location.state as { mode?: CreationMode; ratio?: string; prompt?: string };
+        if (state.mode !== "image" && state.mode !== "video") return;
+        selectMode(state.mode);
+        if (typeof state.ratio === "string" && state.ratio) {
+            setRatio(state.ratio);
+            if (state.mode === "image") rememberImageSettings({ ratio: state.ratio });
+            else rememberVideoSettings({ ratio: state.ratio });
+        }
+        if (typeof state.prompt === "string") setPrompt(state.prompt);
+        navigate(location.pathname, { replace: true, state: null });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [composerPreferencesInitialized, location.state, location.pathname]);
+
     const restoreMessageDraft = (item: CreationMessage) => {
         const nextMode = item.mode || "text";
         const nextSettings = item.settings;
@@ -2536,22 +2552,6 @@ export default function CreatePage() {
         }
         restoreMessageDraft(previous);
     };
-
-    // 灵感广场「做同款」只带模式、比例和提示词过来：预填表单，不替换模型，也不自动生成。
-    useEffect(() => {
-        if (!composerPreferencesInitialized || !location.state) return;
-        const state = location.state as { mode?: CreationMode; ratio?: string; prompt?: string };
-        if (state.mode !== "image" && state.mode !== "video") return;
-        selectMode(state.mode);
-        if (typeof state.ratio === "string" && state.ratio) {
-            setRatio(state.ratio);
-            if (state.mode === "image") rememberImageSettings({ ratio: state.ratio });
-            else rememberVideoSettings({ ratio: state.ratio });
-        }
-        if (typeof state.prompt === "string") setPrompt(state.prompt);
-        navigate(location.pathname, { replace: true, state: null });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [composerPreferencesInitialized, location.state, location.pathname]);
 
     useCreationHomeNavigation(hydrated && composerPreferencesHydrated, startNewConversation);
 
