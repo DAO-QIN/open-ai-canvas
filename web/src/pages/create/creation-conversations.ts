@@ -4,12 +4,14 @@ import type { BackendGenerationResult } from "@/services/api/generation-task";
 import type { GenerationTask } from "@/services/api/task-center";
 import { creationAttachmentKind, type CreationAttachment } from "./creation-assets";
 import type { CreationConversation, CreationMessage, CreationShotRailEntry } from "./creation-types";
+import { LOCAL_CONVERSATION_PREFIX } from "./creation-session-sync";
 
 type CreationRuntime = typeof import("./creation-runtime");
 type PersistedCreationTask = GenerationTask & { creationResultUrls?: string[]; creationResultStorageKeys?: string[]; creationError?: string };
 
+/** 本地新会话；第一次提交时才在服务端创建会话并换成服务端 ID。 */
 export function newConversation(): CreationConversation {
-    return { id: createClientId(), title: "新创作", updatedAt: new Date().toISOString(), messages: [] };
+    return { id: `${LOCAL_CONVERSATION_PREFIX}${createClientId()}`, title: "新创作", updatedAt: new Date().toISOString(), messages: [] };
 }
 
 export function newMessage(role: CreationMessage["role"], content: string, extra: Partial<CreationMessage> = {}): CreationMessage {

@@ -1,5 +1,6 @@
 export { createGenerationBatchRetryContexts, createGenerationRetryContext, runGenerationOperationOnce } from "@/lib/canvas/canvas-project-generation";
-export { isGenerationTaskCancelled, runBackendGenerationTask, runBackendGenerationTaskBatch } from "@/services/api/generation-task";
+export { defaultGenerationTaskDependencies, isGenerationTaskCancelled, runBackendGenerationTask, runBackendGenerationTaskBatch } from "@/services/api/generation-task";
+export { createCreationEntryTaskCreator } from "@/services/creation-entry-task-creator";
 export { subscribeGenerationTasks } from "@/services/api/task-center";
 export { uploadMediaFile } from "@/services/file-storage";
 export { uploadImage } from "@/services/image-storage";

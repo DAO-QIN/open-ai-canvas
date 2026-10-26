@@ -74,6 +74,9 @@ func (s *Service) CompleteTextReplayTask(userID string, taskID string, text stri
 	if compactErr := s.finalizeTaskTextReplay(taskID, model.TaskStatusSucceeded); compactErr != nil {
 		_ = s.log(userID, taskID, "error", "文本回放窗口更新失败", compactErr.Error())
 	}
+	if syncErr := s.syncCreationEntriesForTask(userID, taskID); syncErr != nil {
+		_ = s.log(userID, taskID, "error", "首页生成记录回写失败", syncErr.Error())
+	}
 	return s.repo.TaskForUser(userID, taskID)
 }
 

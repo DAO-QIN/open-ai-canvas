@@ -219,6 +219,11 @@ func (r *Repository) ResourceReferenceSnapshotExcludingAssets(userID string, exc
 	for _, run := range runs {
 		snapshot.Documents = append(snapshot.Documents, ResourceReferenceDocument{Kind: "创作会话", ID: run.ID, Title: "智能创作", PrimaryJSON: run.StateJSON, SecondaryJSON: run.ApprovedOperationsJSON})
 	}
+	entryDocuments, err := r.CreationEntryReferenceDocuments(userID, resourceIDs)
+	if err != nil {
+		return snapshot, err
+	}
+	snapshot.Documents = append(snapshot.Documents, entryDocuments...)
 	var submissions []model.CreationSubmission
 	if err := r.db.Where("user_id = ? AND revoked_at IS NULL", userID).Find(&submissions).Error; err != nil {
 		return snapshot, err

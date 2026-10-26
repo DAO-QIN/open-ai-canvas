@@ -239,9 +239,12 @@ func validateCloudAgentRuntime(run *model.CloudAgentExecution, state *cloudAgent
 		return errors.New("Agent runtime active task is not in task history")
 	}
 	if state.MediaTaskID != "" {
-		if !cloudAgentContainsString(state.TaskIDs, state.MediaTaskID) || state.CallIndex >= len(state.Calls) || (state.Calls[state.CallIndex].Function.Name != "generate_media" && state.Calls[state.CallIndex].Function.Name != "image_layer_split") {
+		if !cloudAgentContainsString(state.TaskIDs, state.MediaTaskID) || state.CallIndex >= len(state.Calls) || !cloudAgentMediaTool(state.Calls[state.CallIndex].Function.Name) {
 			return errors.New("Agent runtime media task is not attached to current call")
 		}
+	}
+	if state.CreationEntryID != "" && (state.MediaTaskID == "" || state.Calls[state.CallIndex].Function.Name != cloudAgentCreationMediaToolName) {
+		return errors.New("Agent runtime creation entry is not attached to current media task")
 	}
 	if state.AutoPreparedMedia != nil {
 		if state.AutoPreparedCallHash == "" || state.CallIndex < 0 || state.CallIndex >= len(state.Calls) {
@@ -516,6 +519,10 @@ func cloudAgentSave(run *model.CloudAgentExecution, state *cloudAgentRuntime) er
 		return cloudAgentCheckpointFailure("state size", fmt.Errorf("Agent 状态超过 512KB 上限（%d bytes）", len(raw)))
 	}
 	run.CanvasID, run.ActiveTaskID, run.MediaTaskID = state.Request.CanvasID, state.ActiveTaskID, state.MediaTaskID
+	run.Target, run.CreationSessionID = model.CloudAgentTargetCanvas, state.Request.CreationSessionID
+	if state.Request.CreationSessionID != "" {
+		run.Target = model.CloudAgentTargetCreation
+	}
 	run.ParentID = state.ParentID
 	if run.Title == "" {
 		run.Title = truncateRunes(state.Request.Prompt, 80)

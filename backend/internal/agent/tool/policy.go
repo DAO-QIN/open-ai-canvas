@@ -54,6 +54,10 @@ type Policy struct {
 	RequiresCanvas    bool
 	RequiresSkills    bool
 	RequiresWriteMode bool
+	// RequiresCreation 只在首页创作会话中可见；CreationAllowed 让不依赖画布内容的
+	// RequiresCanvas 工具（如 model_list）在首页会话里同样可见。
+	RequiresCreation bool
+	CreationAllowed  bool
 	// OutsideTransaction performs storage IO before the checkpoint transaction.
 	OutsideTransaction bool
 }
@@ -61,6 +65,7 @@ type Policy struct {
 // Scope contains server-derived capabilities for this run, never model claims.
 type Scope struct {
 	Canvas         bool
+	Creation       bool
 	Skills         bool
 	Vision         bool
 	ReadOnly       bool
@@ -69,7 +74,8 @@ type Scope struct {
 
 func (p Policy) Allowed(scope Scope) bool {
 	return p.Name != "" &&
-		(!p.RequiresCanvas || scope.Canvas) &&
+		(!p.RequiresCanvas || scope.Canvas || (p.CreationAllowed && scope.Creation)) &&
+		(!p.RequiresCreation || scope.Creation) &&
 		(!p.RequiresSkills || scope.Skills) &&
 		(!p.Vision || scope.Vision) &&
 		(!p.Write() && !p.RequiresWriteMode || !scope.ReadOnly) &&
@@ -124,6 +130,9 @@ const (
 	CanvasApplyOps         = "canvas_apply_ops"
 	CanvasArrangeNodes     = "canvas_arrange_nodes"
 	GenerateMedia          = "generate_media"
+	// 首页创作会话工具：产出生成记录，不读写画布。
+	CreationReadEntries   = "creation_read_entries"
+	CreationGenerateMedia = "creation_generate_media"
 )
 
 var offsets = []string{"offset", "connectionOffset", "storyboardOffset"}
@@ -166,7 +175,7 @@ func policies() []Policy {
 		{Name: RecallLessons, Kind: KindRead},
 		{Name: RememberLesson, Kind: KindControl, RequiresWriteMode: true},
 		{Name: ImageLayerSplit, Kind: KindMedia, RequiresCanvas: true},
-		{Name: ModelList, Kind: KindRead, Cacheable: true, RequiresCanvas: true, RequiresWriteMode: true, OutsideTransaction: true},
+		{Name: ModelList, Kind: KindRead, Cacheable: true, RequiresCanvas: true, CreationAllowed: true, RequiresWriteMode: true, OutsideTransaction: true},
 		{Name: CanvasCreateStoryboard, Kind: KindWrite, RequiresCanvas: true},
 		{Name: CanvasEditStoryboard, Kind: KindWrite, RequiresCanvas: true},
 		{Name: CanvasCreateCharacter, Kind: KindWrite, RequiresCanvas: true},
@@ -174,6 +183,8 @@ func policies() []Policy {
 		{Name: CanvasApplyOps, Kind: KindWrite, RequiresCanvas: true},
 		{Name: CanvasArrangeNodes, Kind: KindWrite, RequiresCanvas: true},
 		{Name: GenerateMedia, Kind: KindMedia, RequiresCanvas: true},
+		{Name: CreationReadEntries, Kind: KindRead, RequiresCreation: true},
+		{Name: CreationGenerateMedia, Kind: KindMedia, RequiresCreation: true},
 	}
 }
 

@@ -129,6 +129,10 @@ func compileCloudAgentPolicies(req CloudAgentRequest, agentName string, skills [
 		},
 		"maxToolCalls": cloudAgentMaxToolCalls, "maxOutputBytes": cloudAgentMaxOutputBytes,
 	}
+	if req.CreationSessionID != "" {
+		// 产出目标是稳定事实（整轮不变），会话内容只走动态事实帧。
+		context["target"] = "creation"
+	}
 	if strings.TrimSpace(canvasSummary) != "" {
 		// Callers may provide a catalog for policy-contract tests or other
 		// isolated compilation paths. The production run path deliberately

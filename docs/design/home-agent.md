@@ -258,12 +258,20 @@
 
 | 方法与路径 | 请求 | 响应与说明 |
 | --- | --- | --- |
-| `GET /api/creation/sessions/:id/entries?before=&limit=` | `limit` 默认 20 | `{entries, nextBefore}`；不返回总数 |
-| `POST /api/creation/sessions/:id/entries` | `{clientOperationId, type, prompt, config, references, count}` | 普通模式提交；同 `clientOperationId` 返回原记录 |
-| `POST /api/creation/entries/:id/retry` | `{clientOperationId, failedOnly}` | 用原参数重试，生成新记录并填 `retryOf` |
+| `GET /api/creation/sessions/:id/entries?before=&limit=` | `limit` 默认 20 | `{entries, nextBefore}`；不返回总数；未结束的记录先按任务状态校准 |
+| `POST /api/creation/sessions/:id/entries` | `{clientOperationId, type, prompt, config, references, tasks}` | 普通模式提交；`tasks` 是 1–4 个与 `POST /api/tasks` 相同的任务输入，每项一个槽位；同 `clientOperationId` 返回原记录并只补建缺失槽位 |
+| `GET /api/creation/entries/:id` | | 单条记录 |
+| `POST /api/creation/entries/:id/retry` | 无 | 把失败或已取消槽位的原任务重新排队（沿用 `POST /api/tasks/:id/retry`），记录回到进行中，不新建记录 |
 | `POST /api/creation/entries/:id/clear-failed` | | 隐藏失败槽位，不删任务和账务 |
 
-任务提交复用现有生成任务和计费逻辑。
+实现要点（PR2）：
+
+- **不在服务端重新组装供应商请求。** 客户端仍按现有方式准备任务输入（协议参数、参考上传、计费字段），服务端逐个交给 `CreateTask`，模型路由、能力校验、额度和计费都沿用任务入口。
+- **防重复扣费。** 任务创建本身没有服务端幂等。每个槽位的任务 ID 由服务端从 `(用户, 记录, 槽位)` 推导（`CreateTaskRequest` 的内部字段 `fixedTaskID`，客户端无法指定）；重试同一操作时先按该 ID 查任务，已存在就复用；并发撞主键时建任务与预扣积分的事务整体回滚，再复用先到者。文本回放任务同样使用该 ID。
+- **准入失败。** 某槽位建任务失败（如积分不足）时记录为没有 `taskId` 的失败槽位；所有槽位都失败时接口返回第一个准入错误，记录保留为失败。同一操作重放不再尝试这些槽位，需要客户端以新操作重新提交。
+- **回写。** 任务终态协调器在所有终态路径上同步引用该任务的记录，结算或退款后再同步一次扣费；文本回放完成也会同步。未经过协调器的路径（如直接取消排队任务）由读取时校准兜底。
+- **扣费汇总。** `creditsMicrocredits` 汇总关联计费单：已结算取实际金额，已退款扣除退款，其余取预扣金额。
+- **素材引用。** 生成记录的参考与结果纳入资源引用汇总，未删除会话中的记录会阻止素材删除，占用来源显示为“首页创作记录”。
 
 ### 6.3 Agent（会话级）
 
@@ -360,9 +368,9 @@ data:{"id":"<itemId>","seq":12,"position":10,"type":"output","turnId":"<runId>",
 | --- | --- | --- |
 | `plan_update`、`ask_user` | 是 | `ask_user` 选项增加稳定 `id` |
 | `skill_search`、`recall_lessons`、`remember_lesson`、`model_list` | 是 | 不变 |
-| `generate_media`（首页变体） | 是 | 不要求 `snapshotHash`，不写画布；参数 `type, prompt, model, params, count, references`；只产生方案 |
+| `creation_generate_media`（首页版 `generate_media`） | 是 | 独立工具名，不改画布版契约；不要求 `snapshotHash`，不写画布；参数 `mode, prompt, title, 模型选择, 规格, references[{entryId,slot}|{resourceId}]`；每次一个方案、一个结果 |
 | `creation_read_entries` | 新增 | 分页读本会话生成记录摘要 |
-| `creation_inspect_result` | 新增，需视觉能力 | 按“记录 ID + 槽位”读真实图片，复用 `canvas_inspect_image` 的图片准备 |
+| `creation_inspect_result` | 新增，需视觉能力；推迟到 PR7 | 按“记录 ID + 槽位”读真实图片，复用 `canvas_inspect_image` 的图片准备 |
 | `canvas_*`、`previs_*`、`image_layer_split`、`image_annotation_render` | 否 | |
 | `compose_video` | 阶段 4 | |
 | `web_search`、`web_fetch` | 阶段 4 | 出站经 `internal/outbound` 的 SSRF 校验 |
@@ -392,6 +400,22 @@ data:{"id":"<itemId>","seq":12,"position":10,"type":"output","turnId":"<runId>",
 | 生成失败 | 继续一轮说明失败并给出选项，不自动重新提交收费生成 |
 
 每次自动继续写一条 `activity`（如“生成完成，继续下一步”），随后该轮的 `usage` 会显示本轮文本积分。会话设置里提供“生成完成后自动继续”开关，默认开。
+
+### 8.3.1 PR4 实现说明
+
+- 运行：`CloudAgentRequest.creationSessionId`（与 `canvasId` 互斥）、`autoContinue`（省略为开）。运行行写 `target=creation` 与 `creation_session_id`。同一会话同时只允许一轮，占用随运行结束自愈（下一轮创建时发现占用者已结束即释放）。续轮的 parent 必须属于同一会话。
+- 生成：方案先做不收费准入与报价，进入审批（预览 `kind=creation_generation`）。批准后在同一事务里创建任务与 `origin=agent` 的生成记录（`proposal_id` = 审批 ID，`client_operation_id` = `agent:<审批 ID>`，记录 ID 由用户和审批 ID 推导），任一失败整体回滚。任务终态由任务协调器回写记录，Agent 只把记录的槽位结果作为工具结果交给模型。
+- 拒绝：本轮结束且不产生任务或记录，方案在运行状态 `creationProposals` 里记为 `reject`，续轮继承（未决定的记为 `expired`）。“全部拒绝时继续一轮”随 PR6 的决定接口实现。
+- 事实帧：每次模型请求末尾附一条 `kind=creation_facts` 的运行状态消息，含最近 8 条生成记录（槽位、资源 ID、尺寸、失败原因）与方案决定；只用于本次请求，不写回对话历史。
+- 自动继续：关闭时生成完成即结束本轮；开启时失败续跑一轮说明原因，成功只在计划还有 `pending` 步骤时续跑，否则直接结束本轮（不额外花一次模型调用）。
+- 系统提示词：`agent-system-policy.md` v19 增加“首页创作会话”一节；执行上下文在首页会话里带 `target: "creation"`。
+
+### 8.3.2 PR5–PR7 实现说明
+
+- 公开事件：仓储层在追加运行日志的同一事务里回调整理器（`repository.CloudAgentJournalAppended`），把 `target=creation` 运行的内部事件整理成 §7.2 的公开事件。方案卡、结果卡等同一条内容的每个版本都是完整内容，快照只取最新版本。
+- 流式正文不落库：事件流每秒检查一次，把当前步骤的草稿正文作为 `event:live` 帧附带。
+- 方案决定：`decision` 转调画布审批决定；`expectedCreditsMicrocredits` 与当前报价不符时 `409 quote_changed`。方案卡编辑提示词、数量和实时报价（原 PR6 的其余部分）尚未实现，审批时可改模型和规格。
+- 首页界面：Agent 模式下首页切换为 Agent 工作区（时间线、计划浮条、选择题、方案卡、结果卡、用量行、停止），复用画布 Agent 的正文、计划与选择题组件；右下角的画布助手入口在首页 Agent 模式下隐藏。
 
 ### 8.4 预算
 
@@ -426,6 +450,14 @@ data:{"id":"<itemId>","seq":12,"position":10,"type":"output","turnId":"<runId>",
 - 断线重连：间隔 2 秒起、指数退避至 30 秒；页面隐藏时断开，可见时重连。
 - `requestId`：对 `{sessionId, text, references, skillIds(排序)}` 做 SHA-256 指纹，存 `sessionStorage`（键含用户与会话），相同指纹复用；成功后删除。服务端同样按 `requestId` 去重。
 - 本地历史导入：首次进入时后台调用导入接口；失败不阻塞，保留本地副本。
+
+普通模式接入（PR3，已实现）：
+
+- 生成流程只替换建任务这一步：`createCreationEntryTaskCreator` 收齐一次生成的全部任务输入后提交一条生成记录，再按槽位把服务端建好的任务交还；参考上传、流式文本、等待、结果物化和重试上下文不变。生成记录的 `config` 保存模型、参数和已上传附件的展示信息，`references` 只放已上传的资源。
+- 会话列表以服务端为准，浏览器 localforage 只做缓存；打开服务端会话时读取它的生成记录，与缓存消息合并（按 `entryId`、`clientOperationId` 或导入键 `import:<会话>:<消息ID>` 对上，本地正在生成的消息保留本地版本）。
+- 本地新会话 ID 带 `local:` 前缀，第一次提交时才在服务端创建会话并换成服务端 ID，地址随之变为 `/create/:id?mode=`。
+- 打开 `/create` 时从空白会话开始（原先会自动打开最近一次的会话），历史会话从抽屉或 `/create/:id` 进入；会话不存在时提示并回到 `/create`。
+- 重试失败消息时调用 `clear-failed` 隐藏旧的失败记录，刷新或换设备后不再出现。
 
 ## 10. 计费与安全
 

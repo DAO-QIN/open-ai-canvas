@@ -3,6 +3,7 @@ package repository
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -325,7 +326,7 @@ func (r *Repository) CreationEntryLinksForTask(taskID string) ([]model.CreationE
 }
 
 // MutateCreationEntry 以修订号做乐观并发：读取记录、交给 fn 修改、按原修订号写回。
-// 只写回可变字段（状态、结果、隐藏失败）；修订号已变化时返回 ErrCreationConflict，调用方重读后重试。
+// 只写回可变字段（状态、结果、隐藏失败、扣费汇总）；修订号已变化时返回 ErrCreationConflict，调用方重读后重试。
 func (r *Repository) MutateCreationEntry(userID, id string, fn func(*model.CreationEntry) error) (*model.CreationEntry, error) {
 	entry, err := r.CreationEntry(userID, id)
 	if err != nil {
@@ -339,11 +340,12 @@ func (r *Repository) MutateCreationEntry(userID, id string, fn func(*model.Creat
 	result := r.db.Model(&model.CreationEntry{}).
 		Where("id = ? AND user_id = ? AND revision = ?", id, userID, revision).
 		UpdateColumns(map[string]any{
-			"status":        entry.Status,
-			"results_json":  entry.ResultsJSON,
-			"hidden_failed": entry.HiddenFailed,
-			"revision":      revision + 1,
-			"updated_at":    now,
+			"status":               entry.Status,
+			"results_json":         entry.ResultsJSON,
+			"hidden_failed":        entry.HiddenFailed,
+			"credits_microcredits": entry.CreditsMicrocredits,
+			"revision":             revision + 1,
+			"updated_at":           now,
 		})
 	if result.Error != nil {
 		return nil, result.Error
@@ -528,4 +530,98 @@ func (r *Repository) PruneCreationAgentEventVersions(userID, sessionID string, o
 	result := r.db.Where("session_id = ? AND user_id = ? AND created_at < ? AND seq NOT IN (?)", sessionID, userID, olderThan, latest).
 		Delete(&model.CreationAgentEvent{})
 	return result.RowsAffected, result.Error
+}
+
+// AddCreationEntryTask 关联生成记录槽位与任务；同一关联已存在时视为成功。
+func (r *Repository) AddCreationEntryTask(link model.CreationEntryTask) error {
+	if link.EntryID == "" || link.TaskID == "" || link.UserID == "" {
+		return errors.New("生成记录关联缺少记录、任务或用户")
+	}
+	var count int64
+	if err := r.db.Model(&model.CreationEntryTask{}).Where("entry_id = ? AND task_id = ?", link.EntryID, link.TaskID).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	if err := r.db.Create(&link).Error; err != nil {
+		// 并发写入同一关联时，后到者撞主键；确认已存在即可。
+		if countErr := r.db.Model(&model.CreationEntryTask{}).Where("entry_id = ? AND task_id = ?", link.EntryID, link.TaskID).Count(&count).Error; countErr == nil && count > 0 {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// CreationEntryReferenceDocuments 返回未删除会话中提到任一资源 ID 的生成记录，供资源删除前的引用检查。
+func (r *Repository) CreationEntryReferenceDocuments(userID string, resourceIDs []string) ([]ResourceReferenceDocument, error) {
+	documents := []ResourceReferenceDocument{}
+	if len(resourceIDs) == 0 {
+		return documents, nil
+	}
+	query := r.db.Table("creation_entries AS e").
+		Select("e.id, e.prompt, e.references_json, e.results_json").
+		Joins("JOIN creation_sessions AS s ON s.id = e.session_id AND s.user_id = e.user_id").
+		Where("e.user_id = ? AND s.deleted_at IS NULL", userID)
+	if len(resourceIDs) <= 100 {
+		conditions := make([]string, 0, len(resourceIDs))
+		args := make([]any, 0, len(resourceIDs)*2)
+		for _, resourceID := range resourceIDs {
+			conditions = append(conditions, "e.references_json LIKE ? OR e.results_json LIKE ?")
+			args = append(args, "%"+resourceID+"%", "%"+resourceID+"%")
+		}
+		query = query.Where(strings.Join(conditions, " OR "), args...)
+	}
+	var rows []struct {
+		ID             string
+		Prompt         string
+		ReferencesJSON string
+		ResultsJSON    string
+	}
+	if err := query.Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		documents = append(documents, ResourceReferenceDocument{Kind: "首页创作记录", ID: row.ID, Title: row.Prompt, PrimaryJSON: row.ReferencesJSON, SecondaryJSON: row.ResultsJSON})
+	}
+	return documents, nil
+}
+
+// SetCreationSessionActivity 把会话最近活动时间改回指定值，供导入历史时保留原有排序。
+func (r *Repository) SetCreationSessionActivity(userID, id string, at time.Time) error {
+	return r.db.Model(&model.CreationSession{}).
+		Where("id = ? AND user_id = ? AND deleted_at IS NULL", id, userID).
+		UpdateColumn("updated_at", at).Error
+}
+
+// LatestCreationAgentItem 返回某条公开内容的最新版本；不存在时返回 nil。
+func (r *Repository) LatestCreationAgentItem(userID, sessionID, itemID string) (*model.CreationAgentEvent, error) {
+	var event model.CreationAgentEvent
+	err := r.db.Where("session_id = ? AND user_id = ? AND item_id = ?", sessionID, userID, itemID).Order("seq DESC").First(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &event, nil
+}
+
+// CreationAgentRequestEvent 返回同一会话内带该 requestId 的公开事件；不存在时返回 nil。
+func (r *Repository) CreationAgentRequestEvent(sessionID, requestID string) (*model.CreationAgentEvent, error) {
+	return findCreationAgentRequest(r.db, sessionID, []CreationAgentEventInput{{RequestID: requestID}})
+}
+
+// LatestCreationAgentItemForRun 返回某轮次某类型最新的公开事件；不存在时返回 nil。
+func (r *Repository) LatestCreationAgentItemForRun(userID, sessionID, runID, eventType string) (*model.CreationAgentEvent, error) {
+	var event model.CreationAgentEvent
+	err := r.db.Where("session_id = ? AND user_id = ? AND run_id = ? AND type = ?", sessionID, userID, runID, eventType).Order("seq DESC").First(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &event, nil
 }

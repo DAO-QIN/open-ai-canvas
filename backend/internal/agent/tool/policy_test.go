@@ -14,6 +14,9 @@ var (
 	legacyCanvasRev  = []string{"canvas_get_state", "canvas_read_text", "canvas_read_storyboard", "previs_scene_read"}
 	legacyOffsetNorm = []string{"skill_read_file", "canvas_get_state", "canvas_read_text", "canvas_read_storyboard", "canvas_read_batch_table"}
 	legacyMedia      = []string{"generate_media", "image_layer_split"}
+	// 首页创作会话新增的工具（迁移后登记，不在旧分类表里）。
+	creationWrite    = []string{"creation_generate_media"}
+	creationReadOnly = []string{"creation_read_entries"}
 )
 
 func pick(pred func(Policy) bool) []string {
@@ -38,13 +41,13 @@ func TestRegistryMatchesLegacyClassification(t *testing.T) {
 		want []string
 		pred func(Policy) bool
 	}{
-		{"write", legacyWrite, Policy.Write},
+		{"write", append(legacyWrite, creationWrite...), Policy.Write},
 		{"cacheable", legacyCacheable, func(p Policy) bool { return p.Cacheable }},
-		{"readOnly", legacyReadOnly, Policy.ReadOnly},
+		{"readOnly", append(legacyReadOnly, creationReadOnly...), Policy.ReadOnly},
 		{"canvasRevision", legacyCanvasRev, func(p Policy) bool { return p.CacheScope == CacheCanvasRevision }},
 		{"offsetDefaults", legacyOffsetNorm, func(p Policy) bool { return len(p.OffsetDefaults) > 0 }},
-		{"media", legacyMedia, Policy.Media},
-		{"lessonEligible", legacyWrite, Policy.LessonEligible},
+		{"media", append(legacyMedia, creationWrite...), Policy.Media},
+		{"lessonEligible", append(legacyWrite, creationWrite...), Policy.LessonEligible},
 	}
 	for _, tc := range cases {
 		if got := pick(tc.pred); !reflect.DeepEqual(got, sorted(tc.want)) {

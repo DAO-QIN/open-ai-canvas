@@ -69,6 +69,14 @@ func (s *Service) cloudAgentModelIntent(userID, canvasID, arguments string) (*Mo
 	if !cloudAgentGenerationModeSupported(a.Mode) || len(a.ReferenceNodeIDs) > 16 {
 		return nil, BadAuthRequest("请指定支持的生成模式，参考节点最多16个")
 	}
+	if canvasID == "" {
+		// 首页会话没有画布节点：按模式查询，参考由生成工具在准入时再校验类型。
+		if len(a.ReferenceNodeIDs) > 0 {
+			return nil, BadAuthRequest("首页会话没有画布节点，referenceNodeIds 请传 []")
+		}
+		intent := ModelRequestIntentFromTaskInput(map[string]any{"mode": a.Mode}, "canvas_"+a.Mode, cloudAgentMediaOperation(a.Mode, map[string]any{}))
+		return &intent, nil
+	}
 	canvas, err := s.repo.CanvasProjectForUser(userID, canvasID)
 	if err != nil {
 		return nil, err

@@ -456,6 +456,15 @@ func (s *Service) advanceCloudAgentTool(run *model.CloudAgentExecution, state *c
 	allowed := cloudAgentToolAllowed(state.Request, call.Function.Name)
 	binding, _ := cloudAgentRegistry().Lookup(call.Function.Name)
 	toolPolicy := agenttool.Of(call.Function.Name)
+	// 首页会话的生成方案走独立管线：审批与计费同画布版，产出生成记录而不是画布节点。
+	if allowed && call.Function.Name == cloudAgentCreationMediaToolName {
+		if state.Approval == nil {
+			return s.requestCreationAgentMediaApproval(run, state, call)
+		}
+		if state.Approval.Decision == "approve" {
+			return s.advanceCreationAgentMedia(run, state, call)
+		}
+	}
 	// 媒体工具在所有模式下都进入审批；其他写入只在 request_approval 下审批。
 	if allowed && toolPolicy.ApprovalRequired(state.Request.PermissionMode) && state.Approval == nil {
 		var plan *cloudAgentMediaPlan

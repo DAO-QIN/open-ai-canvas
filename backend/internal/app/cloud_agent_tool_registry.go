@@ -19,6 +19,8 @@ const (
 	cloudAgentToolDirect cloudAgentToolPipeline = iota
 	cloudAgentToolVision
 	cloudAgentToolMedia
+	// cloudAgentToolCreationMedia 是首页会话的媒体生成：审批与计费沿用媒体准入，产出生成记录。
+	cloudAgentToolCreationMedia
 )
 
 type cloudAgentToolHandler struct {
@@ -74,7 +76,7 @@ func buildCloudAgentRegistry() *agenttool.Registry[cloudAgentToolHandler] {
 
 func cloudAgentToolScope(req CloudAgentRequest, profile bool) agenttool.Scope {
 	return agenttool.Scope{
-		Canvas: len(req.ContextScope) > 0, Skills: len(req.SkillIDs) > 0,
+		Canvas: len(req.ContextScope) > 0, Creation: req.CreationSessionID != "", Skills: len(req.SkillIDs) > 0,
 		Vision: req.VisionEnabled, ReadOnly: req.PermissionMode == "read_only", IncludeProfile: profile,
 	}
 }

@@ -18355,6 +18355,37 @@ html:not(.dark) .creation-history-drawer-root {
     color: var(--creation-history-muted);
     font-size: var(--fs-label);
 }
+.creation-history-more-footer {
+    display: grid;
+    gap: 8px;
+    justify-items: center;
+    padding: 12px 0 4px;
+}
+.creation-history-more-footer small {
+    color: var(--creation-history-muted);
+    font-size: var(--fs-label);
+}
+.creation-history-load-more {
+    min-height: 32px;
+    padding: 0 16px;
+    border: 1px solid var(--creation-history-line);
+    border-radius: 999px;
+    background: var(--creation-history-surface);
+    color: var(--creation-history-text);
+    font-size: var(--fs-label);
+    cursor: pointer;
+}
+.creation-history-load-more:hover:not(:disabled) {
+    background: var(--creation-history-hover);
+}
+.creation-history-load-more:disabled {
+    color: var(--creation-history-muted);
+    cursor: default;
+}
+.creation-history-load-more:focus-visible {
+    outline: 2px solid var(--creation-history-accent);
+    outline-offset: 2px;
+}
 .creation-history-menu-overlay .ant-dropdown-menu {
     border-radius: var(--r-md);
     padding: 4px;

@@ -145,6 +145,9 @@ func (s *Service) CreateTask(userID string, req CreateTaskRequest) (*model.Task,
 		workbenchKind = workbenchKindFromTaskInput(normalizedInput, taskType)
 	}
 	task := model.Task{ID: newID(), UserID: userID, TraceID: req.TraceID, RequestID: req.RequestID, ProjectID: req.ProjectID, Type: taskType, WorkbenchKind: workbenchKind, Status: model.TaskStatusQueued, Stage: "等待队列调度", Progress: 5, Prompt: prompt, Operation: req.Operation, Provider: req.Provider, Model: req.Model}
+	if req.fixedTaskID != "" {
+		task.ID = req.fixedTaskID
+	}
 	if req.admission != nil {
 		task.ID = req.admission.ID
 		task.AgentRunID = req.admission.AgentRunID
@@ -411,6 +414,9 @@ func (s *Service) createTextReplayTask(userID string, req CreateTaskRequest, nor
 		ID: newID(), UserID: userID, TraceID: req.TraceID, RequestID: req.RequestID, ProjectID: req.ProjectID,
 		Type: taskType, Status: model.TaskStatusTextReplay, Stage: "文本持久化（前端自管）", Progress: 5,
 		Prompt: prompt, Operation: req.Operation, Provider: req.Provider, Model: strings.TrimSpace(req.Model),
+	}
+	if req.fixedTaskID != "" {
+		task.ID = req.fixedTaskID
 	}
 	if err := s.protectTaskSecrets(normalizedInput); err != nil {
 		return nil, err

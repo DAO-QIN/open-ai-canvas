@@ -25,9 +25,14 @@ const cloudAgentOperation = "cloud_agent"
 // turns reference the previous run, not a mutable in-memory conversation. This
 // reuses transactional billing, worker leases, cancellation and text replay.
 type CloudAgentRequest struct {
-	ReasoningMode         string   `json:"reasoningMode,omitempty"`
-	ProfileRevision       string   `json:"profileRevision,omitempty"`
-	CanvasID              string   `json:"canvasId"`
+	ReasoningMode   string `json:"reasoningMode,omitempty"`
+	ProfileRevision string `json:"profileRevision,omitempty"`
+	CanvasID        string `json:"canvasId"`
+	// CreationSessionID 绑定首页创作会话（与 CanvasID 互斥）：生成产出生成记录而不是画布节点。
+	CreationSessionID string `json:"creationSessionId,omitempty"`
+	// AutoContinue 控制首页会话在生成完成后是否自动续跑；省略 = 开启。
+	// 开启时也只在计划仍有未完成项且生成成功时续跑，见 cloudAgentCreationShouldContinue。
+	AutoContinue          *bool    `json:"autoContinue,omitempty"`
 	Prompt                string   `json:"prompt"`
 	Model                 string   `json:"model,omitempty"`
 	LogicalModelID        string   `json:"logicalModelId,omitempty"`
@@ -64,18 +69,19 @@ func cloudAgentStepLimit(req CloudAgentRequest) int {
 }
 
 type cloudAgentState struct {
-	Version                        int                       `json:"version"`
-	Request                        CloudAgentRequest         `json:"request"`
-	ParentID                       string                    `json:"parentId"`
-	Fingerprint                    string                    `json:"fingerprint"`
-	CreativeAnchor                 cloudAgentCreativeAnchor  `json:"creativeAnchor,omitempty"`
-	Plan                           []cloudAgentPlanItem      `json:"plan,omitempty"`
-	ConfirmationRounds             int                       `json:"confirmationRounds,omitempty"`
-	ConfirmationFingerprints       []string                  `json:"confirmationFingerprints,omitempty"`
-	PendingConfirmationFingerprint string                    `json:"pendingConfirmationFingerprint,omitempty"`
-	Skills                         []cloudAgentSkill         `json:"skills,omitempty"`
-	Profile                        cloudAgentProfileSnapshot `json:"profile"`
-	Policy                         cloudAgentPolicySnapshot  `json:"policy"`
+	Version                        int                          `json:"version"`
+	Request                        CloudAgentRequest            `json:"request"`
+	ParentID                       string                       `json:"parentId"`
+	Fingerprint                    string                       `json:"fingerprint"`
+	CreativeAnchor                 cloudAgentCreativeAnchor     `json:"creativeAnchor,omitempty"`
+	Plan                           []cloudAgentPlanItem         `json:"plan,omitempty"`
+	ConfirmationRounds             int                          `json:"confirmationRounds,omitempty"`
+	ConfirmationFingerprints       []string                     `json:"confirmationFingerprints,omitempty"`
+	PendingConfirmationFingerprint string                       `json:"pendingConfirmationFingerprint,omitempty"`
+	CreationProposals              []cloudAgentCreationProposal `json:"creationProposals,omitempty"`
+	Skills                         []cloudAgentSkill            `json:"skills,omitempty"`
+	Profile                        cloudAgentProfileSnapshot    `json:"profile"`
+	Policy                         cloudAgentPolicySnapshot     `json:"policy"`
 }
 
 type CloudAgentRun struct {
@@ -128,6 +134,16 @@ func validateCloudAgentRequest(req *CloudAgentRequest) error {
 		if err := validateCloudAgentID(req.CanvasID, "画布 ID", 80); err != nil {
 			return err
 		}
+	}
+	if req.CreationSessionID != "" {
+		if err := validateCloudAgentID(req.CreationSessionID, "创作会话 ID", creationIDLimit); err != nil {
+			return err
+		}
+		if req.CanvasID != "" {
+			return BadAuthRequest("首页创作会话与画布不能同时绑定")
+		}
+	} else if req.AutoContinue != nil {
+		return BadAuthRequest("自动继续仅适用于首页创作会话")
 	}
 	if err := validateCloudAgentPrompt(req.Prompt, 16000); err != nil {
 		return err
@@ -370,6 +386,11 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 			return nil, err
 		}
 	}
+	if req.CreationSessionID != "" {
+		if _, err := s.creationSessionForUser(userID, req.CreationSessionID); err != nil {
+			return nil, err
+		}
+	}
 	// Resolve and freeze the effective preference document before idempotency
 	// lookup. A retry without an explicit revision must still refer to the same
 	// immutable input; a changed profile therefore cannot silently create a
@@ -404,6 +425,7 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 	var inheritedPlan []cloudAgentPlanItem
 	inheritedConfirmationRounds := 0
 	var inheritedConfirmationFingerprints []string
+	var inheritedProposals []cloudAgentCreationProposal
 	if parentID != "" {
 		parent, _, parentErr := s.cloudAgentTask(userID, parentID)
 		if parentErr != nil {
@@ -435,7 +457,12 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 		if err != nil {
 			return nil, WrapAppError(409, "上一轮 Agent 历史记录不完整，无法继续对话；请新建对话", err)
 		}
+		// 首页会话的对话就是会话本身：续轮不能跨会话，也不能在画布对话和首页会话之间切换。
+		if parentState.Request.CreationSessionID != req.CreationSessionID {
+			return nil, kernel.NewAppError(409, "上一轮不属于当前创作会话，请在原会话中继续")
+		}
 		inheritedPlan = parentState.Plan
+		inheritedProposals = cloudAgentInheritedCreationProposals(parentState.CreationProposals)
 		if parentRun.Status == "completed" && parentState.PendingConfirmationFingerprint != "" {
 			inheritedConfirmationRounds = parentState.ConfirmationRounds
 			inheritedConfirmationFingerprints = append([]string(nil), parentState.ConfirmationFingerprints...)
@@ -509,7 +536,7 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 	if err != nil {
 		return nil, err
 	}
-	state := cloudAgentState{Version: 1, Request: req, ParentID: parentID, Fingerprint: fingerprint, CreativeAnchor: creativeAnchor, Plan: inheritedPlan, ConfirmationRounds: inheritedConfirmationRounds, ConfirmationFingerprints: inheritedConfirmationFingerprints, Skills: skillSnapshots, Profile: profile, Policy: policy}
+	state := cloudAgentState{Version: 1, Request: req, ParentID: parentID, Fingerprint: fingerprint, CreativeAnchor: creativeAnchor, Plan: inheritedPlan, ConfirmationRounds: inheritedConfirmationRounds, ConfirmationFingerprints: inheritedConfirmationFingerprints, CreationProposals: inheritedProposals, Skills: skillSnapshots, Profile: profile, Policy: policy}
 	canonical := cloudAgentCanonicalFor(system, history, req.Prompt, req, len(profile.Layers) > 0)
 	// Keep the catalog out of TextHistory (which defines conversation turns),
 	// while exposing it as a fresh data message for this run immediately before
@@ -534,8 +561,19 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 			input["piSessionJSONL"] = session.SessionJSONL
 		}
 	}
+	if req.CreationSessionID != "" {
+		// 同一会话同一时刻只跑一轮；占用随运行结束自愈（见 claimCreationSessionRun）。
+		if err := s.claimCreationSessionRun(userID, req.CreationSessionID, id); err != nil {
+			return nil, err
+		}
+	}
 	task, err := s.CreateTask(userID, CreateTaskRequest{ProjectID: req.CanvasID, Type: "canvas_text", Operation: cloudAgentOperation, Prompt: req.Prompt, Model: req.Model, LogicalModelID: req.LogicalModelID, Input: input,
 		admission: &taskAdmission{ID: id, MaxCharge: int64(math.Floor(req.Budget.MaxCredits * float64(CreditScale))), NonBillable: true}})
+	if err != nil && req.CreationSessionID != "" {
+		if _, lookupErr := s.repo.TaskForUser(userID, id); lookupErr != nil {
+			_ = s.repo.ReleaseCreationSessionRun(userID, req.CreationSessionID, id)
+		}
+	}
 	if err != nil {
 		// A concurrent identical request may have won the transaction. Never
 		// replace its result or reserve credits a second time.

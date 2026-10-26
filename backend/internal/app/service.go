@@ -118,6 +118,8 @@ type CreateTaskRequest struct {
 	creationPrepare *creationTaskPreparation
 	admission       *taskAdmission
 	workbenchKind   string
+	// fixedTaskID 由服务端为生成记录槽位推导，靠主键防止重试重复建任务和扣费；不接受客户端传入。
+	fixedTaskID string
 	// callerHoldsStorageMu 只给已经持有 Service.storageMu 的内部调用设置。
 	// 文件容量检查不能再锁一次，否则审批改参数会自锁。
 	callerHoldsStorageMu bool

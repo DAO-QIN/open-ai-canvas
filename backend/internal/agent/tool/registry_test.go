@@ -107,3 +107,26 @@ func TestScopeAndApprovalDoNotGrantMediaInReadOnlyMode(t *testing.T) {
 		t.Fatal("vision unavailable but inspection exposed")
 	}
 }
+
+func TestCreationScopeExposesOnlyCreationAndCanvasFreeTools(t *testing.T) {
+	creation := Scope{Creation: true, IncludeProfile: true}
+	for _, name := range []string{CreationGenerateMedia, CreationReadEntries, ModelList, PlanUpdate, AskUser, TaskGet} {
+		if !Of(name).Allowed(creation) {
+			t.Errorf("%s hidden in creation scope", name)
+		}
+	}
+	for _, name := range []string{GenerateMedia, CanvasGetState, CanvasApplyOps, ImageLayerSplit, CanvasInspectImage} {
+		if Of(name).Allowed(creation) {
+			t.Errorf("canvas tool %s exposed in creation scope", name)
+		}
+	}
+	canvas := Scope{Canvas: true, IncludeProfile: true}
+	for _, name := range []string{CreationGenerateMedia, CreationReadEntries} {
+		if Of(name).Allowed(canvas) || Of(name).Allowed(Scope{IncludeProfile: true}) {
+			t.Errorf("creation tool %s exposed outside creation scope", name)
+		}
+	}
+	if Of(CreationGenerateMedia).Allowed(Scope{Creation: true, ReadOnly: true}) {
+		t.Fatal("creation media allowed in read_only")
+	}
+}

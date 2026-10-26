@@ -22,6 +22,12 @@ type taskTerminalCoordinator struct {
 	outputs           taskOutputLifecycle
 	userFacingMessage func(error) string
 	logFailedAttempt  func(model.Task, error)
+	creationEntries   taskCreationEntrySync
+}
+
+// taskCreationEntrySync 在任务进入终态后回写首页生成记录；为 nil 时跳过（读取时仍会校准）。
+type taskCreationEntrySync interface {
+	syncCreationEntriesForTask(userID, taskID string) error
 }
 
 type taskTerminalRepository interface {
@@ -73,6 +79,7 @@ func newTaskTerminalCoordinator(s *Service) *taskTerminalCoordinator {
 		outputs:           s,
 		userFacingMessage: s.UserFacingErrorMessage,
 		logFailedAttempt:  s.ensureFailedProviderAttemptLogged,
+		creationEntries:   s,
 	}
 }
 
@@ -103,6 +110,7 @@ func (c *taskTerminalCoordinator) markPreparationFailure(task *model.Task, stage
 	} else {
 		billingErr = c.billing.RefundBilling(task.BillingOrderID, refundReason)
 	}
+	c.syncCreationEntries(task)
 	if billingErr != nil {
 		return errors.Join(err, fmt.Errorf("任务计费收尾失败：%w", billingErr))
 	}
@@ -165,6 +173,8 @@ func (c *taskTerminalCoordinator) handleExecutionFailure(task *model.Task, err e
 	} else {
 		billingErr = c.billing.RefundBilling(task.BillingOrderID, task.Error)
 	}
+	// 退款后再同步一次，让生成记录的扣费反映退款。
+	c.syncCreationEntries(task)
 	_ = c.logger.log(task.UserID, task.ID, "error", "任务处理失败", task.Error)
 	resultErr := err
 	if billingErr != nil {
@@ -284,6 +294,8 @@ func (c *taskTerminalCoordinator) handleSuccess(task *model.Task) error {
 			completionErr = errors.Join(completionErr, fmt.Errorf("记录计费待核对状态失败：%w", uncertainErr))
 		}
 	}
+	// 结算后再同步一次，让生成记录的扣费反映实际结算金额。
+	c.syncCreationEntries(task)
 	_ = c.logger.log(task.UserID, task.ID, "info", "任务完成，结果已持久化", "")
 	return completionErr
 }
@@ -308,8 +320,20 @@ func (c *taskTerminalCoordinator) markTerminalState(task *model.Task) error {
 	return nil
 }
 
+// finalizeReplay 在除准备失败外的每条终态路径上调用，顺带回写首页生成记录；
+// 结算或退款在它之后发生的路径会再同步一次。
 func (c *taskTerminalCoordinator) finalizeReplay(task *model.Task, status model.TaskStatus, message string) {
 	if err := c.replay.finalizeTaskTextReplay(task.ID, status); err != nil {
 		_ = c.logger.log(task.UserID, task.ID, "error", message, err.Error())
+	}
+	c.syncCreationEntries(task)
+}
+
+func (c *taskTerminalCoordinator) syncCreationEntries(task *model.Task) {
+	if c.creationEntries == nil || task == nil || task.ID == "" {
+		return
+	}
+	if err := c.creationEntries.syncCreationEntriesForTask(task.UserID, task.ID); err != nil {
+		_ = c.logger.log(task.UserID, task.ID, "error", "首页生成记录回写失败", err.Error())
 	}
 }

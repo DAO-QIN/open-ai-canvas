@@ -296,6 +296,26 @@ func cloudAgentAllToolSchemas() []map[string]any {
 		"snapshotHash": str("可省略；执行器取当前快照"), "nodeId": str("续用草稿时填真实ID；新建可省略，由执行器生成稳定ID"), "title": str("可省略；草稿保留原名，新节点使用默认名"), "sourceNodeId": str("文本/镜头提示词节点ID"), "referenceNodeIds": map[string]any{"type": "array", "maxItems": 16, "items": str("真实媒体参考ID，按引用顺序；无参考传[]")}, "referenceTransientIds": map[string]any{"type": "array", "maxItems": 4, "items": str("标注工具返回的临时参考ID")},
 	}, "mode", "prompt", "referenceNodeIds")
 	cloudAgentDeclareMediaModelSelection(tools[len(tools)-1], true)
+	add("creation_read_entries", "读取本首页会话的生成记录（新到旧）：每条含 entryId、类型、提示词摘要、状态和各槽位结果。参考已有作品时用这里的 entryId 和 slot，不猜ID。", map[string]any{
+		"before": str("上一页返回的 nextBefore；首页省略"),
+		"limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": creationAgentReadEntriesLimit},
+	})
+	add("creation_generate_media", "首页生成方案：给出完整提示词和真实参考，执行器解析模型默认、报价并请用户审批，批准后生成一条记录并等待结果。每次调用一个方案、一个结果。用户拒绝过的方案不要原样再提。已提交失败不得自动重提或换模型。", map[string]any{
+		"mode": map[string]any{"type": "string", "enum": cloudAgentGenerationModeNames()}, "prompt": str("完整提示词；参考按各类型分别编号 @图片1/@视频1/@音频1"),
+		"title":          str("方案名称，可省略"),
+		"logicalModelId": str("selection.logicalModelId；与channelId/channelModelKey互斥"), "channelId": str("selection.channelId"), "channelModelKey": str("selection.channelModelKey"),
+		"durationSeconds": map[string]any{"type": "integer", "minimum": 0}, "size": str(cloudAgentMediaSizeDescription), "imageResolution": str("model_list 档位；未启用时省略"), "quality": str("按本回合 model_list 返回的 image.quality 或 video.resolutions 取值"), "videoGenerateAudio": map[string]any{"type": "boolean", "description": "是否生成音频，仅视频可用"},
+		"references": map[string]any{"type": "array", "maxItems": creationReferenceLimit, "description": "按引用顺序；无参考传[]", "items": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"entryId":    str("creation_read_entries 或事实帧中的生成记录ID"),
+				"slot":       map[string]any{"type": "integer", "minimum": 0, "description": "该记录的结果槽位"},
+				"resourceId": str("用户附件的资源ID"),
+			},
+			"additionalProperties": false,
+		}},
+	}, "mode", "prompt", "references")
+	cloudAgentDeclareMediaModelSelection(tools[len(tools)-1], true)
 	return tools
 }
 
