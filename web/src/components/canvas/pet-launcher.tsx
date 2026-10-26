@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, Maximize2, Minus } from "lucide-react";
+import { FluidOrb } from "@/components/ui/fluid-orb";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
 import { effectivePet, petAvatarSize, petStatusPosition } from "@/lib/canvas/pet-menu";
@@ -32,6 +33,22 @@ export function AgentLauncher({
     petState?: SpriteRunState;
 }) {
     const { base, catalog, scope, store, preference, available, modelId, appearance: current, resolved } = usePetAppearance();
+    const [collapsed, setCollapsed] = useState(() => {
+        try {
+            return localStorage.getItem("canvas:agent-launcher-collapsed:v1") === "1";
+        } catch {
+            return false;
+        }
+    });
+    const toggleCollapsed = () => {
+        setMenu(null);
+        setCollapsed(!collapsed);
+        try {
+            localStorage.setItem("canvas:agent-launcher-collapsed:v1", collapsed ? "0" : "1");
+        } catch {
+            /* The current session can still toggle without storage. */
+        }
+    };
     const mediaReduced = usePetReducedMotion(),
         motionReduced = mediaReduced || reducedMotion;
     const [previewScale, setPreviewScale] = useState<number | null>(null),
@@ -75,7 +92,7 @@ export function AgentLauncher({
         };
     }, [scope]);
     const requested = (base.avatarHeight * (previewScale ?? preference.scale)) / 100;
-    const height = Math.max(24, Math.min(requested, compact ? 72 : 360, viewport.height - 80, viewport.width - 40)),
+    const height = collapsed ? 48 : Math.max(24, Math.min(requested, compact ? 72 : 360, viewport.height - 80, viewport.width - 40)),
         width = height;
     const update = useCallback(
         (patch: Partial<typeof preference>) => {
@@ -128,7 +145,17 @@ export function AgentLauncher({
                 aria-haspopup="dialog"
                 title="点击对话 · 拖动移动 · 右键设置"
                 className={`canvas-agent-launcher pet-personal-launcher canvas-agent-launcher-live2d fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${dragging ? "is-dragging" : ""}`}
-                style={{ ...launcherPosition, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, "--canvas-pet-inset": `${current.avatarType === "orb" ? (height - petAvatarSize(current, height).height) / 2 : 0}px`, ...(launcherHidden ? { display: "none" } : null) } as CSSProperties & Record<`--${string}`, string>}
+                style={
+                    {
+                        ...launcherPosition,
+                        width,
+                        height,
+                        color: theme.node.text,
+                        "--canvas-agent-launcher-shadow": theme.spatial.shadow,
+                        "--canvas-pet-inset": `${current.avatarType === "orb" ? (height - petAvatarSize(current, height).height) / 2 : 0}px`,
+                        ...(launcherHidden ? { display: "none" } : null),
+                    } as CSSProperties & Record<`--${string}`, string>
+                }
                 aria-hidden={launcherHidden || undefined}
                 tabIndex={launcherHidden ? -1 : undefined}
                 data-canvas-no-zoom
@@ -195,19 +222,38 @@ export function AgentLauncher({
                 onDoubleClick={handlers.onDoubleClick}
                 transition={{ duration: motionReduced ? 0 : 0.16 }}
             >
-                <PetAppearanceTransition appearance={current} resolved={resolved} reducedMotion={motionReduced || launcherHidden}>
-                {resolved ? (
-                    <PetAvatar appearance={current} height={height} paused={launcherHidden} reducedMotion={motionReduced} state={petState} moveDirection={moveDirection} />
-                ) : (
-                    <span role="status" aria-busy="true">
-                        <LoaderCircle className="size-6 motion-safe:animate-spin" aria-hidden />
-                        <span className="sr-only">正在加载助手形象</span>
+                {collapsed ? <FluidOrb size={32} /> : null}
+                <span style={{ display: collapsed ? "none" : "contents" }}>
+                    <PetAppearanceTransition appearance={current} resolved={resolved} reducedMotion={motionReduced || launcherHidden || collapsed}>
+                        {resolved ? (
+                            <PetAvatar appearance={current} height={height} paused={launcherHidden || collapsed} reducedMotion={motionReduced} state={petState} moveDirection={moveDirection} />
+                        ) : (
+                            <span role="status" aria-busy="true">
+                                <LoaderCircle className="size-6 motion-safe:animate-spin" aria-hidden />
+                                <span className="sr-only">正在加载助手形象</span>
+                            </span>
+                        )}
+                    </PetAppearanceTransition>
+                </span>
+                {base.launcherLabel || approvalPending ? (
+                    <span className={`canvas-agent-launcher-label ${approvalPending ? "is-pending" : ""}`} title={approvalPending ? "待审批" : base.launcherLabel}>
+                        {approvalPending ? "待审批" : base.launcherLabel}
                     </span>
-                )}
-                </PetAppearanceTransition>
-                {base.launcherLabel || approvalPending ? <span className={`canvas-agent-launcher-label ${approvalPending ? "is-pending" : ""}`} title={approvalPending ? "待审批" : base.launcherLabel}>{approvalPending ? "待审批" : base.launcherLabel}</span> : null}
+                ) : null}
                 <span aria-hidden="true" className={`canvas-agent-launcher-status ${approvalPending ? "is-pending" : ""}`} style={{ ...petStatusPosition(current, height), "--canvas-agent-status-color": statusColor } as CSSProperties} />
             </motion.button>
+            {!launcherHidden ? (
+                <button
+                    type="button"
+                    className="canvas-agent-launcher-toggle fixed z-[calc(var(--z-toast)+2)]"
+                    style={{ right: launcherPosition.right + width - 22, bottom: `calc(${typeof launcherPosition.bottom === "number" ? `${launcherPosition.bottom}px` : launcherPosition.bottom} + ${height - 22}px)` }}
+                    aria-label={collapsed ? "展开助手形象" : "收起助手形象"}
+                    title={collapsed ? "展开形象" : "收起为小圆球"}
+                    onClick={toggleCollapsed}
+                >
+                    {collapsed ? <Maximize2 className="size-3" /> : <Minus className="size-3" />}
+                </button>
+            ) : null}
             {prepared && candidate ? (
                 <div className="pet-prepare-layer" aria-hidden>
                     <PetAvatar
@@ -232,24 +278,24 @@ export function AgentLauncher({
                 </div>
             ) : null}
             <AnimatePresence>
-            {menu ? (
-                <PetRadialMenu
-                    key="pet-menu"
-                    reducedMotion={motionReduced}
-                    anchor={new DOMRect(viewport.width-position.right-width,viewport.height-position.bottom-height,width,height)}
-                    catalog={catalog}
-                    preference={{ ...preference, modelId }}
-                    onChange={update}
-                    onSelect={choose}
-                    onClose={closeMenu}
-                    onPreviewScale={setPreviewScale}
-                    error={switchError || store.error || (!available ? "原形象已下架，已跟随系统" : "")}
-                    saving={store.saving}
-                    onRetry={() => void store.retry()}
-                    busy={candidate !== null}
-                    loading={store.loading || store.scope !== scope}
-                />
-            ) : null}
+                {menu ? (
+                    <PetRadialMenu
+                        key="pet-menu"
+                        reducedMotion={motionReduced}
+                        anchor={new DOMRect(viewport.width - position.right - width, viewport.height - position.bottom - height, width, height)}
+                        catalog={catalog}
+                        preference={{ ...preference, modelId }}
+                        onChange={update}
+                        onSelect={choose}
+                        onClose={closeMenu}
+                        onPreviewScale={setPreviewScale}
+                        error={switchError || store.error || (!available ? "原形象已下架，已跟随系统" : "")}
+                        saving={store.saving}
+                        onRetry={() => void store.retry()}
+                        busy={candidate !== null}
+                        loading={store.loading || store.scope !== scope}
+                    />
+                ) : null}
             </AnimatePresence>
         </>
     );

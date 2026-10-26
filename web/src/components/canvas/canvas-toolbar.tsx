@@ -195,7 +195,7 @@ export function CanvasToolbar({
         onNodeUpload: () => {},
         onNodeDownload: () => {},
         onNodeSaveAsset: () => {},
-        onNodeMaskEdit: () => {},
+        onNodeRegionEdit: () => {},
         onNodeImageEdit: () => {},
         onNodeRemoveBackground: () => {},
         onNodeEmotion: () => {},
@@ -272,7 +272,7 @@ export function CanvasToolbar({
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.97, transition: { duration: 0 } }}
                             transition={{ duration: aceternityMotion.duration.instant, ease: aceternityMotion.easing.enter }}
-                            className="aceternity-floating-panel flex flex-col overflow-hidden rounded-[var(--panel-radius)] border p-2.5 backdrop-blur-2xl"
+                            className="aceternity-floating-panel flex flex-col overflow-hidden rounded-[var(--panel-radius)] border p-2 backdrop-blur-2xl"
                             contentClassName="relative z-[1] min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain thin-scrollbar"
                             data-canvas-wheel-scroll
                             style={{ maxHeight: "calc(100dvh - var(--canvas-inset-y) - var(--canvas-dock-popover-offset) - 12px)", background: theme.spatial.elevated, borderColor: theme.toolbar.border, color: theme.toolbar.item }}
@@ -288,8 +288,8 @@ export function CanvasToolbar({
                                 onSaveAppearanceDefault={onSaveAppearanceDefault}
                                 onBackgroundModeChange={onBackgroundModeChange}
                             />
-                            <div className="mt-2.5 flex items-center justify-between gap-2 rounded-[var(--dock-item-radius-labeled)] border px-2.5 py-2" style={{ background: theme.spatial.surface, borderColor: theme.toolbar.border }}>
-                                <span className="inline-flex min-w-0 items-center gap-1.5 text-[var(--fs-caption)] font-semibold">
+                            <div className="mt-2 flex items-center justify-between gap-2 rounded-[var(--dock-item-radius-labeled)] border px-2 py-2" style={{ background: theme.spatial.surface, borderColor: theme.toolbar.border }}>
+                                <span className="inline-flex min-w-0 items-center gap-2 text-[var(--fs-caption)] font-semibold">
                                     <Info className="size-3" />
                                     媒体信息
                                 </span>

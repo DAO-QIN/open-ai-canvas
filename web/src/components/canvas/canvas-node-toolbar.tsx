@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { App, Button, Input, Modal, Tag, Tooltip } from "antd";
+import { App, Button, Input, Modal, Tag } from "antd";
+import { AntTooltip as Tooltip } from "@/components/ui/base/tooltip/ant-tooltip";
 import { CanvasAnchoredDropdown as Dropdown } from "./canvas-anchored-dropdown";
 import type { MenuProps } from "antd";
-import { Camera, Check, ChevronDown, ChevronRight, Ellipsis, Grid3x3, Images, Plus, SlidersHorizontal, UserRound } from "lucide-react";
+import { Camera, Check, ChevronDown, ChevronRight, Ellipsis, Grid3x3, Palette, Plus, SlidersHorizontal, Wrench } from "lucide-react";
 
 import { canvasDockStyle } from "@/lib/canvas/canvas-aceternity-style";
 import { avoidCanvasNodePanels, canvasNodePanelBounds, canvasOverlayBounds, canvasToolbarLayoutLevel, observeCanvasOverlayBounds, subscribeCanvasNodePanelBounds } from "@/lib/canvas/canvas-overlay-layout";
@@ -42,7 +43,7 @@ type CanvasNodeToolbarProps = {
     onUpload: (node: CanvasNodeData) => void;
     onDownload: (node: CanvasNodeData) => void;
     onSaveAsset: (node: CanvasNodeData) => void;
-    onMaskEdit: (node: CanvasNodeData) => void;
+    onRegionEdit: (node: CanvasNodeData) => void;
     onRemoveBackground: (node: CanvasNodeData) => void;
     onLayerDecomposition: (node: CanvasNodeData) => void;
     onEmotion: (node: CanvasNodeData) => void;
@@ -65,6 +66,7 @@ type CanvasNodeToolbarProps = {
     onEnhanceVideo?: (node: CanvasNodeData) => void;
     onSubtitles: (node: CanvasNodeData) => void;
     onTimeline: (node: CanvasNodeData) => void;
+    onVersions?: (node: CanvasNodeData) => void;
     extractingVideoFrames: boolean;
     extractingAudio: boolean;
     trimmingVideo: boolean;
@@ -113,7 +115,7 @@ export function CanvasNodeToolbar({
     onUpload,
     onDownload,
     onSaveAsset,
-    onMaskEdit,
+    onRegionEdit,
     onRemoveBackground,
     onLayerDecomposition,
     onEmotion,
@@ -136,6 +138,7 @@ export function CanvasNodeToolbar({
     onEnhanceVideo,
     onSubtitles,
     onTimeline,
+    onVersions,
     extractingVideoFrames,
     extractingAudio,
     trimmingVideo,
@@ -282,7 +285,7 @@ export function CanvasNodeToolbar({
         onAnnotate,
         onAnnotationEdit,
         onTextEdit,
-        onMaskEdit,
+        onRegionEdit,
         onRemoveBackground,
         onLayerDecomposition,
         onEmotion,
@@ -302,13 +305,41 @@ export function CanvasNodeToolbar({
 
     // 构建 ToolContext——供注册表解析工具
     const nodeHoverHandlers = {
-        onNodeInfo: onInfo, onNodeDelete: onDelete, onNodeRetry: onRetry, onNodeEditText: onEditText, onNodeDecreaseFont: onDecreaseFont, onNodeIncreaseFont: onIncreaseFont,
-        onNodeToggleDialog: onToggleDialog, onNodeAnnotate: onAnnotate, onNodeGenerateImage: onGenerateImage, onNodeUpload: onUpload, onNodeDownload: onDownload,
-        onNodeSaveAsset: onSaveAsset, onNodeMaskEdit: onMaskEdit, onNodeRemoveBackground: onRemoveBackground, onNodeEmotion: onEmotion, onNodePortraitTexture: onPortraitTexture, onNodeCrop: onCrop,
-        onNodeCreateEditCopy: onCreateEditCopy, onNodeRotateImage: onRotateImage,
-        onNodeSplit: (target) => onSplit(target, { rows: 2, columns: 2 }), onNodeUpscale: onUpscale, onNodeSuperResolve: onSuperResolve, onNodeAngle: onAngle, onNodeViewImage: onViewImage,
-        onNodeExtractVideoFrames: onExtractVideoFrames, onNodeExtractAudioFromVideo: onExtractAudioFromVideo, onNodeTrimVideoSegments: onTrimVideoSegments, onNodeEnhanceVideo: onEnhanceVideo, onNodeReversePrompt: onReversePrompt, onNodeToggleFreeResize: onToggleFreeResize,
-        onNodeSubtitles: onSubtitles, onNodeTimeline: onTimeline, onNodeToggleLocked: onToggleLocked, onNodeCopyPrompt: copyImagePrompt,
+        onNodeInfo: onInfo,
+        onNodeDelete: onDelete,
+        onNodeRetry: onRetry,
+        onNodeEditText: onEditText,
+        onNodeDecreaseFont: onDecreaseFont,
+        onNodeIncreaseFont: onIncreaseFont,
+        onNodeToggleDialog: onToggleDialog,
+        onNodeAnnotate: onAnnotate,
+        onNodeGenerateImage: onGenerateImage,
+        onNodeUpload: onUpload,
+        onNodeDownload: onDownload,
+        onNodeSaveAsset: onSaveAsset,
+        onNodeRegionEdit: onRegionEdit,
+        onNodeRemoveBackground: onRemoveBackground,
+        onNodeEmotion: onEmotion,
+        onNodePortraitTexture: onPortraitTexture,
+        onNodeCrop: onCrop,
+        onNodeCreateEditCopy: onCreateEditCopy,
+        onNodeRotateImage: onRotateImage,
+        onNodeSplit: (target) => onSplit(target, { rows: 2, columns: 2 }),
+        onNodeUpscale: onUpscale,
+        onNodeSuperResolve: onSuperResolve,
+        onNodeAngle: onAngle,
+        onNodeViewImage: onViewImage,
+        onNodeExtractVideoFrames: onExtractVideoFrames,
+        onNodeExtractAudioFromVideo: onExtractAudioFromVideo,
+        onNodeTrimVideoSegments: onTrimVideoSegments,
+        onNodeEnhanceVideo: onEnhanceVideo,
+        onNodeReversePrompt: onReversePrompt,
+        onNodeToggleFreeResize: onToggleFreeResize,
+        onNodeSubtitles: onSubtitles,
+        onNodeTimeline: onTimeline,
+        onNodeVersions: onVersions,
+        onNodeToggleLocked: onToggleLocked,
+        onNodeCopyPrompt: copyImagePrompt,
     } as Partial<ToolbarHandlers> as ToolbarHandlers;
 
     const nodeHoverCtx: ToolContext = {
@@ -357,15 +388,15 @@ export function CanvasNodeToolbar({
     const inGroup = (group: NodeToolbarGroup) => allTools.filter((tool) => tool.group === group).sort(compareToolbarTools);
     const primary = inGroup("primary");
     const primaryTools = narrow ? primary.filter((tool, index) => index === 0 || tool.id === "rotateClockwise" || tool.id === "rotateCounterclockwise") : primary;
-    const portraitTools = compact ? [] : inGroup("portrait");
-    const viewpointLightingTools = compact ? [] : [...inGroup("viewpoint"), ...inGroup("lighting")];
-    const panoramaTools = compact ? [] : inGroup("panorama");
-    const processTools = compact ? [...inGroup("portrait"), ...inGroup("viewpoint"), ...inGroup("lighting"), ...inGroup("panorama"), ...inGroup("process")] : inGroup("process");
-    const nineGridTools = compact ? [] : inGroup("nine_grid");
+    // 紧凑档把画面调整、镜头、宫格与设定并入同一个「工具」菜单，按 section 分组，不丢入口。
+    const adjustTools = compact ? [] : inGroup("adjust");
+    const cameraTools = compact ? [] : inGroup("camera");
+    const sheetTools = compact ? [] : inGroup("sheet");
+    const processTools = compact ? [...inGroup("adjust"), ...inGroup("camera"), ...inGroup("sheet"), ...inGroup("process")] : inGroup("process");
     const workspaceTools = narrow ? [] : inGroup("workspace");
     const utilityTools = narrow ? [] : inGroup("utility");
     const moreTools = [...(narrow ? [...primary.filter((tool) => !primaryTools.includes(tool)), ...inGroup("workspace"), ...inGroup("utility")] : []), ...inGroup("more")];
-    const processMenuLabel = compact ? "工具" : isVideo ? "提取素材" : isImage ? "图片工具" : isAudio ? "音频处理" : "文本调整";
+    const processMenuLabel = compact ? "工具" : isVideo ? "视频工具" : isImage ? "图片工具" : isAudio ? "音频处理" : "文本调整";
     const handleMenuOpenChange = (menuId: string, open: boolean) => {
         setOpenMenuId((current) => (open ? menuId : current === menuId ? null : current));
         if (open) onKeep(node.id);
@@ -392,21 +423,25 @@ export function CanvasNodeToolbar({
                 if (!event.currentTarget.contains(event.relatedTarget) && !openMenuId) onLeave();
             }}
         >
-            <div role="toolbar" aria-label="节点快捷工具" className="flex h-11 max-w-full items-center gap-0.5 overflow-visible rounded-[var(--dock-radius-tight)] px-2 backdrop-blur-2xl" style={{ ...dockStyle, border: 0 }}>
+            <div
+                role="toolbar"
+                aria-label="节点快捷工具"
+                className="canvas-node-toolbar-dock flex h-11 max-w-full items-center gap-0.5 overflow-visible rounded-[var(--dock-radius-tight)] border px-2 backdrop-blur-2xl"
+                style={{ ...dockStyle, borderColor: "color-mix(in srgb, currentColor 8%, transparent)" }}
+            >
                 {primaryTools.map((tool) => (
                     <NodeDockToolButton key={tool.id} tool={tool} iconOnly={narrow} />
                 ))}
-                {nineGridTools.length ? <NodeDockMenuButton menuId="nine-grid" label="九宫格" icon={<Grid3x3 className="size-3.5" />} tools={nineGridTools} openMenuId={openMenuId} onOpenChange={handleMenuOpenChange} /> : null}
-                {panoramaTools.map((tool) => (
-                    <NodeDockToolButton key={tool.id} tool={tool} />
-                ))}
-                {portraitTools.length ? <NodeDockMenuButton menuId="portrait" label="人像调整" icon={<UserRound className="size-3.5" />} tools={portraitTools} openMenuId={openMenuId} onOpenChange={handleMenuOpenChange} /> : null}
-                {viewpointLightingTools.length ? <NodeDockMenuButton menuId="viewpoint-lighting" label="视角" icon={<Camera className="size-3.5" />} tools={viewpointLightingTools} openMenuId={openMenuId} onOpenChange={handleMenuOpenChange} /> : null}
+                {/* 直接编辑类（primary）与生成/调整菜单分组，长工具条更易扫读。 */}
+                {primaryTools.length > 0 && (adjustTools.length || cameraTools.length || sheetTools.length || processTools.length) ? <span aria-hidden className="aceternity-dock-separator mx-1 h-5 w-px shrink-0" /> : null}
+                {adjustTools.length ? <NodeDockMenuButton menuId="adjust" label="画面调整" icon={<Palette className="size-3.5" />} tools={adjustTools} openMenuId={openMenuId} onOpenChange={handleMenuOpenChange} /> : null}
+                {cameraTools.length ? <NodeDockMenuButton menuId="camera" label="镜头" icon={<Camera className="size-3.5" />} tools={cameraTools} openMenuId={openMenuId} onOpenChange={handleMenuOpenChange} /> : null}
+                {sheetTools.length ? <NodeDockMenuButton menuId="sheet" label="宫格与设定" icon={<Grid3x3 className="size-3.5" />} tools={sheetTools} openMenuId={openMenuId} onOpenChange={handleMenuOpenChange} /> : null}
                 {processTools.length ? (
                     <NodeDockMenuButton
                         menuId="process"
                         label={processMenuLabel}
-                        icon={isVideo ? <Images className="size-3.5" /> : <SlidersHorizontal className="size-3.5" />}
+                        icon={isVideo ? <Wrench className="size-3.5" /> : <SlidersHorizontal className="size-3.5" />}
                         tools={processTools}
                         openMenuId={openMenuId}
                         onOpenChange={handleMenuOpenChange}
@@ -431,17 +466,17 @@ function NodeDockToolButton({ tool, iconOnly = false }: { tool: ToolbarTool; ico
     return (
         // 默认 250px 宽度会把“名称：说明”折成两行，放宽到 360px 让常见说明单行显示。
         <Tooltip title={tool.description ? `${tool.label}：${tool.description}` : tool.label} styles={{ root: { maxWidth: 360 } }}>
-        <button
-            type="button"
-            className={`aceternity-dock-command is-labeled pointer-events-auto inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[var(--dock-item-radius)] px-2.5 outline-none ${tool.active ? "is-active" : ""} ${tool.danger ? "is-danger" : ""}`}
-            aria-label={tool.label}
-            aria-pressed={tool.active}
-            disabled={tool.disabled}
-            onClick={tool.onClick}
-        >
-            <span className="grid size-3.5 shrink-0 place-items-center">{tool.icon}</span>
-            {!iconOnly ? <span className="inline-flex h-4 items-center whitespace-nowrap text-[var(--fs-label)] font-medium leading-none">{tool.label}</span> : null}
-        </button>
+            <button
+                type="button"
+                className={`aceternity-dock-command is-labeled pointer-events-auto inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-[var(--dock-item-radius)] outline-none ${iconOnly ? "w-8 px-0" : "px-2"} ${tool.active ? "is-active" : ""} ${tool.danger ? "is-danger" : ""}`}
+                aria-label={tool.label}
+                aria-pressed={tool.active}
+                disabled={tool.disabled}
+                onClick={tool.onClick}
+            >
+                <span className="grid size-3.5 shrink-0 place-items-center">{tool.icon}</span>
+                {!iconOnly ? <span className="inline-flex h-4 items-center whitespace-nowrap text-[var(--fs-label)] font-medium leading-none">{tool.label}</span> : null}
+            </button>
         </Tooltip>
     );
 }
@@ -640,7 +675,7 @@ function NodeDockMenuButton({
             <button
                 ref={triggerRef}
                 type="button"
-                className={`aceternity-dock-command is-labeled pointer-events-auto inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[var(--dock-item-radius)] px-2.5 outline-none ${open ? "is-active" : ""}`}
+                className={`aceternity-dock-command is-labeled pointer-events-auto inline-flex h-8 shrink-0 items-center justify-center rounded-[var(--dock-item-radius)] outline-none ${iconOnly ? "w-8 gap-2 px-0" : "gap-1 pl-2 pr-2"}`}
                 aria-label={label}
                 aria-expanded={open}
                 aria-haspopup="menu"
@@ -660,8 +695,8 @@ function NodeDockMenuButton({
                 <span className="grid size-3.5 shrink-0 place-items-center">{icon}</span>
                 {!iconOnly ? (
                     <>
-                        <span className="inline-flex h-4 items-center whitespace-nowrap text-[var(--fs-label)] font-medium leading-none">{label}</span>
-                        <ChevronDown className="size-3 shrink-0 opacity-55" />
+                        <span className="ml-0.5 inline-flex h-4 items-center whitespace-nowrap text-[var(--fs-label)] font-medium leading-none">{label}</span>
+                        <ChevronDown className="canvas-node-toolbar-chevron size-3 shrink-0" aria-hidden />
                     </>
                 ) : null}
             </button>

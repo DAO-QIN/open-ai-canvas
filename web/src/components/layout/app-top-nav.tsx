@@ -8,9 +8,9 @@ import { WorkspaceSidebarNav } from "@/components/layout/workspace-sidebar-nav";
 import { readWorkspaceSidebarCollapsed, writeWorkspaceSidebarCollapsed } from "@/components/layout/workspace-sidebar-state";
 import { WorkspaceTopBar } from "@/components/layout/workspace-top-bar";
 import { WorkspaceTopBarExtensionProvider } from "@/components/layout/workspace-top-bar-extension";
+import { WorkspaceStorageLimitNotice } from "@/components/layout/workspace-storage-limit-notice";
 import { WorkspaceWalletHost } from "@/components/layout/workspace-wallet-modal";
 import { WorkspaceMobileNav } from "@/components/layout/workspace-mobile-nav";
-import { FloatingFeedbackWidget } from "@/components/feedback/floating-feedback-widget";
 import { cn } from "@/lib/utils";
 import { isSpatialWorkbenchPath } from "@/lib/workspace-routes";
 
@@ -173,8 +173,8 @@ export function AppWorkspaceShell({ children }: { children: ReactNode }) {
                 </div>
             </WorkspaceTopBarExtensionProvider>
             <WorkspaceWalletHost />
-            <ModelSetupGuide hidden={pathname.startsWith("/admin")} />
-            {!hideChrome ? <FloatingFeedbackWidget /> : null}
+            <WorkspaceStorageLimitNotice />
+            <ModelSetupGuide hidden={pathname === "/login" || pathname === "/register" || pathname.startsWith("/admin")} />
         </>
     );
 }

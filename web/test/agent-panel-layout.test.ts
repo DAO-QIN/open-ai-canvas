@@ -62,7 +62,7 @@ describe("Agent submission sync preflight contract", () => {
         expect(source).not.toContain("cloudNodeIds");
         expect(source).toMatch(/submitDisabled=\{\s*\(?otherAgentRunning/);
         expect(source).toContain("重新读取记录");
-        expect(source).toContain("requestSent = true;\n            const result = submission.parentRunId ? await sendAgentMessage");
+        expect(source).toMatch(/requestSent = true;\s*const result = submission\.parentRunId\s*\?\s*await sendAgentMessage/);
         expect(source).toContain("agentSubmissionErrorTitle(cause, accepted, requestSent)");
     });
 

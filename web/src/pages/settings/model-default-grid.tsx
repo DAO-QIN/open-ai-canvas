@@ -3,14 +3,7 @@ import { AudioLines, Check, Film, Image, MessageSquareText } from "lucide-react"
 import { ModelIcon } from "@/components/model-picker";
 import { cn } from "@/lib/utils";
 import { modelChannelLabel } from "@/lib/model-picker-groups";
-import {
-    filterModelsByCapability,
-    modelDisplayName,
-    modelOptionName,
-    resolveModelChannel,
-    type AiConfig,
-    type ModelCapability,
-} from "@/stores/use-config-store";
+import { filterModelsByCapability, modelDisplayName, modelOptionName, resolveModelChannel, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 type DefaultModelKey = "imageModel" | "videoModel" | "textModel" | "audioModel";
@@ -38,9 +31,13 @@ export function ModelDefaultGrid({ config, onChange }: { config: AiConfig; onCha
                 return (
                     <section key={group.capability} className="py-5 first:pt-0 last:pb-0" aria-labelledby={`default-${group.capability}-title`}>
                         <div className="mb-3 flex items-start gap-3">
-                            <span className="grid size-8 shrink-0 place-items-center rounded-md bg-surface-active text-foreground/65"><Icon className="size-4" /></span>
+                            <span className="grid size-8 shrink-0 place-items-center rounded-md bg-surface-active text-foreground/65">
+                                <Icon className="size-4" />
+                            </span>
                             <div className="min-w-0">
-                                <h3 id={`default-${group.capability}-title`} className="text-sm font-semibold">{group.title}</h3>
+                                <h3 id={`default-${group.capability}-title`} className="text-sm font-semibold">
+                                    {group.title}
+                                </h3>
                                 <p className="mt-0.5 text-xs text-foreground/48">{group.description}</p>
                             </div>
                             <span className="ml-auto shrink-0 text-xs tabular-nums text-foreground/38">{models.length} 个可用</span>
@@ -59,12 +56,12 @@ export function ModelDefaultGrid({ config, onChange }: { config: AiConfig; onCha
                                             role="radio"
                                             aria-checked={selected}
                                             className={cn(
-                                                "model-default-option group relative overflow-hidden rounded-md px-3 py-2.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+                                                "model-default-option group relative overflow-hidden rounded-md px-3 py-2 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
                                                 selected && "is-selected",
                                             )}
                                             onClick={() => onChange(group.modelKey, model)}
                                         >
-                                            <span className="flex min-w-0 items-start gap-2.5">
+                                            <span className="flex min-w-0 items-start gap-2">
                                                 <span className="model-default-option-icon grid size-8 shrink-0 place-items-center rounded-md">
                                                     <ModelIcon config={config} model={model} />
                                                 </span>
@@ -75,7 +72,12 @@ export function ModelDefaultGrid({ config, onChange }: { config: AiConfig; onCha
                                                     </span>
                                                     <span className="model-default-option-meta">
                                                         <span className="model-default-option-scope">{channel.scope === "system" ? "系统" : "自定义"}</span>
-                                                        {creditsEnabled && cost ? <span className="model-default-price">{formatPrice(cost.billingMode === "token" ? (cost.outputTokenPriceMicrocredits || 0) : cost.unitPriceMicrocredits)} /{cost.billingMode === "token" ? "百万 Token" : cost.billingMode === "per_second" ? "秒" : "次"}</span> : null}
+                                                        {creditsEnabled && cost ? (
+                                                            <span className="model-default-price">
+                                                                {formatPrice(cost.billingMode === "token" ? cost.outputTokenPriceMicrocredits || 0 : cost.unitPriceMicrocredits)} /
+                                                                {cost.billingMode === "token" ? "百万 Token" : cost.billingMode === "per_second" ? "秒" : "次"}
+                                                            </span>
+                                                        ) : null}
                                                     </span>
                                                 </span>
                                                 <span className={cn("model-default-option-check grid size-5 shrink-0 place-items-center rounded-full", selected ? "is-selected" : "text-transparent")}>

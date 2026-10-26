@@ -1,5 +1,6 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
-import { Button, Switch, Tooltip } from "antd";
+import { Button, Switch } from "antd";
+import { AntTooltip as Tooltip } from "@/components/ui/base/tooltip/ant-tooltip";
 import { Film, Image as ImageIcon, LoaderCircle, Maximize2, Minus, Play, Plus, Rows3, Trash2, Upload } from "lucide-react";
 
 import { CachedResourceImage } from "@/components/cached-resource-image";
@@ -278,7 +279,7 @@ export function CanvasBatchTableNodeContent({
                 <div data-canvas-batch-drag className="flex h-11 cursor-grab items-center gap-2 px-3 active:cursor-grabbing">
                     <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden" onPointerDown={(event) => event.stopPropagation()}>
                         <BatchChoiceGroup ariaLabel="批量任务类型" theme={theme} disabled={readOnly} options={OPERATION_OPTIONS} value={table.operation} onChange={(operation) => onPatchTable({ operation: operation as CanvasBatchOperation })} />
-                        <div className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2" style={{ background: theme.node.panel }}>
+                        <div className="flex h-8 shrink-0 items-center gap-2 rounded-lg px-2" style={{ background: theme.node.panel }}>
                             <span className="font-medium" style={{ color: theme.node.muted }}>
                                 并发
                             </span>
@@ -330,7 +331,7 @@ export function CanvasBatchTableNodeContent({
                         </span>
                     </div>
                     {!readOnly ? (
-                        <div className="ml-auto flex shrink-0 items-center gap-1.5" onPointerDown={(event) => event.stopPropagation()}>
+                        <div className="ml-auto flex shrink-0 items-center gap-2" onPointerDown={(event) => event.stopPropagation()}>
                             <Tooltip title="列端口已自动生效。用列图片重新填充手动修改过的格子，覆盖前需确认">
                                 <Button size="small" type="text" icon={<Rows3 className="size-3.5" />} onClick={onFillRows}>
                                     按列填充
@@ -347,7 +348,7 @@ export function CanvasBatchTableNodeContent({
                         </div>
                     ) : null}
                 </div>
-                <div className="flex h-[76px] flex-col gap-1.5 border-t px-3 py-2" style={{ borderColor: theme.node.stroke }} onPointerDown={(event) => event.stopPropagation()}>
+                <div className="flex h-[76px] flex-col gap-2 border-t px-3 py-2" style={{ borderColor: theme.node.stroke }} onPointerDown={(event) => event.stopPropagation()}>
                     <div className="flex items-center gap-2">
                         <label data-canvas-no-drag htmlFor={`batch-global-prompt-${node.id}`} className="shrink-0 text-sm font-semibold">
                             全局提示词
@@ -365,7 +366,7 @@ export function CanvasBatchTableNodeContent({
                         readOnly={readOnly}
                         placeholder="填写后，所有行统一使用这段提示词；清空后恢复使用各行原文"
                         aria-label="全局提示词"
-                        className="h-8 min-w-0 w-full rounded-md border px-2.5 text-sm outline-none focus-visible:ring-2"
+                        className="h-8 min-w-0 w-full rounded-md border px-2 text-sm outline-none focus-visible:ring-2"
                         style={{ background: inputSurface, borderColor: theme.node.stroke, color: theme.node.text }}
                         onChange={(event) => onPatchTable({ globalPrompt: event.target.value })}
                     />
@@ -386,7 +387,7 @@ export function CanvasBatchTableNodeContent({
             >
                 <div style={{ minWidth: 64 + referenceColumns.length * 88 + textColumns.length * 168 + 280 + 88 + 80 + 24 }}>
                     <div
-                        className="sticky top-0 z-10 grid items-center border-b px-3 text-center text-[11px] font-medium"
+                        className="sticky top-0 z-10 grid items-center border-b px-3 text-center text-[var(--fs-label)] font-medium"
                         style={{ height: BATCH_COLUMN_HEADER_HEIGHT, borderColor: theme.node.stroke, background: theme.node.panel, color: theme.node.muted, gridTemplateColumns }}
                     >
                         <span className="min-w-0 truncate px-1">任务</span>
@@ -575,7 +576,7 @@ const BatchTableRow = memo(
                 style={{ height: BATCH_ROW_HEIGHT, borderColor: theme.node.stroke, gridTemplateColumns, opacity: row.enabled ? 1 : 0.58 }}
             >
                 <div className="flex flex-col items-center justify-center gap-2">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                         {!readOnly ? <Switch size="small" checked={row.enabled} aria-label={`启用任务 ${index + 1}`} onChange={(enabled) => actions.current.onUpdateRow(row.id, { enabled })} /> : null}
                         <span className="tabular-nums" style={{ color: theme.node.muted }}>
                             {index + 1}
@@ -649,7 +650,7 @@ const BatchTableRow = memo(
                         onPointerDown={(event) => event.stopPropagation()}
                         onWheel={(event) => event.stopPropagation()}
                     />
-                    <div className="mt-1 flex h-5 items-center gap-2 px-0.5 text-[11px]" style={{ color: theme.node.muted }}>
+                    <div className="mt-1 flex h-5 items-center gap-2 px-0.5 text-[var(--fs-label)]" style={{ color: theme.node.muted }}>
                         <span className="min-w-0 flex-1 truncate" title={hasGlobalPrompt ? globalPrompt : undefined}>
                             {hasGlobalPrompt ? "本次生成使用全局提示词；本行原文保留" : readOnly ? "本次生成使用本行提示词" : "输入 @ 引用参考图 · Ctrl/⌘ + Enter 生成"}
                         </span>
@@ -669,7 +670,7 @@ const BatchTableRow = memo(
                         }}
                     />
                     {inputChanged ? (
-                        <span className="whitespace-nowrap text-[10px] font-medium" style={{ color: theme.node.text }} title="参考图或提示词已变更，当前显示的是原结果；需要手动重新生成">
+                        <span className="whitespace-nowrap text-[var(--fs-label)] font-medium" style={{ color: theme.node.text }} title="参考图或提示词已变更，当前显示的是原结果；需要手动重新生成">
                             输入已变更
                         </span>
                     ) : null}
@@ -736,7 +737,7 @@ function BatchChoiceGroup({
                         type="button"
                         aria-pressed={selected}
                         disabled={disabled}
-                        className={`rounded-md font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 disabled:cursor-not-allowed disabled:opacity-50 ${compact ? "min-w-7 px-1.5 py-1 text-[10px]" : "px-2.5 py-1.5 text-[11px]"}`}
+                        className={`rounded-md font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 disabled:cursor-not-allowed disabled:opacity-50 ${compact ? "min-w-7 px-2 py-1 text-[var(--fs-label)]" : "px-2 py-2 text-[var(--fs-label)]"}`}
                         style={{ background: selected ? theme.accent.primary : "transparent", color: selected ? theme.accent.onPrimary : theme.node.muted }}
                         onClick={() => onChange(option.value)}
                     >
@@ -822,7 +823,7 @@ function BatchReferenceHandle({
                 }}
             >
                 <span
-                    className="grid size-[18px] place-items-center rounded-full border text-[8px] font-semibold shadow-sm transition-transform duration-100 group-hover:scale-125 group-focus-visible:scale-125"
+                    className="grid size-[18px] place-items-center rounded-full border text-[var(--fs-label)] font-semibold shadow-sm transition-transform duration-150 group-hover:brightness-110 group-focus-visible:ring-2 group-focus-visible:ring-current"
                     style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${hovered ? 1.06 : 1})`, background: theme.node.panel, borderColor: theme.accent.primary, color: theme.accent.primary }}
                 >
                     {index + 1}
@@ -935,7 +936,7 @@ function ReferenceThumbnail({
                     ) : (
                         fallback
                     )}
-                    <span className="absolute bottom-1 left-1 rounded px-1 py-0.5 text-[8px] font-medium text-white" style={{ background: "rgba(0,0,0,.58)" }}>
+                    <span className="absolute bottom-1 left-1 rounded px-1 py-0.5 text-[var(--fs-label)] font-medium text-white" style={{ background: "rgba(0,0,0,.58)" }}>
                         {label}
                     </span>
                 </button>
@@ -1036,7 +1037,7 @@ function EmptyThumbnail({ theme, compact = false }: { theme: CanvasTheme; compac
             ) : (
                 <span className="flex flex-col items-center gap-0.5">
                     <Upload className="size-4" />
-                    <span className="text-[9px] leading-none">上传</span>
+                    <span className="text-[var(--fs-label)] leading-none">上传</span>
                 </span>
             )}
         </div>

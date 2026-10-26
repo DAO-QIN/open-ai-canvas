@@ -177,7 +177,7 @@ export function AssetBatchUploadModal({ open, defaultFolderId, folders, onClose,
                                             {item.file.name}
                                         </span>
                                         {item.status === "error" && item.error ? (
-                                            <span className="block truncate text-[11px] text-red-500" title={item.error}>
+                                            <span className="block truncate text-[var(--fs-label)] text-red-500" title={item.error}>
                                                 {item.error}
                                             </span>
                                         ) : null}

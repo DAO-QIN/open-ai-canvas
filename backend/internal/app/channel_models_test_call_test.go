@@ -43,7 +43,7 @@ func TestAdminVideoTestUsesDraftDefaultsAndStoresOwnedPreviewWithoutBilling(t *t
 	svc, db := newChannelModelTestService(t)
 	svc.dataDir = t.TempDir()
 	svc.coordinator = platform.NewCoordinatorWithRedis(nil, "video-preview-test")
-	if err := db.AutoMigrate(&model.SystemSetting{}, &model.UserOSSSetting{}, &model.StorageLocation{}, &model.UserDailyUploadUsage{}, &model.UserDailyActivity{}, &model.Resource{}, &model.UploadReservation{}, &model.BillingOrder{}, &model.ApiCallLog{}); err != nil {
+	if err := db.AutoMigrate(&model.SystemSetting{}, &model.UserOSSSetting{}, &model.StorageLocation{}, &model.UserStorageGrant{}, &model.UserStorageState{}, &model.UserDailyUploadUsage{}, &model.UserDailyActivity{}, &model.Resource{}, &model.UploadReservation{}, &model.BillingOrder{}, &model.ApiCallLog{}); err != nil {
 		t.Fatal(err)
 	}
 	admin := &model.User{ID: "preview-admin", Role: model.UserRoleAdmin}

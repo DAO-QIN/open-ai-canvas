@@ -6,7 +6,6 @@ import { AppWorkspaceShell } from "@/components/layout/app-top-nav";
 import { cn } from "@/lib/utils";
 import { isSpatialWorkbenchPath } from "@/lib/workspace-routes";
 import { getWorkspaceAntThemeConfig } from "@/lib/app-theme";
-import { useWorkspaceButtonFeedback } from "@/hooks/use-workspace-button-feedback";
 import { useUserStore } from "@/stores/use-user-store";
 import { useLoginModalStore } from "@/stores/use-login-modal-store";
 import "@/styles/workspace-product.css";
@@ -28,7 +27,6 @@ export default function UserLayout({ children }: { children: ReactNode }) {
     const loginModalRequested = useLoginModalStore((state) => state.open);
     const [loginModalMounted, setLoginModalMounted] = useState(false);
     if (loginModalRequested && !loginModalMounted) setLoginModalMounted(true);
-    useWorkspaceButtonFeedback(productWorkspace);
 
     useLayoutEffect(() => {
         // Ant Design 浮层挂载在 body，必须用路由级标记隔离用户工作台与画布编辑器、运营后台。

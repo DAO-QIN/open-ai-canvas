@@ -51,7 +51,7 @@ export function CanvasAppearanceControls({
     const resetCustom = () => selectPreset(draft.preset?.values.baseTheme === values.baseTheme ? draft.preset.id : values.baseTheme);
 
     return (
-        <div className="mt-2.5 space-y-2.5 text-[var(--fs-caption)]">
+        <div className="mt-2 space-y-2 text-[var(--fs-caption)]">
             <div className="grid grid-cols-3 gap-1 rounded-[var(--dock-item-radius)] border p-1" role="group" aria-label="画布主题模式" style={{ background: theme.spatial.surface, borderColor: theme.toolbar.border }}>
                 {(
                     [
@@ -90,8 +90,8 @@ export function CanvasAppearanceControls({
                 </button>
             </div>
             {customExpanded ? (
-                <div id={customId} className="space-y-2.5 rounded-[var(--dock-item-radius)] border p-2" role="region" aria-label="自定义配色" style={{ borderColor: theme.toolbar.border }}>
-                    <div className="grid grid-cols-4 gap-1.5" role="group" aria-label={`${values.baseTheme === "light" ? "浅色" : "深色"}配色预设`}>
+                <div id={customId} className="space-y-2 rounded-[var(--dock-item-radius)] border p-2" role="region" aria-label="自定义配色" style={{ borderColor: theme.toolbar.border }}>
+                    <div className="grid grid-cols-4 gap-2" role="group" aria-label={`${values.baseTheme === "light" ? "浅色" : "深色"}配色预设`}>
                         {presets.map((preset) => {
                             const palette = canvasThemes[preset.values.baseTheme];
                             return (
@@ -100,7 +100,7 @@ export function CanvasAppearanceControls({
                                     type="button"
                                     aria-label={`使用${preset.label}预设`}
                                     aria-pressed={activePreset === preset.id}
-                                    className="flex min-w-0 flex-col items-center gap-1 rounded-[var(--dock-item-radius)] border px-1 py-1.5 transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2"
+                                    className="flex min-w-0 flex-col items-center gap-1 rounded-[var(--dock-item-radius)] border px-1 py-2 transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2"
                                     style={{ background: theme.spatial.surface, borderColor: activePreset === preset.id ? theme.node.activeStroke : theme.toolbar.border, color: theme.node.text }}
                                     onClick={() => selectPreset(preset.id)}
                                 >
@@ -141,12 +141,12 @@ export function CanvasAppearanceControls({
                     <div className="rounded-[var(--dock-item-radius)] border" style={{ borderColor: theme.toolbar.border }}>
                         <button
                             type="button"
-                            className="flex w-full items-center justify-between rounded-[inherit] px-2 py-1.5 font-medium focus-visible:outline focus-visible:outline-2"
+                            className="flex w-full items-center justify-between rounded-[inherit] px-2 py-2 font-medium focus-visible:outline focus-visible:outline-2"
                             aria-expanded={colorsExpanded}
                             aria-controls={colorsId}
                             onClick={() => setColorsExpanded(!colorsExpanded)}
                         >
-                            <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-2">
                                 <Paintbrush className="size-3.5" />
                                 更多颜色
                             </span>
@@ -199,7 +199,7 @@ export function CanvasAppearanceControls({
                     ]}
                 />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
                 <p className="m-0" style={{ color: theme.node.muted }}>
                     修改自动保存到当前画布
                 </p>
@@ -231,7 +231,7 @@ function ColorField({ label, value, theme, onChange }: { label: string; value: s
         }
     };
     return (
-        <label className="grid grid-cols-[60px_24px_minmax(0,1fr)] items-center gap-1.5">
+        <label className="grid grid-cols-[60px_24px_minmax(0,1fr)] items-center gap-2">
             <span>{label}</span>
             <ColorPicker disabledAlpha size="small" value={value} onChange={(color) => onChange(color.toHexString().toUpperCase())} />
             <Input

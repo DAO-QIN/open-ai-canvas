@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router";
 import type { Ref } from "react";
 import { workspaceNavigationTool } from "@/constant/navigation-tools";
 
+import { TopbarFeedbackButton } from "@/components/feedback/topbar-feedback-button";
 import { SystemAnnouncementCenter } from "@/components/layout/system-announcement-center";
 import { WorkspaceAccountMenu } from "@/components/layout/workspace-account-menu";
 import { WorkspaceCreditGiftMark } from "@/components/layout/workspace-credit-gift-mark";
@@ -32,7 +33,15 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
 
     return (
         <header className="app-workspace-topbar">
-            <button ref={sidebarToggleRef} type="button" className="app-workspace-mobile-menu app-workspace-topbar-icon-button" aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"} aria-controls="workspace-sidebar" aria-expanded={sidebarOpen} onClick={onToggleSidebar}>
+            <button
+                ref={sidebarToggleRef}
+                type="button"
+                className="app-workspace-mobile-menu app-workspace-topbar-icon-button"
+                aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"}
+                aria-controls="workspace-sidebar"
+                aria-expanded={sidebarOpen}
+                onClick={onToggleSidebar}
+            >
                 {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
             </button>
             <nav className="app-workspace-topbar-breadcrumb" aria-label="当前位置">
@@ -40,11 +49,18 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
             </nav>
             <WorkspaceTopBarExtensionSlot />
             <div className="app-workspace-topbar-actions">
-                {creditsEnabled && !user ? <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className="app-workspace-topbar-credit-pill">登录领积分</Link> : creditsEnabled ? <button type="button" className="app-workspace-topbar-credit-pill" aria-label={`打开积分中心，可用 ${balance} 积分`} onClick={() => openWorkspaceWallet()}>
-                    <WorkspaceCreditGiftMark />
-                    <span>积分</span>
-                    <strong>{balance}</strong>
-                </button> : null}
+                {user ? <TopbarFeedbackButton /> : null}
+                {creditsEnabled && !user ? (
+                    <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className="app-workspace-topbar-credit-pill">
+                        登录领积分
+                    </Link>
+                ) : creditsEnabled ? (
+                    <button type="button" className="app-workspace-topbar-credit-pill" aria-label={`打开积分中心，可用 ${balance} 积分`} onClick={() => openWorkspaceWallet()}>
+                        <WorkspaceCreditGiftMark />
+                        <span>积分</span>
+                        <strong>{balance}</strong>
+                    </button>
+                ) : null}
                 {user ? <SystemAnnouncementCenter userId={user.id} className="app-workspace-topbar-icon-button" autoOpen /> : null}
                 <AnimatedThemeToggler className={`app-workspace-topbar-icon-button ${user ? "app-workspace-account-theme-toggle" : ""}`} theme={theme} onThemeChange={setTheme} aria-label="切换主题" />
                 <WorkspaceAccountMenu />
