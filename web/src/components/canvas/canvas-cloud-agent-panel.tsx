@@ -822,6 +822,14 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                 onError: (cause) => {
                     if (!accountIsCurrent() || currentScope.current !== conversationScope || cloudRunTransitionRef.current !== run.id) return;
                     canvasSyncRef.current?.reconcile();
+                    if ((cause as { status?: number }).status === 404) {
+                        // 运行记录已不存在：继续重连只会反复失败，交给任务中心核对结果。
+                        setMessages((current) => appendAgentError(current, `stream-error-${run.id}`, cause, "上一次 Agent 运行记录已失效，无法确认任务结果；请到任务中心或素材库核对"));
+                        setRun((current) => (current?.id === run.id ? null : current));
+                        setApproval(null);
+                        setConnectionStatus("disconnected");
+                        return;
+                    }
                     setMessages((current) => appendAgentError(current, `stream-error-${run.id}`, cause, "Agent 事件流已断开"));
                     // The observation channel failed, not the durable run. Keep
                     // identity and approval so reconnect/cancel/continue remain available.
@@ -851,6 +859,47 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
             document.removeEventListener("visibilitychange", wake);
         };
     }, [run?.id, connectionStatus, conversationScope, accountScope]);
+
+    // 手动重连先读取服务端快照，告诉用户上一次任务是否已经结束，再恢复事件监听。
+    const reconnectAgent = async () => {
+        const activeRun = run;
+        if (!activeRun?.id || !accountIsCurrent() || currentScope.current !== conversationScope) return;
+        const scope = conversationScope;
+        setConnectionStatus("connecting");
+        try {
+            const snapshot = (await getAgentRun(activeRun.id, AbortSignal.timeout(10_000))).run;
+            if (!accountIsCurrent() || currentScope.current !== scope) return;
+            setRun((current) => (current?.id === activeRun.id ? snapshot : current));
+            setApproval((previous) => {
+                const next = approvalStateFromRun(snapshot);
+                return previous?.approvalId && previous.approvalId === next?.approvalId ? { ...next, reason: previous.reason } : next;
+            });
+            const finished = !snapshot.cleanupPending && ["completed", "failed", "cancelled", "rejected"].includes(snapshot.status);
+            setMessages((current) =>
+                appendUniqueMessage(current, {
+                    id: `reconnect-${snapshot.id}-${snapshot.revision ?? snapshot.status}`,
+                    role: "system",
+                    text: finished
+                        ? snapshot.status === "completed"
+                            ? "上一次任务已处理完成，结果已同步。"
+                            : "上一次任务已结束，状态已同步。"
+                        : snapshot.status === "waiting_approval"
+                          ? "上一次任务正在等待你的确认，已恢复状态监听。"
+                          : "上一次任务仍在执行，已恢复状态监听，完成后会自动更新。",
+                }),
+            );
+            setConnectionEpoch((value) => value + 1);
+        } catch (cause) {
+            if (!accountIsCurrent() || currentScope.current !== scope) return;
+            setConnectionStatus("disconnected");
+            const notFound = (cause as { status?: number }).status === 404;
+            setMessages((current) => appendAgentError(current, `reconnect-error-${activeRun.id}`, cause, notFound ? "找不到上一次 Agent 运行记录，无法确认任务是否完成；请到任务中心或素材库核对" : "暂时无法获取上一次任务状态，请稍后重试"));
+            if (notFound) {
+                setRun((current) => (current?.id === activeRun.id ? null : current));
+                setApproval(null);
+            }
+        }
+    };
 
     const interject = async (value: string) => {
         if (!accountIsCurrent() || pendingSubmission.current) return;
@@ -1457,9 +1506,15 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                                     ) : null}
                                     {run && connectionStatus !== "connected" ? (
                                         <div role="status" className="flex items-center justify-between gap-2 px-5 py-2 text-xs" style={{ color: theme.node.muted }}>
-                                            <span>{connectionStatus === "disconnected" ? "连接已断开，服务端任务可能仍在执行；运行记录已保留" : "正在连接并校准运行状态…"}</span>
+                                            <span>
+                                                {connectionStatus === "disconnected"
+                                                    ? ["queued", "running", "waiting_approval"].includes(run.status)
+                                                        ? "连接已断开，上一次任务可能仍在执行；输入内容会保留，点击“重新连接”查看状态"
+                                                        : "连接已断开，输入内容会保留；点击“重新连接”确认上一次任务状态"
+                                                    : "正在连接并校准运行状态…"}
+                                            </span>
                                             {connectionStatus === "disconnected" ? (
-                                                <Button size="small" onClick={() => setConnectionEpoch((value) => value + 1)}>
+                                                <Button size="small" onClick={() => void reconnectAgent()}>
                                                     重新连接
                                                 </Button>
                                             ) : null}
@@ -1477,7 +1532,8 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                                         approval={approval}
                                         approvalTargetGenerating={approval ? agentApprovalTargetGenerating(approval.detail, canvasNodes, runningNodeId) : undefined}
                                         nodeCount={canvasId ? nodeCount : null}
-                                        approvalSubmitting={otherAgentRunning || approvalSubmitting || connectionStatus !== "connected"}
+                                        approvalSubmitting={approvalSubmitting}
+                                        approvalBlocked={otherAgentRunning || connectionStatus !== "connected"}
                                         onChooseSkill={() => setSkillsOpen(true)}
                                         onDraftPrompt={(draft) => setPrompt((current) => (current.trim() ? `${current}\n\n${draft}` : draft))}
                                         onApprovalReasonChange={(reason) => setApproval((current) => (current ? { ...current, reason } : current))}
