@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSPrope
 import { Link, useLocation, useSearchParams } from "react-router";
 
 import { BrandLogoFrame } from "@/components/brand/brand-logo";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { UserAvatar } from "@/components/layout/user-avatar";
 import { Kbd } from "@/components/ui/base/kbd";
 import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
@@ -168,7 +169,7 @@ function WorkspaceSwitcher({ collapsed, onNavigate }: { collapsed: boolean; onNa
                         fallback={<InfinityIcon className="app-workspace-brand-logo" strokeWidth={2.2} />}
                     />
                     <span className="flex min-w-0 flex-col">
-                        <span className="app-workspace-brand-wordmark truncate text-[var(--fs-body)] leading-none font-semibold">{appearance.brandName}</span>
+                        <BrandWordmark name={appearance.brandName} className="app-workspace-brand-wordmark truncate" />
                     </span>
                 </span>
             </Link>

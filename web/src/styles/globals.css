@@ -24208,6 +24208,16 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
     font-size: var(--workspace-navigation-brand-size);
     font-weight: 700;
     letter-spacing: normal;
+    line-height: 1;
+    color: var(--foreground);
+}
+
+.app-user-workspace .app-workspace-brand-wordmark-art {
+    display: block;
+    width: 4.1em;
+    max-width: 100%;
+    height: auto;
+    overflow: visible;
 }
 
 .app-user-workspace .app-workspace-topbar {
