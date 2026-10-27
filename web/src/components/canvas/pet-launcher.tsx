@@ -89,7 +89,8 @@ export function AgentLauncher({
     const keepsAvatarSize = largeAvatar && !collapsed;
     const height = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.max(40, Math.min(compact ? Math.min(appearance.avatarHeight, 96) : appearance.avatarHeight, viewport.height - 60, (viewport.width - 40) / aspectRatio)) : 76;
     const width = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.round(height * aspectRatio) : 76;
-    const { position, dragging, handlers } = useAgentLauncherPosition(onOpen, width, height);
+    const bottomInset = compact ? 72 : 0;
+    const { position, dragging, handlers } = useAgentLauncherPosition(onOpen, width, height + bottomInset);
     const showToggle = !hidden && (largeAvatar || collapsed);
     return (
         <>
@@ -104,7 +105,7 @@ export function AgentLauncher({
                     keepsAvatarSize && live && "canvas-agent-launcher-live2d",
                     keepsAvatarSize && media && "canvas-agent-launcher-media",
                 )}
-                style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden ? { display: "none" } : null) } as CSSProperties}
+                style={{ ...position, bottom: position.bottom + bottomInset, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden ? { display: "none" } : null) } as CSSProperties}
                 aria-hidden={hidden || undefined}
                 tabIndex={hidden ? -1 : undefined}
                 data-canvas-no-zoom
@@ -149,7 +150,7 @@ export function AgentLauncher({
                 <button
                     type="button"
                     className="canvas-agent-launcher-toggle fixed z-[calc(var(--z-toast)+2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35"
-                    style={{ right: position.right + width - 14, bottom: position.bottom + height - 14, color: theme.node.text } as CSSProperties}
+                    style={{ right: position.right + width - 14, bottom: position.bottom + bottomInset + height - 14, color: theme.node.text } as CSSProperties}
                     aria-label={collapsed ? `展开${appearance.agentName}形象` : `收起${appearance.agentName}形象`}
                     aria-pressed={collapsed}
                     title={collapsed ? "展开形象" : "收起形象，只保留小入口"}
