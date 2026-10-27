@@ -15,11 +15,12 @@ export function featuredCanvasBadge(item: Pick<LibTVFeaturedItem, "nodeCount">) 
     return item.nodeCount > 0 ? `可编辑画布 · ${item.nodeCount} 节点` : "可编辑画布";
 }
 
-/** 首页「精选画布」：服务端缓存的前 5 个公开作品（含节点数），点卡片打开精简弹窗，复制仍需用户确认。 */
+/** 首页「精选画布」：服务端精选列表（节点多、可复制、无 LibTV 水印）的前 5 个，点卡片打开精简弹窗，复制仍需用户确认。 */
 export function HomeFeaturedCanvases() {
     const [active, setActive] = useState<LibTVFeaturedItem>();
     const { data, isLoading, isError, isFetching, refetch } = useQuery({ queryKey: ["libtv-featured"], queryFn: getLibTVFeatured, staleTime: 5 * 60_000 });
     const items = data?.items.slice(0, FEATURED_COUNT) ?? [];
+    const total = data?.items.length ?? 0;
     if (!isLoading && !isError && !items.length) return null;
 
     return (
@@ -27,7 +28,7 @@ export function HomeFeaturedCanvases() {
             <header className="home-section-heading">
                 <h2 id="home-featured-canvases-title">精选画布</h2>
                 <Link to="/inspiration" className="home-section-link">
-                    全部画布
+                    {total ? `全部画布 · ${total}` : "全部画布"}
                     <ArrowUpRight aria-hidden="true" />
                 </Link>
             </header>

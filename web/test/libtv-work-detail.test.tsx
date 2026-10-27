@@ -214,7 +214,8 @@ describe("LibTV work detail dialog", () => {
         const gallery = source("../src/pages/inspiration/index.tsx");
         expect(gallery).toContain('next.set("work", item.templateUuid)');
         expect(gallery).not.toContain("navigate(`/inspiration/${item.templateUuid}`)");
-        expect(gallery).toContain("<LibTVWorkDetailDialog templateUuid={activeTemplateUuid}");
+        // 全部画布页与首页共用精简弹窗。
+        expect(gallery).toContain("<HomeFeaturedCanvasDialog item={active} onClose={closeWork} />");
         // 关闭弹窗恢复列表上下文，不残留 work 参数。
         expect(gallery).toContain('next.delete("work")');
     });
@@ -477,21 +478,14 @@ describe("LibTV gallery tag containment", () => {
         expect(rankLibTVGalleryTags([], undefined, 8).visible).toEqual([]);
     });
 
-    test("the gallery keeps the catalog across a filter, and can still clear the selection", () => {
+    test("「全部画布」只展示服务端精选，不再铺开整个公开作品流", () => {
         const gallery = source("../src/pages/inspiration/index.tsx");
-        // 目录是 state + effect，不在 render 期间往 ref 里写。
-        expect(gallery).toContain("const [knownTags, setKnownTags] = useState<LibTVGalleryTag[]>([]);");
-        expect(gallery).not.toContain("knownTagsRef");
-        expect(gallery).toContain("rankLibTVGalleryTags(items, selectedTagId, 8, knownTags)");
-        expect(gallery).toContain("const visibleTags = tagsExpanded ? knownTags : tagRank.visible;");
-        // 选中态与清除入口都在，且筛选用的仍是真实 tagId。
-        expect(gallery).toContain("checked={selectedTagId === tag.id}");
-        expect(gallery).toContain('onChange={() => handleTagClick(tag.id)}');
-        expect(gallery).toContain('checked={!selectedTagId}');
-        expect(gallery).toContain("onChange={() => handleTagClick(undefined)}");
-        expect(gallery).toContain("aria-expanded={tagsExpanded}");
-        // 首屏只铺常用的几个，其余按需展开。
-        expect(gallery).toContain("{tagsExpanded ? \"收起标签\" : `展开全部 ${knownTags.length} 个标签`}");
+        expect(gallery).toContain('useQuery({ queryKey: ["libtv-featured"], queryFn: getLibTVFeatured');
+        expect(gallery).not.toContain("useInfiniteQuery");
+        expect(gallery).not.toContain("fetchNextPage");
+        expect(gallery).toContain("全部画布 · ${items.length}");
+        // 分享链接里的作品不在精选里时仍能打开（弹窗按 UUID 读详情）。
+        expect(gallery).toContain("items.find((item) => item.templateUuid === activeTemplateUuid) ?? { templateUuid: activeTemplateUuid");
     });
 });
 

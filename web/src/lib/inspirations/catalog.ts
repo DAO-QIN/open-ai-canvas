@@ -66,6 +66,8 @@ export type CreationInspiration = {
     title: string;
     description: string;
     image: string;
+    /** 视频样片（https mp4），首页悬停时静音播放；没有则只显示封面。 */
+    video?: string;
     mode: CreationMode;
     prompt: string;
     /** 自定义双语条目的中文正文；内置目录已将中文统一存入 prompt。 */

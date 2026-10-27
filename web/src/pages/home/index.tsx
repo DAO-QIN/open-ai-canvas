@@ -2,6 +2,7 @@
 // Agent 对话创作移到 /create；这里的入口只接已有功能，不自动生成。
 
 import { LoaderCircle, Plus } from "lucide-react";
+import type { PointerEvent } from "react";
 
 import { loadCanvasProjectPage } from "@/lib/workspace-route-modules";
 import { useCreateBlankCanvas } from "@/pages/create/use-create-blank-canvas";
@@ -31,8 +32,20 @@ function HomeNewCanvas() {
     const { createCanvas, creating, ready } = useCreateBlankCanvas(requireLogin);
     const busy = creating !== null;
     const preload = () => void loadCanvasProjectPage();
+    // 光点跟随鼠标：只写 CSS 变量，不触发 React 重新渲染。
+    const trackPointer = (event: PointerEvent<HTMLButtonElement>) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        event.currentTarget.style.setProperty("--home-pointer-x", `${event.clientX - rect.left}px`);
+        event.currentTarget.style.setProperty("--home-pointer-y", `${event.clientY - rect.top}px`);
+    };
     return (
-        <button type="button" className="home-new-canvas" onClick={() => void createCanvas()} disabled={!ready || busy} aria-busy={busy} onPointerEnter={preload} onFocus={preload}>
+        <button type="button" className="home-new-canvas" onClick={() => void createCanvas()} disabled={!ready || busy} aria-busy={busy} onPointerEnter={preload} onPointerMove={trackPointer} onFocus={preload}>
+            <span className="home-new-canvas-glow" aria-hidden="true">
+                <span className="home-new-canvas-ripple" />
+                <span className="home-new-canvas-ripple is-delayed" />
+                <span className="home-new-canvas-spotlight" />
+                <span className="home-new-canvas-halo" />
+            </span>
             <span className="home-new-canvas-icon" aria-hidden="true">
                 {busy ? <LoaderCircle className="animate-spin" /> : <Plus />}
             </span>

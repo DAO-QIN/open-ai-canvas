@@ -187,6 +187,15 @@ async function loadSeedance(options) {
  * 所以退一步用上游分类的译名——同样是中文，同样说得清这条是什么，
  * 只是讲的是"哪一类"而不是"这一条讲了什么"。连分类都没有的少数条目留空。
  */
+function seedanceVideoUrl(value) {
+    try {
+        const url = new URL(String(value || ""));
+        return url.protocol === "https:" && url.hostname === "media.goodcase.ai" && url.pathname.endsWith(".mp4") ? url.toString() : "";
+    } catch {
+        return "";
+    }
+}
+
 function seedanceDescription(item, category) {
     if (hasCjk(item.summary)) return clip(item.summary, DESCRIPTION_LIMIT);
     return SEEDANCE_CATEGORY_LABELS[category] ?? "";
@@ -205,6 +214,8 @@ function buildSeedanceEntries(raw) {
                 title: item.title,
                 description: seedanceDescription(item, category),
                 image: item.posterUrl,
+                // 视频样片：首页精选灵感悬停播放。只接受 goodcase 的 https mp4，其余来源不写入。
+                ...(seedanceVideoUrl(item.mediaUrl) ? { video: seedanceVideoUrl(item.mediaUrl) } : {}),
                 mode: "video",
                 prompt: item.promptFull,
                 ...(category ? { category } : {}),

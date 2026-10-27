@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUp, ArrowUpRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowUp, ArrowUpRight, Play } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
 import type { CreationInspiration } from "@/lib/inspirations/catalog";
@@ -21,10 +21,15 @@ const FILTERS: { value: Filter; label: string }[] = [
 const MODE_LABEL: Record<string, string> = { video: "视频", image: "图片", text: "文本" };
 const LIMIT = 10;
 
-/** 精选在前，其余保持目录顺序；不同分类各取前若干条。 */
+/** 有视频样片的在前（其中精选优先），再是其余精选与目录顺序；不同分类各取前若干条。 */
 export function pickHomeInspirations(items: CreationInspiration[], filter: Filter, limit = LIMIT) {
     const matched = items.filter((item) => filter === "all" || item.mode === filter);
-    return [...matched.filter((item) => item.featured), ...matched.filter((item) => !item.featured)].slice(0, limit);
+    const rank = (item: CreationInspiration) => (item.video ? 0 : 2) + (item.featured ? 0 : 1);
+    return matched
+        .map((item, index) => ({ item, index }))
+        .sort((left, right) => rank(left.item) - rank(right.item) || left.index - right.index)
+        .slice(0, limit)
+        .map(({ item }) => item);
 }
 
 /**
@@ -89,8 +94,14 @@ export function HomeFeaturedInspirations() {
                               <li key={item.id ?? `${item.sourceId}:${item.title}`} className="home-card">
                                   <button type="button" className="home-card-button" title={item.title} onClick={() => navigate("/create", { state: inspirationPrefillState(item) })}>
                                       <span className="home-card-cover">
-                                          <InspirationCover image={item.image} />
+                                          <InspirationCardMedia item={item} />
                                           <span className="home-card-badge">{MODE_LABEL[item.mode] ?? "灵感"}</span>
+                                          {item.video ? (
+                                              <span className="home-card-kind">
+                                                  <Play aria-hidden="true" />
+                                                  视频样片
+                                              </span>
+                                          ) : null}
                                           <span className="home-card-overlay">
                                               <ArrowUp aria-hidden="true" />
                                               使用这个创意
@@ -104,5 +115,67 @@ export function HomeFeaturedInspirations() {
                 </ul>
             )}
         </section>
+    );
+}
+
+/**
+ * 封面 + 视频样片：鼠标悬停（或键盘聚焦）卡片时才加载并静音循环播放，离开即暂停回到封面。
+ * 触屏没有悬停，不自动播放，避免耗流量；系统要求减少动态时也不播放。
+ */
+function InspirationCardMedia({ item }: { item: CreationInspiration }) {
+    const [active, setActive] = useState(false);
+    const [playing, setPlaying] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const holderRef = useRef<HTMLSpanElement>(null);
+
+    useEffect(() => {
+        const card = holderRef.current?.closest(".home-card-button");
+        if (!card || !item.video) return;
+        const canHover = typeof window.matchMedia !== "function" || (window.matchMedia("(hover: hover)").matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+        if (!canHover) return;
+        const start = () => setActive(true);
+        const stop = () => {
+            setActive(false);
+            setPlaying(false);
+            videoRef.current?.pause();
+        };
+        card.addEventListener("pointerenter", start);
+        card.addEventListener("pointerleave", stop);
+        card.addEventListener("focus", start);
+        card.addEventListener("blur", stop);
+        return () => {
+            card.removeEventListener("pointerenter", start);
+            card.removeEventListener("pointerleave", stop);
+            card.removeEventListener("focus", start);
+            card.removeEventListener("blur", stop);
+        };
+    }, [item.video]);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!active || !video) return;
+        video.currentTime = 0;
+        void video.play().catch(() => setPlaying(false));
+    }, [active]);
+
+    return (
+        <span ref={holderRef} className="home-card-media">
+            <InspirationCover image={item.image} />
+            {item.video && active ? (
+                <video
+                    ref={videoRef}
+                    className={playing ? "is-playing" : undefined}
+                    src={item.video}
+                    poster={item.image}
+                    muted
+                    loop
+                    playsInline
+                    preload="auto"
+                    aria-hidden="true"
+                    onPlaying={() => setPlaying(true)}
+                    onError={() => setPlaying(false)}
+                />
+            ) : null}
+        </span>
     );
 }

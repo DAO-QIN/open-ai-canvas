@@ -47,9 +47,10 @@ export function WorkspaceAccountMenu() {
             </Popover>
         </>
     ) : (
-        <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className="inline-flex items-center gap-2 px-2 text-xs text-foreground/55" aria-label="登录" title="登录">
-            <CircleUserRound className="size-5" />
-            <span className="hidden sm:inline">游客</span>
+        <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className="app-workspace-topbar-auth-pill" aria-label="注册或登录" title="注册 / 登录">
+            <CircleUserRound aria-hidden="true" />
+            <span className="app-workspace-topbar-auth-label">注册 / 登录</span>
+            <span className="app-workspace-topbar-auth-short">登录</span>
         </Link>
     );
 }

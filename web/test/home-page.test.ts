@@ -100,6 +100,28 @@ describe("首页布局（参考 leyi.my）", () => {
         for (const path of ["/canvas", "/assets", "/settings", "/c/abc"]) expect(isGuestWorkspacePath(path)).toBe(false);
     });
 
+    test("新建画布卡片带光效：扩散亮点、跟随鼠标的光斑与柔光，减少动态时关闭动画", () => {
+        const page = source("../src/pages/home/index.tsx");
+        for (const cls of ["home-new-canvas-ripple", "home-new-canvas-ripple is-delayed", "home-new-canvas-spotlight", "home-new-canvas-halo"]) expect(page).toContain(`className="${cls}"`);
+        expect(page).toContain('style.setProperty("--home-pointer-x"');
+        const css = source("../src/pages/home/home.css");
+        expect(css).toContain("@property --home-ripple-radius");
+        expect(css).toContain("@keyframes home-dot-ripple");
+        expect(css).toContain(".home-new-canvas-ripple { animation: none; opacity: 0; }");
+    });
+
+    test("未登录顶栏与登录后同一套胶囊样式：礼盒积分胶囊 + 注册 / 登录按钮", () => {
+        const bar = source("../src/components/layout/workspace-top-bar.tsx");
+        const guestPill = bar.slice(bar.indexOf("creditsEnabled && !user ?"), bar.indexOf(") : creditsEnabled ?"));
+        expect(guestPill).toContain('className="app-workspace-topbar-credit-pill is-guest"');
+        expect(guestPill).toContain("<WorkspaceCreditGiftMark />");
+        const menu = source("../src/components/layout/workspace-account-menu.tsx");
+        expect(menu).toContain('className="app-workspace-topbar-auth-pill"');
+        expect(menu).toContain("注册 / 登录");
+        expect(menu).not.toContain('<span className="hidden sm:inline">游客</span>');
+        expect(source("../src/styles/workspace-product.css")).toContain(".app-user-workspace .app-workspace-topbar-auth-pill {");
+    });
+
     test("精选画布角标只在读到节点数时显示数量", () => {
         expect(featuredCanvasBadge({ nodeCount: 167 })).toBe("可编辑画布 · 167 节点");
         expect(featuredCanvasBadge({ nodeCount: 0 })).toBe("可编辑画布");
@@ -108,12 +130,33 @@ describe("首页布局（参考 leyi.my）", () => {
 
 describe("首页精选灵感", () => {
     const item = (title: string, mode: CreationInspiration["mode"], featured = false): CreationInspiration => ({ title, mode, featured, description: "", image: "", prompt: `${title} prompt` });
-    test("按分类筛选，精选在前，最多 10 条", () => {
-        const items = [item("a", "image"), item("b", "video", true), item("c", "text"), item("d", "video"), ...Array.from({ length: 12 }, (_, i) => item(`v${i}`, "video"))];
-        expect(pickHomeInspirations(items, "all").map((x) => x.title).slice(0, 2)).toEqual(["b", "a"]);
-        expect(pickHomeInspirations(items, "all")).toHaveLength(10);
-        expect(pickHomeInspirations(items, "video").every((x) => x.mode === "video")).toBe(true);
-        expect(pickHomeInspirations(items, "text").map((x) => x.title)).toEqual(["c"]);
+    test("有视频样片的排在前面（其中精选优先），按分类筛选，最多 10 条", () => {
+        const withVideo = (x: CreationInspiration) => ({ ...x, video: `https://media.goodcase.ai/media/video/${x.title}.mp4` });
+        const items = [item("a", "image", true), item("b", "video"), withVideo(item("c", "video")), item("t", "text"), withVideo(item("d", "video", true)), ...Array.from({ length: 12 }, (_, i) => item(`i${i}`, "image"))];
+        const all = pickHomeInspirations(items, "all");
+        expect(all.slice(0, 4).map((x) => x.title)).toEqual(["d", "c", "a", "b"]);
+        expect(all).toHaveLength(10);
+        expect(pickHomeInspirations(items, "video").map((x) => x.title)).toEqual(["d", "c", "b"]);
+        expect(pickHomeInspirations(items, "text").map((x) => x.title)).toEqual(["t"]);
+    });
+
+    test("悬停才加载并静音循环播放样片，触屏与减少动态时不播放", () => {
+        const page = source("../src/pages/home/home-featured-inspirations.tsx");
+        const media = page.slice(page.indexOf("function InspirationCardMedia"));
+        expect(media).toContain('window.matchMedia("(hover: hover)").matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches');
+        expect(media).toContain("{item.video && active ? (");
+        for (const attr of ["muted", "loop", "playsInline"]) expect(media).toContain(attr);
+        expect(media).toContain('card.addEventListener("pointerleave", stop);');
+        expect(media).toContain("videoRef.current?.pause();");
+        expect(page).toContain("视频样片");
+    });
+
+    test("灵感目录里的视频样片只来自 goodcase 的 https mp4", async () => {
+        const catalog = JSON.parse(source("../public/inspirations/seedance.json")) as { entries: Array<{ video?: string; mode: string }> };
+        const videos = catalog.entries.filter((entry) => entry.video);
+        expect(videos.length).toBeGreaterThan(700);
+        for (const entry of videos) expect(entry.video).toMatch(/^https:\/\/media\.goodcase\.ai\/.+\.mp4$/);
+        expect(source("../scripts/import-inspirations.mjs")).toContain('url.protocol === "https:" && url.hostname === "media.goodcase.ai" && url.pathname.endsWith(".mp4")');
     });
 
     test("点灵感只带提示词进创作页，并先开新对话", () => {

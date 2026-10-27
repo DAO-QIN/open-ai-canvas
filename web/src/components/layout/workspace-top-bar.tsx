@@ -51,8 +51,9 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
             <div className="app-workspace-topbar-actions">
                 {user ? <TopbarFeedbackButton /> : null}
                 {creditsEnabled && !user ? (
-                    <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className="app-workspace-topbar-credit-pill">
-                        登录领积分
+                    <Link to="/login" onClick={(event) => interceptLoginLinkClick(event, { description: "登录后即可领取积分，开始创作" })} className="app-workspace-topbar-credit-pill is-guest" aria-label="登录领取积分">
+                        <WorkspaceCreditGiftMark />
+                        <span>登录领积分</span>
                     </Link>
                 ) : creditsEnabled ? (
                     <button type="button" className="app-workspace-topbar-credit-pill" aria-label={`打开积分中心，可用 ${balance} 积分`} onClick={() => openWorkspaceWallet()}>

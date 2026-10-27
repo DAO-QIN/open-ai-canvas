@@ -11,6 +11,22 @@
 .home-new-canvas:hover:not(:disabled) .home-new-canvas-icon { transform: translateY(-2px); }
 .home-new-canvas-icon svg { width: 28px; height: 28px; stroke-width: 2; }
 .home-new-canvas-label { font-size: var(--fs-body); font-weight: 650; letter-spacing: .02em; }
+/* 光效：两圈从中心扩散的亮点 + 跟随鼠标的光斑 + 按钮背后的柔光。只用点阵本身变亮，不加额外色块。 */
+@property --home-ripple-radius { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+.home-new-canvas { isolation: isolate; --home-dot-light: color-mix(in srgb, var(--user-ink) 32%, transparent); }
+.dark .home-new-canvas { --home-dot-light: rgb(255 255 255 / .6); }
+.home-new-canvas-icon, .home-new-canvas-label { position: relative; z-index: 1; }
+.home-new-canvas-glow, .home-new-canvas-glow > span { position: absolute; inset: 0; pointer-events: none; }
+.home-new-canvas-ripple, .home-new-canvas-spotlight { background: radial-gradient(circle, var(--home-dot-light) .8px, transparent 1.5px) center / 22px 22px; }
+.home-new-canvas-ripple { opacity: 0; -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent max(0px, calc(var(--home-ripple-radius) - 40px)), #000 var(--home-ripple-radius), transparent calc(var(--home-ripple-radius) + 40px)); mask-image: radial-gradient(circle at 50% 50%, transparent max(0px, calc(var(--home-ripple-radius) - 40px)), #000 var(--home-ripple-radius), transparent calc(var(--home-ripple-radius) + 40px)); animation: home-dot-ripple 4.2s cubic-bezier(.33, 0, .2, 1) infinite; }
+.home-new-canvas-ripple.is-delayed { animation-delay: -2.1s; }
+.home-new-canvas-spotlight { opacity: 0; -webkit-mask-image: radial-gradient(circle 130px at var(--home-pointer-x, 50%) var(--home-pointer-y, 50%), #000, transparent); mask-image: radial-gradient(circle 130px at var(--home-pointer-x, 50%) var(--home-pointer-y, 50%), #000, transparent); transition: opacity .25s ease; }
+.home-new-canvas:hover:not(:disabled) .home-new-canvas-spotlight { opacity: 1; }
+.home-new-canvas-halo { inset: auto; left: 50%; top: 50%; width: 260px; height: 160px; translate: -50% -62%; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--user-ink) 10%, transparent), transparent); filter: blur(6px); transition: opacity .25s ease, transform .25s ease; }
+.dark .home-new-canvas-halo { background: radial-gradient(closest-side, rgb(255 255 255 / .16), transparent); }
+.home-new-canvas:hover:not(:disabled) .home-new-canvas-halo { transform: scale(1.12); }
+.dark .home-new-canvas-icon { box-shadow: 0 0 0 1px rgb(255 255 255 / .08), 0 10px 40px rgb(255 255 255 / .18); }
+@keyframes home-dot-ripple { 0% { --home-ripple-radius: 0%; opacity: 0; } 15% { opacity: .85; } 100% { --home-ripple-radius: 100%; opacity: 0; } }
 
 /* 工具入口 */
 .home-tool-entries ul { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
@@ -57,6 +73,14 @@
 .home-card-button:hover .home-card-overlay, .home-card-button:focus-visible .home-card-overlay { opacity: 1; transform: none; }
 .home-card-button strong { overflow: hidden; margin-top: 6px; font-size: var(--fs-body); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .home-card-button small { overflow: hidden; color: var(--user-ink-muted); font-size: var(--fs-caption); text-overflow: ellipsis; white-space: nowrap; }
+.home-card-media, .home-card-media > img, .home-card-media > video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.home-card-media > video { opacity: 0; transition: opacity .25s ease; }
+.home-card-media > video.is-playing { opacity: 1; }
+.home-card-button:hover .home-card-media > img { transform: scale(1.04); }
+/* 「使用这个创意」出现时收起右下角的类型角标，二者不重叠。 */
+.home-card-cover:has(.home-card-overlay) .home-card-kind { transition: opacity var(--user-motion); }
+.home-card-button:hover .home-card-cover:has(.home-card-overlay) .home-card-kind, .home-card-button:focus-visible .home-card-cover:has(.home-card-overlay) .home-card-kind { opacity: 0; }
+.home-gallery-page { display: flex; flex-direction: column; gap: var(--space-5); width: 100%; max-width: 1680px; margin-inline: auto; }
 .home-card.is-placeholder .home-card-cover, .home-card-line { animation: home-pulse 1.4s ease-in-out infinite; }
 .home-card-line { display: block; width: 60%; height: 14px; margin-top: var(--space-2); border-radius: 6px; background: var(--library-cover-surface); }
 @keyframes home-pulse { 50% { opacity: .55; } }
@@ -115,6 +139,8 @@
     .home-section-heading-main { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 }
 @media (prefers-reduced-motion: reduce) {
+    .home-new-canvas-ripple { animation: none; opacity: 0; }
+    .home-new-canvas-spotlight, .home-new-canvas-halo { transition: none; }
     .home-card-cover img, .home-tool-entry-icon, .home-new-canvas-icon, .home-card-overlay { transition: none; }
     .home-card.is-placeholder .home-card-cover, .home-card-line { animation: none; }
 }

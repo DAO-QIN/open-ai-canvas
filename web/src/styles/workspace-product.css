@@ -2882,3 +2882,35 @@
         transform: none !important;
     }
 }
+
+/* 未登录顶栏：与登录后同一套胶囊按钮几何（36px 高、圆角、边框），不再是一行灰色小字。 */
+.app-user-workspace .app-workspace-topbar-auth-pill {
+    display: inline-flex;
+    flex-shrink: 0;
+    height: 36px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px 0 10px;
+    border: 1px solid var(--user-ink);
+    border-radius: 999px;
+    background: var(--user-ink);
+    color: var(--user-surface);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: transform .18s ease, opacity .18s ease;
+}
+.app-user-workspace .app-workspace-topbar-auth-pill:hover { color: var(--user-surface); opacity: .88; transform: translateY(-1px); }
+.app-user-workspace .app-workspace-topbar-auth-pill:focus-visible { outline: 2px solid var(--control-focus-ring); outline-offset: 2px; }
+.app-user-workspace .app-workspace-topbar-auth-pill svg { width: 18px; height: 18px; }
+.app-user-workspace .app-workspace-topbar-auth-short { display: none; }
+@media (max-width: 640px) {
+    .app-user-workspace .app-workspace-topbar-auth-label { display: none; }
+    .app-user-workspace .app-workspace-topbar-auth-short { display: inline; }
+    .app-user-workspace .app-workspace-topbar-credit-pill.is-guest > span:not(.app-workspace-credit-gift) { display: none; }
+    .app-user-workspace .app-workspace-topbar-credit-pill.is-guest { padding: 0 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .app-user-workspace .app-workspace-topbar-auth-pill, .app-user-workspace .app-workspace-topbar-auth-pill:hover { transform: none; transition: none; }
+}
