@@ -2,8 +2,6 @@
 .agent-moon {
     --agent-moon-duration: 40s;
     --agent-moon-glow-level: 0.22;
-    /* 衬底色取页面背景：深色主题是深色、浅色主题是浅色，和条纹颜色正好相反。 */
-    --agent-moon-halo: var(--background, #0b0b0d);
     display: block;
     flex: none;
     overflow: visible;
@@ -18,15 +16,6 @@
     transform-box: view-box;
     transform-origin: 50px 50px;
     transition: opacity 0.6s;
-}
-
-.agent-moon-halo-stop {
-    stop-color: var(--agent-moon-halo);
-}
-
-/* 条纹描一圈与主题相反的细边，叠在亮图、复杂图上也能分清。滤镜放在遮罩外层，描边才不会被遮罩裁掉。 */
-.agent-moon-ink {
-    filter: drop-shadow(0 0 0.7px var(--agent-moon-halo)) drop-shadow(0 0.6px 1.4px color-mix(in srgb, var(--agent-moon-halo) 70%, transparent));
 }
 
 .agent-moon-glow {
@@ -115,9 +104,9 @@
     animation: agent-moon-glitch 0.4s steps(2) 4 reverse both;
 }
 
-/* 已停止 / 已拒绝：条纹变细、停住，整体暗下去。 */
+/* 已停止 / 已拒绝：条纹停住、略收细，整体缓慢呼吸；最暗时仍约 78%，深色画布上依旧清楚，不靠整体变暗表达。 */
 .agent-moon[data-mode="sleep"] {
-    --agent-moon-glow-level: 0;
+    --agent-moon-glow-level: 0.12;
 }
 
 .agent-moon[data-mode="sleep"] .agent-moon-stripe {
@@ -125,11 +114,11 @@
 }
 
 .agent-moon[data-mode="sleep"] .agent-moon-bar {
-    transform: scaleY(0.45);
+    transform: scaleY(0.82);
 }
 
 .agent-moon[data-mode="sleep"] .agent-moon-body {
-    opacity: 0.5;
+    animation: agent-moon-rest 4.8s ease-in-out infinite;
 }
 
 /* 暂停或减少动态效果：条纹停在各自的错开位置，仍是一轮完整的渐变满月。 */
@@ -139,7 +128,8 @@
 }
 
 .agent-moon[data-reduced-motion] .agent-moon-bar,
-.agent-moon[data-reduced-motion] .agent-moon-glow {
+.agent-moon[data-reduced-motion] .agent-moon-glow,
+.agent-moon[data-reduced-motion] .agent-moon-body {
     animation: none !important;
     transition: none !important;
 }
@@ -150,7 +140,8 @@
     }
 
     .agent-moon .agent-moon-bar,
-    .agent-moon .agent-moon-glow {
+    .agent-moon .agent-moon-glow,
+    .agent-moon .agent-moon-body {
         animation: none !important;
         transition: none !important;
     }
@@ -231,6 +222,16 @@
     }
     100% {
         opacity: var(--agent-moon-glow-level);
+    }
+}
+
+@keyframes agent-moon-rest {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.78;
     }
 }
 

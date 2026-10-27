@@ -31,6 +31,19 @@ test("flow keyframes follow the thickness curve across the whole moon", () => {
     expect(css).toContain(`/ -${AGENT_MOON_STRIPES})`);
 });
 
+test("no state fades the moon out: stopped stays clearly visible on dark canvases", () => {
+    const css = readFileSync(new URL("../src/components/canvas/agent-moon.css", import.meta.url), "utf8");
+    expect(css).not.toContain("agent-moon-halo");
+    expect(css).not.toContain("drop-shadow");
+    const rest = css.slice(css.indexOf("@keyframes agent-moon-rest"), css.indexOf("@keyframes agent-moon-glitch"));
+    const levels = [...rest.matchAll(/opacity:\s*([\d.]+)/g)].map((match) => Number(match[1]));
+    expect(levels.length).toBeGreaterThan(0);
+    expect(Math.min(...levels)).toBeGreaterThanOrEqual(0.75);
+    const sleepBar = css.match(/data-mode="sleep"\] \.agent-moon-bar \{\s*transform: scaleY\(([\d.]+)\)/);
+    expect(Number(sleepBar?.[1])).toBeGreaterThanOrEqual(0.8);
+    for (const match of css.matchAll(/\.agent-moon-body \{[^}]*?opacity:\s*([\d.]+)/g)) expect(Number(match[1])).toBeGreaterThanOrEqual(0.75);
+});
+
 test("moon follows the theme colour, glows faint white and keeps ids unique per instance", () => {
     const html = renderToStaticMarkup(
         <>
@@ -42,8 +55,6 @@ test("moon follows the theme colour, glows faint white and keeps ids unique per 
     expect(html).toContain('data-mode="approval"');
     expect(html).toContain('stop-color="currentColor"');
     expect(html).toContain('stop-color="#fff"');
-    expect(html).toContain('class="agent-moon-halo"');
-    expect(html).toContain('class="agent-moon-ink"');
     expect(html.match(/class="agent-moon-stripe"/g)).toHaveLength(AGENT_MOON_STRIPES * 2);
     expect(html).toContain("data-reduced-motion");
     expect(html).toContain("data-paused");
