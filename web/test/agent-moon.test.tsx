@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AgentMoon } from "../src/components/canvas/agent-moon";
 import { PetAvatar } from "../src/components/canvas/pet-avatar";
 import { AGENT_AVATAR_STATES, DEFAULT_CANVAS_APPEARANCE, assistantAppearance } from "../src/lib/canvas/agent-appearance";
-import { AGENT_MOON_BAR, AGENT_MOON_SPAN, AGENT_MOON_STRIPES, agentMoonMode, agentMoonStripeThickness } from "../src/lib/canvas/agent-moon";
+import { AGENT_MOON_BAR, AGENT_MOON_MIN_BAR, AGENT_MOON_SPAN, AGENT_MOON_STRIPES, agentMoonMode, agentMoonStripeThickness } from "../src/lib/canvas/agent-moon";
 import { petAvatarSize } from "../src/lib/canvas/pet-menu";
 
 test("every run state maps to a moon motion", () => {
@@ -14,7 +14,9 @@ test("every run state maps to a moon motion", () => {
 test("stripes thin out from the top of the moon to the bottom", () => {
     expect(agentMoonStripeThickness(0)).toBeCloseTo(AGENT_MOON_BAR, 5);
     for (let step = 1; step <= 8; step++) expect(agentMoonStripeThickness(step / 8)).toBeLessThan(agentMoonStripeThickness((step - 1) / 8));
-    expect(agentMoonStripeThickness(1)).toBeCloseTo(0.35, 5);
+    expect(agentMoonStripeThickness(1)).toBeCloseTo(AGENT_MOON_MIN_BAR, 5);
+    // 84px 显示时最细的条纹也约有 1px。
+    expect((agentMoonStripeThickness(1) * 84) / 100).toBeGreaterThan(0.9);
 });
 
 test("flow keyframes follow the thickness curve across the whole moon", () => {
@@ -40,6 +42,8 @@ test("moon follows the theme colour, glows faint white and keeps ids unique per 
     expect(html).toContain('data-mode="approval"');
     expect(html).toContain('stop-color="currentColor"');
     expect(html).toContain('stop-color="#fff"');
+    expect(html).toContain('class="agent-moon-halo"');
+    expect(html).toContain('class="agent-moon-ink"');
     expect(html.match(/class="agent-moon-stripe"/g)).toHaveLength(AGENT_MOON_STRIPES * 2);
     expect(html).toContain("data-reduced-motion");
     expect(html).toContain("data-paused");
