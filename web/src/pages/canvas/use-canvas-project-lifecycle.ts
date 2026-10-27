@@ -12,13 +12,21 @@ import { normalizeCanvasNodeTimestamps } from "@/lib/canvas/canvas-node-timestam
 import { canvasPersistentNodes } from "@/lib/canvas/canvas-persistent-nodes";
 import { hydrateAssistantImages, resetInterruptedGeneration } from "@/lib/canvas/canvas-project-generation";
 import { listAddedSkills, type Skill } from "@/services/api/skills";
-import { createCanvasProjectWithRemoteSync, deleteCanvasProjectsWithRemoteSync, loadCanvasProjectForEditing, saveRemoteUserDataNow, prepareCanvasForCloudAction, subscribeAgentCanvasRefresh, refreshCanvasAfterAgent } from "@/services/user-data-sync";
+import { createCanvasProjectWithRemoteSync, deleteCanvasProjectsWithRemoteSync, isRetryableRemoteSyncError, loadCanvasProjectForEditing, saveRemoteUserDataNow, prepareCanvasForCloudAction, subscribeAgentCanvasRefresh, refreshCanvasAfterAgent } from "@/services/user-data-sync";
 import { getCanvasSyncStatus } from "@/services/api/user-data";
 import { canvasEditLeases } from "@/services/canvas-edit-leases";
 import { startCanvasSyncPolling } from "@/services/canvas-sync-polling";
 import { subscribeCanvasRealtime } from "@/services/canvas-realtime";
 import { getActiveUserScope } from "@/lib/user-scope";
-import { waitForCanvasSync } from "@/lib/canvas/sync-recovery";
+import { CanvasSyncPendingError, waitForCanvasSync } from "@/lib/canvas/sync-recovery";
+import { ApiError } from "@/services/api/request";
+
+export type CanvasSaveResult = "saved" | "pending" | "failed";
+
+/** 超时 / 新修改排队，或同步层会自动重试的接口错误（限流、5xx、断网）都只是「还没存完」，不是失败。 */
+export function canvasSaveErrorResult(error: unknown): Exclude<CanvasSaveResult, "saved"> {
+    return error instanceof CanvasSyncPendingError || (error instanceof ApiError && isRetryableRemoteSyncError(error)) ? "pending" : "failed";
+}
 import { flushCanvasStorePersistence, useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
 import { useCanvasThemeStore } from "@/stores/canvas/use-canvas-theme-store";
 import { useSyncProgressStore } from "@/stores/use-sync-progress-store";
@@ -392,26 +400,28 @@ export function useCanvasProjectLifecycle({
         if (options.flush !== false) await waitForCanvasSync(flushCanvasStorePersistence());
     }, [activeChatId, backgroundMode, canvasAppearance, chatSessions, connectionsRef, nodesRef, projectId, showImageInfo, updateProject, viewportRef]);
 
-    const saveCanvasProject = useCallback(async (options: { requireRemote?: boolean } = {}): Promise<boolean> => {
+    /**
+     * saved：云端已确认；pending：本地已保存、云端仍在后台保存（超过等待上限或有新修改排队），
+     * 同步层会继续保存并自动重试；failed：明确失败。
+     * 大画布（如导入上百个媒体节点）逐个保存素材常超过 15 秒等待上限，这时不能当成失败处理。
+     */
+    const saveCanvasProjectResult = useCallback(async (options: { requireRemote?: boolean; silent?: boolean } = {}): Promise<CanvasSaveResult> => {
         try {
             await persistLocalEdits();
         } catch (error) {
             console.warn("画布本地持久化暂未完成", error);
         }
         try {
-            if (options.requireRemote === false) {
-                await saveRemoteUserDataNow(projectId);
-                message.success("画布已保存到云端");
-            } else {
-                await prepareCanvasForCloudAction(projectId);
-                message.success("画布已保存到云端");
-            }
-            return true;
+            if (options.requireRemote === false) await saveRemoteUserDataNow(projectId);
+            else await prepareCanvasForCloudAction(projectId);
+            if (!options.silent) message.success("画布已保存到云端");
+            return "saved";
         } catch (error) {
             console.warn("画布等待后台同步", error);
-            return false;
+            return canvasSaveErrorResult(error);
         }
     }, [message, persistLocalEdits, projectId]);
+    const saveCanvasProject = useCallback(async (options: { requireRemote?: boolean } = {}) => (await saveCanvasProjectResult(options)) === "saved", [saveCanvasProjectResult]);
 
     const clearCanvasFiles = useCallback(() => {
         cleanupCanvasFiles({ projectId, nodes: [], chatSessions: [] });
@@ -428,6 +438,7 @@ export function useCanvasProjectLifecycle({
         deleteCurrentProject,
         renameCurrentProject,
         saveCanvasProject,
+        saveCanvasProjectResult,
         updateProject,
     };
 }

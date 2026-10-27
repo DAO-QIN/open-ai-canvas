@@ -411,7 +411,7 @@ function CanvasViewportPage() {
         [cleanupAssetImages, getHistoryCleanupContext],
     );
 
-    const { loadError, retryLoad, addedSkills, agentFocus, clearCanvasFiles, createAndOpenProject, currentProject, deleteCurrentProject, renameCurrentProject, saveCanvasProject, updateProject } = useCanvasProjectLifecycle({
+    const { loadError, retryLoad, addedSkills, agentFocus, clearCanvasFiles, createAndOpenProject, currentProject, deleteCurrentProject, renameCurrentProject, saveCanvasProject, saveCanvasProjectResult, updateProject } = useCanvasProjectLifecycle({
         projectId,
         projectLoaded,
         nodes,
@@ -500,16 +500,19 @@ function CanvasViewportPage() {
             connectionsRef.current = nextConnections;
             setNodes(nextNodes);
             setConnections(nextConnections);
-            const saved = await saveCanvasProject({ requireRemote: false });
-            if (!saved) {
+            // 本地已保存、云端仍在后台保存（大模板逐个保存素材常超过等待上限）时保留导入结果，
+            // 由同步层继续保存与重试；只有明确失败才撤销，避免「等太久就整批丢掉」。
+            const saved = await saveCanvasProjectResult({ requireRemote: false, silent: true });
+            if (saved === "failed") {
                 nodesRef.current = previousNodes;
                 connectionsRef.current = previousConnections;
                 setNodes(previousNodes);
                 setConnections(previousConnections);
                 throw new Error("画布保存失败，已撤销本次 LibTV 导入");
             }
+            return saved;
         },
-        [saveCanvasProject, setConnections, setNodes],
+        [saveCanvasProjectResult, setConnections, setNodes],
     );
     const applyTapNowImport = useCallback(
         async (importedNodes: CanvasNodeData[], importedConnections: CanvasConnection[]) => {
@@ -521,16 +524,19 @@ function CanvasViewportPage() {
             connectionsRef.current = nextConnections;
             setNodes(nextNodes);
             setConnections(nextConnections);
-            const saved = await saveCanvasProject({ requireRemote: false });
-            if (!saved) {
+            // 本地已保存、云端仍在后台保存（大模板逐个保存素材常超过等待上限）时保留导入结果，
+            // 由同步层继续保存与重试；只有明确失败才撤销，避免「等太久就整批丢掉」。
+            const saved = await saveCanvasProjectResult({ requireRemote: false, silent: true });
+            if (saved === "failed") {
                 nodesRef.current = previousNodes;
                 connectionsRef.current = previousConnections;
                 setNodes(previousNodes);
                 setConnections(previousConnections);
                 throw new Error("画布保存失败，已撤销本次 TapNow 导入");
             }
+            return saved;
         },
-        [saveCanvasProject, setConnections, setNodes],
+        [saveCanvasProjectResult, setConnections, setNodes],
     );
     const linkedProjectId = shortDramaEnabled ? currentProject?.projectId || "" : "";
     const linkedProjectQuery = useQuery({ queryKey: ["project", linkedProjectId], queryFn: () => getProject(linkedProjectId), enabled: Boolean(linkedProjectId) });
@@ -727,8 +733,9 @@ function CanvasViewportPage() {
     const applyLibTVDialogImport = useCallback(
         async (importedNodes: CanvasNodeData[], importedConnections: CanvasConnection[]) => {
             const fitAfterImport = Boolean(libTVImportTemplateUuid) && nodesRef.current.length === 0;
-            await applyLibTVImport(importedNodes, importedConnections);
+            const saved = await applyLibTVImport(importedNodes, importedConnections);
             if (fitAfterImport) fitCanvasContent();
+            return saved;
         },
         [applyLibTVImport, fitCanvasContent, libTVImportTemplateUuid],
     );

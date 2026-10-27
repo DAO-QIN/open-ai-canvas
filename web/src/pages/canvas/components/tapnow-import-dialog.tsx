@@ -1,3 +1,4 @@
+import type { CanvasSaveResult } from "@/pages/canvas/use-canvas-project-lifecycle";
 import { App, Button, Input, Modal, Tag } from "antd";
 import { CircleAlert, ExternalLink, Import, LoaderCircle } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -12,7 +13,8 @@ type Props = {
     viewport: ViewportTransform;
     viewportSize: { width: number; height: number };
     onClose: () => void;
-    onApply: (nodes: CanvasNodeData[], connections: CanvasConnection[]) => Promise<void>;
+    /** 返回 pending 表示已导入并保存在本机，云端仍在后台保存。 */
+    onApply: (nodes: CanvasNodeData[], connections: CanvasConnection[]) => Promise<CanvasSaveResult | void>;
 };
 
 function buildCanvasNodes(result: TapNowImportResult, viewport: ViewportTransform, viewportSize: { width: number; height: number }) {
@@ -91,10 +93,12 @@ export function TapNowImportDialog({ open, projectId, viewport, viewportSize, on
         if (!result) return;
         setLoading(true);
         try {
-            await onApply(buildCanvasNodes(result, viewport, viewportSize), result.connections);
+            const saved = await onApply(buildCanvasNodes(result, viewport, viewportSize), result.connections);
             reset();
             onClose();
-            message.success(`已导入 ${result.importedNodeCount} 个节点和 ${result.importedConnectionCount} 条连接`);
+            const summary = `已导入 ${result.importedNodeCount} 个节点和 ${result.importedConnectionCount} 条连接`;
+            if (saved === "pending") message.info(`${summary}，正在后台保存到云端，可以继续编辑`);
+            else message.success(`${summary}，已保存到云端`);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "保存导入结果失败");
         } finally {

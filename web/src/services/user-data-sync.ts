@@ -848,7 +848,7 @@ export function scheduleRemoteUserDataSync() {
     );
 }
 
-function isRetryableRemoteSyncError(error: unknown) {
+export function isRetryableRemoteSyncError(error: unknown) {
     if (error instanceof ApiError) return error.retryable || error.status === undefined || error.reason === "canvas_concurrent_write" || canReconcileCanvasRejection(error);
     if (error instanceof DOMException && error.name === "AbortError") return false;
     if (typeof error === "object" && error !== null && "permanent" in error) {
