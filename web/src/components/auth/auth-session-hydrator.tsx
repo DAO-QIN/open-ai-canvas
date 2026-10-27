@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { getAuthSession, type AuthSessionPayload } from "@/services/api/auth";
 import { FullScreenLoader } from "@/components/ui/aceternity/full-screen-loader";
 import { preloadWorkspaceRoute } from "@/lib/workspace-route-modules";
+import { useStartupProgressStore } from "@/stores/use-startup-progress-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { recordDiagnosticEvent } from "@/services/diagnostics/client-diagnostics";
 
@@ -13,6 +14,7 @@ export function AuthSessionHydrator({ children }: { children: ReactNode }) {
     useEffect(() => {
         let cancelled = false;
         const startedAt = performance.now();
+        useStartupProgressStore.getState().setStep("account");
         recordDiagnosticEvent({ category: "navigation", level: "info", code: "startup.auth_session_started", message: "开始恢复认证会话" });
         getAuthSession()
             .then(async (payload) => {
@@ -26,6 +28,7 @@ export function AuthSessionHydrator({ children }: { children: ReactNode }) {
                 });
                 if (!payload.user) {
                     await applyAnonymousSession(payload);
+                    useStartupProgressStore.getState().setStep(null);
                     recordDiagnosticEvent({
                         category: "navigation",
                         level: "info",
@@ -35,10 +38,12 @@ export function AuthSessionHydrator({ children }: { children: ReactNode }) {
                     });
                     return;
                 }
+                useStartupProgressStore.getState().setStep("workspace");
                 // 账号数据、画布和素材持久化只属于已登录工作区，登录页不下载这些模块。
                 const { applyUserSession } = await import("@/lib/user-session");
                 if (cancelled) return;
                 await applyUserSession(payload);
+                useStartupProgressStore.getState().setStep(null);
                 recordDiagnosticEvent({
                     category: "navigation",
                     level: "info",
@@ -51,6 +56,7 @@ export function AuthSessionHydrator({ children }: { children: ReactNode }) {
             .catch(async () => {
                 if (!cancelled) {
                     await applyAnonymousSession({ user: null });
+                    useStartupProgressStore.getState().setStep(null);
                     recordDiagnosticEvent({
                         category: "navigation",
                         level: "warning",

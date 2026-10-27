@@ -94,13 +94,21 @@ describe("workspace route loading", () => {
         expect(announcements).toContain('lazy(() => import("@/components/ui/aceternity/announcement-timeline-modal")');
     });
 
-    test("uses a quiet workspace skeleton for initial hydration", () => {
+    test("renders the scan reveal loader with real startup steps", () => {
         const loader = source("../src/components/ui/aceternity/full-screen-loader.tsx");
+        const hydrator = source("../src/components/auth/auth-session-hydrator.tsx");
         const css = source("../src/styles/globals.css");
 
         expect(loader).toContain("full-screen-loader-scene");
-        expect(loader).toContain("full-screen-loader-guide");
+        expect(loader).toContain("full-screen-loader-beam");
+        expect(loader).toContain("LoaderRippleField");
+        expect(loader).toContain("useStartupProgressStore");
         expect(loader).toContain("LoadingSignal");
+        expect(hydrator).toContain('setStep("account")');
+        expect(hydrator).toContain('setStep("workspace")');
+        expect(hydrator).toContain("setStep(null)");
+        expect(css).toContain("@keyframes loader-scan-reveal");
+        expect(css).not.toContain("@keyframes loader-orbit-spin");
         expect(loader).not.toContain("YINGCE STUDIO");
         expect(loader).not.toContain("loading-cue");
         expect(css).toContain("@keyframes loading-signal-spin");
