@@ -106,6 +106,11 @@ func catalogReferences(pets []PetAppearance, kind, id string) bool {
 }
 
 func (s *Service) validatePetCatalog(actor *model.User, a *AppearanceSetting, before AppearanceSetting) error {
+	// The shared assistant editor keeps former catalog assets as an unmodified archive.
+	if a.Canvas.DefaultPetID == "" {
+		a.PetCatalog = before.PetCatalog
+		return nil
+	}
 	// An older editor may update only the default presentation; preserve that operation.
 	if a.PetCatalog == nil {
 		seedPetCatalog(a)

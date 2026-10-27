@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"strconv"
 	"testing"
 	"yingce/backend/internal/model"
@@ -37,6 +38,36 @@ func TestPetCatalogBundleCoexistsAndRevokesPublicAccess(t *testing.T) {
 	}
 	if _, _, err = s.AgentAvatarBundleAsset(nil, bundle.ResourceID, "idle.mp4"); err == nil {
 		t.Fatal("unpublished catalog bundle remained public")
+	}
+}
+
+func TestSharedAssistantKeepsCatalogArchiveWithoutApplyingDefault(t *testing.T) {
+	s, _, _, admin := newAppearanceTestService(t)
+	value := defaultAppearanceSetting()
+	seedPetCatalog(&value)
+	saved, err := s.UpdateAppearance(admin, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive, _ := json.Marshal(saved.PetCatalog)
+	value = saved.AppearanceSetting
+	value.Canvas.DefaultPetID = ""
+	value.Canvas.AvatarType = "orb"
+	value.Canvas.AvatarHeight = 180
+	value.PetCatalog = nil
+	saved, err = s.UpdateAppearance(admin, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, _ := json.Marshal(saved.PetCatalog)
+	if string(current) != string(archive) || saved.Canvas.AvatarType != "orb" || saved.Canvas.AvatarHeight != 180 || saved.Canvas.DefaultPetID != "" {
+		t.Fatal("archive overrode shared assistant")
+	}
+	value = saved.AppearanceSetting
+	value.Canvas.AvatarType = "bundle"
+	saved, err = s.UpdateAppearance(admin, value)
+	if err != nil || saved.Canvas.AvatarType != "bundle" {
+		t.Fatalf("shared bundle could not be saved: %v", err)
 	}
 }
 

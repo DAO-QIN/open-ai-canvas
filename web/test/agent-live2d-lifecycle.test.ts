@@ -16,9 +16,15 @@ test("Live2D launcher remains mounted while the Agent panel is open", () => {
 });
 
 test("launcher waits for appearance configuration before displaying the default orb", () => {
-    expect(launcherSource).toContain("usePetAppearance()");
-    expect(launcherSource).toContain("{resolved ? (");
+    expect(launcherSource).toContain("bundleManifestLoading || !appearanceResolved");
     expect(launcherSource).toContain("正在加载助手形象");
+});
+
+test("assistant launcher uses shared animation states and a compact toggle without a pet picker", () => {
+    expect(launcherSource).toContain("agentAvatarStateForRunStatus(status)");
+    expect(launcherSource).toContain("AGENT_LAUNCHER_COLLAPSED_SIZE = 48");
+    expect(launcherSource).not.toContain("PetRadialMenu");
+    expect(launcherSource).not.toContain("usePetPreference");
 });
 
 test("Live2D fallback is reserved for load or render failures and yielded render slots, not initial loading", () => {

@@ -784,12 +784,16 @@ func appearanceResourceID(value AppearanceSetting, slot string) string {
 
 func publicAppearanceSetting(setting *model.SystemSetting, value AppearanceSetting) *PublicAppearanceSetting {
 	seedPetCatalog(&value)
+	catalog := publishedPets(value.PetCatalog)
+	if value.Canvas.DefaultPetID == "" {
+		catalog = []PetAppearance{}
+	}
 	revision := "builtin"
 	if setting != nil {
 		revision = strconv.FormatInt(setting.UpdatedAt.UTC().UnixNano(), 36)
 	}
 	result := &PublicAppearanceSetting{
-		PetCatalog:          publishedPets(value.PetCatalog),
+		PetCatalog:          catalog,
 		Updates:             publicUpdateAnnouncement(value.Updates, revision),
 		Canvas:              value.Canvas,
 		SchemaVersion:       appearanceSchemaVersion,

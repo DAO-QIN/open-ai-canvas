@@ -9,14 +9,13 @@ import { Switch } from "@/pages/admin/ui/controls";
 import { WelcomeSetting } from "@/pages/admin/settings/components/welcome-setting";
 import { SkinThemeEditor } from "@/pages/admin/settings/components/skin-theme-editor";
 import { CanvasAppearanceEditor } from "./components/canvas-appearance-editor";
-import { validateSpritePet } from "@/lib/canvas/sprite-pet";
 import { UpdateAnnouncementEditor } from "./components/update-announcement-editor";
 import { DEFAULT_UPDATE_ANNOUNCEMENT, normalizeUpdateAnnouncement, validateUpdateAnnouncement, type UpdateAnnouncement } from "@/lib/update-announcement";
 import { App, Button, Tabs, Form, Input } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBlocker } from "react-router";
 import { cloneSkinDefinition, DEFAULT_CLASSIC_SKIN, normalizeSkinDefinition, type SkinDefinition, duplicateSkinDefinition } from "@/lib/skin-themes";
-import { DEFAULT_CANVAS_APPEARANCE, type CanvasAppearance } from "@/lib/canvas/agent-appearance";
+import { assistantAppearance, DEFAULT_CANVAS_APPEARANCE, type CanvasAppearance } from "@/lib/canvas/agent-appearance";
 import { getAdminAppearance, type AdminAppearance, type AppearanceAssetSlot, resetAdminAppearance, uploadAppearanceAsset, updateAdminAppearance } from "@/services/api/appearance";
 import { normalizeDraftCopy, normalizeSingleLine, hasUnsupportedControlCharacter, validateSkinDrafts, useAppearancePreviews, AppearanceSkeleton, AssetPicker, LogoThemePreview, FaviconPreview } from "./appearance-settings-parts";
 import { type DraftFiles, FILE_RULES, type ResetState } from "./appearance-settings-parts";
@@ -98,7 +97,7 @@ export default function AppearanceSettingsPage() {
         const selectedID = themes.some((theme) => theme.id === value.skinId) ? value.skinId : "classic";
         setSetting({ ...value, skinThemes: themes, skinId: selectedID });
         setBrandName(value.brandName);
-        setCanvas(value.canvas || DEFAULT_CANVAS_APPEARANCE);
+        setCanvas(assistantAppearance(value.canvas || DEFAULT_CANVAS_APPEARANCE));
         setPetCatalog(value.petCatalog || []);
         setUpdates(normalizeUpdateAnnouncement(value.updates));
         setBrandSlug(value.brandSlug);
@@ -212,7 +211,7 @@ export default function AppearanceSettingsPage() {
 
     const discardDraft = () => {
         if (!setting || saving || restoring || canvasUploading) return;
-        setCanvas(setting.canvas || DEFAULT_CANVAS_APPEARANCE);
+        setCanvas(assistantAppearance(setting.canvas || DEFAULT_CANVAS_APPEARANCE));
         setPetCatalog(setting.petCatalog || []);
         setUpdates(normalizeUpdateAnnouncement(setting.updates));
         setBrandName(setting.brandName);
@@ -287,12 +286,6 @@ export default function AppearanceSettingsPage() {
 
     const save = async () => {
         if (!setting || saving || restoring || canvasUploading) return;
-        const spriteError = canvas.sprite ? validateSpritePet(canvas.sprite) : "";
-        if (spriteError) {
-            setActiveTab("canvas");
-            message.error(spriteError);
-            return;
-        }
         const updatesError = validateUpdateAnnouncement(updates);
         if (updatesError) {
             setActiveTab("updates");
@@ -860,7 +853,7 @@ export default function AppearanceSettingsPage() {
                             {
                                 key: "canvas",
                                 label: "画布配置",
-                                children: <CanvasAppearanceEditor value={canvas} onChange={setCanvas} catalog={petCatalog} onCatalogChange={setPetCatalog} disabled={saving || refreshing || restoring || canvasUploading} onUploading={setCanvasUploading} />,
+                                children: <CanvasAppearanceEditor value={canvas} onChange={setCanvas} disabled={saving || refreshing || restoring || canvasUploading} onUploading={setCanvasUploading} />,
                             },
                             { key: "updates", label: "更新公告", children: <UpdateAnnouncementEditor value={updates} onChange={setUpdates} disabled={saving || refreshing || restoring || canvasUploading} onUploading={setCanvasUploading} /> },
                         ]}

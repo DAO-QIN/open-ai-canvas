@@ -113,3 +113,14 @@ export const DEFAULT_CANVAS_APPEARANCE: CanvasAppearance = {
 export function agentCopy(template: string, name: string) {
     return template.replaceAll("{agentName}", () => name);
 }
+
+/** Retired personal sprite choices must not override the shared assistant presentation. */
+export function assistantAppearance(value: CanvasAppearance): CanvasAppearance {
+    return {
+        ...value,
+        defaultPetId: "",
+        avatarType: value.avatarType === "sprite" ? "bundle" : value.avatarType,
+        spriteResourceId: "",
+        sprite: undefined,
+    };
+}

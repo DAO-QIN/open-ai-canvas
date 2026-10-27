@@ -72,7 +72,6 @@ import { useAgentPanelLayout } from "./use-agent-panel-layout";
 import "./canvas-cloud-agent.css";
 import { appendAgentError, appendUniqueMessage, applyAgentEvent, positiveNumber, type ApprovalState } from "./canvas-cloud-agent-events";
 import { AgentContextRing, AgentConversation, AgentHeader, AgentHistory, AgentLauncher, ComposerControls } from "./canvas-cloud-agent-panel-parts";
-import { useSpriteRunState } from "./use-sprite-run-state";
 import { AgentConnectorsBar } from "./canvas-cloud-agent-connectors";
 import { useGlobalAgentStore, type AgentPrefillRequest } from "@/stores/use-global-agent-store";
 
@@ -385,7 +384,6 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
         [busy, conversationScope, historyHydrated, installedSkillIds, pendingHydrated, running],
     );
     const status = run?.status || "idle";
-    const petState = useSpriteRunState({ runId: run?.id, status, cleanupPending: run?.cleanupPending, waitingUser: Boolean(pendingQuestion), approvalPending: Boolean(approval), connected: connectionStatus === "connected" });
     const statusLabel =
         status === "waiting_approval"
             ? "等待审批"
@@ -1396,7 +1394,7 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
 
     return (
         <>
-            <AgentLauncher theme={theme} statusColor={statusColor} approvalPending={Boolean(approval)} reducedMotion={Boolean(reducedMotion)} hidden={open} onOpen={onOpen} petState={petState} />
+            <AgentLauncher theme={theme} statusColor={statusColor} approvalPending={Boolean(approval)} reducedMotion={Boolean(reducedMotion)} hidden={open} onOpen={onOpen} status={status} />
             <AnimatePresence>
                 {open ? (
                     <motion.aside

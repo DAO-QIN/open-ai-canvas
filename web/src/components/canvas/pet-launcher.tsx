@@ -1,302 +1,180 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { type CSSProperties, useEffect, useState } from "react";
+import { motion } from "motion/react";
 import { LoaderCircle, Maximize2, Minus } from "lucide-react";
-import { FluidOrb } from "@/components/ui/fluid-orb";
-import type { CanvasTheme } from "@/lib/canvas-theme";
-import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
-import { effectivePet, petAvatarSize, petStatusPosition } from "@/lib/canvas/pet-menu";
-import { usePetPreference } from "@/stores/use-pet-preference";
-import { usePetAppearance } from "@/hooks/use-pet-appearance";
-import { usePetReducedMotion } from "@/hooks/use-pet-reduced-motion";
+import { useAppearanceStore } from "@/stores/use-appearance-store";
+import { agentAvatarClipForState, agentAvatarStateForRunStatus, assistantAppearance, DEFAULT_CANVAS_APPEARANCE, isAgentAvatarBundleManifest, type AgentAvatarBundleManifest } from "@/lib/canvas/agent-appearance";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import type { CanvasTheme } from "@/lib/canvas-theme";
+import { cn } from "@/lib/utils";
+import { Live2DAvatar } from "./live2d-avatar";
+import { agentAvatarBundleFileURL, live2DModelURL } from "@/services/api/appearance";
+import { AgentAvatarVideo } from "./agent-avatar-video";
+import { FluidOrb } from "@/components/ui/fluid-orb";
 import { useAgentLauncherPosition } from "./use-agent-launcher-position";
-import { PetAvatar } from "./pet-avatar";
-import { PetAppearanceTransition } from "./pet-appearance-transition";
-import { PetRadialMenu } from "./pet-radial-menu";
-import "./pet-radial-menu.css";
 
 export function AgentLauncher({
     theme,
     statusColor,
     approvalPending,
     reducedMotion,
+    status,
     hidden = false,
     onOpen,
-    petState,
 }: {
     theme: CanvasTheme;
     statusColor: string;
     approvalPending: boolean;
     reducedMotion: boolean;
+    status: string;
     hidden?: boolean;
     onOpen: () => void;
-    petState?: SpriteRunState;
 }) {
-    const { base, catalog, scope, store, preference, available, modelId, appearance: current, resolved } = usePetAppearance();
-    const [collapsed, setCollapsed] = useState(() => {
-        try {
-            return localStorage.getItem("canvas:agent-launcher-collapsed:v1") === "1";
-        } catch {
-            return false;
-        }
-    });
-    const toggleCollapsed = () => {
-        setMenu(null);
-        setCollapsed(!collapsed);
-        try {
-            localStorage.setItem("canvas:agent-launcher-collapsed:v1", collapsed ? "0" : "1");
-        } catch {
-            /* The current session can still toggle without storage. */
-        }
-    };
-    const mediaReduced = usePetReducedMotion(),
-        motionReduced = mediaReduced || reducedMotion;
-    const [previewScale, setPreviewScale] = useState<number | null>(null),
-        [menu, setMenu] = useState<DOMRect | null>(null),
-        [candidate, setCandidate] = useState<string | null>(null),
-        [switchError, setSwitchError] = useState("");
-    const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+    const appearance = assistantAppearance(useAppearanceStore((state) => state.appearance.canvas) || DEFAULT_CANVAS_APPEARANCE);
+    const appearanceResolved = useAppearanceStore((state) => state.resolved);
+    const appearanceRevision = useAppearanceStore((state) => state.appearance.revision);
+    const live = appearance.avatarType === "live2d" && Boolean(appearance.live2dResourceId && appearance.live2dEntry);
+    const avatarState = agentAvatarStateForRunStatus(status);
     const compact = useMediaQuery("(max-width: 720px)");
-    const [editing, setEditing] = useState(false);
+    const bundleManifestURL = appearance.avatarBundleResourceId ? agentAvatarBundleFileURL(appearance.avatarBundleResourceId, "avatar.json", false, appearanceRevision) : "/doll/avatar.json";
+    const [bundleManifestState, setBundleManifestState] = useState<{ url: string; manifest: AgentAvatarBundleManifest | null } | null>(null);
     useEffect(() => {
-        if (!compact) return;
-        const update = () => setEditing(Boolean(document.activeElement?.matches('input, textarea, [contenteditable="true"]')));
-        update();
-        document.addEventListener("focusin", update);
-        document.addEventListener("focusout", update);
-        return () => {
-            document.removeEventListener("focusin", update);
-            document.removeEventListener("focusout", update);
-        };
-    }, [compact]);
-    const launcherHidden = hidden || (compact && editing);
-    const ref = useRef<HTMLButtonElement>(null),
-        timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
-        touch = useRef<{ x: number; y: number } | null>(null),
-        longPressed = useRef(false),
-        suppress = useRef(false),
-        actor = useRef(scope);
-    actor.current = scope;
-    useEffect(() => {
-        setMenu(null);
-        setCandidate(null);
-        setPreviewScale(null);
-        setSwitchError("");
-    }, [scope]);
-    useEffect(() => {
-        const resize = () => setViewport({ width: innerWidth, height: innerHeight });
-        window.addEventListener("resize", resize);
-        return () => {
-            window.removeEventListener("resize", resize);
-            clearTimeout(timer.current);
-        };
-    }, [scope]);
-    const requested = (base.avatarHeight * (previewScale ?? preference.scale)) / 100;
-    const height = collapsed ? 48 : Math.max(24, Math.min(requested, compact ? 72 : 360, viewport.height - 80, viewport.width - 40)),
-        width = height;
-    const update = useCallback(
-        (patch: Partial<typeof preference>) => {
-            if (actor.current !== scope || usePetPreference.getState().scope !== scope) return;
-            usePetPreference.getState().update({ modelId, ...patch });
-        },
-        [modelId, scope],
-    );
-    const { position, dragging, moveDirection, handlers } = useAgentLauncherPosition(
-        () => {
-            if (!suppress.current && !longPressed.current) onOpen();
-            suppress.current = false;
-            longPressed.current = false;
-        },
-        width,
-        height,
-    );
-    const openMenu = useCallback(() => {
-        clearTimeout(timer.current);
-        const box = ref.current?.getBoundingClientRect();
-        setMenu(box && box.width ? box : new DOMRect(innerWidth - position.right - width, innerHeight - position.bottom - height, width, height));
-    }, [position.right, position.bottom, width, height]);
-    const launcherPosition = compact ? { ...position, bottom: `max(${position.bottom}px, calc(80px + env(safe-area-inset-bottom)))` } : position;
-    useEffect(() => {
-        const open = () => openMenu();
-        window.addEventListener("yinghui:pet-settings", open);
-        return () => window.removeEventListener("yinghui:pet-settings", open);
-    }, [openMenu]);
-    const closeMenu = useCallback(() => {
-        setMenu(null);
-        setPreviewScale(null);
-    }, []);
-    const choose = (id: string) => {
-        setSwitchError("");
-        if (id === modelId) return;
-        if ((id === "system" && base.avatarType === "orb") || (id !== "system" && catalog.find((p) => p.id === id)?.avatarType === "orb")) {
-            update({ modelId: id });
+        if (appearance.avatarType !== "bundle") {
+            setBundleManifestState(null);
             return;
         }
-        setCandidate(id);
+        const controller = new AbortController();
+        void (async () => {
+            try {
+                const response = await fetch(bundleManifestURL, { credentials: "include", signal: controller.signal });
+                if (!response.ok) throw new Error(`无法读取 Agent 动画包（HTTP ${response.status}）`);
+                const manifest: unknown = await response.json();
+                if (!isAgentAvatarBundleManifest(manifest)) throw new Error("avatar.json 格式无效");
+                setBundleManifestState({ url: bundleManifestURL, manifest });
+            } catch {
+                if (!controller.signal.aborted) setBundleManifestState({ url: bundleManifestURL, manifest: null });
+            }
+        })();
+        return () => controller.abort();
+    }, [appearance.avatarType, bundleManifestURL]);
+    const currentBundleManifestState = bundleManifestState?.url === bundleManifestURL ? bundleManifestState : null;
+    const bundleManifest = currentBundleManifestState?.manifest ?? null;
+    const bundleManifestLoading = appearance.avatarType === "bundle" && currentBundleManifestState === null;
+    const clip = bundleManifest ? agentAvatarClipForState(appearance, avatarState, bundleManifest) : "";
+    const clipFile = bundleManifest?.clips[clip] || "";
+    const mediaURL = appearance.avatarType === "bundle" && clipFile ? (appearance.avatarBundleResourceId ? agentAvatarBundleFileURL(appearance.avatarBundleResourceId, clipFile, false, appearanceRevision) : `/doll/${encodeURIComponent(clipFile)}`) : "";
+    const [mediaError, setMediaError] = useState(false);
+    useEffect(() => setMediaError(false), [mediaURL]);
+    const [live2DError, setLive2DError] = useState("");
+    const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+    useEffect(() => {
+        const resize = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
+        window.addEventListener("resize", resize);
+        return () => window.removeEventListener("resize", resize);
+    }, []);
+    const [collapsed, setCollapsed] = useState(readAgentLauncherCollapsed);
+    const toggleCollapsed = () => {
+        const next = !collapsed;
+        setCollapsed(next);
+        try {
+            if (next) localStorage.setItem(AGENT_LAUNCHER_COLLAPSED_KEY, "1");
+            else localStorage.removeItem(AGENT_LAUNCHER_COLLAPSED_KEY);
+        } catch (error) {
+            console.warn("Agent 形象收起状态无法保存", error);
+        }
     };
-    const prepared = candidate ? effectivePet(base, catalog, candidate) : null;
-    const candidateScope = scope;
+    const media = Boolean(mediaURL && !mediaError);
+    const aspectRatio = live ? 0.75 : bundleManifest ? bundleManifest.width / bundleManifest.height : appearance.avatarType === "bundle" ? 480 / 432 : 1;
+    const largeAvatar = live || media || bundleManifestLoading;
+    // 收起后只留小圆球入口：不加载 Live2D / 动画，也不挡画布。位置以右下角为锚点，收起展开不跳位。
+    const keepsAvatarSize = largeAvatar && !collapsed;
+    const height = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.max(40, Math.min(compact ? Math.min(appearance.avatarHeight, 96) : appearance.avatarHeight, viewport.height - 60, (viewport.width - 40) / aspectRatio)) : 76;
+    const width = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.round(height * aspectRatio) : 76;
+    const { position, dragging, handlers } = useAgentLauncherPosition(onOpen, width, height);
+    const showToggle = !hidden && (largeAvatar || collapsed);
     return (
         <>
             <motion.button
-                ref={ref}
                 type="button"
-                aria-label={`打开${base.agentName}`}
-                aria-haspopup="dialog"
-                title="点击对话 · 拖动移动 · 右键设置"
-                className={`canvas-agent-launcher pet-personal-launcher canvas-agent-launcher-live2d fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35 ${dragging ? "is-dragging" : ""}`}
-                style={
-                    {
-                        ...launcherPosition,
-                        width,
-                        height,
-                        color: theme.node.text,
-                        "--canvas-agent-launcher-shadow": theme.spatial.shadow,
-                        "--canvas-pet-inset": `${current.avatarType === "orb" ? (height - petAvatarSize(current, height).height) / 2 : 0}px`,
-                        ...(launcherHidden ? { display: "none" } : null),
-                    } as CSSProperties & Record<`--${string}`, string>
-                }
-                aria-hidden={launcherHidden || undefined}
-                tabIndex={launcherHidden ? -1 : undefined}
+                aria-label={`打开${appearance.agentName}`}
+                title={live && live2DError ? live2DError : `${approvalPending ? "Agent 等待你的审批" : "打开 Agent 助手"} · 拖动可调整位置，聚焦后可用方向键移动`}
+                className={cn(
+                    "canvas-agent-launcher fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35",
+                    dragging && "is-dragging",
+                    collapsed && "is-collapsed",
+                    keepsAvatarSize && live && "canvas-agent-launcher-live2d",
+                    keepsAvatarSize && media && "canvas-agent-launcher-media",
+                )}
+                style={{ ...position, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden ? { display: "none" } : null) } as CSSProperties}
+                aria-hidden={hidden || undefined}
+                tabIndex={hidden ? -1 : undefined}
                 data-canvas-no-zoom
-                onContextMenu={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openMenu();
-                }}
-                onPointerDown={(e) => {
-                    e.stopPropagation();
-                    if (e.button === 0) suppress.current = false;
-                    longPressed.current = false;
-                    if (e.pointerType === "touch") {
-                        touch.current = { x: e.clientX, y: e.clientY };
-                        timer.current = setTimeout(() => {
-                            longPressed.current = true;
-                            suppress.current = true;
-                            openMenu();
-                        }, 500);
-                    }
-                    if (!preference.locked && !menu) handlers.onPointerDown(e);
-                }}
-                onPointerMove={(e) => {
-                    if (touch.current && Math.hypot(e.clientX - touch.current.x, e.clientY - touch.current.y) >= 6) clearTimeout(timer.current);
-                    if (!preference.locked && !longPressed.current) handlers.onPointerMove(e);
-                    else e.stopPropagation();
-                }}
-                onPointerUp={(e) => {
-                    clearTimeout(timer.current);
-                    touch.current = null;
-                    if (longPressed.current) handlers.onPointerCancel(e);
-                    else handlers.onPointerUp(e);
-                }}
-                onPointerCancel={(e) => {
-                    clearTimeout(timer.current);
-                    touch.current = null;
-                    handlers.onPointerCancel(e);
-                }}
-                onLostPointerCapture={handlers.onLostPointerCapture}
-                onClick={(e) => {
-                    if (suppress.current || longPressed.current) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        suppress.current = false;
-                        longPressed.current = false;
-                        return;
-                    }
-                    handlers.onClick(e);
-                }}
-                onKeyDown={(e) => {
-                    if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openMenu();
-                        return;
-                    }
-                    if (preference.locked && e.key.startsWith("Arrow")) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return;
-                    }
-                    handlers.onKeyDown(e);
-                }}
-                onDoubleClick={handlers.onDoubleClick}
-                transition={{ duration: motionReduced ? 0 : 0.16 }}
+                onDragStart={(event) => event.preventDefault()}
+                {...handlers}
+                whileHover={reducedMotion || dragging ? undefined : { scale: 1.035 }}
+                whileTap={reducedMotion || dragging ? undefined : { scale: 0.96 }}
+                transition={{ duration: reducedMotion ? 0 : 0.18 }}
             >
-                {collapsed ? <FluidOrb size={32} /> : null}
-                <span style={{ display: collapsed ? "none" : "contents" }}>
-                    <PetAppearanceTransition appearance={current} resolved={resolved} reducedMotion={motionReduced || launcherHidden || collapsed}>
-                        {resolved ? (
-                            <PetAvatar appearance={current} height={height} paused={launcherHidden || collapsed} reducedMotion={motionReduced} state={petState} moveDirection={moveDirection} />
-                        ) : (
-                            <span role="status" aria-busy="true">
-                                <LoaderCircle className="size-6 motion-safe:animate-spin" aria-hidden />
-                                <span className="sr-only">正在加载助手形象</span>
-                            </span>
-                        )}
-                    </PetAppearanceTransition>
-                </span>
-                {base.launcherLabel || approvalPending ? (
-                    <span className={`canvas-agent-launcher-label ${approvalPending ? "is-pending" : ""}`} title={approvalPending ? "待审批" : base.launcherLabel}>
-                        {approvalPending ? "待审批" : base.launcherLabel}
+                {collapsed ? (
+                    <FluidOrb size={30} color="#7164f6" />
+                ) : live ? (
+                    <Live2DAvatar
+                        url={live2DModelURL(appearance.live2dResourceId, appearance.live2dEntry)}
+                        width={width}
+                        height={height}
+                        reducedMotion={reducedMotion}
+                        fallback={<FluidOrb size={60} color="#7164f6" />}
+                        onReady={() => setLive2DError("")}
+                        onError={setLive2DError}
+                    />
+                ) : mediaURL && !mediaError ? (
+                    <AgentAvatarVideo src={mediaURL} paused={hidden} reducedMotion={reducedMotion} loop={!["completed", "failed", "cancelled", "rejected"].includes(avatarState)} onError={() => setMediaError(true)} />
+                ) : bundleManifestLoading || !appearanceResolved ? (
+                    <span role="status" aria-busy="true">
+                        <LoaderCircle className={reducedMotion ? "size-6" : "size-6 motion-safe:animate-spin"} aria-hidden="true" />
+                        <span className="sr-only">正在加载助手形象</span>
+                    </span>
+                ) : (
+                    <FluidOrb size={60} color="#7164f6" />
+                )}
+                {appearance.launcherLabel && !collapsed ? <span className="canvas-agent-launcher-label">{appearance.launcherLabel}</span> : null}
+                {live && live2DError ? (
+                    <span className="sr-only" role="status">
+                        {live2DError}
                     </span>
                 ) : null}
-                <span aria-hidden="true" className={`canvas-agent-launcher-status ${approvalPending ? "is-pending" : ""}`} style={{ ...petStatusPosition(current, height), "--canvas-agent-status-color": statusColor } as CSSProperties} />
+                <span className={cn("canvas-agent-launcher-status", approvalPending && "is-pending")} style={{ "--canvas-agent-status-color": statusColor } as CSSProperties} />
+                {approvalPending ? <span className="canvas-agent-launcher-badge">待审批</span> : null}
             </motion.button>
-            {!launcherHidden ? (
+            {showToggle ? (
                 <button
                     type="button"
-                    className="canvas-agent-launcher-toggle fixed z-[calc(var(--z-toast)+2)]"
-                    style={{ right: launcherPosition.right + width - 22, bottom: `calc(${typeof launcherPosition.bottom === "number" ? `${launcherPosition.bottom}px` : launcherPosition.bottom} + ${height - 22}px)` }}
-                    aria-label={collapsed ? "展开助手形象" : "收起助手形象"}
-                    title={collapsed ? "展开形象" : "收起为小圆球"}
-                    onClick={toggleCollapsed}
+                    className="canvas-agent-launcher-toggle fixed z-[calc(var(--z-toast)+2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35"
+                    style={{ right: position.right + width - 14, bottom: position.bottom + height - 14, color: theme.node.text } as CSSProperties}
+                    aria-label={collapsed ? `展开${appearance.agentName}形象` : `收起${appearance.agentName}形象`}
+                    aria-pressed={collapsed}
+                    title={collapsed ? "展开形象" : "收起形象，只保留小入口"}
+                    data-canvas-no-zoom
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        toggleCollapsed();
+                    }}
                 >
-                    {collapsed ? <Maximize2 className="size-3" /> : <Minus className="size-3" />}
+                    {collapsed ? <Maximize2 className="size-3" aria-hidden="true" /> : <Minus className="size-3" aria-hidden="true" />}
                 </button>
             ) : null}
-            {prepared && candidate ? (
-                <div className="pet-prepare-layer" aria-hidden>
-                    <PetAvatar
-                        key={candidate}
-                        appearance={prepared}
-                        height={120}
-                        reducedMotion
-                        paused={false}
-                        onReady={() => {
-                            if (actor.current === candidateScope) {
-                                update({ modelId: candidate });
-                                setCandidate(null);
-                            }
-                        }}
-                        onError={(detail) => {
-                            if (actor.current === candidateScope) {
-                                setCandidate(null);
-                                setSwitchError(detail + "，已保留原形象");
-                            }
-                        }}
-                    />
-                </div>
-            ) : null}
-            <AnimatePresence>
-                {menu ? (
-                    <PetRadialMenu
-                        key="pet-menu"
-                        reducedMotion={motionReduced}
-                        anchor={new DOMRect(viewport.width - position.right - width, viewport.height - position.bottom - height, width, height)}
-                        catalog={catalog}
-                        preference={{ ...preference, modelId }}
-                        onChange={update}
-                        onSelect={choose}
-                        onClose={closeMenu}
-                        onPreviewScale={setPreviewScale}
-                        error={switchError || store.error || (!available ? "原形象已下架，已跟随系统" : "")}
-                        saving={store.saving}
-                        onRetry={() => void store.retry()}
-                        busy={candidate !== null}
-                        loading={store.loading || store.scope !== scope}
-                    />
-                ) : null}
-            </AnimatePresence>
         </>
     );
 }
+
+const AGENT_LAUNCHER_COLLAPSED_KEY = "canvas:agent-launcher-collapsed:v1";
+const AGENT_LAUNCHER_COLLAPSED_SIZE = 48;
+
+function readAgentLauncherCollapsed() {
+    try {
+        return localStorage.getItem(AGENT_LAUNCHER_COLLAPSED_KEY) === "1";
+    } catch {
+        return false;
+    }
+}
+
