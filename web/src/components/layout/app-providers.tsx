@@ -23,7 +23,7 @@ function ClientRootBoundary({ children }: { children: ReactNode }) {
     const authenticated = useUserStore((state) => Boolean(state.user));
     if (!authenticated) return children;
     return (
-        <Suspense fallback={<FullScreenLoader step="environment" label="正在准备创作环境" detail="连接本地能力与模型配置" />}>
+        <Suspense fallback={<FullScreenLoader label="正在准备创作环境" detail="连接本地能力与模型配置" />}>
             <ClientRootInit>{children}</ClientRootInit>
         </Suspense>
     );

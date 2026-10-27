@@ -94,26 +94,24 @@ describe("workspace route loading", () => {
         expect(announcements).toContain('lazy(() => import("@/components/ui/aceternity/announcement-timeline-modal")');
     });
 
-    test("renders the scan reveal loader with real startup steps", () => {
+    test("uses the dot ripple for every loading transition", () => {
         const loader = source("../src/components/ui/aceternity/full-screen-loader.tsx");
-        const hydrator = source("../src/components/auth/auth-session-hydrator.tsx");
+        const field = source("../src/components/ui/aceternity/dot-ripple-field.tsx");
+        const canvasShell = source("../src/pages/canvas/canvas-refresh-shell.tsx");
         const css = source("../src/styles/globals.css");
 
-        expect(loader).toContain("full-screen-loader-scene");
-        expect(loader).toContain("full-screen-loader-beam");
-        expect(loader).toContain("LoaderRippleField");
-        expect(loader).toContain("useStartupProgressStore");
-        expect(loader).toContain("LoadingSignal");
-        expect(hydrator).toContain('setStep("account")');
-        expect(hydrator).toContain('setStep("workspace")');
-        expect(hydrator).toContain("setStep(null)");
-        expect(css).toContain("@keyframes loader-scan-reveal");
-        expect(css).not.toContain("@keyframes loader-orbit-spin");
-        expect(loader).not.toContain("YINGCE STUDIO");
-        expect(loader).not.toContain("loading-cue");
-        expect(css).toContain("@keyframes loading-signal-spin");
+        expect(loader).toContain("<DotRippleField");
+        expect(canvasShell).toContain("<DotRippleField");
+        expect(field).toContain("prefers-reduced-motion: reduce");
+        expect(field).toContain("--ripple-pulse");
+        expect(css).toContain("@keyframes loader-ring-ripple");
         expect(css).toContain("@media (prefers-reduced-motion: reduce)");
-        expect(css).not.toContain("@keyframes loading-cue-pulse");
+        for (const removed of ["loader-scan-reveal", "loader-orbit-spin", "loading-signal-spin", "loader-surface-enter", "loading-cue-pulse"]) {
+            expect(css).not.toContain(`@keyframes ${removed}`);
+        }
+        for (const removed of ["LoadingSignal", "full-screen-loader-scene", "full-screen-loader-steps", "YINGCE STUDIO", "loading-cue"]) {
+            expect(loader).not.toContain(removed);
+        }
     });
 });
 

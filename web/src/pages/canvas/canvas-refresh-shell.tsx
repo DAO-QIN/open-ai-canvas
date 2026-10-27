@@ -1,3 +1,5 @@
+import { DotRippleField } from "@/components/ui/aceternity/dot-ripple-field";
+
 export function CanvasRefreshShell() {
     return (
         <main className="relative h-full min-h-0 overflow-hidden bg-background text-foreground">
@@ -8,6 +10,8 @@ export function CanvasRefreshShell() {
                     backgroundSize: "28px 28px",
                 }}
             />
+            {/* 与画布网格同一 28px 点位，只叠加经过的波纹，加载完成后网格位置不跳动。 */}
+            <DotRippleField className="canvas-refresh-ripple" spacing={28} gridOffset={14} baseAlpha={0} push={0} />
 
             <div
                 className="absolute bottom-5 left-1/2 z-[var(--z-toolbar)] flex h-14 -translate-x-1/2 items-center gap-1 rounded-xl border px-2 shadow-lg backdrop-blur"

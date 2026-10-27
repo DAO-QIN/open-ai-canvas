@@ -27,7 +27,4 @@
     html:not([data-ui-scale-off]) .full-screen-loader {
         min-height: calc(100dvh / 0.9);
     }
-    html:not([data-ui-scale-off]) .full-screen-loader-shell {
-        height: calc(100dvh / 0.9);
-    }
 }

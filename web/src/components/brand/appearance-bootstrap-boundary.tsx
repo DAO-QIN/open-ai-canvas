@@ -10,7 +10,6 @@ export function AppearanceBootstrapBoundary({ children }: { children: ReactNode 
     if (resolved) return children;
     return (
         <FullScreenLoader
-            step={null}
             label={loadFailed ? "暂时无法加载站点配置" : "正在加载站点配置"}
             detail={loadFailed ? "请重试后继续" : "确认品牌与页面外观"}
             action={
