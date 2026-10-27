@@ -34,7 +34,7 @@
 
 - 图片最多 9 张、视频最多 3 个、音频最多 3 个。
 - 首帧和尾帧各最多 1 张；尾帧不能脱离首帧。
-- 首尾帧模式不能混入 `reference_image/subject_reference/style_reference`。
+- 首帧、尾帧可以与 `reference_image/subject_reference/style_reference` 同时提交（H3 按 role 区分，秘塔等中转同样支持）；带首帧或尾帧时 `ratio` 固定为 `adaptive`。
 - duration 超出 4-30 秒直接失败，不静默裁剪。
 
 ## 中转兼容边界
@@ -62,7 +62,7 @@
   "apiVersion": "yingce.plugin/v2",
   "id": "minimax-hailuo-video-v2",
   "name": "MiniMax Hailuo Video V2 / H3",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "author": "MiniMax / 影策",
   "description": "MiniMax / Hailuo V2 视频生成协议，保留首帧、尾帧、参考图、视频和音频角色语义。",
   "documentation": "<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>",
@@ -374,68 +374,574 @@
               ]
             },
             "message": "MiniMax H3 使用尾帧时必须同时提供首帧"
+          }
+        ],
+        "create": {
+          "method": "POST",
+          "path": "/v2/video_generation",
+          "contentType": "application/json",
+          "body": {
+            "model": {
+              "$ref": "request.model"
+            },
+            "content": {
+              "$concatArrays": [
+                [
+                  {
+                    "type": "text",
+                    "text": {
+                      "$ref": "request.prompt"
+                    }
+                  }
+                ],
+                {
+                  "$map": {
+                    "from": {
+                      "$sortByOrder": {
+                        "$ref": "request.images"
+                      }
+                    },
+                    "as": "media",
+                    "in": {
+                      "type": "image_url",
+                      "image_url": {
+                        "url": {
+                          "$ref": "media.value"
+                        }
+                      },
+                      "role": {
+                        "$coalesce": [
+                          {
+                            "$ref": "media.role"
+                          },
+                          "reference_image"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "$map": {
+                    "from": {
+                      "$sortByOrder": {
+                        "$ref": "request.videos"
+                      }
+                    },
+                    "as": "media",
+                    "in": {
+                      "type": "video_url",
+                      "video_url": {
+                        "url": {
+                          "$ref": "media.value"
+                        }
+                      },
+                      "role": {
+                        "$coalesce": [
+                          {
+                            "$ref": "media.role"
+                          },
+                          "reference_video"
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "$map": {
+                    "from": {
+                      "$sortByOrder": {
+                        "$ref": "request.audios"
+                      }
+                    },
+                    "as": "media",
+                    "in": {
+                      "type": "audio_url",
+                      "audio_url": {
+                        "url": {
+                          "$ref": "media.value"
+                        }
+                      },
+                      "role": {
+                        "$coalesce": [
+                          {
+                            "$ref": "media.role"
+                          },
+                          "reference_audio"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "duration": {
+              "$ref": "request.duration"
+            },
+            "resolution": {
+              "$coalesce": [
+                {
+                  "$ref": "request.resolution"
+                },
+                "768P"
+              ]
+            },
+            "ratio": {
+              "$if": {
+                "condition": {
+                  "$gt": [
+                    {
+                      "$len": {
+                        "$filter": {
+                          "from": {
+                            "$ref": "request.images"
+                          },
+                          "as": "image",
+                          "where": {
+                            "$in": [
+                              {
+                                "$ref": "image.role"
+                              },
+                              [
+                                "first_frame",
+                                "last_frame"
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    0
+                  ]
+                },
+                "then": "adaptive",
+                "else": {
+                  "$coalesce": [
+                    {
+                      "$ref": "request.aspectRatio"
+                    },
+                    "16:9"
+                  ]
+                }
+              }
+            },
+            "aigc_watermark": {
+              "$ref": "request.watermark"
+            },
+            "generate_audio": {
+              "$ref": "request.generateAudio"
+            },
+            "seed": {
+              "$omitEmpty": {
+                "$ref": "request.providerOptions.minimax-video.seed"
+              }
+            },
+            "prompt_optimizer": {
+              "$omitEmpty": {
+                "$ref": "request.providerOptions.minimax-video.prompt_optimizer"
+              }
+            }
+          }
+        },
+        "poll": {
+          "method": "GET",
+          "path": "/v2/query/video_generation/{{taskId}}"
+        },
+        "response": {
+          "taskId": {
+            "$coalesce": [
+              {
+                "$ref": "response.task.id"
+              },
+              {
+                "$ref": "response.task_id"
+              },
+              {
+                "$ref": "response.id"
+              },
+              {
+                "$ref": "taskId"
+              }
+            ]
+          },
+          "status": {
+            "$coalesce": [
+              {
+                "$ref": "response.task.status"
+              },
+              {
+                "$ref": "response.status"
+              },
+              "pending"
+            ]
+          },
+          "message": {
+            "$coalesce": [
+              {
+                "$ref": "response.task.error.message"
+              },
+              {
+                "$ref": "response.task.message"
+              },
+              {
+                "$ref": "response.base_resp.status_msg"
+              },
+              {
+                "$ref": "response.message"
+              },
+              {
+                "$ref": "response.error.message"
+              }
+            ]
+          },
+          "videos": {
+            "$coalesce": [
+              {
+                "$ref": "response.task.content.url"
+              },
+              {
+                "$ref": "response.content.url"
+              },
+              {
+                "$ref": "response.video_url"
+              },
+              {
+                "$ref": "response.file.url"
+              }
+            ]
+          },
+          "errorPaths": [
+            "task.error.code",
+            "base_resp.status_code",
+            "error.code"
+          ],
+          "resultEphemeral": true
+        }
+      }
+    ]
+  }
+}
+```
+<!-- YINGCE_MANIFEST_CONTRACT_END -->
+
+<!-- YINGCE_MANIFEST_CONTRACT_BEGIN -->
+## 插件清单
+
+```json
+{
+  "apiVersion": "yingce.plugin/v2",
+  "id": "minimax-hailuo-video-v2",
+  "name": "MiniMax Hailuo Video V2 / H3",
+  "version": "2.0.3",
+  "author": "MiniMax / 影策",
+  "description": "MiniMax / Hailuo V2 视频生成协议，保留首帧、尾帧、参考图、视频和音频角色语义。",
+  "permissions": [
+    "generation.run",
+    "media.read"
+  ],
+  "configuration": {
+    "fields": [
+      {
+        "name": "apiKey",
+        "type": "secret",
+        "label": "API Key",
+        "required": true
+      }
+    ]
+  },
+  "contributes": {
+    "providers": [
+      {
+        "id": "minimax-video",
+        "label": "MiniMax Hailuo Video V2 / H3",
+        "capabilities": [
+          "video"
+        ],
+        "scopes": [
+          "admin.system-channel",
+          "user.custom-channel",
+          "canvas",
+          "creation",
+          "agent"
+        ],
+        "baseUrl": "https://api.minimax.io",
+        "requiresPublicMediaUrls": true,
+        "auth": {
+          "type": "bearer",
+          "field": "apiKey"
+        },
+        "parameters": [
+          {
+            "name": "model",
+            "type": "string",
+            "required": true,
+            "mapping": "model",
+            "description": "MiniMax/Hailuo 视频模型 ID。"
+          },
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "content[type=text].text",
+            "description": "仅写入 text content block，避免与顶层 prompt 重复。"
+          },
+          {
+            "name": "images",
+            "type": "media[]",
+            "mapping": "content[type=image_url]",
+            "description": "保留 first_frame、last_frame、reference_image 等 role。"
+          },
+          {
+            "name": "videos",
+            "type": "media[]",
+            "mapping": "content[type=video_url]",
+            "description": "映射为 reference_video。"
+          },
+          {
+            "name": "audios",
+            "type": "media[]",
+            "mapping": "content[type=audio_url]",
+            "description": "映射为 reference_audio/reference_voice。"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "required": true,
+            "values": [
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18",
+              "19",
+              "20",
+              "21",
+              "22",
+              "23",
+              "24",
+              "25",
+              "26",
+              "27",
+              "28",
+              "29",
+              "30"
+            ],
+            "mapping": "duration",
+            "description": "4-30 秒。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "description": "如 768P、1080P、2K；按模型能力限制。"
+          },
+          {
+            "name": "aspectRatio",
+            "type": "string",
+            "mapping": "ratio",
+            "description": "首尾帧模式自动使用 adaptive；其他模式使用用户比例。"
+          },
+          {
+            "name": "watermark",
+            "type": "boolean",
+            "mapping": "aigc_watermark",
+            "description": "AIGC 水印。"
+          },
+          {
+            "name": "generateAudio",
+            "type": "boolean",
+            "mapping": "generate_audio",
+            "description": "模型支持时生成音频。"
+          },
+          {
+            "name": "seed",
+            "type": "integer",
+            "mapping": "seed",
+            "description": "providerOptions.minimax-video.seed。"
+          },
+          {
+            "name": "prompt_optimizer",
+            "type": "boolean",
+            "mapping": "prompt_optimizer",
+            "description": "providerOptions.minimax-video.prompt_optimizer。"
+          }
+        ],
+        "validations": [
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.images"
+                  }
+                },
+                9
+              ]
+            },
+            "message": "MiniMax H3 最多支持 9 张图片"
           },
           {
             "assert": {
-              "$not": {
-                "$and": [
-                  {
-                    "$gt": [
-                      {
-                        "$len": {
-                          "$filter": {
-                            "from": {
-                              "$ref": "request.images"
-                            },
-                            "as": "image",
-                            "where": {
-                              "$in": [
-                                {
-                                  "$ref": "image.role"
-                                },
-                                [
-                                  "first_frame",
-                                  "last_frame"
-                                ]
-                              ]
-                            }
-                          }
-                        }
-                      },
-                      0
-                    ]
-                  },
-                  {
-                    "$gt": [
-                      {
-                        "$len": {
-                          "$filter": {
-                            "from": {
-                              "$ref": "request.images"
-                            },
-                            "as": "image",
-                            "where": {
-                              "$in": [
-                                {
-                                  "$ref": "image.role"
-                                },
-                                [
-                                  "reference_image",
-                                  "subject_reference",
-                                  "style_reference"
-                                ]
-                              ]
-                            }
-                          }
-                        }
-                      },
-                      0
-                    ]
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.videos"
                   }
-                ]
-              }
+                },
+                3
+              ]
             },
-            "message": "MiniMax H3 首尾帧模式不能混入普通角色或风格参考图"
+            "message": "MiniMax H3 最多支持 3 个参考视频"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$ref": "request.audios"
+                  }
+                },
+                3
+              ]
+            },
+            "message": "MiniMax H3 最多支持 3 个参考音频"
+          },
+          {
+            "assert": {
+              "$and": [
+                {
+                  "$gte": [
+                    {
+                      "$ref": "request.duration"
+                    },
+                    4
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$ref": "request.duration"
+                    },
+                    30
+                  ]
+                }
+              ]
+            },
+            "message": "MiniMax H3 duration 必须在 4-30 秒之间"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$filter": {
+                      "from": {
+                        "$ref": "request.images"
+                      },
+                      "as": "image",
+                      "where": {
+                        "$eq": [
+                          {
+                            "$ref": "image.role"
+                          },
+                          "first_frame"
+                        ]
+                      }
+                    }
+                  }
+                },
+                1
+              ]
+            },
+            "message": "MiniMax H3 最多只能有一个首帧"
+          },
+          {
+            "assert": {
+              "$lte": [
+                {
+                  "$len": {
+                    "$filter": {
+                      "from": {
+                        "$ref": "request.images"
+                      },
+                      "as": "image",
+                      "where": {
+                        "$eq": [
+                          {
+                            "$ref": "image.role"
+                          },
+                          "last_frame"
+                        ]
+                      }
+                    }
+                  }
+                },
+                1
+              ]
+            },
+            "message": "MiniMax H3 最多只能有一个尾帧"
+          },
+          {
+            "assert": {
+              "$or": [
+                {
+                  "$eq": [
+                    {
+                      "$len": {
+                        "$filter": {
+                          "from": {
+                            "$ref": "request.images"
+                          },
+                          "as": "image",
+                          "where": {
+                            "$eq": [
+                              {
+                                "$ref": "image.role"
+                              },
+                              "last_frame"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    0
+                  ]
+                },
+                {
+                  "$eq": [
+                    {
+                      "$len": {
+                        "$filter": {
+                          "from": {
+                            "$ref": "request.images"
+                          },
+                          "as": "image",
+                          "where": {
+                            "$eq": [
+                              {
+                                "$ref": "image.role"
+                              },
+                              "first_frame"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    1
+                  ]
+                }
+              ]
+            },
+            "message": "MiniMax H3 使用尾帧时必须同时提供首帧"
           }
         ],
         "create": {
