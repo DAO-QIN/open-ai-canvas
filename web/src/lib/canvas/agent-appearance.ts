@@ -8,7 +8,7 @@ export type CanvasAppearance = {
     welcomeTitle: string;
     welcomeDescription: string;
     inputPlaceholder: string;
-    avatarType: "orb" | "live2d" | "sprite" | "bundle";
+    avatarType: "orb" | "aperture" | "live2d" | "sprite" | "bundle";
     live2dResourceId: string;
     live2dEntry: string;
     avatarBundleResourceId?: string;

@@ -4,6 +4,7 @@ import { ExternalLink, Upload } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import { Live2DAvatar } from "@/components/canvas/live2d-avatar";
 import { FluidOrb } from "@/components/ui/fluid-orb";
+import { AgentAperture } from "@/components/canvas/agent-aperture";
 import {
     AGENT_AVATAR_STATES,
     DEFAULT_AGENT_AVATAR_CLIP_STATES,
@@ -134,6 +135,7 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
                     value={value.avatarType}
                     disabled={disabled || uploading}
                     options={[
+                        { label: "影绘光圈", value: "aperture" },
                         { label: "默认动态球", value: "orb" },
                         { label: "Live2D", value: "live2d", disabled: !url || readyURL !== url },
                         { label: "状态动画包", value: "bundle" },
@@ -143,6 +145,19 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
                         change(type === "bundle" ? { avatarType: type, avatarClipStates: value.avatarClipStates || DEFAULT_AGENT_AVATAR_CLIP_STATES } : { avatarType: type });
                     }}
                 />
+                {value.avatarType === "aperture" ? (
+                    <div className="grid gap-3">
+                        <p className="text-sm text-foreground/60">六片叶片拼满的圆形光圈，没有底座和外圈，深色主题显示白色、浅色主题显示黑色。8 种运行状态各有动效：运行时旋转开合，等待审批透出琥珀色，完成时收拢再张开，异常时卡顿并透出红光。</p>
+                        <Radio.Group
+                            className="flex flex-wrap"
+                            optionType="button"
+                            value={selectedAvatarState}
+                            disabled={disabled || uploading}
+                            options={AGENT_AVATAR_STATES.map((item) => ({ label: item.label, value: item.id }))}
+                            onChange={(event) => setSelectedAvatarState(event.target.value)}
+                        />
+                    </div>
+                ) : null}
                 {value.avatarType === "live2d" ? (
                     <p className="text-sm text-foreground/60">上传有授权的 Cubism 3/4 运行时 ZIP：一个 model3.json、moc3、PNG 纹理及可选动作/表情 JSON。首期不支持音频、旧版模型和编辑工程。模型会发送到浏览器，无法保证防下载。</p>
                 ) : null}
@@ -273,7 +288,9 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
                     px
                 </label>
                 <div className="grid justify-items-center gap-3 rounded-xl border border-border bg-background p-5" aria-label="Agent 形象预览">
-                    {url ? (
+                    {value.avatarType === "aperture" ? (
+                        <AgentAperture key={selectedAvatarState} size={120} state={selectedAvatarState} reducedMotion={reducedMotion} />
+                    ) : url ? (
                         <Live2DAvatar
                             key={`${url}-${attempt}`}
                             url={url}

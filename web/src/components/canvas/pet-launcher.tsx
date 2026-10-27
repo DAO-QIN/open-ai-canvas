@@ -10,6 +10,7 @@ import { Live2DAvatar } from "./live2d-avatar";
 import { agentAvatarBundleFileURL, live2DModelURL } from "@/services/api/appearance";
 import { AgentAvatarVideo } from "./agent-avatar-video";
 import { FluidOrb } from "@/components/ui/fluid-orb";
+import { AgentAperture } from "./agent-aperture";
 import { useAgentLauncherPosition } from "./use-agent-launcher-position";
 import { layoutViewport } from "@/lib/ui-scale";
 
@@ -34,8 +35,11 @@ export function AgentLauncher({
     const appearanceResolved = useAppearanceStore((state) => state.resolved);
     const appearanceRevision = useAppearanceStore((state) => state.appearance.revision);
     const live = appearance.avatarType === "live2d" && Boolean(appearance.live2dResourceId && appearance.live2dEntry);
+    const aperture = appearance.avatarType === "aperture";
     const avatarState = agentAvatarStateForRunStatus(status);
     const compact = useMediaQuery("(max-width: 720px)");
+    // 光圈没有底座，本身就是图标：桌面 84px，窄屏 68px。
+    const apertureSize = compact ? 68 : 84;
     const bundleManifestURL = appearance.avatarBundleResourceId ? agentAvatarBundleFileURL(appearance.avatarBundleResourceId, "avatar.json", false, appearanceRevision) : "/doll/avatar.json";
     const [bundleManifestState, setBundleManifestState] = useState<{ url: string; manifest: AgentAvatarBundleManifest | null } | null>(null);
     useEffect(() => {
@@ -89,8 +93,9 @@ export function AgentLauncher({
     const largeAvatar = live || media || bundleManifestLoading;
     // 收起后只留小圆球入口：不加载 Live2D / 动画，也不挡画布。位置以右下角为锚点，收起展开不跳位。
     const keepsAvatarSize = largeAvatar && !collapsed;
-    const height = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.max(40, Math.min(compact ? Math.min(appearance.avatarHeight, 96) : appearance.avatarHeight, viewport.height - 60, (viewport.width - 40) / aspectRatio)) : 76;
-    const width = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.round(height * aspectRatio) : 76;
+    const idleSize = aperture ? apertureSize : 76;
+    const height = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.max(40, Math.min(compact ? Math.min(appearance.avatarHeight, 96) : appearance.avatarHeight, viewport.height - 60, (viewport.width - 40) / aspectRatio)) : idleSize;
+    const width = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.round(height * aspectRatio) : idleSize;
     const bottomInset = compact ? 72 : 0;
     const { position, dragging, handlers } = useAgentLauncherPosition(onOpen, width, height + bottomInset);
     const showToggle = !hidden && (largeAvatar || collapsed);
@@ -106,6 +111,7 @@ export function AgentLauncher({
                     collapsed && "is-collapsed",
                     keepsAvatarSize && live && "canvas-agent-launcher-live2d",
                     keepsAvatarSize && media && "canvas-agent-launcher-media",
+                    aperture && "canvas-agent-launcher-aperture",
                 )}
                 style={{ ...position, bottom: position.bottom + bottomInset, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden ? { display: "none" } : null) } as CSSProperties}
                 aria-hidden={hidden || undefined}
@@ -118,7 +124,11 @@ export function AgentLauncher({
                 transition={{ duration: reducedMotion ? 0 : 0.18 }}
             >
                 {collapsed ? (
-                    <FluidOrb size={30} color="#7164f6" />
+                    aperture ? (
+                        <AgentAperture size={40} state={avatarState} reducedMotion={reducedMotion} paused={hidden} />
+                    ) : (
+                        <FluidOrb size={30} color="#7164f6" />
+                    )
                 ) : live ? (
                     <Live2DAvatar
                         url={live2DModelURL(appearance.live2dResourceId, appearance.live2dEntry)}
@@ -136,6 +146,8 @@ export function AgentLauncher({
                         <LoaderCircle className={reducedMotion ? "size-6" : "size-6 motion-safe:animate-spin"} aria-hidden="true" />
                         <span className="sr-only">正在加载助手形象</span>
                     </span>
+                ) : aperture ? (
+                    <AgentAperture size={apertureSize} state={avatarState} reducedMotion={reducedMotion} paused={hidden} />
                 ) : (
                     <FluidOrb size={60} color="#7164f6" />
                 )}

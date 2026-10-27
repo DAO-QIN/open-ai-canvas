@@ -1713,6 +1713,20 @@
     display: none;
 }
 
+/* 影绘光圈自身就是完整的圆：去掉底座、外圈和状态点，状态由光圈动效和缝隙色光表达。 */
+.canvas-agent-launcher.canvas-agent-launcher-aperture {
+    box-shadow: none;
+}
+
+.canvas-agent-launcher-aperture::before,
+.canvas-agent-launcher-aperture > .canvas-agent-launcher-status {
+    display: none;
+}
+
+.canvas-agent-launcher-aperture > .agent-aperture {
+    filter: drop-shadow(0 10px 16px color-mix(in srgb, var(--canvas-agent-launcher-shadow) 70%, transparent));
+}
+
 .canvas-agent-launcher-media > img,
 .canvas-agent-launcher-media > .canvas-agent-keyed-video {
     width: 100%;

@@ -1,4 +1,4 @@
-import type { CanvasAppearance } from "@/lib/canvas/agent-appearance";
+import { agentAvatarStateForRunStatus, type CanvasAppearance } from "@/lib/canvas/agent-appearance";
 import type { SpriteRunState } from "@/lib/canvas/sprite-pet";
 import { SpriteAvatar } from "./sprite-avatar";
 import { Live2DAvatar } from "./live2d-avatar";
@@ -7,6 +7,7 @@ import { live2DModelURL, spriteImageURL } from "@/services/api/appearance";
 import { useEffect } from "react";
 import { petAvatarSize } from "@/lib/canvas/pet-menu";
 import { AgentAvatarBundle } from "./agent-avatar-bundle";
+import { AgentAperture } from "./agent-aperture";
 
 export function PetAvatar({
     appearance,
@@ -28,11 +29,13 @@ export function PetAvatar({
     onError?: (error: string) => void;
 }) {
     useEffect(() => {
-        if (appearance.avatarType === "orb") onReady?.();
+        if (appearance.avatarType === "orb" || appearance.avatarType === "aperture") onReady?.();
     }, [appearance.avatarType, onReady]);
     const fitted = petAvatarSize(appearance, height);
     const content =
-        appearance.avatarType === "bundle" ? (
+        appearance.avatarType === "aperture" ? (
+            <AgentAperture size={fitted.height} state={agentAvatarStateForRunStatus(state?.status ?? "idle")} reducedMotion={reducedMotion} paused={paused} />
+        ) : appearance.avatarType === "bundle" ? (
             <AgentAvatarBundle appearance={appearance} height={height} status={state?.status} paused={paused} reducedMotion={reducedMotion} onReady={onReady} onError={onError} />
         ) : appearance.avatarType === "sprite" && appearance.sprite && appearance.spriteResourceId ? (
             <SpriteAvatar

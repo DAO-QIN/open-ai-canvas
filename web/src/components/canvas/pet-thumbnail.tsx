@@ -1,7 +1,7 @@
 import type { CanvasAppearance } from "@/lib/canvas/agent-appearance";
 import { spriteThumbnailURL } from "@/services/api/appearance";
 import { useSpriteImage } from "./use-sprite-image";
-import { Circle, RotateCw, UserRound } from "lucide-react";
+import { Aperture, Circle, RotateCw, UserRound } from "lucide-react";
 import "./pet-thumbnail.css";
 import {useEffect,useRef,useState} from "react";
 import { petAvatarSize } from "@/lib/canvas/pet-menu";
@@ -31,7 +31,7 @@ export function PetThumbnail({ pet, preview = false }: { pet: Pick<CanvasAppeara
     if (pet.avatarType !== "sprite" || !pet.sprite || !url)
         return (
             <span className="pet-thumbnail-symbol" aria-hidden>
-                {pet.avatarType === "orb" ? <Circle /> : <UserRound />}
+                {pet.avatarType === "orb" ? <Circle /> : pet.avatarType === "aperture" ? <Aperture /> : <UserRound />}
             </span>
         );
     const { width: w, height: h } = petAvatarSize(pet, 44);

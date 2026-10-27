@@ -10,13 +10,15 @@ export function effectivePet(canvas: CanvasAppearance, catalog: PetAppearance[],
 export function petAvatarSize(pet: Pick<CanvasAppearance, "avatarType" | "sprite">, size: number) {
     // A filled disc carries more visual weight than a character silhouette.
     if (pet.avatarType === "orb") return { width: size * 0.6, height: size * 0.6 };
+    // 光圈本身就是圆形图标，比动态球略大才能和人物形象分量相当。
+    if (pet.avatarType === "aperture") return { width: size * 0.72, height: size * 0.72 };
     const ratio = pet.avatarType === "sprite" && pet.sprite ? pet.sprite.frameWidth / pet.sprite.frameHeight : pet.avatarType === "live2d" ? 0.75 : 1;
     return { width: Math.min(size, size * ratio), height: Math.min(size, size / ratio) };
 }
 /** Keep the status dot outside the rendered silhouette at every personal scale. */
 export function petStatusPosition(pet: Pick<CanvasAppearance, "avatarType" | "sprite">, stage: number) {
     const fitted = petAvatarSize(pet, stage), size = 8, gap = 3;
-    if (pet.avatarType === "orb") {
+    if (pet.avatarType === "orb" || pet.avatarType === "aperture") {
         const offset = (fitted.height / 2 + gap + size / 2) / Math.SQRT2;
         return { top: stage / 2 - offset - size / 2, right: stage / 2 - offset - size / 2, width: size, height: size };
     }

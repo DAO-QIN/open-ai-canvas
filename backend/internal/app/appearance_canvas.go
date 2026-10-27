@@ -64,7 +64,7 @@ func normalizeCanvasAppearance(value CanvasAppearance) (CanvasAppearance, error)
 			return value, BadAuthRequest("助手名称不能包含控制字符")
 		}
 	}
-	if value.AvatarType != "orb" && value.AvatarType != "live2d" && value.AvatarType != "sprite" && value.AvatarType != "bundle" {
+	if !validCanvasAvatarType(value.AvatarType) {
 		return value, BadAuthRequest("请选择有效的 Agent 形象类型")
 	}
 	if value.AvatarHeight < 120 || value.AvatarHeight > 360 {
@@ -126,4 +126,14 @@ func validAvatarClipID(value string) bool {
 		}
 	}
 	return true
+}
+
+// validCanvasAvatarType lists the shared assistant presentations; "aperture" is the
+// built-in vector aperture that needs no uploaded resource.
+func validCanvasAvatarType(kind string) bool {
+	switch kind {
+	case "orb", "aperture", "live2d", "sprite", "bundle":
+		return true
+	}
+	return false
 }
