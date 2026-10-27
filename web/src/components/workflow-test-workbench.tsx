@@ -12,6 +12,7 @@ import { useConfigStore, type AiConfig, type RunningHubCapability, type Workflow
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { Select } from "@/components/ui/base/select";
+import { toLayoutPx } from "@/lib/ui-scale";
 
 type WorkflowProvider = "runninghub";
 type MediaKind = "image" | "video" | "audio";
@@ -276,7 +277,8 @@ function WorkflowNode({ id, title, icon, position, onMove, wide = false, childre
         const canvas = target?.parentElement;
         if (!target || !canvas) return;
         const rect = target.getBoundingClientRect();
-        dragRef.current = { pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
+        // 指针和 rect 是屏幕像素，节点位置是样式像素：桌面端整体缩放下统一换算。
+        dragRef.current = { pointerId: event.pointerId, offsetX: toLayoutPx(event.clientX - rect.left), offsetY: toLayoutPx(event.clientY - rect.top) };
         event.currentTarget.setPointerCapture(event.pointerId);
     };
     const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -287,7 +289,7 @@ function WorkflowNode({ id, title, icon, position, onMove, wide = false, childre
         const rect = canvas.getBoundingClientRect();
         const width = wide ? 324 : 284;
         const height = node?.offsetHeight || 92;
-        onMove({ x: Math.max(12, Math.min(rect.width - width - 12, event.clientX - rect.left - dragRef.current.offsetX)), y: Math.max(12, Math.min(rect.height - height - 12, event.clientY - rect.top - dragRef.current.offsetY)) });
+        onMove({ x: Math.max(12, Math.min(toLayoutPx(rect.width) - width - 12, toLayoutPx(event.clientX - rect.left) - dragRef.current.offsetX)), y: Math.max(12, Math.min(toLayoutPx(rect.height) - height - 12, toLayoutPx(event.clientY - rect.top) - dragRef.current.offsetY)) });
     };
     const finishDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
         dragRef.current = null;

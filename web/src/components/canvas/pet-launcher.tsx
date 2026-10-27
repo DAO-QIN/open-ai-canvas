@@ -11,6 +11,7 @@ import { agentAvatarBundleFileURL, live2DModelURL } from "@/services/api/appeara
 import { AgentAvatarVideo } from "./agent-avatar-video";
 import { FluidOrb } from "@/components/ui/fluid-orb";
 import { useAgentLauncherPosition } from "./use-agent-launcher-position";
+import { layoutViewport } from "@/lib/ui-scale";
 
 export function AgentLauncher({
     theme,
@@ -65,9 +66,10 @@ export function AgentLauncher({
     const [mediaError, setMediaError] = useState(false);
     useEffect(() => setMediaError(false), [mediaURL]);
     const [live2DError, setLive2DError] = useState("");
-    const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+    // 工作台跟随桌面端整体缩放，视口按样式像素算。
+    const [viewport, setViewport] = useState(layoutViewport);
     useEffect(() => {
-        const resize = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
+        const resize = () => setViewport(layoutViewport());
         window.addEventListener("resize", resize);
         return () => window.removeEventListener("resize", resize);
     }, []);

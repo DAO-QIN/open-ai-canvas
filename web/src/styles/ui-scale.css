@@ -1,0 +1,33 @@
+/*
+ * 桌面端界面整体按 90% 显示（相当于以前浏览器缩放 90% 的观感），浏览器缩放照常按比例叠加。
+ * 画布编辑器、分享画布、开发实验页加 data-ui-scale-off 不缩放；窄屏保持原尺寸，避免手机字太小。
+ * 规则与 lib/ui-scale.ts 的 DESKTOP_UI_SCALE / UI_SCALE_MIN_WIDTH 保持一致。
+ */
+@media (min-width: 1024px) {
+    html:not([data-ui-scale-off]) {
+        zoom: 0.9;
+    }
+
+    /* 缩放后视口单位也会乘 0.9：铺满视口的容器按比例补回，避免底部留白。 */
+    html:not([data-ui-scale-off]) .h-dvh {
+        height: calc(100dvh / 0.9);
+    }
+    html:not([data-ui-scale-off]) .h-screen {
+        height: calc(100vh / 0.9);
+    }
+    html:not([data-ui-scale-off]) .min-h-dvh {
+        min-height: calc(100dvh / 0.9);
+    }
+    html:not([data-ui-scale-off]) .min-h-screen {
+        min-height: calc(100vh / 0.9);
+    }
+    html:not([data-ui-scale-off]) .max-h-dvh {
+        max-height: calc(100dvh / 0.9);
+    }
+    html:not([data-ui-scale-off]) .full-screen-loader {
+        min-height: calc(100dvh / 0.9);
+    }
+    html:not([data-ui-scale-off]) .full-screen-loader-shell {
+        height: calc(100dvh / 0.9);
+    }
+}

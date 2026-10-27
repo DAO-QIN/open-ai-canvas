@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { WorkflowFieldMappingEditor } from "@/components/workflow-field-mapping-editor";
 import type { WorkflowFieldMapping, WorkflowGraphPreview } from "@/stores/use-config-store";
 import { Select } from "@/components/ui/base/select";
+import { toLayoutPx } from "@/lib/ui-scale";
 
 type WorkflowNode = {
     id: string;
@@ -90,8 +91,8 @@ export function WorkflowGraphEditor({ workflowJson, workflowGraph, fields, onCha
             const viewport = viewportRef.current;
             if (!viewport) return;
             const rect = viewport.getBoundingClientRect();
-            const pointerX = event.clientX - rect.left;
-            const pointerY = event.clientY - rect.top;
+            const pointerX = toLayoutPx(event.clientX - rect.left);
+            const pointerY = toLayoutPx(event.clientY - rect.top);
             const contentX = viewport.scrollLeft + pointerX;
             const contentY = viewport.scrollTop + pointerY;
             const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
@@ -130,8 +131,8 @@ export function WorkflowGraphEditor({ workflowJson, workflowGraph, fields, onCha
         const pan = panRef.current;
         const viewport = viewportRef.current;
         if (!pan || !viewport || pan.pointerId !== event.pointerId) return;
-        viewport.scrollLeft = pan.left - (event.clientX - pan.x);
-        viewport.scrollTop = pan.top - (event.clientY - pan.y);
+        viewport.scrollLeft = pan.left - toLayoutPx(event.clientX - pan.x);
+        viewport.scrollTop = pan.top - toLayoutPx(event.clientY - pan.y);
     };
 
     return (

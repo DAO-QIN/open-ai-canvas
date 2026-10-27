@@ -2,6 +2,7 @@ import { motion, useMotionTemplate, useMotionValue, useReducedMotion, type HTMLM
 import { forwardRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
+import { toLayoutPx } from "@/lib/ui-scale";
 
 type SpotlightSurfaceProps = Omit<HTMLMotionProps<"div">, "children"> & {
     children?: ReactNode;
@@ -22,8 +23,8 @@ export const SpotlightSurface = forwardRef<HTMLDivElement, SpotlightSurfaceProps
 
     const updatePointer = (event: ReactPointerEvent<HTMLDivElement>) => {
         const bounds = event.currentTarget.getBoundingClientRect();
-        mouseX.set(event.clientX - bounds.left);
-        mouseY.set(event.clientY - bounds.top);
+        mouseX.set(toLayoutPx(event.clientX - bounds.left));
+        mouseY.set(toLayoutPx(event.clientY - bounds.top));
     };
 
     return (

@@ -38,6 +38,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
     useLayoutEffect(() => {
         document.documentElement.classList.toggle("dark", dark);
         document.documentElement.style.colorScheme = theme;
+        // index.html 首屏给浅色用户加的底色标记，接手后交给主题样式。
+        document.documentElement.classList.remove("light-boot");
         if (!appearanceResolved) return;
         applySkinTheme(appearance.activeSkin, theme);
         applyAppearanceMetadata(appearance);

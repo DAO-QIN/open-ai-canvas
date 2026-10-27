@@ -19,6 +19,7 @@ import { ModelLogo } from "@/components/model-logo";
 import { ModelTags } from "@/components/model-tags";
 import { videoReferenceCapabilityTag } from "@/lib/model-tags";
 import { quoteModel, type LogicalModelQuote, type PublicChannelModelAvailability } from "@/services/api/logical-models";
+import { currentUiScale, toLayoutPx } from "@/lib/ui-scale";
 
 type ModelPickerProps = {
     config: AiConfig;
@@ -106,7 +107,8 @@ export function ModelPicker({
         if (!open) return;
         const updateAvailableHeight = () => {
             const { top, bottom } = triggerRef.current!.getBoundingClientRect();
-            setAvailableHeight(Math.max(top, window.innerHeight - bottom));
+            // 屏幕像素换成样式像素，桌面端整体缩放下可用高度才准确。
+            setAvailableHeight(toLayoutPx(Math.max(top, window.innerHeight - bottom)));
         };
         updateAvailableHeight();
         window.addEventListener("resize", updateAvailableHeight);
@@ -420,8 +422,11 @@ function focusPickerOption(target: HTMLButtonElement | null | undefined) {
     // Only reveal the focused row inside its pane; scrolling portal ancestors moves the page.
     const pane = target.closest<HTMLElement>(".model-picker-mobile-list, .canvas-model-picker-model-pane, .canvas-model-picker-menu");
     if (!pane) return;
-    const row = target.getBoundingClientRect();
-    const top = pane.getBoundingClientRect().top + pane.clientTop;
+    // rect 是屏幕像素，clientTop / clientHeight / scrollTop 是样式像素，统一换成样式像素再比较。
+    const scale = currentUiScale();
+    const rect = target.getBoundingClientRect();
+    const row = { top: rect.top / scale, bottom: rect.bottom / scale };
+    const top = pane.getBoundingClientRect().top / scale + pane.clientTop;
     const bottom = top + pane.clientHeight;
     const delta = row.top < top ? row.top - top : row.bottom > bottom ? row.bottom - bottom : 0;
     if (delta) pane.scrollTop += delta;

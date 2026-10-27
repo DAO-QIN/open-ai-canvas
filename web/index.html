@@ -15,7 +15,17 @@
             html,
             body {
                 margin: 0;
+                background: #0f0f11;
+            }
+            html.light-boot,
+            html.light-boot body {
                 background: #ffffff;
+            }
+            /* 桌面端整体 90% 显示；与 src/styles/ui-scale.css、src/lib/ui-scale.ts 一致，首屏就生效避免跳一下。 */
+            @media (min-width: 1024px) {
+                html:not([data-ui-scale-off]) {
+                    zoom: 0.9;
+                }
             }
             #root:empty {
                 min-height: 100vh;
@@ -57,14 +67,25 @@
         </style>
         <script>
             try {
+                // 默认深色；只有 v1 起用户自己选过浅色才用浅色（规则同 stores/use-theme-store.ts）。
                 var s = JSON.parse(localStorage.getItem("yingce:theme_store") || "{}");
-                var t = s.state && s.state.theme === "dark" ? "dark" : "light";
+                var t = s.version >= 1 && s.state && s.state.theme === "light" ? "light" : "dark";
                 document.documentElement.classList.toggle("dark", t === "dark");
+                document.documentElement.classList.toggle("light-boot", t === "light");
                 document.documentElement.style.colorScheme = t;
+            } catch (e) {
+                document.documentElement.classList.add("dark");
+            }
+            try {
+                // 画布编辑器、分享画布、开发实验页不参与整体缩放（规则同 src/lib/ui-scale.ts）。
+                var p = location.pathname;
+                if (/^\/canvas\/[^/]+/.test(p) || p.indexOf("/share/canvas/") === 0 || p.indexOf("/dev/") === 0) {
+                    document.documentElement.setAttribute("data-ui-scale-off", "");
+                }
             } catch (e) {}
         </script>
     </head>
-    <body class="bg-background text-foreground antialiased" style="background:#ffffff">
+    <body class="bg-background text-foreground antialiased">
         <div id="root"></div>
         <script type="module" src="/src/main.tsx"></script>
     </body>

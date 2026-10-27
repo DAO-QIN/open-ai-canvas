@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import { AGENT_LAUNCHER_POSITION_KEY, clampAgentLauncherPosition, moveAgentLauncher, restoreAgentLauncherPosition, type AgentLauncherGesture, type AgentLauncherPosition } from "@/lib/canvas/agent-launcher-position";
+import { layoutViewport, toLayoutPx } from "@/lib/ui-scale";
 
-const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
+// 入口按钮在工作台里跟随桌面端整体缩放：视口和指针都换成样式坐标再算位置。
+const viewport = layoutViewport;
 
 export function useAgentLauncherPosition(onOpen: () => void, width = 76, height = 76) {
     const size = { width, height };
@@ -46,13 +48,13 @@ export function useAgentLauncherPosition(onOpen: () => void, width = 76, height 
             if ((cause as { name?: string }).name !== "NotFoundError") throw cause;
             return;
         }
-        gestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, start: position, dragged: false };
+        gestureRef.current = { pointerId: event.pointerId, x: toLayoutPx(event.clientX), y: toLayoutPx(event.clientY), start: position, dragged: false };
     };
     const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
         event.stopPropagation();
         const gesture = gestureRef.current;
         if (!gesture || gesture.pointerId !== event.pointerId) return;
-        const next = moveAgentLauncher(gesture, event.clientX, event.clientY, viewport(), size);
+        const next = moveAgentLauncher(gesture, toLayoutPx(event.clientX), toLayoutPx(event.clientY), viewport(), size);
         gesture.dragged = next.dragged;
         if (!next.dragged) return;
         event.preventDefault();
@@ -67,7 +69,7 @@ export function useAgentLauncherPosition(onOpen: () => void, width = 76, height 
         const gesture = gestureRef.current;
         if (!gesture || gesture.pointerId !== event.pointerId) return;
         gestureRef.current = null;
-        const next = cancelled ? { dragged: gesture.dragged, position: clampAgentLauncherPosition(position, viewport(), size) } : moveAgentLauncher(gesture, event.clientX, event.clientY, viewport(), size);
+        const next = cancelled ? { dragged: gesture.dragged, position: clampAgentLauncherPosition(position, viewport(), size) } : moveAgentLauncher(gesture, toLayoutPx(event.clientX), toLayoutPx(event.clientY), viewport(), size);
         suppressClick.current = cancelled || next.dragged;
         setDragging(false);
         setMoveDirection(0);

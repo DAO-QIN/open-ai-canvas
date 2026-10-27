@@ -12,6 +12,7 @@ import { HomeFeaturedCanvases } from "./home-featured-canvases";
 import { HomeFeaturedInspirations } from "./home-featured-inspirations";
 import { HomeToolEntries } from "./home-tool-entries";
 import "./home.css";
+import { toLayoutPx } from "@/lib/ui-scale";
 
 const requireLogin = () => openLoginModal({ description: "登录后即可新建画布，作品会保存在你的空间" });
 
@@ -35,8 +36,9 @@ function HomeNewCanvas() {
     // 光点跟随鼠标：只写 CSS 变量，不触发 React 重新渲染。
     const trackPointer = (event: PointerEvent<HTMLButtonElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
-        event.currentTarget.style.setProperty("--home-pointer-x", `${event.clientX - rect.left}px`);
-        event.currentTarget.style.setProperty("--home-pointer-y", `${event.clientY - rect.top}px`);
+        // 指针和 rect 是屏幕像素，写回样式前换成缩放后的 CSS 像素，光斑才贴着鼠标。
+        event.currentTarget.style.setProperty("--home-pointer-x", `${toLayoutPx(event.clientX - rect.left)}px`);
+        event.currentTarget.style.setProperty("--home-pointer-y", `${toLayoutPx(event.clientY - rect.top)}px`);
     };
     return (
         <button type="button" className="home-new-canvas" onClick={() => void createCanvas()} disabled={!ready || busy} aria-busy={busy} onPointerEnter={preload} onPointerMove={trackPointer} onFocus={preload}>

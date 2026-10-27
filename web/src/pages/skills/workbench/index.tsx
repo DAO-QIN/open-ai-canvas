@@ -44,6 +44,7 @@ import { SKILL_VERSION_CONFLICT_REASON, addSkill, getSkill, getSkillFile, listSk
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 
 import "./skill-workbench.css";
+import { toLayoutPx } from "@/lib/ui-scale";
 
 type Tab = { path: string; preview: boolean };
 type MarkdownMode = "edit" | "split" | "preview";
@@ -615,7 +616,7 @@ export default function SkillWorkbenchPage() {
     const onResizeMove = (event: ReactPointerEvent<HTMLDivElement>) => {
         const start = resizeRef.current;
         if (!start) return;
-        const width = Math.min(MAX_EXPLORER, Math.max(MIN_EXPLORER, start.startWidth + event.clientX - start.startX));
+        const width = Math.min(MAX_EXPLORER, Math.max(MIN_EXPLORER, start.startWidth + toLayoutPx(event.clientX - start.startX)));
         setLayout((current) => (current.width === width ? current : { ...current, width }));
     };
     const onResizeEnd = (event: ReactPointerEvent<HTMLDivElement>) => {

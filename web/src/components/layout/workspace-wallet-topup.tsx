@@ -10,6 +10,7 @@ import type { AccountFileStorageUsage } from "@/services/api/resources";
 import { storageGrantActive, type UserStorageGrant } from "@/services/api/storage-grants";
 
 import "./workspace-wallet-topup.css";
+import { toLayoutPx } from "@/lib/ui-scale";
 
 export type TopupCategory = "all" | TopupProductKind;
 
@@ -178,7 +179,7 @@ export function WalletTopupPanel({
         if (!container || !target) return;
         // 只滚动分组列表本身。scrollIntoView 会连带滚动 overflow: hidden 的祖先（弹窗外壳、内容区），
         // 把页头和页签推出可视区且无法滚回。
-        const top = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+        const top = toLayoutPx(target.getBoundingClientRect().top - container.getBoundingClientRect().top) + container.scrollTop;
         container.scrollTo({ top, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     }, [loading, focusKind, focusToken]);
 

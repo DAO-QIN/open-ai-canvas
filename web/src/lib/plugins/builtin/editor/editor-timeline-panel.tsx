@@ -22,6 +22,7 @@ import { computeSnap } from "@/lib/timeline/timeline-snap";
 import { getClipSeekTime, getTimelineClipTitle } from "@/lib/timeline/timeline-clip-view";
 import { EditorClipFilmstrip } from "./editor-clip-filmstrip";
 import type { TimelineClip, TimelineProject, TimelineTrack, TimelineTrackKind } from "@/types/timeline";
+import { toLayoutPx } from "@/lib/ui-scale";
 
 const MIN_VISUAL_END_MS = 1_000;
 const SNAP_MS = 10;
@@ -411,7 +412,7 @@ function TimelineRuler({
     const dragPointerRef = useRef<number | null>(null);
     const moveTo = (clientX: number) => {
         const rect = areaRef.current!.getBoundingClientRect();
-        let ms = (clientX - rect.left) / pxPerMs;
+        let ms = toLayoutPx(clientX - rect.left) / pxPerMs;
         if (snapEnabled) ms = Math.round(ms / SNAP_MS) * SNAP_MS;
         onScrub(ms);
     };
@@ -566,7 +567,7 @@ function TrackRow({
                     if (razorActive) return;
                     if (e.target === e.currentTarget) {
                         onSelectClip(null);
-                        onSeek((e.clientX - e.currentTarget.getBoundingClientRect().left) / pxPerMs);
+                        onSeek(toLayoutPx(e.clientX - e.currentTarget.getBoundingClientRect().left) / pxPerMs);
                     }
                 }}
             >
@@ -665,7 +666,7 @@ function ClipItem({
         if (!g || e.pointerId !== g.pointerId) return;
         if (!g.moved && Math.abs(e.clientX - g.startClientX) < 3) return;
         g.moved = true;
-        const deltaMs = (e.clientX - g.startClientX) / pxPerMs;
+        const deltaMs = toLayoutPx(e.clientX - g.startClientX) / pxPerMs;
 
         if (g.mode === "move") {
             const candidateMs = Math.max(0, g.originStartMs + deltaMs);
@@ -755,7 +756,7 @@ function ClipItem({
             // pointer capture 可能已被隐式释放
         }
         if (g.moved) onCommit();
-        else if (g.mode === "move") onSeek(getClipSeekTime(clip, e.clientX - e.currentTarget.getBoundingClientRect().left, pxPerMs));
+        else if (g.mode === "move") onSeek(getClipSeekTime(clip, toLayoutPx(e.clientX - e.currentTarget.getBoundingClientRect().left), pxPerMs));
     };
 
     const isSubtitle = clip.kind === "subtitle";
@@ -768,7 +769,7 @@ function ClipItem({
 
     const razorSplitAt = (e: React.PointerEvent) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        const atMs = clip.startMs + (e.clientX - rect.left) / pxPerMs;
+        const atMs = clip.startMs + toLayoutPx(e.clientX - rect.left) / pxPerMs;
         const splitMs = Math.round(atMs);
         if (splitMs - clip.startMs < MIN_SPLIT_MS || clip.startMs + clip.durationMs - splitMs < MIN_SPLIT_MS) return;
         onSplitClip(clip.id, splitMs);

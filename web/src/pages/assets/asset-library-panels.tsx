@@ -11,6 +11,7 @@ import { resourceStorageLabel, resourceStorageLocation, resourceStorageTitle } f
 import { type LibraryAsset, assetKindIcons } from "./asset-library-format";
 import { isKnownAssetKind } from "./asset-library-cards";
 import { assetDownloadLabel, assetKindLabel, assetProjectLabel, assetSizeLabel, formatAssetClock, formatAssetDateTime } from "./asset-library-format";
+import { toLayoutPx } from "@/lib/ui-scale";
 
 export function AssetsBatchBar({
     count,
@@ -349,7 +350,7 @@ export function AssetImageZoom({ asset }: { asset: LibraryAsset & { kind: "image
             onPointerMove={(event) => {
                 const drag = dragRef.current;
                 if (!drag) return;
-                setOffset({ x: drag.ox + event.clientX - drag.x, y: drag.oy + event.clientY - drag.y });
+                setOffset({ x: drag.ox + toLayoutPx(event.clientX - drag.x), y: drag.oy + toLayoutPx(event.clientY - drag.y) });
             }}
             onPointerUp={() => {
                 dragRef.current = null;
