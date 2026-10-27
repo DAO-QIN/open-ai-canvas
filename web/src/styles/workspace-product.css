@@ -2077,7 +2077,7 @@
 }
 /* 内容库分段筛选：创作历史状态/视图、灵感类型共用同一组几何。
    轨道 34px（紧凑 28px）+ 3px 内衬，选中块为卡片表面，计数为弱化等宽数字。 */
-.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar) .app-segmented {
+.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar, .inspiration-hall-filters) .app-segmented {
     width: fit-content;
     max-width: 100%;
     height: var(--user-control-height);
@@ -2086,22 +2086,22 @@
     background: var(--user-surface-muted);
     padding: 4px;
 }
-.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar) .app-segmented.is-sm {
+.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar, .inspiration-hall-filters) .app-segmented.is-sm {
     height: var(--user-control-height-sm);
     padding: 2px;
     border-radius: var(--user-radius-button-sm);
 }
-.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar) .app-segmented-thumb {
+.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar, .inspiration-hall-filters) .app-segmented-thumb {
     inset-block: 4px;
     border-radius: 4px;
     background: var(--user-surface);
     box-shadow: none;
 }
-.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar) .app-segmented.is-sm .app-segmented-thumb {
+.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar, .inspiration-hall-filters) .app-segmented.is-sm .app-segmented-thumb {
     inset-block: 2px;
     border-radius: 4px;
 }
-.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar) .app-segmented-item {
+.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar, .inspiration-hall-filters) .app-segmented-item {
     min-height: 0;
     gap: 8px;
     border-radius: 8px;
@@ -2113,21 +2113,21 @@
         color var(--product-state) var(--product-ease),
         background var(--product-state) var(--product-ease);
 }
-.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar) .app-segmented.is-sm .app-segmented-item {
+.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar, .inspiration-hall-filters) .app-segmented.is-sm .app-segmented-item {
     padding-inline: 8px;
     border-radius: 4px;
     font-size: var(--fs-caption);
 }
-.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar) .app-segmented-item svg {
+.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar, .inspiration-hall-filters) .app-segmented-item svg {
     width: 14px;
     height: 14px;
     stroke-width: var(--user-button-icon-stroke);
 }
-.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar) .app-segmented-item:not(:disabled):hover {
+.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar, .inspiration-hall-filters) .app-segmented-item:not(:disabled):hover {
     background: transparent;
     color: var(--user-ink);
 }
-.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar) .app-segmented-item[aria-checked="true"] {
+.app-product-workspace :is(.collection-toolbar, .inspiration-hall-toolbar, .inspiration-hall-filters) .app-segmented-item[aria-checked="true"] {
     background: transparent;
     color: var(--user-ink);
     box-shadow: none;
@@ -2914,3 +2914,28 @@
 @media (prefers-reduced-motion: reduce) {
     .app-user-workspace .app-workspace-topbar-auth-pill, .app-user-workspace .app-workspace-topbar-auth-pill:hover { transform: none; transition: none; }
 }
+
+/* 侧栏左下角游客卡片：与顶栏胶囊同一套主题色，深色模式下不再是浅灰圆块。 */
+.app-user-workspace .app-workspace-sidebar-guest {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px 8px 10px;
+    border: 1px solid var(--user-border);
+    border-radius: 14px;
+    background: var(--user-surface);
+    color: var(--user-ink);
+    text-decoration: none;
+    transition: border-color .18s ease, background-color .18s ease;
+}
+.app-user-workspace .app-workspace-sidebar-guest:hover { border-color: color-mix(in srgb, var(--user-ink) 22%, transparent); background: var(--user-surface-hover); color: var(--user-ink); }
+.app-user-workspace .app-workspace-sidebar-guest:focus-visible { outline: 2px solid var(--control-focus-ring); outline-offset: 2px; }
+.app-user-workspace .app-workspace-sidebar-guest.is-collapsed { flex: 0 0 auto; justify-content: center; padding: 6px; border-radius: 12px; }
+.app-user-workspace .app-workspace-sidebar-guest-avatar { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--user-surface-muted); color: var(--user-ink-muted); }
+.app-user-workspace .app-workspace-sidebar-guest-avatar svg { width: 18px; height: 18px; }
+.app-user-workspace .app-workspace-sidebar-guest-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.app-user-workspace .app-workspace-sidebar-guest-copy strong { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.app-user-workspace .app-workspace-sidebar-guest-copy span { overflow: hidden; color: var(--user-ink-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.app-user-workspace .app-workspace-sidebar-guest-action { flex: 0 0 auto; border-radius: 999px; padding: 4px 10px; background: var(--user-ink); color: var(--user-surface); font-size: 12px; font-weight: 600; }

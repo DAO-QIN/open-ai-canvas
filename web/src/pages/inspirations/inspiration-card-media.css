@@ -1,0 +1,7 @@
+/* 灵感卡片封面 + 悬停视频样片（首页精选灵感、灵感库、创作页灵感区共用）。 */
+.inspiration-card-media, .inspiration-card-media > img, .inspiration-card-media > video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.inspiration-card-media > img { transition: transform .4s ease; }
+.inspiration-card-media > video { opacity: 0; transition: opacity .25s ease; }
+.inspiration-card-media > video.is-playing { opacity: 1; }
+:is(.home-card-button, .inspiration-card-open):hover .inspiration-card-media > img { transform: scale(1.04); }
+@media (prefers-reduced-motion: reduce) { .inspiration-card-media > img, .inspiration-card-media > video { transition: none; } :is(.home-card-button, .inspiration-card-open):hover .inspiration-card-media > img { transform: none; } }

@@ -5,8 +5,9 @@ import { Link, useNavigate } from "react-router";
 
 import type { CreationInspiration } from "@/lib/inspirations/catalog";
 import { fillablePrompt, resolveInspirations } from "@/lib/inspirations/resolve";
-import { InspirationCover } from "@/pages/inspirations/inspiration-detail-modal";
+import { InspirationCardMedia } from "@/pages/inspirations/inspiration-card-media";
 import { loadInspirationCatalog } from "@/services/inspiration-catalog";
+import { useIncrementalReveal } from "@/hooks/use-incremental-reveal";
 import { useInspirationStore } from "@/stores/use-inspiration-store";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -19,10 +20,10 @@ const FILTERS: { value: Filter; label: string }[] = [
     { value: "text", label: "文本" },
 ];
 const MODE_LABEL: Record<string, string> = { video: "视频", image: "图片", text: "文本" };
-const LIMIT = 10;
+const PAGE = 20;
 
-/** 有视频样片的在前（其中精选优先），再是其余精选与目录顺序；不同分类各取前若干条。 */
-export function pickHomeInspirations(items: CreationInspiration[], filter: Filter, limit = LIMIT) {
+/** 有视频样片的在前（其中精选优先），再是其余精选与目录顺序；limit 不传则返回全部（首页下滑分批显示）。 */
+export function pickHomeInspirations(items: CreationInspiration[], filter: Filter, limit = Number.POSITIVE_INFINITY) {
     const matched = items.filter((item) => filter === "all" || item.mode === filter);
     const rank = (item: CreationInspiration) => (item.video ? 0 : 2) + (item.featured ? 0 : 1);
     return matched
@@ -50,7 +51,10 @@ export function HomeFeaturedInspirations() {
     const hidden = useInspirationStore((state) => state.hidden);
     const { data, isLoading, isError, refetch, isFetching } = useQuery({ queryKey: ["inspiration-catalog"], queryFn: loadInspirationCatalog, staleTime: Infinity });
     const resolved = useMemo(() => (data ? resolveInspirations(data.entries, { custom, overrides, hidden }) : []), [custom, data, hidden, overrides]);
-    const items = useMemo(() => pickHomeInspirations(resolved, filter), [filter, resolved]);
+    const ordered = useMemo(() => pickHomeInspirations(resolved, filter), [filter, resolved]);
+    // 首页可以一直下滑：先显示 20 条，接近底部再追加。
+    const { count, hasMore, sentinelRef } = useIncrementalReveal(ordered.length, PAGE, filter);
+    const items = useMemo(() => ordered.slice(0, count), [count, ordered]);
 
     return (
         <section className="home-section" aria-labelledby="home-featured-inspirations-title">
@@ -84,7 +88,7 @@ export function HomeFeaturedInspirations() {
             ) : (
                 <ul className="home-card-grid" aria-busy={isLoading}>
                     {isLoading
-                        ? Array.from({ length: LIMIT }, (_, index) => (
+                        ? Array.from({ length: 10 }, (_, index) => (
                               <li key={index} className="home-card is-placeholder" aria-label="正在读取灵感">
                                   <span className="home-card-cover" />
                                   <span className="home-card-line" />
@@ -114,68 +118,17 @@ export function HomeFeaturedInspirations() {
                           ))}
                 </ul>
             )}
-        </section>
-    );
-}
-
-/**
- * 封面 + 视频样片：鼠标悬停（或键盘聚焦）卡片时才加载并静音循环播放，离开即暂停回到封面。
- * 触屏没有悬停，不自动播放，避免耗流量；系统要求减少动态时也不播放。
- */
-function InspirationCardMedia({ item }: { item: CreationInspiration }) {
-    const [active, setActive] = useState(false);
-    const [playing, setPlaying] = useState(false);
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const holderRef = useRef<HTMLSpanElement>(null);
-
-    useEffect(() => {
-        const card = holderRef.current?.closest(".home-card-button");
-        if (!card || !item.video) return;
-        const canHover = typeof window.matchMedia !== "function" || (window.matchMedia("(hover: hover)").matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-        if (!canHover) return;
-        const start = () => setActive(true);
-        const stop = () => {
-            setActive(false);
-            setPlaying(false);
-            videoRef.current?.pause();
-        };
-        card.addEventListener("pointerenter", start);
-        card.addEventListener("pointerleave", stop);
-        card.addEventListener("focus", start);
-        card.addEventListener("blur", stop);
-        return () => {
-            card.removeEventListener("pointerenter", start);
-            card.removeEventListener("pointerleave", stop);
-            card.removeEventListener("focus", start);
-            card.removeEventListener("blur", stop);
-        };
-    }, [item.video]);
-
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!active || !video) return;
-        video.currentTime = 0;
-        void video.play().catch(() => setPlaying(false));
-    }, [active]);
-
-    return (
-        <span ref={holderRef} className="home-card-media">
-            <InspirationCover image={item.image} />
-            {item.video && active ? (
-                <video
-                    ref={videoRef}
-                    className={playing ? "is-playing" : undefined}
-                    src={item.video}
-                    poster={item.image}
-                    muted
-                    loop
-                    playsInline
-                    preload="auto"
-                    aria-hidden="true"
-                    onPlaying={() => setPlaying(true)}
-                    onError={() => setPlaying(false)}
-                />
+            {!isLoading && !isError && items.length ? (
+                <div ref={sentinelRef} className="home-load-more" role="status">
+                    {hasMore ? (
+                        "正在读取更多灵感…"
+                    ) : (
+                        <>
+                            已显示全部 {ordered.length.toLocaleString("zh-CN")} 条 · <Link to="/inspirations">去灵感库筛选</Link>
+                        </>
+                    )}
+                </div>
             ) : null}
-        </span>
+        </section>
     );
 }

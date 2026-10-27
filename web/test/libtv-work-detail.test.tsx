@@ -602,13 +602,16 @@ describe("LibTV home featured canvases", () => {
 describe("LibTV inspiration navigation", () => {
     test("sidebar, title, command palette and route preload all know the inspiration page", () => {
         const sidebar = source("../src/components/layout/workspace-sidebar-nav.tsx");
-        // 参考站布局：首页、项目、画布、创作、灵感。
-        expect(sidebar.indexOf('toolItem("inspiration", "/inspiration")')).toBeGreaterThan(sidebar.indexOf('toolItem("create", "/create")'));
+        // 参考站布局：首页、项目、画布、创作、灵感；侧栏「灵感」进入灵感库，「全部画布」从首页精选画布进入，也归在「灵感」下高亮。
+        expect(sidebar.indexOf('toolItem("inspirations", "/inspirations")')).toBeGreaterThan(sidebar.indexOf('toolItem("create", "/create")'));
+        expect(sidebar).toContain('if (slug === "inspiration") return "inspirations";');
         const tools = source("../src/constant/navigation-tools.ts");
         expect(tools).toContain('slug: "inspiration"');
-        expect(tools).toContain('label: "灵感"');
-        expect(tools).toContain('fullLabel: "灵感广场"');
-        expect(source("../src/components/layout/workspace-command-palette.tsx")).toContain('toolEntry("inspiration", "/inspiration")');
+        expect(tools).toContain('fullLabel: "全部画布"');
+        expect(tools).toContain('fullLabel: "灵感库"');
+        const palette = source("../src/components/layout/workspace-command-palette.tsx");
+        expect(palette).toContain('toolEntry("inspiration", "/inspiration")');
+        expect(palette).toContain('toolEntry("inspirations", "/inspirations")');
         const modules = source("../src/lib/workspace-route-modules.ts");
         expect(modules).toContain('inspiration: () => import("@/pages/inspiration")');
         expect(source("../src/router.tsx")).toContain("lazy(loadInspirationPage)");

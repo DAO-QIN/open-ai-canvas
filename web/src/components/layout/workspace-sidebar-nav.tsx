@@ -52,7 +52,7 @@ function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[];
                 ...(features.shortDramaEnabled ? [{ ...toolItem("projects", "/projects"), title: "项目" }] : []),
                 toolItem("canvas", "/canvas"),
                 toolItem("create", "/create"),
-                toolItem("inspiration", "/inspiration"),
+                toolItem("inspirations", "/inspirations"),
             ],
         },
         {
@@ -80,11 +80,19 @@ function WorkspaceSidebarProfile({ collapsed, user, onExpand, onCollapse }: { co
 
     if (!user) {
         return (
-            <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className={cn("app-workspace-sidebar-profile", collapsed && "is-collapsed")} aria-label="登录" title="登录">
-                <span className="app-workspace-sidebar-profile-avatar">
+            <Link to="/login" onClick={(event) => interceptLoginLinkClick(event)} className={cn("app-workspace-sidebar-guest", collapsed && "is-collapsed")} aria-label="游客模式，登录或注册" title="登录 / 注册">
+                <span className="app-workspace-sidebar-guest-avatar">
                     <CircleUserRound aria-hidden />
                 </span>
-                {!collapsed ? <span>游客模式</span> : null}
+                {!collapsed ? (
+                    <>
+                        <span className="app-workspace-sidebar-guest-copy">
+                            <strong>游客模式</strong>
+                            <span>登录后同步作品与积分</span>
+                        </span>
+                        <span className="app-workspace-sidebar-guest-action">登录</span>
+                    </>
+                ) : null}
             </Link>
         );
     }
@@ -329,8 +337,8 @@ export function workspaceNavActiveId(pathname: string, section?: string | null) 
     if (segments[0] === "toolbox" && segments[1]) return `toolbox-${segments[1]}`;
     const slug = segments[0] || "home";
     if (slug === "create" || slug === "c") return "create";
-    // 灵感大厅与灵感广场共用侧栏「灵感」。
-    if (slug === "inspirations") return "inspiration";
+    // 灵感库与「全部画布」都归在侧栏「灵感」下。
+    if (slug === "inspiration") return "inspirations";
     return slug === "settings" && section ? `settings:${section}` : slug;
 }
 

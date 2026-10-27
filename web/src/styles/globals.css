@@ -23999,11 +23999,11 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
 
 /* ===== 2026-09 user workspace alignment =====
    这一组规则只作用于真实用户端壳层和首页，后台与画布编辑器保持原有职责和交互。
-   几何基准：侧栏 224px、顶部 72px、导航行 48px、首页内容最大宽度 1180px。 */
+   几何基准：侧栏 224px、顶部 56px、导航行 48px、首页内容最大宽度 1180px。 */
 .app-user-workspace {
     --workspace-reference-sidebar: 224px;
     --workspace-reference-collapsed: 64px;
-    --workspace-reference-topbar: 72px;
+    --workspace-reference-topbar: 56px;
     --workspace-reference-row: var(--space-12);
     --workspace-navigation-brand-size: var(--fs-title);
     --workspace-navigation-label-size: var(--fs-heading);
@@ -27125,7 +27125,8 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
     overflow: visible;
     padding-inline: calc(var(--space-6) + var(--space-1)) !important;
     border-bottom: 0 !important;
-    background: var(--user-page-bg) !important;
+    /* 顶栏不单独铺底色：直接透出下面页面的底色，首页 / 创作页与其他页面衔接处都没有色差。 */
+    background: transparent !important;
     color: var(--user-ink) !important;
 }
 .app-user-workspace .app-workspace-topbar-breadcrumb {

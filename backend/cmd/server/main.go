@@ -139,6 +139,8 @@ func run(ctx context.Context) error {
 	svc.StartWorker()
 	// 启动后回填存量视频的播放副本转码（幂等，无待处理项即退出）。
 	go svc.BackfillPlaybackTranscodes()
+	// 首页精选画布要逐个读取 LibTV 详情：启动后先在后台准备好，首个访客不用等。
+	go svc.PrewarmLibTVFeatured()
 	status.markStarted()
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- httpServer.Serve(listener) }()

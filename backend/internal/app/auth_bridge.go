@@ -244,6 +244,8 @@ func (s *Service) LibTVGallery(ctx context.Context, actor *model.User, req LibTV
 	return s.authDomain().LibTVGallery(ctx, actor, req)
 }
 
+func (s *Service) PrewarmLibTVFeatured() { s.authDomain().PrewarmLibTVFeatured() }
+
 func (s *Service) LibTVFeatured(ctx context.Context, actor *model.User) (*LibTVFeaturedResult, error) {
 	return s.authDomain().LibTVFeatured(ctx, actor)
 }

@@ -73,13 +73,11 @@
 .home-card-button:hover .home-card-overlay, .home-card-button:focus-visible .home-card-overlay { opacity: 1; transform: none; }
 .home-card-button strong { overflow: hidden; margin-top: 6px; font-size: var(--fs-body); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .home-card-button small { overflow: hidden; color: var(--user-ink-muted); font-size: var(--fs-caption); text-overflow: ellipsis; white-space: nowrap; }
-.home-card-media, .home-card-media > img, .home-card-media > video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
-.home-card-media > video { opacity: 0; transition: opacity .25s ease; }
-.home-card-media > video.is-playing { opacity: 1; }
-.home-card-button:hover .home-card-media > img { transform: scale(1.04); }
 /* 「使用这个创意」出现时收起右下角的类型角标，二者不重叠。 */
 .home-card-cover:has(.home-card-overlay) .home-card-kind { transition: opacity var(--user-motion); }
 .home-card-button:hover .home-card-cover:has(.home-card-overlay) .home-card-kind, .home-card-button:focus-visible .home-card-cover:has(.home-card-overlay) .home-card-kind { opacity: 0; }
+.home-load-more { padding: var(--space-5) 0 var(--space-2); color: var(--user-ink-muted); font-size: var(--fs-caption); text-align: center; }
+.home-load-more a { color: var(--user-accent); }
 .home-gallery-page { display: flex; flex-direction: column; gap: var(--space-5); width: 100%; max-width: 1680px; margin-inline: auto; }
 .home-card.is-placeholder .home-card-cover, .home-card-line { animation: home-pulse 1.4s ease-in-out infinite; }
 .home-card-line { display: block; width: 60%; height: 14px; margin-top: var(--space-2); border-radius: 6px; background: var(--library-cover-surface); }

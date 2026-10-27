@@ -24,14 +24,14 @@ import (
 // 列表要逐个读详情才能知道节点数，所以结果在进程内缓存，所有访客共用一次上游读取。
 const (
 	libTVCuratedTagID       = 1000
-	libTVCuratedLimit       = 20
+	libTVCuratedLimit       = 60
 	libTVCuratedMinNodes    = 100
 	libTVCuratedFeedPages   = 20
 	libTVCuratedPageSize    = 20
-	libTVCuratedDetailLimit = 4
+	libTVCuratedDetailLimit = 6
 	libTVFeaturedTTL        = 30 * time.Minute
 	libTVFeaturedRetryAfter = time.Minute
-	libTVFeaturedTimeout    = 90 * time.Second
+	libTVFeaturedTimeout    = 150 * time.Second
 )
 
 // 这些标签下的作品是 LibTV 官方活动或品牌广告，封面普遍带 LibTV / 合作方水印。
@@ -46,7 +46,7 @@ var libTVWatermarkTags = map[string]bool{
 	"功能卖点":                 true,
 }
 
-// 人工复核：封面画面直接带 LibTV 水印的作品（2026-10-27 复核 LibTV 精选画布点赞前 40 与公开流前 200）。
+// 人工复核：封面画面直接带 LibTV 水印的作品（2026-10-27 复核 LibTV 精选画布符合条件的前 100 个与公开流前 200）。
 var libTVWatermarkedTemplates = map[string]bool{
 	"9b73b351334c4281adbc36ca6510efad": true, // AI教程｜4步完成TVC广告制作
 	"1569f41b4f794942a0d2e51c1a2afec8": true, // 风雪山神庙（右下角 LibTV）
@@ -56,6 +56,8 @@ var libTVWatermarkedTemplates = map[string]bool{
 	"59db0bf7162247248996844172485565": true, // 身在其中（黑客松）
 	"587f124265454aa1ad2833d5bcca0928": true, // 暴走机关（王者无界）
 	"67d0e9ab23b44506834fefbc50d1927e": true, // 小米空调 TVC
+	"26aa7a460875463c8c7d9089f71255ea": true, // 长安异闻录 第二卷 无头（左下角 LibTV）
+	"f1770f0682a94c49863e707d48a014d3": true, // 归途与光芒（左上角 LibTV）
 }
 
 type LibTVFeaturedItem struct {
@@ -74,12 +76,16 @@ type libTVFeaturedCache struct {
 	result     *LibTVFeaturedResult
 	expires    time.Time
 	refreshing bool
+	loading    chan struct{} // 正在进行的刷新，结束时关闭
 	refreshes  sync.WaitGroup
 	now        func() time.Time
 	fetch      func(context.Context) (*LibTVFeaturedResult, error)
 }
 
 var libTVFeatured = &libTVFeaturedCache{now: time.Now, fetch: fetchLibTVCuratedCanvases}
+
+// PrewarmLibTVFeatured 由服务启动流程调用一次。
+func (s *Service) PrewarmLibTVFeatured() { libTVFeatured.prewarm() }
 
 func (s *Service) LibTVFeatured(ctx context.Context, actor *model.User) (*LibTVFeaturedResult, error) {
 	if actor == nil || strings.TrimSpace(actor.ID) == "" {
@@ -96,12 +102,21 @@ func (s *Service) LibTVFeatured(ctx context.Context, actor *model.User) (*LibTVF
 // 上游失败或挑不出作品时保留旧结果，一分钟后再试，不让首页整块消失。
 func (c *libTVFeaturedCache) get(ctx context.Context) (*LibTVFeaturedResult, error) {
 	c.mu.Lock()
+	// 启动预热还没结束：等这一次读取，不再重复打上游。
+	if c.result == nil && c.refreshing {
+		loading := c.loading
+		c.mu.Unlock()
+		select {
+		case <-loading:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		c.mu.Lock()
+	}
 	defer c.mu.Unlock()
 	if c.result != nil {
 		if !c.now().Before(c.expires) && !c.refreshing {
-			c.refreshing = true
-			c.refreshes.Add(1)
-			go c.refresh()
+			c.startRefreshLocked()
 		}
 		return cloneLibTVFeatured(c.result), nil
 	}
@@ -114,11 +129,28 @@ func (c *libTVFeaturedCache) get(ctx context.Context) (*LibTVFeaturedResult, err
 	return cloneLibTVFeatured(result), nil
 }
 
-func (c *libTVFeaturedCache) refresh() {
+// prewarm 在进程启动后立即后台准备精选，首个访客不必等待逐个读取详情。
+func (c *libTVFeaturedCache) prewarm() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.result == nil && !c.refreshing {
+		c.startRefreshLocked()
+	}
+}
+
+func (c *libTVFeaturedCache) startRefreshLocked() {
+	c.refreshing = true
+	c.loading = make(chan struct{})
+	c.refreshes.Add(1)
+	go c.refresh(c.loading)
+}
+
+func (c *libTVFeaturedCache) refresh(loading chan struct{}) {
 	defer c.refreshes.Done()
 	result, err := c.load(context.Background())
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	defer close(loading)
 	c.refreshing = false
 	if err != nil {
 		c.expires = c.now().Add(libTVFeaturedRetryAfter)

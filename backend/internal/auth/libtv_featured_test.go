@@ -186,3 +186,44 @@ func TestLibTVFeaturedRequiresActor(t *testing.T) {
 		t.Fatal("accepted empty actor id")
 	}
 }
+
+func TestLibTVFeaturedPrewarmSharesTheFirstBuild(t *testing.T) {
+	release := make(chan struct{})
+	var calls atomic.Int32
+	cache := &libTVFeaturedCache{now: time.Now, fetch: func(context.Context) (*LibTVFeaturedResult, error) {
+		calls.Add(1)
+		<-release
+		return &LibTVFeaturedResult{Items: []LibTVFeaturedItem{{NodeCount: 7}}}, nil
+	}}
+	cache.prewarm()
+	cache.prewarm() // 重复调用不会再起一次
+	results := make(chan *LibTVFeaturedResult, 3)
+	for range 3 {
+		go func() {
+			result, _ := cache.get(context.Background())
+			results <- result
+		}()
+	}
+	time.Sleep(20 * time.Millisecond)
+	close(release)
+	for range 3 {
+		if result := <-results; result == nil || result.Items[0].NodeCount != 7 {
+			t.Fatalf("waiting visitor got %#v", result)
+		}
+	}
+	cache.refreshes.Wait()
+	if calls.Load() != 1 {
+		t.Fatalf("upstream builds = %d", calls.Load())
+	}
+	// 等待中的访客自己取消请求时立即返回，不拖住预热。
+	slow := &libTVFeaturedCache{now: time.Now, fetch: func(ctx context.Context) (*LibTVFeaturedResult, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}}
+	slow.prewarm()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := slow.get(ctx); err == nil {
+		t.Fatal("cancelled visitor should not block on prewarm")
+	}
+}

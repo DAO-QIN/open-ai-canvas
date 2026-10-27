@@ -67,7 +67,7 @@ description: 信封、错误码与 OpenAPI
 | 接口 | 用途 |
 | --- | --- |
 | `GET /api/libtv/gallery` | 分页作品列表，支持 `page`、`pageSize`、`keyword`、`tagId`、`requestId`；后续分页复用首次响应的查询标识 |
-| `GET /api/libtv/featured` | 精选画布（最多 20 个）：LibTV「精选画布」标签中节点 ≥100、可导入、有成片且封面无 LibTV 水印的作品，按点赞排序；服务端缓存 30 分钟，上游失败时返回上一份结果 |
+| `GET /api/libtv/featured` | 精选画布（最多 60 个，服务启动即预热）：LibTV「精选画布」标签中节点 ≥100、可导入、有成片且封面无 LibTV 水印的作品，按点赞排序；服务端缓存 30 分钟，上游失败时返回上一份结果 |
 | `GET /api/libtv/works/:uuid` | 作品、制作步骤、公开提示词、媒体及导入警告 |
 | `POST /api/canvas-projects/:id/import/libtv-template` | 请求体 `{"uuid":"作品模板 UUID"}`；校验画布归属后返回转换预览，用户确认后由前端通过现有画布保存流程写入 |
 

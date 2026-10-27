@@ -11,7 +11,7 @@ export default function InspirationsPage() {
     const navigate = useNavigate();
     return (
         <WorkspacePage>
-            <InspirationHall onUse={(item: CreationInspiration) => navigate("/create", { state: inspirationPrefillState(item) })} />
+            <InspirationHall eager onUse={(item: CreationInspiration) => navigate("/create", { state: inspirationPrefillState(item) })} />
         </WorkspacePage>
     );
 }

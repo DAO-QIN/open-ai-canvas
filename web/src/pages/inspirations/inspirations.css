@@ -1,4 +1,4 @@
-/* 创作首页中的灵感大厅：标题与常用筛选常驻，完整管理功能按需展开。 */
+/* 灵感库（/inspirations 与创作页灵感区共用）：参考 leyi.my 灵感库——标题 + 操作、类型、分类标签、筛选行、卡片网格，下滑加载。 */
 .inspiration-hall {
     min-width: 0;
     width: 100%;
@@ -21,8 +21,8 @@
 .inspiration-hall-header h2 {
     margin: 0;
     color: var(--user-ink);
-    font-size: var(--fs-title);
-    font-weight: 600;
+    font-size: 22px;
+    font-weight: 700;
     letter-spacing: -0.025em;
     line-height: 1.35;
 }
@@ -30,7 +30,7 @@
 .inspiration-hall-header p {
     margin: var(--space-1) 0 0;
     color: var(--user-ink-muted);
-    font-size: var(--fs-caption);
+    font-size: var(--fs-body);
     line-height: 1.6;
 }
 
@@ -59,12 +59,11 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* 搜索框与内容库工具栏同一套外观：34px、9px 圆角、透明底 + 1px 细线。 */
+/* 搜索框与内容库工具栏同一套外观：细线、透明底，在筛选行里占主要宽度。 */
 .inspiration-hall-search.ant-input-affix-wrapper {
-    width: clamp(200px, 24%, 300px);
-    height: var(--user-control-height);
+    width: clamp(220px, 32%, 420px);
+    height: 38px;
     min-width: 0;
-    margin-left: auto;
     background: transparent;
     border: 1px solid var(--user-border);
     border-radius: var(--user-radius-button);
@@ -90,54 +89,53 @@
     outline-offset: var(--space-half);
 }
 
-.inspiration-hall-filter-toggle > svg:last-child {
-    width: var(--space-3);
-    height: var(--space-3);
-    margin-left: calc(-1 * var(--space-half));
-    color: var(--user-ink-soft);
-    transition: transform var(--user-motion);
-}
-
-.inspiration-hall-filter-toggle > svg.is-open {
-    transform: rotate(180deg);
-}
 .inspiration-hall-count {
+    margin-left: auto;
     color: var(--user-ink-soft);
     font-size: var(--fs-caption);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.inspiration-hall-filters {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    align-items: end;
-    gap: var(--space-3);
-    padding: var(--space-4);
-    margin-bottom: var(--space-5);
-    border-radius: var(--user-radius-card);
-    background: var(--user-surface-muted);
-}
-
-.inspiration-hall-field {
+/* 分类标签：常驻铺开，选中态用控件选中色；更多分类按需展开。 */
+.inspiration-hall-categories {
     display: flex;
-    min-width: 0;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: var(--space-2);
+    margin-bottom: var(--space-4);
 }
+.inspiration-hall-categories .inspiration-chip {
+    border: 1px solid var(--user-border);
+    background: transparent;
+    color: var(--user-ink);
+    font-size: var(--fs-caption);
+    cursor: pointer;
+    transition: border-color var(--user-motion), background-color var(--user-motion);
+}
+.inspiration-hall-categories .inspiration-chip:hover { border-color: var(--user-border-strong); background: var(--user-surface-hover); }
+.inspiration-hall-categories .inspiration-chip > span { color: var(--user-ink-soft); font-variant-numeric: tabular-nums; }
+.inspiration-hall-categories .inspiration-chip[aria-pressed="true"] { border-color: transparent; }
+.inspiration-hall-categories .inspiration-chip[aria-pressed="true"] > span { color: inherit; opacity: .7; }
+.inspiration-hall-categories .inspiration-chip.is-toggle svg { width: 12px; height: 12px; transition: transform var(--user-motion); }
+.inspiration-hall-categories .inspiration-chip.is-toggle svg.is-open { transform: rotate(180deg); }
 
-.inspiration-hall-field > span {
+/* 筛选行：搜索、全部 / 收藏 / 已隐藏、来源、排序一行排开，窄屏自动换行。 */
+.inspiration-hall-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-5);
+}
+.inspiration-hall-views { flex: 0 0 auto; }
+.inspiration-hall-select { width: 168px; min-width: 0; }
+.inspiration-hall-select.is-source { width: 220px; }
+.inspiration-hall-reset { flex: 0 0 auto; }
+.inspiration-hall-more {
+    padding: var(--space-6) 0 var(--space-2);
     color: var(--user-ink-muted);
-    font-size: var(--fs-label);
-    font-weight: 600;
-}
-
-.inspiration-hall-field .ant-select {
-    width: 100%;
-    min-width: 0;
-}
-.inspiration-hall-reset {
-    justify-self: start;
+    font-size: var(--fs-caption);
+    text-align: center;
 }
 .inspiration-hall-results {
     min-width: 0;
@@ -148,8 +146,8 @@
 
 .inspiration-gallery {
     display: grid;
-    gap: var(--space-4);
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 232px), 1fr));
+    gap: var(--space-5) var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
     align-items: stretch;
 }
 
@@ -158,8 +156,8 @@
     display: flex;
     min-width: 0;
     overflow: hidden;
-    border: 0;
-    border-radius: var(--user-radius-card);
+    border: 1px solid var(--user-border);
+    border-radius: 14px;
     background: var(--library-surface);
     box-shadow: none;
     transition:
@@ -179,7 +177,7 @@
     flex-direction: column;
     border: 0;
     border-radius: inherit;
-    padding: var(--space-2);
+    padding: 0;
     background: transparent;
     color: inherit;
     text-align: left;
@@ -199,7 +197,7 @@
     flex-shrink: 0;
     aspect-ratio: 4 / 3;
     overflow: hidden;
-    border-radius: var(--user-radius-media);
+    border-radius: 0;
     background: var(--library-cover-surface);
 }
 
@@ -209,27 +207,31 @@
     height: 100%;
     object-fit: cover;
 }
-.inspiration-card-source {
+.inspiration-card-source,
+.inspiration-card-kind {
     position: absolute;
-    bottom: var(--space-2);
-    left: var(--space-2);
-    max-width: calc(100% - var(--space-4));
+    bottom: var(--space-3);
     overflow: hidden;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--r-full);
-    background: var(--user-surface-raised);
-    color: var(--user-ink-muted);
-    font-size: var(--fs-tiny);
+    padding: 3px 10px;
+    border-radius: 8px;
+    background: rgb(0 0 0 / .55);
+    color: #fff;
+    font-size: var(--fs-label);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     line-height: 1.5;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.inspiration-card-source { left: var(--space-3); max-width: calc(100% - 120px); }
+.inspiration-card-kind { right: var(--space-3); display: inline-flex; align-items: center; gap: 4px; }
+.inspiration-card-kind svg { width: 10px; height: 10px; fill: currentColor; }
 
 /* 操作与详情按钮是兄弟节点；收藏和展开的菜单始终可见。 */
 .inspiration-card-actions {
     position: absolute;
-    top: var(--space-4);
-    right: var(--space-4);
+    top: var(--space-3);
+    right: var(--space-3);
     display: flex;
     gap: var(--space-1);
     opacity: 0;
@@ -284,15 +286,15 @@
     min-width: 0;
     flex: 1;
     flex-direction: column;
-    gap: var(--space-1);
-    padding: var(--space-3) var(--space-2) var(--space-1);
+    gap: 6px;
+    padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .inspiration-card-title {
     overflow: hidden;
     color: var(--user-ink);
-    font-size: var(--fs-body);
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 650;
     line-height: 1.4;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -301,6 +303,7 @@
 .inspiration-card-desc {
     display: -webkit-box;
     overflow: hidden;
+    min-height: 3em;
     color: var(--user-ink-muted);
     font-size: var(--fs-caption);
     line-height: 1.5;
@@ -345,10 +348,11 @@
 
 .inspiration-card-tags .inspiration-chip {
     display: block;
-    padding: var(--space-half) var(--space-2);
+    padding: 2px 10px;
+    border: 1px solid var(--user-border);
     color: var(--user-ink-muted);
-    background: color-mix(in srgb, var(--user-ink) 6%, transparent);
-    font-size: var(--fs-tiny);
+    background: transparent;
+    font-size: var(--fs-label);
 }
 
 /* 详情图标按钮使用 span 与 data-icon-only，避开共享按钮的装饰 hover。 */
@@ -435,15 +439,12 @@
     .inspiration-hall-count {
         margin-left: auto;
     }
-    .inspiration-hall-filters {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
     .inspiration-gallery {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: var(--space-3);
     }
     .inspiration-card-body {
-        padding: var(--space-2) var(--space-1) 0;
+        padding: var(--space-2) var(--space-3) var(--space-3);
     }
     .inspiration-card-source {
         font-size: var(--fs-tiny);
@@ -510,7 +511,17 @@
     .inspiration-card-actions,
     .inspiration-card-action,
     .inspiration-icon-button,
-    .inspiration-hall-filter-toggle > svg:last-child {
+    .inspiration-hall-categories .inspiration-chip.is-toggle svg {
         transition: none;
     }
+}
+
+@media (max-width: 760px) {
+    .inspiration-hall-header { flex-direction: column; align-items: flex-start; }
+    .inspiration-hall-actions { flex-wrap: wrap; }
+    .inspiration-hall-search.ant-input-affix-wrapper { width: 100%; }
+    .inspiration-hall-select, .inspiration-hall-select.is-source { width: calc(50% - var(--space-2)); }
+    .inspiration-hall-categories { flex-wrap: nowrap; overflow-x: auto; padding-bottom: var(--space-1); scrollbar-width: none; }
+    .inspiration-hall-categories::-webkit-scrollbar { display: none; }
+    .inspiration-hall-categories .inspiration-chip { flex: 0 0 auto; }
 }
