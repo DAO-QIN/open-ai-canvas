@@ -1,4 +1,5 @@
 import { usableResultUrl } from "./creation-result-urls";
+import "./creation-results.css";
 // 创作页消息流：用户消息、媒体结果、生成中占位、引用素材与预览。
 
 import { conversationTimeFormatter, type CreationMessage } from "./creation-types";
@@ -9,6 +10,7 @@ import { MessageReasoning } from "@/components/ai/message-reasoning";
 import { AIMessageMarkdown } from "@/components/ai/ai-message-markdown";
 import { WorkingDots } from "@/components/ai/working-indicator";
 import { UserAvatar } from "@/components/layout/user-avatar";
+import { BrandLogoFrame } from "@/components/brand/brand-logo";
 import { generationErrorMessage } from "@/lib/generation-error";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import type { AgentOutputPreference } from "@/services/api/agent";
@@ -157,9 +159,7 @@ export function CreationMessageView({
         mode !== "text" && mode !== "agent" ? (
             <>
                 {shotNumber > 0 ? <span className="creation-shot-badge">镜 {shotNumber}</span> : null}
-                <span className="creation-message-mark">
-                    <Sparkles />
-                </span>
+                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<Sparkles />} />
                 <strong>{mode === "image" ? "图像生成" : "视频生成"}</strong>
                 {item.status === "pending" ? (
                     <span className="creation-message-progress-copy">
@@ -192,9 +192,7 @@ export function CreationMessageView({
         ) : (
             <>
                 {shotNumber > 0 ? <span className="creation-shot-badge">镜 {shotNumber}</span> : null}
-                <span className="creation-message-mark">
-                    <Sparkles />
-                </span>
+                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<Sparkles />} />
                 <strong>{brandName}</strong>
                 {item.createdAt ? <time dateTime={item.createdAt}>{formatMessageTime(item.createdAt)}</time> : null}
                 {stateLabel ? <span className={`creation-message-state is-${item.status}`}>{stateLabel}</span> : null}
