@@ -68,7 +68,7 @@ export default function AppearanceSettingsPage() {
     const dirty =
         Boolean(setting) &&
         (JSON.stringify(updates) !== JSON.stringify(normalizeUpdateAnnouncement(setting?.updates)) ||
-            JSON.stringify(canvas) !== JSON.stringify(setting?.canvas || DEFAULT_CANVAS_APPEARANCE) ||
+            JSON.stringify(canvas) !== JSON.stringify(assistantAppearance(setting?.canvas || DEFAULT_CANVAS_APPEARANCE)) ||
             JSON.stringify(petCatalog) !== JSON.stringify(setting?.petCatalog || []) ||
             canvasUploading ||
             brandName.trim() !== setting?.brandName ||
