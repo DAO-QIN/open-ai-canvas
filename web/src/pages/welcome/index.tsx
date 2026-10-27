@@ -3,6 +3,7 @@ import { Button, ConfigProvider, Tabs } from "antd";
 import { ArrowDown, ArrowRight, ArrowUpRight, Code2, Menu, Pause, Play, X } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { IconButton } from "@/components/ui/base/buttons";
 import { getAntThemeConfig } from "@/lib/app-theme";
 import { applyAppearanceMetadata, useAppearanceStore } from "@/stores/use-appearance-store";
@@ -103,7 +104,7 @@ function WelcomeExperience({ look, brandName, onLookChange }: { look: WelcomeLoo
             <header className="welcome-header">
                 <a className="welcome-brand" href="/welcome" aria-label={`${brandName}首页`}>
                     <BrandLogo theme="dark" className="welcome-brand-logo" alt="" fallback={<span className="welcome-brand-logo is-fallback" />} />
-                    {brandName}
+                    <BrandWordmark name={brandName} />
                 </a>
                 <nav className={menu ? "welcome-nav is-open" : "welcome-nav"} aria-label="首页导航">
                     <a href="#workbench" onClick={() => setMenu(false)}>工作台</a>

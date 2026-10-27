@@ -2495,7 +2495,6 @@
     /* 品牌字标：弱化但可读，hover 加深 */
     .app-workspace-brand-wordmark {
         color: color-mix(in srgb, var(--foreground) 78%, transparent);
-        letter-spacing: 0.01em;
         transition: color var(--motion-instant) ease-out;
     }
     .app-workspace-nav-link {
@@ -23784,18 +23783,7 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
 
 .app-user-workspace .app-workspace-brand-wordmark {
     font-size: var(--workspace-navigation-brand-size);
-    font-weight: 700;
-    letter-spacing: normal;
-    line-height: 1;
     color: var(--foreground);
-}
-
-.app-user-workspace .app-workspace-brand-wordmark-art {
-    display: block;
-    width: 4.1em;
-    max-width: 100%;
-    height: auto;
-    overflow: visible;
 }
 
 .app-user-workspace .app-workspace-topbar {

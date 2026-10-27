@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router";
 
 import { AppModal } from "@/components/ui/product/app-modal";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { splitAgreementParagraph } from "@/lib/agreement-text";
 import { curatedInspirations } from "@/lib/inspirations/catalog";
 import { getAuthSettings } from "@/services/api/auth";
@@ -131,7 +132,7 @@ function LoginModalContent({ onClose }: { onClose: () => void }) {
                 </button>
                 <div className="login-modal-brand">
                     <BrandLogo className="size-7" alt="" fallback={<span className="size-7 bg-current" style={{ mask: "url(/logo.svg) center / contain no-repeat", WebkitMask: "url(/logo.svg) center / contain no-repeat" }} />} />
-                    <span>{brandName}</span>
+                    <BrandWordmark name={brandName} />
                 </div>
                 {view === "login" ? <AuthLoginView key="login" context={context} title={request.title} description={request.description} /> : null}
                 {view === "register" ? <AuthRegisterView key="register" context={context} /> : null}

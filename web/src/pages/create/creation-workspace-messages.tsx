@@ -11,6 +11,7 @@ import { AIMessageMarkdown } from "@/components/ai/ai-message-markdown";
 import { WorkingDots } from "@/components/ai/working-indicator";
 import { UserAvatar } from "@/components/layout/user-avatar";
 import { BrandLogoFrame } from "@/components/brand/brand-logo";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { generationErrorMessage } from "@/lib/generation-error";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import type { AgentOutputPreference } from "@/services/api/agent";
@@ -193,7 +194,9 @@ export function CreationMessageView({
             <>
                 {shotNumber > 0 ? <span className="creation-shot-badge">镜 {shotNumber}</span> : null}
                 <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<Sparkles />} />
-                <strong>{brandName}</strong>
+                <strong>
+                    <BrandWordmark name={brandName} />
+                </strong>
                 {item.createdAt ? <time dateTime={item.createdAt}>{formatMessageTime(item.createdAt)}</time> : null}
                 {stateLabel ? <span className={`creation-message-state is-${item.status}`}>{stateLabel}</span> : null}
             </>

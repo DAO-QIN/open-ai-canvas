@@ -1,0 +1,22 @@
+/* 品牌字标：Inter 粗体倾斜，与登录弹窗品牌名同款；Yinghui 使用矢量轮廓保证各端一致。
+   欢迎页等不加载 globals.css 的页面也会使用，所以样式随组件加载。 */
+.brand-wordmark {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    font-family: var(--font-sans, "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif);
+    font-style: italic;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.brand-wordmark-art {
+    display: block;
+    flex: none;
+    width: 3.993em;
+    height: 1.21em;
+    max-width: 100%;
+    overflow: visible;
+}

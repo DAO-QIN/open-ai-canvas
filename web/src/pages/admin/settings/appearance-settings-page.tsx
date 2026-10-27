@@ -5,6 +5,7 @@ import { AdminStatusBadge, SettingsSectionCard } from "@/pages/admin/components/
 import { AdminPageFrame } from "@/pages/admin/components/admin-shell";
 import { Palette, RefreshCw, Undo2, RotateCcw, Save, Sun, Moon, MonitorPlay, Globe2, Search, Copyright, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { Switch } from "@/pages/admin/ui/controls";
 import { WelcomeSetting } from "@/pages/admin/settings/components/welcome-setting";
 import { SkinThemeEditor } from "@/pages/admin/settings/components/skin-theme-editor";
@@ -688,7 +689,9 @@ export default function AppearanceSettingsPage() {
                                                     <span className="admin-appearance-preview-shade" />
                                                     <span className="admin-appearance-preview-brand">
                                                         <img src={previews.logoDark} alt="" />
-                                                        <strong>{brandName.trim() || "未命名品牌"}</strong>
+                                                        <strong>
+                                                            <BrandWordmark name={brandName.trim() || "未命名品牌"} />
+                                                        </strong>
                                                     </span>
                                                     <span className="admin-appearance-preview-copy">
                                                         <small>{(brandSlug.trim() || "brand-studio").replace(/-+/g, " ").toLocaleUpperCase()}</small>
