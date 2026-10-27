@@ -57,7 +57,7 @@ func TestHomepageAgentMigrationUpgradesSchema74WithoutChangingExistingData(t *te
 			}
 		}
 	}
-	if err := db.Where("version = ?", 75).Delete(&schemaMigration{}).Error; err != nil {
+	if err := db.Where("version > ?", 74).Delete(&schemaMigration{}).Error; err != nil {
 		t.Fatal(err)
 	}
 	if status, err := ReadSchemaStatus(db); err != nil || status.Current != 74 || status.Ready {
@@ -68,7 +68,7 @@ func TestHomepageAgentMigrationUpgradesSchema74WithoutChangingExistingData(t *te
 			t.Fatal(err)
 		}
 	}
-	if status, err := ReadSchemaStatus(db); err != nil || status.Current != 75 || !status.Ready {
+	if status, err := ReadSchemaStatus(db); err != nil || status.Current != CurrentSchemaVersion || !status.Ready {
 		t.Fatalf("upgraded schema: %+v, %v", status, err)
 	}
 	var history []schemaMigration

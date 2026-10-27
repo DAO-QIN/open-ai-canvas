@@ -121,7 +121,8 @@ func TestAutoDLMediaValidation(t *testing.T) {
 		{"empty image", GenerationRequest{Model: "minimax_h3_zm_u24", Images: []MediaReference{{Role: "first_frame"}}}, "图片尚未就绪"},
 		{"unknown role", GenerationRequest{Model: "minimax_h3_zm_u24", Images: []MediaReference{{URL: "image", Role: "mask"}}}, "图片用途不受支持"},
 		{"duplicate first frame", GenerationRequest{Model: "minimax_h3_b99_002", Images: []MediaReference{{URL: "first", Role: "first_frame"}, {URL: "other", Role: "first_frame"}}}, "只选择一张首帧"},
-		{"unknown workflow", GenerationRequest{Model: "unknown_workflow", Images: media(1)}, "配置已更新"},
+		{"undeclared workflow", GenerationRequest{Model: "unknown_workflow", Images: media(1)}, ""},
+		{"undeclared audio overflow", GenerationRequest{Model: "unknown_workflow", Audios: media(4)}, "最多支持 3 段"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spec, err := adapter.BuildCreate(context.Background(), RequestContext{Request: tc.request})

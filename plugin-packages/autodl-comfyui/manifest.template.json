@@ -2,7 +2,7 @@
   "apiVersion": "yingce.plugin/v2",
   "id": "autodl-comfyui",
   "name": "AutoDL ComfyUI 视频与音频",
-  "version": "2.3.1",
+  "version": "2.4.1",
   "author": "影策社区",
   "description": "通过 AutoDL.Art ComfyUI 工作流 API 接入异步视频生成。",
   "permissions": [
@@ -59,7 +59,7 @@
             "name": "resolution",
             "type": "string",
             "mapping": "resolution",
-            "description": "输出分辨率档位，如 480p竖、768p竖、1080p竖、480p横、768p横、1080p横、480p(1:1)、768p(1:1) 等。"
+            "description": "输出分辨率标签，原样转小写发送。已声明工作流使用各自枚举；其他工作流默认提供 480p竖、768p竖、960p竖、480p横、768p横、960p横，管理员也可输入上游支持的其他标签。"
           },
           {
             "name": "images",
@@ -77,7 +77,372 @@
         "create": {
           "method": "POST",
           "path": "/api/v1/comfyui/comfyui_workflow/{{model}}",
-          "contentType": "application/json"
+          "contentType": "application/json",
+          "body": {
+            "$merge": [
+              {
+                "prompt": {
+                  "$if": {
+                    "condition": {
+                      "$ne": [
+                        {
+                          "$ref": "request.model"
+                        },
+                        "minimax_h3_image_audio_to_video"
+                      ]
+                    },
+                    "then": {
+                      "$ref": "request.prompt"
+                    }
+                  }
+                },
+                "duration": {
+                  "$if": {
+                    "condition": {
+                      "$ne": [
+                        {
+                          "$ref": "request.model"
+                        },
+                        "minimax_h3_image_audio_to_video"
+                      ]
+                    },
+                    "then": {
+                      "$ref": "request.duration"
+                    }
+                  }
+                },
+                "audio_duration": {
+                  "$if": {
+                    "condition": {
+                      "$eq": [
+                        {
+                          "$ref": "request.model"
+                        },
+                        "minimax_h3_image_audio_to_video"
+                      ]
+                    },
+                    "then": {
+                      "$ref": "request.duration"
+                    }
+                  }
+                },
+                "resolution": {
+                  "$omitEmpty": {
+                    "$lower": {
+                      "$ref": "request.resolution"
+                    }
+                  }
+                }
+              },
+              {
+                "$if": {
+                  "condition": {
+                    "$in": [
+                      {
+                        "$ref": "request.model"
+                      },
+                      [
+                        "minimax_h3_b99_003_12s",
+                        "minimax_h3_image_audio_to_video_v2_15s",
+                        "minimax_h3_lightx2v_v5_15s",
+                        "minimax_h3_image_audio_to_video_v2",
+                        "minimax_h3_lightx2v_v5",
+                        "minimax_h3_zm_u24",
+                        "minimax_h3_zm_u08",
+                        "minimax_h3_z0902",
+                        "minimax_h3_z0903"
+                      ]
+                    ]
+                  },
+                  "then": {
+                    "$indexObject": {
+                      "from": {
+                        "$filter": {
+                          "from": {
+                            "$sortByOrder": {
+                              "$ref": "request.images"
+                            }
+                          },
+                          "as": "media",
+                          "where": {
+                            "$in": [
+                              {
+                                "$ref": "media.role"
+                              },
+                              [
+                                "reference_image",
+                                "subject_reference",
+                                "style_reference",
+                                "edit_source",
+                                ""
+                              ]
+                            ]
+                          }
+                        }
+                      },
+                      "as": "media",
+                      "prefix": "ref_image_",
+                      "max": 9,
+                      "value": {
+                        "$ref": "media.value"
+                      }
+                    }
+                  },
+                  "else": {}
+                }
+              },
+              {
+                "$if": {
+                  "condition": {
+                    "$in": [
+                      {
+                        "$ref": "request.model"
+                      },
+                      [
+                        "minimax_h3_b99_002",
+                        "minimax_h3_lightx2v"
+                      ]
+                    ]
+                  },
+                  "then": {
+                    "first_frame": {
+                      "$omitEmpty": {
+                        "$coalesce": [
+                          {
+                            "$first": {
+                              "$map": {
+                                "from": {
+                                  "$filter": {
+                                    "from": {
+                                      "$sortByOrder": {
+                                        "$ref": "request.images"
+                                      }
+                                    },
+                                    "as": "media",
+                                    "where": {
+                                      "$eq": [
+                                        {
+                                          "$ref": "media.role"
+                                        },
+                                        "first_frame"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "as": "media",
+                                "in": {
+                                  "$ref": "media.value"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "$at": [
+                              {
+                                "$map": {
+                                  "from": {
+                                    "$sortByOrder": {
+                                      "$ref": "request.images"
+                                    }
+                                  },
+                                  "as": "media",
+                                  "in": {
+                                    "$ref": "media.value"
+                                  }
+                                }
+                              },
+                              0
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "last_frame": {
+                      "$omitEmpty": {
+                        "$coalesce": [
+                          {
+                            "$first": {
+                              "$map": {
+                                "from": {
+                                  "$filter": {
+                                    "from": {
+                                      "$sortByOrder": {
+                                        "$ref": "request.images"
+                                      }
+                                    },
+                                    "as": "media",
+                                    "where": {
+                                      "$eq": [
+                                        {
+                                          "$ref": "media.role"
+                                        },
+                                        "last_frame"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "as": "media",
+                                "in": {
+                                  "$ref": "media.value"
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "$at": [
+                              {
+                                "$map": {
+                                  "from": {
+                                    "$sortByOrder": {
+                                      "$ref": "request.images"
+                                    }
+                                  },
+                                  "as": "media",
+                                  "in": {
+                                    "$ref": "media.value"
+                                  }
+                                }
+                              },
+                              1
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "else": {}
+                }
+              },
+              {
+                "$if": {
+                  "condition": {
+                    "$eq": [
+                      {
+                        "$ref": "request.model"
+                      },
+                      "minimax_h3_image_audio_to_video"
+                    ]
+                  },
+                  "then": {
+                    "ref_image_0": {
+                      "$omitEmpty": {
+                        "$first": {
+                          "$map": {
+                            "from": {
+                              "$sortByOrder": {
+                                "$ref": "request.images"
+                              }
+                            },
+                            "as": "media",
+                            "in": {
+                              "$ref": "media.value"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "else": {}
+                }
+              },
+              {
+                "$if": {
+                  "condition": {
+                    "$in": [
+                      {
+                        "$ref": "request.model"
+                      },
+                      [
+                        "minimax_h3_image_audio_to_video",
+                        "minimax_h3_image_audio_to_video_v2",
+                        "minimax_h3_image_audio_to_video_v2_15s",
+                        "minimax_h3_z0903"
+                      ]
+                    ]
+                  },
+                  "then": {
+                    "$indexObject": {
+                      "from": {
+                        "$sortByOrder": {
+                          "$ref": "request.audios"
+                        }
+                      },
+                      "as": "media",
+                      "prefix": "ref_audio_",
+                      "max": 3,
+                      "value": {
+                        "$ref": "media.value"
+                      }
+                    }
+                  },
+                  "else": {}
+                }
+              },
+              {
+                "$if": {
+                  "condition": {
+                    "$in": [
+                      {
+                        "$ref": "request.model"
+                      },
+                      [
+                        "minimax_h3_b99_002",
+                        "minimax_h3_b99_001",
+                        "minimax_h3_b99_003_12s",
+                        "minimax_h3_image_audio_to_video_v2_15s",
+                        "minimax_h3_lightx2v_v5_15s",
+                        "minimax_h3_image_audio_to_video_v2",
+                        "minimax_h3_image_audio_to_video",
+                        "minimax_h3_lightx2v_v5",
+                        "minimax_h3_lightx2v_no_pic",
+                        "minimax_h3_lightx2v",
+                        "minimax_h3_zm_u24",
+                        "minimax_h3_zm_u08",
+                        "minimax_h3_z0901",
+                        "minimax_h3_z0902",
+                        "minimax_h3_z0903"
+                      ]
+                    ]
+                  },
+                  "then": {},
+                  "else": {
+                    "$merge": [
+                      {
+                        "$indexObject": {
+                          "from": {
+                            "$sortByOrder": {
+                              "$ref": "request.images"
+                            }
+                          },
+                          "as": "media",
+                          "prefix": "ref_image_",
+                          "max": 9,
+                          "value": {
+                            "$ref": "media.value"
+                          }
+                        }
+                      },
+                      {
+                        "$indexObject": {
+                          "from": {
+                            "$sortByOrder": {
+                              "$ref": "request.audios"
+                            }
+                          },
+                          "as": "media",
+                          "prefix": "ref_audio_",
+                          "max": 3,
+                          "value": {
+                            "$ref": "media.value"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
         },
         "poll": {
           "method": "GET",
@@ -647,6 +1012,44 @@
         "defaults": {
           "duration": 5,
           "resolution": "768p竖(768*1376)"
+        }
+      },
+      {
+        "id": "*",
+        "label": "其他工作流（透传上游模型 ID）",
+        "providerId": "autodl-comfyui",
+        "capability": "video",
+        "parameters": [
+          {
+            "name": "prompt",
+            "type": "string",
+            "required": true,
+            "mapping": "prompt"
+          },
+          {
+            "name": "duration",
+            "type": "integer",
+            "mapping": "duration",
+            "description": "视频时长（秒），范围以上游工作流为准。"
+          },
+          {
+            "name": "resolution",
+            "type": "string",
+            "mapping": "resolution",
+            "values": [
+              "480p竖",
+              "768p竖",
+              "960p竖",
+              "480p横",
+              "768p横",
+              "960p横"
+            ],
+            "description": "默认预设；管理员可输入上游工作流支持的其他分辨率标签。"
+          }
+        ],
+        "defaults": {
+          "duration": 5,
+          "resolution": "768p竖"
         }
       }
     ]

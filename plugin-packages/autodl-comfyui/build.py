@@ -70,14 +70,14 @@ def workflow_validations(contract):
 def build():
     manifest = json.loads((ROOT / "manifest.template.json").read_text(encoding="utf-8"))
     contracts = json.loads((ROOT / "workflow-media.json").read_text(encoding="utf-8"))
-    workflow_ids = {item["id"] for item in manifest["contributes"]["workflows"]}
+    workflow_ids = {item["id"] for item in manifest["contributes"]["workflows"] if item["id"] != "*"}
     if workflow_ids != set(contracts):
         raise ValueError("Every contributed workflow must have exactly one media contract")
     provider = manifest["contributes"]["providers"][0]
+    passthrough_body = copy.deepcopy(provider["create"]["body"])
     provider["parameters"][3]["description"] = "由工作流媒体契约决定首尾帧或参考图语义；参考图按 order 全量编号，包含历史首尾帧标记。"
     provider["parameters"][4]["description"] = "按 order 生成 ref_audio_N；超出工作流数量限制时在发送前拒绝，不截断。"
     cases, rules = [], []
-    rules.append(validation({"$in": [ref("request.model"), list(contracts)]}, "当前模型配置已更新，请重新选择模型后重试。"))
     rules.append(validation({"$eq": [count(ref("request.videos")), 0]}, "当前模型不支持参考视频，请移除视频或切换模型。"))
     rules.append(validation({"$eq": [count(select(ref("request.images"), {"$not": {"$in": [ref("media.role"), IMAGE_ROLES]}})), 0]}, "参考图片用途不受支持，请重新选择参考图片。"))
     for kind, label in [("images", "图片"), ("audios", "音频")]:
@@ -104,7 +104,8 @@ def build():
         cases.append({"when": matches, "then": {"$merge": parts}})
         for rule in workflow_validations(contract):
             rules.append(validation({"$or": [{"$not": matches}, rule["assert"]]}, rule["message"]))
-    provider["create"]["body"] = {"$switch": {"cases": cases}}
+    rules.append(validation({"$or": [{"$in": [ref("request.model"), list(contracts)]}, {"$lte": [count(ref("request.audios")), 3]}]}, "当前模型最多支持 3 段参考音频，请减少音频后重试。"))
+    provider["create"]["body"] = {"$switch": {"cases": cases, "default": passthrough_body}}
     provider["validations"] = rules
 
     documentation = (ROOT / "docs/interface.md").read_text(encoding="utf-8").split("<!-- YINGCE_MANIFEST_CONTRACT_START -->")[0].rstrip()
