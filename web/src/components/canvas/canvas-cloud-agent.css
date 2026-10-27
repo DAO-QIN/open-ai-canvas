@@ -1713,17 +1713,17 @@
     display: none;
 }
 
-/* 影绘光圈自身就是完整的圆：去掉底座、外圈和状态点，状态由光圈动效和缝隙色光表达。 */
-.canvas-agent-launcher.canvas-agent-launcher-aperture {
+/* 渐变满月自身就是完整的圆：去掉底座、外圈和状态点，状态由条纹动效和缝隙白光表达。 */
+.canvas-agent-launcher.canvas-agent-launcher-moon {
     box-shadow: none;
 }
 
-.canvas-agent-launcher-aperture::before,
-.canvas-agent-launcher-aperture > .canvas-agent-launcher-status {
+.canvas-agent-launcher-moon::before,
+.canvas-agent-launcher-moon > .canvas-agent-launcher-status {
     display: none;
 }
 
-.canvas-agent-launcher-aperture > .agent-aperture {
+.canvas-agent-launcher-moon > .agent-moon {
     filter: drop-shadow(0 10px 16px color-mix(in srgb, var(--canvas-agent-launcher-shadow) 70%, transparent));
 }
 

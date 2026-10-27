@@ -7,7 +7,7 @@ import { live2DModelURL, spriteImageURL } from "@/services/api/appearance";
 import { useEffect } from "react";
 import { petAvatarSize } from "@/lib/canvas/pet-menu";
 import { AgentAvatarBundle } from "./agent-avatar-bundle";
-import { AgentAperture } from "./agent-aperture";
+import { AgentMoon } from "./agent-moon";
 
 export function PetAvatar({
     appearance,
@@ -29,12 +29,12 @@ export function PetAvatar({
     onError?: (error: string) => void;
 }) {
     useEffect(() => {
-        if (appearance.avatarType === "orb" || appearance.avatarType === "aperture") onReady?.();
+        if (appearance.avatarType === "orb" || appearance.avatarType === "moon") onReady?.();
     }, [appearance.avatarType, onReady]);
     const fitted = petAvatarSize(appearance, height);
     const content =
-        appearance.avatarType === "aperture" ? (
-            <AgentAperture size={fitted.height} state={agentAvatarStateForRunStatus(state?.status ?? "idle")} reducedMotion={reducedMotion} paused={paused} />
+        appearance.avatarType === "moon" ? (
+            <AgentMoon size={fitted.height} state={agentAvatarStateForRunStatus(state?.status ?? "idle")} reducedMotion={reducedMotion} paused={paused} />
         ) : appearance.avatarType === "bundle" ? (
             <AgentAvatarBundle appearance={appearance} height={height} status={state?.status} paused={paused} reducedMotion={reducedMotion} onReady={onReady} onError={onError} />
         ) : appearance.avatarType === "sprite" && appearance.sprite && appearance.spriteResourceId ? (

@@ -1,0 +1,233 @@
+/* 渐变满月：12 道条纹共用一条“下流并变细”的关键帧，按序号错开时间，连起来就是一轮由粗到细、缓缓下流的满月。 */
+.agent-moon {
+    --agent-moon-duration: 40s;
+    --agent-moon-glow-level: 0.22;
+    display: block;
+    flex: none;
+    overflow: visible;
+}
+
+.agent-moon * {
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+.agent-moon-body {
+    transform-box: view-box;
+    transform-origin: 50px 50px;
+    transition: opacity 0.6s;
+}
+
+.agent-moon-glow {
+    opacity: var(--agent-moon-glow-level);
+    transition: opacity 0.5s;
+}
+
+.agent-moon-stripe {
+    animation: agent-moon-flow var(--agent-moon-duration) linear infinite;
+    animation-delay: calc(var(--agent-moon-stripe) * var(--agent-moon-duration) / -12);
+}
+
+.agent-moon-bar {
+    transition: transform 0.5s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+
+/* 悬停：条纹变粗、流速加快，白光稍亮。 */
+.agent-moon[data-mode="idle"]:hover,
+:where(.canvas-agent-launcher:hover, .canvas-agent-launcher:focus-visible) .agent-moon[data-mode="idle"] {
+    --agent-moon-duration: 12s;
+    --agent-moon-glow-level: 0.38;
+}
+
+.agent-moon[data-mode="idle"]:hover .agent-moon-bar,
+:where(.canvas-agent-launcher:hover, .canvas-agent-launcher:focus-visible) .agent-moon[data-mode="idle"] .agent-moon-bar {
+    transform: scaleY(1.15);
+}
+
+/* 运行中：条纹快速流动。 */
+.agent-moon[data-mode="working"] {
+    --agent-moon-duration: 4.5s;
+    --agent-moon-glow-level: 0.42;
+}
+
+/* 排队中：慢流，条纹粗细一呼一吸。 */
+.agent-moon[data-mode="waiting"] {
+    --agent-moon-duration: 22s;
+    --agent-moon-glow-level: 0.28;
+}
+
+.agent-moon[data-mode="waiting"] .agent-moon-bar {
+    animation: agent-moon-breathe 2.4s ease-in-out infinite;
+}
+
+/* 等待审批：呼吸更明显，白光随之明暗，提示需要处理。 */
+.agent-moon[data-mode="approval"] {
+    --agent-moon-duration: 16s;
+}
+
+.agent-moon[data-mode="approval"] .agent-moon-bar {
+    animation: agent-moon-breathe-strong 1.4s ease-in-out infinite;
+}
+
+.agent-moon[data-mode="approval"] .agent-moon-glow {
+    animation: agent-moon-glow-pulse 1.4s ease-in-out infinite;
+}
+
+/* 已完成：条纹合拢成实心满月、白光一亮，再散开回条纹。只播一次。 */
+.agent-moon[data-mode="done"] {
+    --agent-moon-duration: 30s;
+    --agent-moon-glow-level: 0.32;
+}
+
+.agent-moon[data-mode="done"] .agent-moon-bar {
+    animation: agent-moon-merge 1.8s cubic-bezier(0.6, 0, 0.3, 1) both;
+}
+
+.agent-moon[data-mode="done"] .agent-moon-glow {
+    animation: agent-moon-flash 1.8s ease-out both;
+}
+
+/* 异常：条纹左右错位抖几下，停住，白光变暗。 */
+.agent-moon[data-mode="failed"] {
+    --agent-moon-glow-level: 0.12;
+}
+
+.agent-moon[data-mode="failed"] .agent-moon-stripe {
+    animation-play-state: paused;
+}
+
+.agent-moon[data-mode="failed"] .agent-moon-stripe:nth-child(odd) .agent-moon-bar {
+    animation: agent-moon-glitch 0.4s steps(2) 4 both;
+}
+
+.agent-moon[data-mode="failed"] .agent-moon-stripe:nth-child(even) .agent-moon-bar {
+    animation: agent-moon-glitch 0.4s steps(2) 4 reverse both;
+}
+
+/* 已停止 / 已拒绝：条纹变细、停住，整体暗下去。 */
+.agent-moon[data-mode="sleep"] {
+    --agent-moon-glow-level: 0;
+}
+
+.agent-moon[data-mode="sleep"] .agent-moon-stripe {
+    animation-play-state: paused;
+}
+
+.agent-moon[data-mode="sleep"] .agent-moon-bar {
+    transform: scaleY(0.45);
+}
+
+.agent-moon[data-mode="sleep"] .agent-moon-body {
+    opacity: 0.5;
+}
+
+/* 暂停或减少动态效果：条纹停在各自的错开位置，仍是一轮完整的渐变满月。 */
+.agent-moon[data-paused] *,
+.agent-moon[data-reduced-motion] .agent-moon-stripe {
+    animation-play-state: paused !important;
+}
+
+.agent-moon[data-reduced-motion] .agent-moon-bar,
+.agent-moon[data-reduced-motion] .agent-moon-glow {
+    animation: none !important;
+    transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .agent-moon .agent-moon-stripe {
+        animation-play-state: paused !important;
+    }
+
+    .agent-moon .agent-moon-bar,
+    .agent-moon .agent-moon-glow {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* 取样 agentMoonStripeThickness(progress) / 7.75：progress 每 1/8 一帧。 */
+@keyframes agent-moon-flow {
+    0% {
+        transform: translateY(0) scaleY(1);
+    }
+    12.5% {
+        transform: translateY(11px) scaleY(0.848);
+    }
+    25% {
+        transform: translateY(22px) scaleY(0.702);
+    }
+    37.5% {
+        transform: translateY(33px) scaleY(0.564);
+    }
+    50% {
+        transform: translateY(44px) scaleY(0.433);
+    }
+    62.5% {
+        transform: translateY(55px) scaleY(0.312);
+    }
+    75% {
+        transform: translateY(66px) scaleY(0.203);
+    }
+    87.5% {
+        transform: translateY(77px) scaleY(0.109);
+    }
+    100% {
+        transform: translateY(88px) scaleY(0.045);
+    }
+}
+
+@keyframes agent-moon-breathe {
+    50% {
+        transform: scaleY(1.2);
+    }
+}
+
+@keyframes agent-moon-breathe-strong {
+    50% {
+        transform: scaleY(1.32);
+    }
+}
+
+@keyframes agent-moon-glow-pulse {
+    0%,
+    100% {
+        opacity: 0.25;
+    }
+    50% {
+        opacity: 0.55;
+    }
+}
+
+@keyframes agent-moon-merge {
+    0% {
+        transform: scaleY(1);
+    }
+    35%,
+    55% {
+        transform: scaleY(24);
+    }
+    100% {
+        transform: scaleY(1);
+    }
+}
+
+@keyframes agent-moon-flash {
+    0% {
+        opacity: 0.2;
+    }
+    40% {
+        opacity: 0.8;
+    }
+    100% {
+        opacity: var(--agent-moon-glow-level);
+    }
+}
+
+@keyframes agent-moon-glitch {
+    0% {
+        transform: translateX(-3px);
+    }
+    100% {
+        transform: translateX(3px);
+    }
+}

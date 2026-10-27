@@ -128,11 +128,11 @@ func validAvatarClipID(value string) bool {
 	return true
 }
 
-// validCanvasAvatarType lists the shared assistant presentations; "aperture" is the
-// built-in vector aperture that needs no uploaded resource.
+// validCanvasAvatarType lists the shared assistant presentations; "moon" is the
+// built-in vector striped moon that needs no uploaded resource.
 func validCanvasAvatarType(kind string) bool {
 	switch kind {
-	case "orb", "aperture", "live2d", "sprite", "bundle":
+	case "orb", "moon", "live2d", "sprite", "bundle":
 		return true
 	}
 	return false

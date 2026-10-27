@@ -4,7 +4,7 @@ import { ExternalLink, Upload } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import { Live2DAvatar } from "@/components/canvas/live2d-avatar";
 import { FluidOrb } from "@/components/ui/fluid-orb";
-import { AgentAperture } from "@/components/canvas/agent-aperture";
+import { AgentMoon } from "@/components/canvas/agent-moon";
 import {
     AGENT_AVATAR_STATES,
     DEFAULT_AGENT_AVATAR_CLIP_STATES,
@@ -135,7 +135,7 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
                     value={value.avatarType}
                     disabled={disabled || uploading}
                     options={[
-                        { label: "影绘光圈", value: "aperture" },
+                        { label: "渐变满月", value: "moon" },
                         { label: "默认动态球", value: "orb" },
                         { label: "Live2D", value: "live2d", disabled: !url || readyURL !== url },
                         { label: "状态动画包", value: "bundle" },
@@ -145,9 +145,9 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
                         change(type === "bundle" ? { avatarType: type, avatarClipStates: value.avatarClipStates || DEFAULT_AGENT_AVATAR_CLIP_STATES } : { avatarType: type });
                     }}
                 />
-                {value.avatarType === "aperture" ? (
+                {value.avatarType === "moon" ? (
                     <div className="grid gap-3">
-                        <p className="text-sm text-foreground/60">六片叶片拼满的圆形光圈，没有底座和外圈，深色主题显示白色、浅色主题显示黑色。8 种运行状态各有动效：运行时旋转开合，等待审批透出琥珀色，完成时收拢再张开，异常时卡顿并透出红光。</p>
+                        <p className="text-sm text-foreground/60">横条纹由粗到细拼成一轮满月，没有底座和外圈，深色主题显示白色、浅色主题显示黑色，缝隙里透出很淡的白光。8 种运行状态各有动效：待命缓缓下流，运行时快速流动，等待审批粗细明显呼吸，完成时合拢成实心满月再散开，异常时条纹错位停住。</p>
                         <Radio.Group
                             className="flex flex-wrap"
                             optionType="button"
@@ -288,8 +288,8 @@ export function CanvasAppearanceEditor({ value, onChange, disabled, onUploading 
                     px
                 </label>
                 <div className="grid justify-items-center gap-3 rounded-xl border border-border bg-background p-5" aria-label="Agent 形象预览">
-                    {value.avatarType === "aperture" ? (
-                        <AgentAperture key={selectedAvatarState} size={120} state={selectedAvatarState} reducedMotion={reducedMotion} />
+                    {value.avatarType === "moon" ? (
+                        <AgentMoon key={selectedAvatarState} size={120} state={selectedAvatarState} reducedMotion={reducedMotion} />
                     ) : url ? (
                         <Live2DAvatar
                             key={`${url}-${attempt}`}

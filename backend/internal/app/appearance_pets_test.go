@@ -231,26 +231,26 @@ func TestPetCatalogValidatesIdentityAndOwnership(t *testing.T) {
 	}
 }
 
-func TestSharedAssistantSavesBuiltInApertureAvatar(t *testing.T) {
+func TestSharedAssistantSavesBuiltInMoonAvatar(t *testing.T) {
 	s, _, _, admin := newAppearanceTestService(t)
 	value := defaultAppearanceSetting()
-	value.Canvas.AvatarType = "aperture"
+	value.Canvas.AvatarType = "moon"
 	saved, err := s.UpdateAppearance(admin, value)
 	if err != nil {
-		t.Fatalf("aperture avatar rejected: %v", err)
+		t.Fatalf("moon avatar rejected: %v", err)
 	}
-	if saved.Canvas.AvatarType != "aperture" {
-		t.Fatalf("saved avatar type = %q, want aperture", saved.Canvas.AvatarType)
+	if saved.Canvas.AvatarType != "moon" {
+		t.Fatalf("saved avatar type = %q, want moon", saved.Canvas.AvatarType)
 	}
 	public, err := s.Appearance()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if public.Canvas.AvatarType != "aperture" {
-		t.Fatalf("public avatar type = %q, want aperture", public.Canvas.AvatarType)
+	if public.Canvas.AvatarType != "moon" {
+		t.Fatalf("public avatar type = %q, want moon", public.Canvas.AvatarType)
 	}
 	value = saved.AppearanceSetting
-	value.Canvas.AvatarType = "hologram"
+	value.Canvas.AvatarType = "aperture"
 	if _, err := s.UpdateAppearance(admin, value); err == nil {
 		t.Fatal("unknown avatar type accepted")
 	}
