@@ -125,7 +125,7 @@ async function run(scenario: string) {
                     return respond({}, 503, "unavailable");
                 }
                 if (scenario === "unknown") return respond({}, 503, "unavailable");
-                if (scenario === "id-reused") return respond({}, 409, "canvas_mutation_id_reused");
+                if (scenario === "id-reused" && body.mutationId === "original-request") return respond({}, 409, "canvas_mutation_id_reused");
                 if (scenario === "deleted") return respond({}, 404, "not_found");
                 if (oldRequests === 1 && scenario !== "cached-create") return respond({}, 409, "canvas_field_conflict");
             }

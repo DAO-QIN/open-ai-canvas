@@ -79,13 +79,16 @@ test("an unrelated failed canvas load does not prevent saving the selected canva
     expect(result).toEqual({ firstFailed: true, newSaved: true, oldRequests: 0 });
 });
 
-test("mutation ID reuse is surfaced without rewriting the original body", async () => {
+test("mutation ID reuse rebases with a new ID and finishes saving the original edit", async () => {
     const result = await scenario("id-reused");
     const posts = result.requests.filter((item: any) => item.method === "patch");
-    expect(result.firstFailed).toBe(true);
+    expect(result.firstFailed).toBe(false);
     expect(posts).toHaveLength(2);
-    expect(posts[0].body).toEqual(posts[1].body);
-    expect(result.requests.some((item: any) => item.method === "get")).toBe(false);
+    expect(posts[0].body.mutationId).toBe("original-request");
+    expect(posts[1].body.mutationId).not.toBe("original-request");
+    expect(result.requests.some((item: any) => item.method === "get")).toBe(true);
+    expect(result.journal).toBeUndefined();
+    expect(result.local.nodes[0].title).toBe("local title");
 });
 
 test("two audio outputs materialize and replay as distinct durable assets", async () => {
