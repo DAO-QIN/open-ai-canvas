@@ -3,7 +3,6 @@
     --promo-accent: #ffc54d;
     --promo-accent-ink: #1a1300;
     --promo-accent-soft: rgba(255, 197, 77, 0.14);
-    --promo-accent-text: #ffc54d;
     --promo-hero-bg: #0b0b0d;
     --promo-hero-fg: #f5f5f7;
     --promo-hero-muted: rgba(245, 245, 247, 0.6);
@@ -13,9 +12,6 @@
     padding: var(--space-6) var(--space-8) var(--space-12);
     color: var(--foreground);
     font-size: var(--fs-body);
-}
-:root:not(.dark) .promotion-page {
-    --promo-accent-text: #a86500;
 }
 .promotion-content {
     display: flex;
@@ -307,7 +303,6 @@
 
 /* ---------- 数字条：只有上下两条细线，没有卡片和图标 ---------- */
 .promotion-kpis {
-    position: relative;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     border-top: 1px solid var(--border);
@@ -383,37 +378,6 @@
     color: var(--muted-foreground);
     cursor: not-allowed;
 }
-.promotion-refresh {
-    position: absolute;
-    top: 10px;
-    right: 0;
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border: 0;
-    border-radius: var(--r-full);
-    background: transparent;
-    color: var(--muted-foreground);
-    cursor: pointer;
-}
-.promotion-refresh:hover:not(:disabled) {
-    background: var(--surface-hover);
-    color: var(--foreground);
-}
-.promotion-refresh svg {
-    width: 15px;
-    height: 15px;
-}
-.promotion-refresh .is-spinning {
-    animation: promotion-spin 0.9s linear infinite;
-}
-@keyframes promotion-spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
 /* ---------- 下半区：时间轴 + 账单 ---------- */
 .promotion-lower {
     display: grid;
@@ -698,15 +662,13 @@
 .promotion-code:focus-visible,
 .promotion-rules-link:focus-visible,
 .promotion-claim:focus-visible,
-.promotion-refresh:focus-visible,
 .promotion-tabs button:focus-visible,
 .promotion-receipt summary:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
-    .promotion-tape-track,
-    .promotion-refresh .is-spinning {
+    .promotion-tape-track {
         animation: none;
     }
     .promotion-cta,
@@ -800,7 +762,7 @@
         background: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1.3px) 0 0 / 18px 18px;
     }
     .promotion-tape {
-        top: 168px;
+        top: 140px;
         bottom: auto;
         height: 34px;
         transform: rotate(-3deg);

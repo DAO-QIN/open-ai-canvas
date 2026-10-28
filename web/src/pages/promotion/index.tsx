@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, App, Button, Input, Spin } from "antd";
-import { ChevronRight, Copy, Gift, Link2, MessageSquareText, RefreshCw, Send, UserPlus, Wallet } from "lucide-react";
+import { ChevronRight, Copy, Gift, Link2, MessageSquareText, Send, UserPlus, Wallet } from "lucide-react";
 import { AppModal } from "@/components/ui/product/app-modal/app-modal";
 import { EmptyState } from "@/components/ui/product/empty-state/empty-state";
 import { PaginationBar } from "@/components/layout/workspace-page";
@@ -49,7 +49,7 @@ export default function PromotionPage() {
 function PromotionWorkspace({ userID }: { userID: string }) {
     const { message } = App.useApp();
     const client = useQueryClient();
-    const brandName = useAppearanceStore((state) => state.appearance.brandName) || "我们";
+    const brandName = useAppearanceStore((state) => state.appearance.brandName) || "AI 创作平台";
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const { policy: walletPolicy } = useWalletBalance(userID, creditsEnabled);
     const [recordPage, setRecordPage] = useState(1);
@@ -208,7 +208,7 @@ function PromotionWorkspace({ userID }: { userID: string }) {
     if (code) invitationURL.searchParams.set("inviteCode", code);
     const ratio = data.effectiveRatioBps / 100;
     const signupBonus = creditsEnabled && walletPolicy && walletPolicy.signupBonusMicrocredits > 0 ? formatCredits(walletPolicy.signupBonusMicrocredits, 2) : "";
-    const shareText = `我在用 ${brandName} 做 AI 短剧和商品图，${signupBonus ? `注册就送 ${signupBonus} 积分，` : ""}一起来玩：${invitationURL.toString()}`;
+    const shareText = `我在用 ${brandName} 做短剧和商品图，${signupBonus ? `注册就送 ${signupBonus} 积分，` : ""}一起来玩：${invitationURL.toString()}`;
     const selectedRecords = tab === "records" ? records : tab === "invites" ? invites : transfers;
     const currentPage = tab === "records" ? recordPage : tab === "invites" ? invitePage : transferPage;
     const setPage = tab === "records" ? setRecordPage : tab === "invites" ? setInvitePage : setTransferPage;
@@ -379,9 +379,6 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                             </button>
                         </div>
                     </div>
-                    <button type="button" className="promotion-refresh" aria-label="刷新" disabled={overview.isFetching} onClick={() => void refresh()}>
-                        <RefreshCw aria-hidden className={overview.isFetching ? "is-spinning" : undefined} />
-                    </button>
                 </section>
 
                 <div className="promotion-lower">
@@ -405,7 +402,15 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                                 </span>
                                 <div>
                                     <b>好友注册</b>
-                                    <p>{signupBonus ? <>好友得 <em>{signupBonus}</em> 积分</> : "用你的链接或邀请码注册"}</p>
+                                    <p>
+                                        {signupBonus ? (
+                                            <>
+                                                好友得 <em>{signupBonus}</em> 积分
+                                            </>
+                                        ) : (
+                                            "用你的链接或邀请码注册"
+                                        )}
+                                    </p>
                                 </div>
                             </li>
                             <li>
@@ -434,15 +439,15 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                     <section className="promotion-panel" aria-labelledby="promotion-records-title">
                         <div className="promotion-panel-head">
                             <h2 id="promotion-records-title">记录</h2>
-                            <div className="promotion-tabs" role="tablist" aria-label="选择记录类型">
+                            <div className="promotion-tabs" role="group" aria-label="选择记录类型">
                                 {recordTabs.map((item) => (
-                                    <button key={item.value} type="button" role="tab" aria-selected={tab === item.value} className={tab === item.value ? "is-active" : undefined} onClick={() => setTab(item.value)}>
+                                    <button key={item.value} type="button" aria-pressed={tab === item.value} className={tab === item.value ? "is-active" : undefined} onClick={() => setTab(item.value)}>
                                         {item.label}
                                     </button>
                                 ))}
                             </div>
                         </div>
-                        <div className="promotion-ledger" role="tabpanel" aria-label={recordTabs.find((item) => item.value === tab)?.label} aria-busy={selectedRecords.isFetching}>
+                        <div className="promotion-ledger" role="region" aria-label={recordTabs.find((item) => item.value === tab)?.label} aria-busy={selectedRecords.isFetching}>
                             {selectedRecords.error ? (
                                 <Alert type="error" title="暂时无法读取记录" description={selectedRecords.error.message} action={<Button onClick={() => void selectedRecords.refetch()}>重试</Button>} />
                             ) : selectedRecords.isPending ? (
@@ -458,7 +463,12 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                                           : transfers.data?.items.map((item) => <TransferItem key={item.id} transfer={item} />)}
                                 </ul>
                             ) : (
-                                <EmptyState size="compact" icon={tab === "invites" ? UserPlus : tab === "records" ? Gift : Wallet} title={tab === "invites" ? "还没有好友加入" : tab === "records" ? "还没有奖励" : "还没有领取记录"} description={emptyDescription} />
+                                <EmptyState
+                                    size="compact"
+                                    icon={tab === "invites" ? UserPlus : tab === "records" ? Gift : Wallet}
+                                    title={tab === "invites" ? "还没有好友加入" : tab === "records" ? "还没有奖励" : "还没有领取记录"}
+                                    description={emptyDescription}
+                                />
                             )}
                         </div>
                         {!selectedRecords.error && selectedRecords.data ? <PaginationBar current={currentPage} pageSize={20} total={selectedRecords.data.total} pageSizeOptions={[20]} onChange={(page) => setPage(page)} /> : null}
