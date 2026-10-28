@@ -113,18 +113,20 @@ test("历史图片续签前后保留同一叠图、计数和操作栏，不闪�
         const stack = host.querySelector(".creation-image-result-stack");
         const actions = host.querySelector(".creation-media-actions");
         expect(stack).not.toBeNull();
-        expect(actions?.textContent).toContain("2 张图片 · 成功 2/2");
+        expect(actions?.textContent).toContain("已生成 2 张");
         expect(host.textContent).not.toContain("没有返回可预览结果");
         expect(host.querySelector('img[src=""]')).toBeNull();
         expect(host.querySelector('img[src*="expires=1"]')).toBeNull();
-        expect(host.querySelector<HTMLButtonElement>(".creation-image-result-stack-front")?.disabled).toBe(true);
+        expect(host.querySelector<HTMLButtonElement>(".creation-image-result-stack-front .creation-result-image-open")?.disabled).toBe(true);
 
         await act(release);
         expect(host.querySelector(".creation-image-result-stack")).toBe(stack);
         expect(host.querySelector(".creation-media-actions")).toBe(actions);
-        expect(actions?.textContent).toContain("2 张图片 · 成功 2/2");
+        expect(actions?.textContent).toContain("已生成 2 张");
         expect(host.querySelector<HTMLImageElement>(".creation-image-result-stack-front .creation-result-image img")?.src).toBe("https://media.example/restore-first.png");
-        expect(host.querySelector<HTMLButtonElement>(".creation-image-result-stack-front")?.disabled).toBe(false);
+        expect(host.querySelector<HTMLButtonElement>(".creation-image-result-stack-front .creation-result-image-open")?.disabled).toBe(true);
+        await act(async () => host.querySelector(".creation-image-result-stack-front img")!.dispatchEvent(new dom.Event("load")));
+        expect(host.querySelector<HTMLButtonElement>(".creation-image-result-stack-front .creation-result-image-open")?.disabled).toBe(false);
     } finally {
         await act(async () => root.unmount());
         await release();
@@ -149,10 +151,10 @@ test("非方图批次展开为方形卡，部分地址续签仍保留卡片和�
             ),
         );
         expect(host.querySelector(".creation-image-result-stack")).not.toBeNull();
-        expect(host.textContent).toContain("2 张图片 · 成功 2/2");
+        expect(host.textContent).toContain("已生成 2 张");
         await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="下一张生成图片"]')!.click());
         expect(host.querySelector(".creation-image-result-stack")?.getAttribute("aria-label")).toBe("第 2 张，共 2 张生成图片");
-        expect(host.querySelector<HTMLButtonElement>(".creation-image-result-stack-front")?.disabled).toBe(true);
+        expect(host.querySelector<HTMLButtonElement>(".creation-image-result-stack-front .creation-result-image-open")?.disabled).toBe(true);
         await act(async () =>
             Array.from(host.querySelectorAll("button"))
                 .find((button) => button.textContent === "展开")!
@@ -215,7 +217,7 @@ test("单图已有资源身份时保留媒体框，等待签名不重新显示�
         const card = host.querySelector(".creation-image-result-grid.is-single .creation-image-result");
         expect(card).not.toBeNull();
         expect(host.querySelector(".creation-media-pending")).toBeNull();
-        expect(host.textContent).toContain("1 张图片 · 成功 1/3");
+        expect(host.textContent).toContain("已生成 1 张，其余生成中");
         await act(release);
         expect(host.querySelector(".creation-image-result-grid.is-single .creation-image-result")).toBe(card);
     } finally {
