@@ -11,9 +11,10 @@ description: 信封、错误码与 OpenAPI
 
 `GET /api/wallet/usage?tzOffset=480` 返回当前登录账号截至今天（含）最近 365 个自然日的积分消耗，需积分功能开启，私有且 `Cache-Control: private, no-store`，每用户每分钟 30 次。`tzOffset` 是浏览器的 UTC 偏移分钟数（东八区为 480，范围 -720 到 840，缺省为 0），服务端按它划分自然日；非整数或越界返回 400。
 
-- `data = { from, to, days, timezoneOffset, daily, categories }`。`from`/`to` 为含首尾的本地日期 `YYYY-MM-DD`，`days` 固定 365。
+- `data = { from, to, days, timezoneOffset, daily, categories, models }`。`from`/`to` 为含首尾的本地日期 `YYYY-MM-DD`，`days` 固定 365。
 - `daily` 只含有消耗的日期，按日期升序，项为 `{ date, totalMicrocredits, agentMicrocredits, count, agentCount }`；前端按窗口补零。
 - `categories` 按账单能力汇总窗口内消耗，`capability` 为 `image|video|audio|text|other`（无账单或未知能力归入 other），按消耗降序。
+- `models` 按 `(capability, model)` 汇总窗口内消耗，项为 `{ model, name, capability, totalMicrocredits, agentMicrocredits, count, agentCount }`，按消耗降序且不截断。`model` 是流水上记录的前台模型编码（与积分明细显示的一致，流水为空时取账单上的值；没有记录时为空串），不含供应渠道或线路；`name` 是该编码当前的前台模型名称（同编码优先未归档模型，查不到时为空串，由前端显示编码）。
 - 口径与钱包流水一致：只统计 `type = consume` 且金额为负的流水（结算后的最终扣费），按流水时间（结算时刻）计入当天；冻结、预授权差额与失败退款、管理员调整、充值和赠送都不计入。金额为整数微积分。
 - Agent 用量为关联任务带 `agent_run_id`（云端 Agent 子任务）、带 `creation_submission_id`（首页智能创作提交），或操作名为 `cloud_agent`、`cloud_agent_step`、`cloud_agent_context_compaction`、`agent_memory_compact` 的消耗。系统代理调用等没有任务的消耗只计入总量。
 - 只读接口，不新增数据表或迁移；PostgreSQL 按 `created_at` 时间范围走 `(user_id, created_at)` 索引，SQLite 用 `unixepoch(created_at)` 比较时刻。

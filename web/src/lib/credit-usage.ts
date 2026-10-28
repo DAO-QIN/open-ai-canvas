@@ -1,4 +1,4 @@
-import type { CreditUsageCapability, CreditUsageCategory, CreditUsageReport } from "@/services/api/wallet";
+import type { CreditUsageCapability, CreditUsageCategory, CreditUsageModel, CreditUsageReport } from "@/services/api/wallet";
 
 /**
  * 用量看板的纯计算：把服务端的稀疏日数据补成完整窗口，再派生热力图、周汇总、累计曲线与统计卡。
@@ -223,6 +223,67 @@ export function usageCategoryShares(categories: CreditUsageCategory[], metric: U
         .sort((left, right) => right.value - left.value);
     const total = items.reduce((sum, item) => sum + item.value, 0);
     return items.map((item) => ({ ...item, share: total > 0 ? item.value / total : 0 }));
+}
+
+export type UsageModelShare = {
+    /** 列表 key：类型 + 编码；合并行为 other-models。 */
+    key: string;
+    /** 前台模型名称，其次是编码；没有记录模型时为“未记录模型”。 */
+    label: string;
+    /** 原始编码；与名称不同时用作悬停提示。 */
+    code: string;
+    /** 合并行没有单一类型。 */
+    capability: CreditUsageCapability | null;
+    value: number;
+    count: number;
+    /** 0–1，占当前口径的模型总消耗。 */
+    share: number;
+    /** 平均每笔消耗（微积分）。 */
+    average: number;
+    /** 这一行包含的模型数，只有合并行大于 1。 */
+    merged: number;
+};
+
+/** 用量看板按模型查看时单独列出的模型数。 */
+export const USAGE_MODEL_LIMIT = 8;
+
+/**
+ * 按当前口径列出消耗最多的模型；超出 limit 的合并为“其他 N 个模型”，只多出一个时直接列出。
+ * 同一编码在不同生成类型下分别成行（类型标签区分）。
+ */
+export function usageModelShares(models: CreditUsageModel[] | undefined, metric: UsageMetric, limit = USAGE_MODEL_LIMIT): UsageModelShare[] {
+    type Row = Omit<UsageModelShare, "share" | "average">;
+    const items: Row[] = (models ?? [])
+        .map((item) => {
+            const code = (item.model || "").trim();
+            return {
+                key: `${item.capability}:${code}`,
+                label: (item.name || "").trim() || code || "未记录模型",
+                code,
+                capability: item.capability,
+                value: Math.max(0, metric === "agent" ? item.agentMicrocredits : item.totalMicrocredits),
+                count: Math.max(0, metric === "agent" ? item.agentCount : item.count),
+                merged: 1,
+            };
+        })
+        .filter((item) => item.value > 0)
+        .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label, "zh-CN"));
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+    const visible = items.length > limit + 1 ? items.slice(0, limit) : items;
+    const rest = items.slice(visible.length);
+    const rows: Row[] = [...visible];
+    if (rest.length > 0) {
+        rows.push({
+            key: "other-models",
+            label: `其他 ${rest.length} 个模型`,
+            code: "",
+            capability: null,
+            value: rest.reduce((sum, item) => sum + item.value, 0),
+            count: rest.reduce((sum, item) => sum + item.count, 0),
+            merged: rest.length,
+        });
+    }
+    return rows.map((item) => ({ ...item, share: total > 0 ? item.value / total : 0, average: item.count > 0 ? item.value / item.count : 0 }));
 }
 
 const compactFormatter = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 });

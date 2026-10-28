@@ -1,7 +1,9 @@
 package app
 
 import (
+	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"yingce/backend/internal/model"
@@ -37,6 +39,18 @@ type CreditUsageCategory struct {
 	AgentCount        int64  `json:"agentCount"`
 }
 
+// CreditUsageModel 是窗口内某个模型在某一生成类型下的消耗。Model 是账单记录的前台模型编码
+// （积分明细里显示的同一个值，不含供应渠道），Name 是该编码当前的显示名称，查不到时为空串。
+type CreditUsageModel struct {
+	Model             string `json:"model"`
+	Name              string `json:"name"`
+	Capability        string `json:"capability"`
+	TotalMicrocredits int64  `json:"totalMicrocredits"`
+	AgentMicrocredits int64  `json:"agentMicrocredits"`
+	Count             int64  `json:"count"`
+	AgentCount        int64  `json:"agentCount"`
+}
+
 // CreditUsageReport 是当前用户的用量看板数据。From/To 为含首尾的本地日期，
 // TimezoneOffset 为请求使用的 UTC 偏移分钟数（东八区为 480）。
 type CreditUsageReport struct {
@@ -46,6 +60,7 @@ type CreditUsageReport struct {
 	TimezoneOffset int                   `json:"timezoneOffset"`
 	Daily          []CreditUsageDay      `json:"daily"`
 	Categories     []CreditUsageCategory `json:"categories"`
+	Models         []CreditUsageModel    `json:"models"`
 }
 
 // CreditUsage 汇总当前用户最近 365 个自然日的积分消耗。自然日按浏览器传入的
@@ -77,6 +92,8 @@ func (s *Service) creditUsageAt(user *model.User, timezoneOffsetMinutes int, now
 
 	days := map[int64]*CreditUsageDay{}
 	categories := map[string]*CreditUsageCategory{}
+	type modelKey struct{ capability, model string }
+	models := map[modelKey]*CreditUsageModel{}
 	for _, row := range rows {
 		// 窗口按时刻过滤，日序号只会落在窗口内；这里再防一次方言换算误差。
 		if row.DayIndex < firstDay || row.DayIndex > today || row.TotalMicrocredits <= 0 {
@@ -102,6 +119,29 @@ func (s *Service) creditUsageAt(user *model.User, timezoneOffsetMinutes int, now
 		category.AgentMicrocredits += row.AgentMicrocredits
 		category.Count += row.EntryCount
 		category.AgentCount += row.AgentEntryCount
+
+		mk := modelKey{capability: key, model: strings.TrimSpace(row.Model)}
+		usage := models[mk]
+		if usage == nil {
+			usage = &CreditUsageModel{Model: mk.model, Capability: key}
+			models[mk] = usage
+		}
+		usage.TotalMicrocredits += row.TotalMicrocredits
+		usage.AgentMicrocredits += row.AgentMicrocredits
+		usage.Count += row.EntryCount
+		usage.AgentCount += row.AgentEntryCount
+	}
+
+	codes := make([]string, 0, len(models))
+	for mk := range models {
+		if mk.model != "" {
+			codes = append(codes, mk.model)
+		}
+	}
+	sort.Strings(codes)
+	names, err := s.repo.LogicalModelNamesByCode(slices.Compact(codes))
+	if err != nil {
+		return nil, err
 	}
 
 	report := &CreditUsageReport{
@@ -111,6 +151,7 @@ func (s *Service) creditUsageAt(user *model.User, timezoneOffsetMinutes int, now
 		TimezoneOffset: timezoneOffsetMinutes,
 		Daily:          make([]CreditUsageDay, 0, len(days)),
 		Categories:     make([]CreditUsageCategory, 0, len(categories)),
+		Models:         make([]CreditUsageModel, 0, len(models)),
 	}
 	for _, day := range days {
 		report.Daily = append(report.Daily, *day)
@@ -125,6 +166,20 @@ func (s *Service) creditUsageAt(user *model.User, timezoneOffsetMinutes int, now
 			return left.TotalMicrocredits > right.TotalMicrocredits
 		}
 		return left.Capability < right.Capability
+	})
+	for _, usage := range models {
+		usage.Name = names[usage.Model]
+		report.Models = append(report.Models, *usage)
+	}
+	sort.Slice(report.Models, func(i, j int) bool {
+		left, right := report.Models[i], report.Models[j]
+		if left.TotalMicrocredits != right.TotalMicrocredits {
+			return left.TotalMicrocredits > right.TotalMicrocredits
+		}
+		if left.Capability != right.Capability {
+			return left.Capability < right.Capability
+		}
+		return left.Model < right.Model
 	})
 	return report, nil
 }

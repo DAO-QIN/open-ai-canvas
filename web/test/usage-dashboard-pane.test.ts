@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { getCreditUsage, type CreditUsageReport } from "../src/services/api/wallet";
 import { apiClient } from "../src/services/api/request";
 
-const report: CreditUsageReport = { from: "2025-10-29", to: "2026-10-28", days: 365, timezoneOffset: 480, daily: [], categories: [] };
+const report: CreditUsageReport = { from: "2025-10-29", to: "2026-10-28", days: 365, timezoneOffset: 480, daily: [], categories: [], models: [] };
 
 describe("usage dashboard contracts", () => {
     test("requests the private usage endpoint with the browser offset and abort signal", async () => {
@@ -38,9 +38,9 @@ describe("usage dashboard contracts", () => {
 });
 
 // 组件测试需要 happy-dom 全局对象，放在独立进程里运行，避免污染其他测试文件。
-test("用量看板与个人信息概览的真实组件渲染、切换、键盘与触屏查看、失败重试与刷新失败", () => {
+test("用量看板与个人信息概览的真实组件渲染、切换、按模型查看、键盘与触屏查看、失败重试与刷新失败", () => {
     const result = Bun.spawnSync([process.execPath, "test", "./test/fixtures/usage-dashboard.harness.tsx"], { cwd: resolve(import.meta.dir, ".."), timeout: 60000 });
     const output = new TextDecoder().decode(result.stdout) + new TextDecoder().decode(result.stderr);
     expect(output).toContain(" 0 fail");
-    expect(output).toMatch(/\b5 pass\b/);
+    expect(output).toMatch(/\b6 pass\b/);
 }, 60000);
