@@ -28,7 +28,8 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
     const { pathname } = useLocation();
     const slug = pathname.split("/").filter(Boolean)[0];
     const promotion = usePromotionOverview(user?.id, slug === "promotion");
-    const pageTitle = slug === "promotion" && !promotionDisplay(promotion.data, Boolean(promotion.error)).canInvite ? "返利" : workspaceNavigationTool(pathname)?.label || brandName;
+    const promotionView = promotionDisplay(promotion.data, Boolean(promotion.error));
+    const pageTitle = slug === "promotion" && !promotionView.canInvite ? promotionView.title : workspaceNavigationTool(pathname)?.label || brandName;
     const balance = availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 
     return (
@@ -45,7 +46,9 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
                 {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
             </button>
             <nav className="app-workspace-topbar-breadcrumb" aria-label="当前位置">
-                <Link to="/" state={{ creationHome: true }} className="truncate font-semibold text-foreground">{pageTitle}</Link>
+                <Link to="/" state={{ creationHome: true }} className="truncate font-semibold text-foreground">
+                    {pageTitle}
+                </Link>
             </nav>
             <WorkspaceTopBarExtensionSlot />
             <div className="app-workspace-topbar-actions">

@@ -24,19 +24,20 @@ const recordTabs = [
     { value: "transfers" as const, label: "领取" },
 ];
 
-// 首屏拼贴：AI 短剧与电商作品各半，全部来自站内已打包的灵感缩略图，不额外请求。
+// 首屏拼贴：AI 短剧与电商作品混排，全部来自站内已打包的灵感缩略图，不额外请求。
+// 横向卡片只用方图且主体居中：第三列右半被首屏边缘裁掉，竖图横裁会丢掉商品。
 const showcase = [
     [
         { src: "/short-drama-styles/retro-hong-kong.jpg", label: "港风短剧", shape: "tall" },
         { src: "/inspiration-thumbs/haohaoxue/luxury-skincare-ad.webp", label: "护肤主图", shape: "wide" },
     ],
     [
-        { src: "/inspiration-thumbs/haohaoxue/liquid-splash-product.webp", label: "香水大片", shape: "wide" },
+        { src: "/inspiration-thumbs/haohaoxue/candle-product-mood.webp", label: "香薰主图", shape: "wide" },
         { src: "/inspiration-thumbs/haohaoxue/paris-fashion-portrait.webp", label: "服饰模特", shape: "tall" },
     ],
     [
         { src: "/short-drama-styles/cyberpunk-neon.jpg", label: "雨夜霓虹", shape: "tall" },
-        { src: "/inspiration-thumbs/seedance/case-96017ad7706f.webp", label: "耳机广告", shape: "wide" },
+        { src: "/inspiration-thumbs/haohaoxue/liquid-splash-product.webp", label: "香水大片", shape: "wide" },
     ],
 ] as const;
 const tapeWords = ["AI 短剧", "商品主图", "电影预告", "带货视频", "模特换装", "角色设定", "详情页", "种草海报", "分镜画布", "产品大片"];
