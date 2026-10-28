@@ -22,7 +22,7 @@ test("invitation content requires confirmed activity and personal eligibility; z
     expect(promotionDisplay({ ...active, effectiveRatioBps: 0 }).canInvite).toBe(true);
     for (const overview of [empty, { ...active, policy: empty.policy }, { ...active, canPromote: false }, { ...active, profile: { ...active.profile, paused: true } }]) {
         expect(promotionDisplay(overview).canInvite).toBe(false);
-        expect(promotionDisplay(overview).title).toBe("我的返利");
+        expect(promotionDisplay(overview).title).toBe("我的奖励");
     }
 });
 
@@ -41,15 +41,15 @@ test("closed and paused users keep historical access even if everything was tran
         { ...empty, totalMicrocredits: "11000000000000000000", transferredMicrocredits: "11000000000000000000" },
     ]) {
         for (const paused of [false, true]) {
-            expect(promotionDisplay({ ...history, profile: { ...history.profile, paused } })).toEqual({ canInvite: false, title: "我的返利", showEntry: true });
+            expect(promotionDisplay({ ...history, profile: { ...history.profile, paused } })).toEqual({ canInvite: false, title: "我的奖励", showEntry: true });
         }
     }
 });
 
 test("unknown reads and unfinished transfers preserve a neutral recovery entry without advertising invitations", () => {
     for (const state of [promotionDisplay(), promotionDisplay(active, true), promotionDisplay(empty, true), promotionDisplay(empty, false, true)]) {
-        expect(state).toEqual({ canInvite: false, title: "我的返利", showEntry: true });
+        expect(state).toEqual({ canInvite: false, title: "我的奖励", showEntry: true });
     }
     // A later successful empty read belongs to its own account and may hide the entry.
-    expect(promotionDisplay(empty)).toEqual({ canInvite: false, title: "我的返利", showEntry: false });
+    expect(promotionDisplay(empty)).toEqual({ canInvite: false, title: "我的奖励", showEntry: false });
 });
