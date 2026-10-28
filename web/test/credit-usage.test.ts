@@ -11,10 +11,12 @@ import {
     formatUsageDay,
     recentUsageTotal,
     summarizeUsage,
+    USAGE_MODEL_LIMIT,
     usageCategoryShares,
     usageLevelScale,
+    usageModelShares,
 } from "../src/lib/credit-usage";
-import type { CreditUsageReport } from "../src/services/api/wallet";
+import type { CreditUsageModel, CreditUsageReport } from "../src/services/api/wallet";
 
 const report: CreditUsageReport = {
     from: "2025-10-29",
@@ -31,6 +33,10 @@ const report: CreditUsageReport = {
         { capability: "video", totalMicrocredits: 30_000_000, agentMicrocredits: 25_000_000, count: 3, agentCount: 2 },
         { capability: "image", totalMicrocredits: 20_500_000, agentMicrocredits: 6_000_000, count: 12, agentCount: 5 },
         { capability: "text", totalMicrocredits: 0, agentMicrocredits: 0, count: 0, agentCount: 0 },
+    ],
+    models: [
+        { model: "veo-3", name: "Veo 3", capability: "video", totalMicrocredits: 30_000_000, agentMicrocredits: 25_000_000, count: 3, agentCount: 2 },
+        { model: "nano-banana-pro", name: "Nano Banana Pro", capability: "image", totalMicrocredits: 20_500_000, agentMicrocredits: 6_000_000, count: 12, agentCount: 5 },
     ],
 };
 
@@ -113,6 +119,64 @@ describe("credit usage dashboard math", () => {
             ["video", 25_000_000, 2],
             ["image", 6_000_000, 5],
         ]);
+    });
+
+    test("ranks models for the selected metric with front-end names, code fallback and per-call average", () => {
+        const total = usageModelShares(report.models, "total");
+        expect(total.map((item) => [item.key, item.label, item.code, item.capability, item.value, item.count])).toEqual([
+            ["video:veo-3", "Veo 3", "veo-3", "video", 30_000_000, 3],
+            ["image:nano-banana-pro", "Nano Banana Pro", "nano-banana-pro", "image", 20_500_000, 12],
+        ]);
+        expect(total[0].share).toBeCloseTo(30 / 50.5);
+        expect(total[0].average).toBe(10_000_000);
+        expect(total[1].average).toBeCloseTo(20_500_000 / 12);
+        const agent = usageModelShares(report.models, "agent");
+        expect(agent.map((item) => [item.key, item.value, item.count, item.average])).toEqual([
+            ["video:veo-3", 25_000_000, 2, 12_500_000],
+            ["image:nano-banana-pro", 6_000_000, 5, 1_200_000],
+        ]);
+        expect(agent[0].share).toBeCloseTo(25 / 31);
+
+        // 名称缺失退回编码，编码也没有时显示“未记录模型”；同一编码在不同类型下分开成行；当前口径为 0 的不列出。
+        const fallback = usageModelShares(
+            [
+                { model: " gpt-image-1 ", name: " ", capability: "image", totalMicrocredits: 2_000_000, agentMicrocredits: 0, count: 1, agentCount: 0 },
+                { model: "", name: "", capability: "audio", totalMicrocredits: 1_000_000, agentMicrocredits: 0, count: 2, agentCount: 0 },
+                { model: "gpt-image-1", name: "", capability: "other", totalMicrocredits: 500_000, agentMicrocredits: 0, count: 1, agentCount: 0 },
+                { model: "idle", name: "Idle", capability: "text", totalMicrocredits: 0, agentMicrocredits: 0, count: 0, agentCount: 0 },
+            ],
+            "total",
+        );
+        expect(fallback.map((item) => [item.key, item.label, item.code, item.average])).toEqual([
+            ["image:gpt-image-1", "gpt-image-1", "gpt-image-1", 2_000_000],
+            ["audio:", "未记录模型", "", 500_000],
+            ["other:gpt-image-1", "gpt-image-1", "gpt-image-1", 500_000],
+        ]);
+        expect(usageModelShares(undefined, "total")).toEqual([]);
+    });
+
+    test("lists the top models and folds the long tail, unless only one model would be folded", () => {
+        // 11 个模型，消耗 11、10 … 1 积分，合计 66 积分。
+        const models: CreditUsageModel[] = Array.from({ length: 11 }, (_, index) => ({
+            model: `model-${index + 1}`,
+            name: `模型 ${index + 1}`,
+            capability: "image",
+            totalMicrocredits: (11 - index) * 1_000_000,
+            agentMicrocredits: 0,
+            count: 11 - index,
+            agentCount: 0,
+        }));
+        expect(USAGE_MODEL_LIMIT).toBe(8);
+        const folded = usageModelShares(models, "total");
+        expect(folded.map((item) => item.label)).toEqual(["模型 1", "模型 2", "模型 3", "模型 4", "模型 5", "模型 6", "模型 7", "模型 8", "其他 3 个模型"]);
+        expect(folded[8]).toMatchObject({ key: "other-models", code: "", capability: null, value: 6_000_000, count: 6, merged: 3, average: 1_000_000 });
+        expect(folded[8].share).toBeCloseTo(6 / 66);
+        expect(folded.reduce((sum, item) => sum + item.share, 0)).toBeCloseTo(1);
+        // 恰好多出一个时直接列出，不显示“其他 1 个模型”。
+        const nine = usageModelShares(models.slice(0, 9), "total");
+        expect(nine).toHaveLength(9);
+        expect(nine[8].label).toBe("模型 9");
+        expect(usageModelShares(models, "total", 2).map((item) => item.label)).toEqual(["模型 1", "模型 2", "其他 9 个模型"]);
     });
 
     test("formats credits compactly for cards and precisely for tooltips", () => {

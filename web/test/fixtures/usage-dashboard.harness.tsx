@@ -68,6 +68,12 @@ const report: CreditUsageReport = {
         { capability: "video", totalMicrocredits: 30_000_000, agentMicrocredits: 25_000_000, count: 3, agentCount: 2 },
         { capability: "image", totalMicrocredits: 18_000_000, agentMicrocredits: 5_000_000, count: 9, agentCount: 4 },
     ],
+    // 与 categories 对得上：图片 = Nano Banana Pro + 名称缺失的 seedream-4。
+    models: [
+        { model: "veo-3", name: "Veo 3", capability: "video", totalMicrocredits: 30_000_000, agentMicrocredits: 25_000_000, count: 3, agentCount: 2 },
+        { model: "nano-banana-pro", name: "Nano Banana Pro", capability: "image", totalMicrocredits: 12_000_000, agentMicrocredits: 5_000_000, count: 6, agentCount: 4 },
+        { model: "seedream-4", name: "", capability: "image", totalMicrocredits: 6_000_000, agentMicrocredits: 0, count: 3, agentCount: 0 },
+    ],
 };
 
 type MockConfig = { url: string; params?: Record<string, unknown> };
@@ -229,6 +235,51 @@ test("看板展示统计、整年热力图与构成，可切换口径和视图�
     }
 });
 
+test("消耗构成可按模型查看：前台名称、类型标签、平均每笔与占比，跟随统计口径切换", async () => {
+    useUserStore.getState().setUser(user);
+    respond = (config) => {
+        if (config.url !== "/wallet/usage") throw new Error(`Unexpected API: ${config.url}`);
+        return ok(report);
+    };
+    const view = await mount(<UsageDashboardPane />);
+    const { host } = view;
+    const meta = () => Array.from(host.querySelectorAll(".usage-model-row")).map((row) => texts(row, ".usage-model-meta > *").join("|"));
+    try {
+        expect(radio(host, "按类型").getAttribute("aria-checked")).toBe("true");
+        expect(host.querySelector(".usage-model-list")).toBeNull();
+
+        await act(async () => radio(host, "按模型").click());
+        expect(radio(host, "按模型").getAttribute("aria-checked")).toBe("true");
+        expect(host.querySelector(".usage-breakdown-list")).toBeNull();
+        expect(normalize(host.querySelector("#usage-breakdown-title + p")?.textContent)).toBe("按模型汇总最近 365 天的积分消耗，并给出平均每笔消耗。");
+        expect(host.querySelector(".usage-model-list")?.getAttribute("aria-label")).toBe("模型消耗排行");
+        expect(texts(host, ".usage-model-label")).toEqual(["Veo 3", "Nano Banana Pro", "seedream-4"]);
+        expect(texts(host, ".usage-model-tag")).toEqual(["视频", "图片", "图片"]);
+        expect(meta()).toEqual(["3 笔|平均每笔 10|30 积分", "6 笔|平均每笔 2|12 积分", "3 笔|平均每笔 2|6 积分"]);
+        expect(texts(host, ".usage-model-share")).toEqual(["62.5%", "25%", "12.5%"]);
+        // 条长按最多的模型归一；名称与编码不同时悬停显示编码。
+        expect(Array.from(host.querySelectorAll<HTMLElement>(".usage-model-bar i")).map((bar) => [bar.dataset.capability, parseFloat(bar.style.width)])).toEqual([
+            ["video", 100],
+            ["image", 40],
+            ["image", 20],
+        ]);
+        expect(Array.from(host.querySelectorAll(".usage-model-label")).map((label) => label.getAttribute("title"))).toEqual(["veo-3", "nano-banana-pro", null]);
+
+        await act(async () => radio(host, "Agent 用量").click());
+        expect(host.querySelector(".usage-model-list")?.getAttribute("aria-label")).toBe("Agent 模型消耗排行");
+        expect(texts(host, ".usage-model-label")).toEqual(["Veo 3", "Nano Banana Pro"]);
+        expect(meta()).toEqual(["2 笔|平均每笔 12.5|25 积分", "4 笔|平均每笔 1.25|5 积分"]);
+        expect(texts(host, ".usage-model-share")).toEqual(["83.3%", "16.7%"]);
+
+        await act(async () => radio(host, "按类型").click());
+        expect(host.querySelector(".usage-model-list")).toBeNull();
+        expect(texts(host, ".usage-breakdown-share")).toEqual(["83.3%", "16.7%"]);
+        expect(calls.filter((url) => url === "/wallet/usage")).toHaveLength(1);
+    } finally {
+        await view.unmount();
+    }
+});
+
 test("加载失败时提示原因，重试成功后展示数据", async () => {
     useUserStore.getState().setUser(user);
     let fail = true;
@@ -288,7 +339,7 @@ test("没有消耗时统计为零，热力图全空，构成区给出说明", as
     useUserStore.getState().setUser(user);
     respond = (config) => {
         if (config.url !== "/wallet/usage") throw new Error(`Unexpected API: ${config.url}`);
-        return ok({ ...report, daily: [], categories: [] });
+        return ok({ ...report, daily: [], categories: [], models: [] });
     };
     const view = await mount(<UsageDashboardPane />);
     try {
@@ -296,6 +347,8 @@ test("没有消耗时统计为零，热力图全空，构成区给出说明", as
         expect(view.host.querySelectorAll('.usage-heatmap [data-level="0"]')).toHaveLength(365);
         expect(normalize(view.host.querySelector(".usage-empty-note")?.textContent)).toBe("最近 365 天还没有积分消耗，开始创作后这里会展示各类型的占比。");
         expect(normalize(view.host.querySelector(".usage-panel-footer")?.textContent)).toContain("最近 365 天还没有积分消耗");
+        await act(async () => radio(view.host, "按模型").click());
+        expect(normalize(view.host.querySelector(".usage-empty-note")?.textContent)).toBe("最近 365 天还没有积分消耗，开始创作后这里会列出各模型的消耗。");
     } finally {
         await view.unmount();
     }

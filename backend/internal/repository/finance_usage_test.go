@@ -64,15 +64,16 @@ func TestCreditUsageBucketsByInstant(t *testing.T) {
 
 func testCreditUsageBucketsByInstant(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	if err := db.AutoMigrate(&model.CreditLedgerEntry{}, &model.BillingOrder{}, &model.Task{}); err != nil {
+	if err := db.AutoMigrate(&model.CreditLedgerEntry{}, &model.BillingOrder{}, &model.Task{}, &model.LogicalModel{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&model.Task{ID: "task-agent-video", UserID: "user-1", Operation: "cloud_agent_step"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	for _, order := range []model.BillingOrder{
-		{ID: "order-image", UserID: "user-1", IdempotencyKey: "usage:image", Capability: "image", Status: model.BillingStatusSettled},
-		{ID: "order-video", UserID: "user-1", IdempotencyKey: "usage:video", TaskID: "task-agent-video", Capability: "video", Status: model.BillingStatusSettled},
+		{ID: "order-image", UserID: "user-1", IdempotencyKey: "usage:image", Model: "nano-banana-pro", Capability: "image", Status: model.BillingStatusSettled},
+		{ID: "order-image-2", UserID: "user-1", IdempotencyKey: "usage:image-2", Model: "seedream-4", Capability: "image", Status: model.BillingStatusSettled},
+		{ID: "order-video", UserID: "user-1", IdempotencyKey: "usage:video", TaskID: "task-agent-video", Model: "veo-3", Capability: "video", Status: model.BillingStatusSettled},
 	} {
 		if err := db.Create(&order).Error; err != nil {
 			t.Fatal(err)
@@ -80,11 +81,13 @@ func testCreditUsageBucketsByInstant(t *testing.T, db *gorm.DB) {
 	}
 	cst := time.FixedZone("CST", 8*3600)
 	// 同一天的消耗分别以 UTC 和 +08:00 文本存储，只能按时刻而不是文本划日。
+	// 模型优先取流水上的值（结算时的最终模型），流水为空才回落到账单。
 	for _, entry := range []model.CreditLedgerEntry{
 		{ID: "utc-text", UserID: "user-1", Type: model.CreditLedgerConsume, AmountMicrocredits: -1_000_000, BillingOrderID: "order-image", CreatedAt: time.Date(2026, 10, 27, 16, 30, 0, 0, time.UTC)},
-		{ID: "cst-text", UserID: "user-1", Type: model.CreditLedgerConsume, AmountMicrocredits: -2_000_000, BillingOrderID: "order-image", CreatedAt: time.Date(2026, 10, 28, 0, 30, 0, 0, cst)},
-		{ID: "same-day-video", UserID: "user-1", Type: model.CreditLedgerConsume, AmountMicrocredits: -5_000_000, BillingOrderID: "order-video", CreatedAt: time.Date(2026, 10, 28, 20, 0, 0, 0, cst)},
-		{ID: "previous-day", UserID: "user-1", Type: model.CreditLedgerConsume, AmountMicrocredits: -4_000_000, BillingOrderID: "order-image", CreatedAt: time.Date(2026, 10, 27, 23, 59, 0, 0, cst)},
+		{ID: "cst-text", UserID: "user-1", Type: model.CreditLedgerConsume, AmountMicrocredits: -2_000_000, BillingOrderID: "order-image", Model: "nano-banana-pro", CreatedAt: time.Date(2026, 10, 28, 0, 30, 0, 0, cst)},
+		{ID: "second-image-model", UserID: "user-1", Type: model.CreditLedgerConsume, AmountMicrocredits: -600_000, BillingOrderID: "order-image-2", Model: "seedream-4", CreatedAt: time.Date(2026, 10, 28, 9, 0, 0, 0, cst)},
+		{ID: "same-day-video", UserID: "user-1", Type: model.CreditLedgerConsume, AmountMicrocredits: -5_000_000, BillingOrderID: "order-video", Model: "veo-3", CreatedAt: time.Date(2026, 10, 28, 20, 0, 0, 0, cst)},
+		{ID: "previous-day", UserID: "user-1", Type: model.CreditLedgerConsume, AmountMicrocredits: -4_000_000, BillingOrderID: "order-image", Model: "nano-banana-legacy", CreatedAt: time.Date(2026, 10, 27, 23, 59, 0, 0, cst)},
 		{ID: "outside", UserID: "user-1", Type: model.CreditLedgerConsume, AmountMicrocredits: -9_000_000, BillingOrderID: "order-image", CreatedAt: time.Date(2026, 10, 29, 0, 0, 0, 0, cst)},
 	} {
 		if err := db.Create(&entry).Error; err != nil {
@@ -101,25 +104,48 @@ func testCreditUsageBucketsByInstant(t *testing.T, db *gorm.DB) {
 	type key struct {
 		day        int64
 		capability string
+		model      string
 	}
 	got := map[key]CreditUsageRow{}
 	for _, row := range rows {
-		got[key{row.DayIndex, row.Capability}] = row
+		got[key{row.DayIndex, row.Capability, row.Model}] = row
 	}
-	if len(rows) != 3 {
+	if len(rows) != 4 {
 		t.Fatalf("rows = %#v", rows)
 	}
-	if row := got[key{day27, "image"}]; row.TotalMicrocredits != 4_000_000 || row.EntryCount != 1 {
+	if row := got[key{day27, "image", "nano-banana-legacy"}]; row.TotalMicrocredits != 4_000_000 || row.EntryCount != 1 {
 		t.Fatalf("day27 image = %#v", row)
 	}
-	if row := got[key{day27 + 1, "image"}]; row.TotalMicrocredits != 3_000_000 || row.EntryCount != 2 {
-		t.Fatalf("day28 image = %#v", row)
+	if row := got[key{day27 + 1, "image", "nano-banana-pro"}]; row.TotalMicrocredits != 3_000_000 || row.EntryCount != 2 || row.AgentMicrocredits != 0 || row.AgentEntryCount != 0 {
+		t.Fatalf("day28 nano banana = %#v", row)
 	}
-	if row := got[key{day27 + 1, "video"}]; row.TotalMicrocredits != 5_000_000 || row.EntryCount != 1 || row.AgentMicrocredits != 5_000_000 || row.AgentEntryCount != 1 {
+	if row := got[key{day27 + 1, "image", "seedream-4"}]; row.TotalMicrocredits != 600_000 || row.EntryCount != 1 {
+		t.Fatalf("day28 seedream = %#v", row)
+	}
+	if row := got[key{day27 + 1, "video", "veo-3"}]; row.TotalMicrocredits != 5_000_000 || row.EntryCount != 1 || row.AgentMicrocredits != 5_000_000 || row.AgentEntryCount != 1 {
 		t.Fatalf("day28 video = %#v", row)
 	}
-	if row := got[key{day27 + 1, "image"}]; row.AgentMicrocredits != 0 || row.AgentEntryCount != 0 {
-		t.Fatalf("day28 image agent = %#v", row)
+
+	// 名称：同一编码优先未归档的模型；只剩归档模型时取最近更新的；空名称不返回。
+	older := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	for _, item := range []model.LogicalModel{
+		{ID: "lm-active", Code: "nano-banana-pro", Name: "Nano Banana Pro", UpdatedAt: older},
+		{ID: "lm-archived-same-code", Code: "nano-banana-pro", Name: "旧名称", ArchivedAt: &older, UpdatedAt: newer},
+		{ID: "lm-veo-old", Code: "veo-3", Name: "Veo 3（旧）", ArchivedAt: &older, UpdatedAt: older},
+		{ID: "lm-veo-new", Code: "veo-3", Name: "Veo 3", ArchivedAt: &newer, UpdatedAt: newer},
+		{ID: "lm-blank", Code: "seedream-4", Name: "  "},
+	} {
+		if err := db.Create(&item).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	names, err := New(db).LogicalModelNamesByCode([]string{"nano-banana-pro", "veo-3", "seedream-4", "unknown"})
+	if err != nil {
+		t.Fatalf("LogicalModelNamesByCode() error = %v", err)
+	}
+	if len(names) != 2 || names["nano-banana-pro"] != "Nano Banana Pro" || names["veo-3"] != "Veo 3" {
+		t.Fatalf("names = %#v", names)
 	}
 }
 
@@ -149,12 +175,13 @@ func TestCreditUsageQueryUsesInstantRangeOnPostgres(t *testing.T) {
 	for _, want := range []string{
 		"CAST(FLOOR((EXTRACT(EPOCH FROM e.created_at) + CAST(28800 AS BIGINT)) / 86400) AS BIGINT) AS day_index",
 		"COALESCE(o.capability, '') AS capability",
+		"COALESCE(NULLIF(e.model, ''), o.model, '') AS model",
 		"e.user_id = 'user-1' AND e.type = 'consume' AND e.amount_microcredits < 0",
 		"e.created_at >= '2025-10-28 16:00:00",
 		"e.created_at < '2026-10-28 16:00:00",
 		"LEFT JOIN tasks t ON t.id = o.task_id",
 		"COALESCE(t.operation, '') IN ('cloud_agent','cloud_agent_step')",
-		"GROUP BY day_index, COALESCE(o.capability, '') ORDER BY day_index",
+		"GROUP BY day_index, COALESCE(o.capability, ''), COALESCE(NULLIF(e.model, ''), o.model, '') ORDER BY day_index",
 	} {
 		if !strings.Contains(statement, want) {
 			t.Fatalf("SQL missing %q:\n%s", want, statement)

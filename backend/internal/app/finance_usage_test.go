@@ -21,7 +21,7 @@ func newCreditUsageTestService(t *testing.T) (*Service, *gorm.DB) {
 	if sqlDB, err := db.DB(); err == nil {
 		sqlDB.SetMaxOpenConns(1)
 	}
-	if err := db.AutoMigrate(&model.SystemSetting{}, &model.AdminAuditEvent{}, &model.CreditLedgerEntry{}, &model.BillingOrder{}, &model.Task{}); err != nil {
+	if err := db.AutoMigrate(&model.SystemSetting{}, &model.AdminAuditEvent{}, &model.CreditLedgerEntry{}, &model.BillingOrder{}, &model.Task{}, &model.LogicalModel{}); err != nil {
 		t.Fatal(err)
 	}
 	return New(repository.New(db), t.TempDir()), db
@@ -34,8 +34,10 @@ type creditUsageFixture struct {
 	amount     int64
 	at         time.Time
 	capability string
-	task       *model.Task
-	noOrder    bool
+	// model 写在账单与流水上，与真实结算一致。
+	model   string
+	task    *model.Task
+	noOrder bool
 }
 
 func seedCreditUsage(t *testing.T, db *gorm.DB, items []creditUsageFixture) {
@@ -56,12 +58,12 @@ func seedCreditUsage(t *testing.T, db *gorm.DB, items []creditUsageFixture) {
 				}
 				taskID = item.task.ID
 			}
-			order := model.BillingOrder{ID: orderID, UserID: userID, IdempotencyKey: "usage:" + item.id, TaskID: taskID, Capability: item.capability, Status: model.BillingStatusSettled}
+			order := model.BillingOrder{ID: orderID, UserID: userID, IdempotencyKey: "usage:" + item.id, TaskID: taskID, Model: item.model, Capability: item.capability, Status: model.BillingStatusSettled}
 			if err := db.Create(&order).Error; err != nil {
 				t.Fatal(err)
 			}
 		}
-		entry := model.CreditLedgerEntry{ID: "entry-" + item.id, UserID: userID, Type: item.entryType, AmountMicrocredits: item.amount, BillingOrderID: orderID, CreatedAt: item.at}
+		entry := model.CreditLedgerEntry{ID: "entry-" + item.id, UserID: userID, Type: item.entryType, AmountMicrocredits: item.amount, BillingOrderID: orderID, Model: item.model, CreatedAt: item.at}
 		if err := db.Create(&entry).Error; err != nil {
 			t.Fatal(err)
 		}
@@ -74,12 +76,12 @@ func TestCreditUsageGroupsConsumptionByLocalDayAndAgentOrigin(t *testing.T) {
 	submission := "submission-1"
 	seedCreditUsage(t, db, []creditUsageFixture{
 		// 本地 10-27 23:30，UTC 仍是 10-27。
-		{id: "canvas-image", entryType: model.CreditLedgerConsume, amount: -2_000_000, at: time.Date(2026, 10, 27, 23, 30, 0, 0, cst), capability: "image", task: &model.Task{ID: "task-canvas", Operation: "text_to_image"}},
+		{id: "canvas-image", entryType: model.CreditLedgerConsume, amount: -2_000_000, at: time.Date(2026, 10, 27, 23, 30, 0, 0, cst), capability: "image", model: "nano-banana-pro", task: &model.Task{ID: "task-canvas", Operation: "text_to_image"}},
 		// 本地 10-28 00:10 = UTC 10-27 16:10，必须落在本地 10-28。
-		{id: "agent-video", entryType: model.CreditLedgerConsume, amount: -3_000_000, at: time.Date(2026, 10, 27, 16, 10, 0, 0, time.UTC), capability: "video", task: &model.Task{ID: "task-agent-video", Operation: "text_to_video", AgentRunID: "run-1"}},
-		{id: "agent-step", entryType: model.CreditLedgerConsume, amount: -1_500_000, at: time.Date(2026, 10, 28, 9, 0, 0, 0, cst), capability: "text", task: &model.Task{ID: "task-agent-step", Operation: "cloud_agent_step"}},
-		{id: "creation", entryType: model.CreditLedgerConsume, amount: -500_000, at: time.Date(2026, 10, 26, 12, 0, 0, 0, cst), capability: "image", task: &model.Task{ID: "task-creation", Operation: "text_to_image", CreationSubmissionID: &submission}},
-		{id: "proxy", entryType: model.CreditLedgerConsume, amount: -700_000, at: time.Date(2026, 10, 26, 13, 0, 0, 0, cst), capability: "image"},
+		{id: "agent-video", entryType: model.CreditLedgerConsume, amount: -3_000_000, at: time.Date(2026, 10, 27, 16, 10, 0, 0, time.UTC), capability: "video", model: "veo-3", task: &model.Task{ID: "task-agent-video", Operation: "text_to_video", AgentRunID: "run-1"}},
+		{id: "agent-step", entryType: model.CreditLedgerConsume, amount: -1_500_000, at: time.Date(2026, 10, 28, 9, 0, 0, 0, cst), capability: "text", model: "gemini-3-pro", task: &model.Task{ID: "task-agent-step", Operation: "cloud_agent_step"}},
+		{id: "creation", entryType: model.CreditLedgerConsume, amount: -500_000, at: time.Date(2026, 10, 26, 12, 0, 0, 0, cst), capability: "image", model: "nano-banana-pro", task: &model.Task{ID: "task-creation", Operation: "text_to_image", CreationSubmissionID: &submission}},
+		{id: "proxy", entryType: model.CreditLedgerConsume, amount: -700_000, at: time.Date(2026, 10, 26, 13, 0, 0, 0, cst), capability: "image", model: "gpt-image-1"},
 		{id: "orphan", entryType: model.CreditLedgerConsume, amount: -100_000, at: time.Date(2026, 10, 26, 14, 0, 0, 0, cst), noOrder: true},
 		{id: "first-day", entryType: model.CreditLedgerConsume, amount: -250_000, at: time.Date(2025, 10, 29, 0, 30, 0, 0, cst), capability: "audio"},
 		// 以下都不是消耗或不在窗口内。
@@ -92,6 +94,13 @@ func TestCreditUsageGroupsConsumptionByLocalDayAndAgentOrigin(t *testing.T) {
 		{id: "after-today", entryType: model.CreditLedgerConsume, amount: -900_000, at: time.Date(2026, 10, 29, 0, 5, 0, 0, cst), capability: "image"},
 		{id: "other-user", userID: "user-2", entryType: model.CreditLedgerConsume, amount: -900_000, at: time.Date(2026, 10, 28, 10, 0, 0, 0, cst), capability: "image"},
 	})
+
+	// 前台模型名称：未登记的编码（代理调用的 gpt-image-1、gemini-3-pro）返回空名称，由前端显示编码。
+	for _, item := range []model.LogicalModel{{ID: "lm-nano", Code: "nano-banana-pro", Name: "Nano Banana Pro"}, {ID: "lm-veo", Code: "veo-3", Name: "Veo 3"}} {
+		if err := db.Create(&item).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	report, err := svc.creditUsageAt(&model.User{ID: "user-1"}, 480, time.Date(2026, 10, 28, 12, 0, 0, 0, cst))
 	if err != nil {
@@ -127,6 +136,23 @@ func TestCreditUsageGroupsConsumptionByLocalDayAndAgentOrigin(t *testing.T) {
 	for index := range wantCategories {
 		if report.Categories[index] != wantCategories[index] {
 			t.Fatalf("categories[%d] = %#v, want %#v", index, report.Categories[index], wantCategories[index])
+		}
+	}
+	// 模型构成跨日合并；没有记录模型的消耗按类型各成一行（编码为空）。
+	wantModels := []CreditUsageModel{
+		{Model: "veo-3", Name: "Veo 3", Capability: "video", TotalMicrocredits: 3_000_000, AgentMicrocredits: 3_000_000, Count: 1, AgentCount: 1},
+		{Model: "nano-banana-pro", Name: "Nano Banana Pro", Capability: "image", TotalMicrocredits: 2_500_000, AgentMicrocredits: 500_000, Count: 2, AgentCount: 1},
+		{Model: "gemini-3-pro", Capability: "text", TotalMicrocredits: 1_500_000, AgentMicrocredits: 1_500_000, Count: 1, AgentCount: 1},
+		{Model: "gpt-image-1", Capability: "image", TotalMicrocredits: 700_000, Count: 1},
+		{Model: "", Capability: "audio", TotalMicrocredits: 250_000, Count: 1},
+		{Model: "", Capability: "other", TotalMicrocredits: 100_000, Count: 1},
+	}
+	if len(report.Models) != len(wantModels) {
+		t.Fatalf("models = %#v, want %#v", report.Models, wantModels)
+	}
+	for index := range wantModels {
+		if report.Models[index] != wantModels[index] {
+			t.Fatalf("models[%d] = %#v, want %#v", index, report.Models[index], wantModels[index])
 		}
 	}
 }
@@ -182,7 +208,8 @@ func TestCreditUsageRejectsInvalidRequests(t *testing.T) {
 		}
 	}
 	report, err := svc.creditUsageAt(&model.User{ID: "user-1"}, 840, time.Now())
-	if err != nil || len(report.Daily) != 0 || len(report.Categories) != 0 {
+	// 空报告的数组必须是 [] 而不是 null，前端可以直接遍历。
+	if err != nil || report.Daily == nil || report.Categories == nil || report.Models == nil || len(report.Daily) != 0 || len(report.Categories) != 0 || len(report.Models) != 0 {
 		t.Fatalf("empty report = %#v err=%v", report, err)
 	}
 }

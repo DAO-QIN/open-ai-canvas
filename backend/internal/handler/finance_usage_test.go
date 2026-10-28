@@ -26,7 +26,7 @@ func TestWalletUsageHTTPContract(t *testing.T) {
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxOpenConns(1)
 	t.Cleanup(func() { _ = sqlDB.Close() })
-	if err := db.AutoMigrate(&model.User{}, &model.AuthSession{}, &model.SystemSetting{}, &model.CreditLedgerEntry{}, &model.BillingOrder{}, &model.Task{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.AuthSession{}, &model.SystemSetting{}, &model.CreditLedgerEntry{}, &model.BillingOrder{}, &model.Task{}, &model.LogicalModel{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&model.User{ID: "user", Username: "user", Email: "user@example.invalid", Role: model.UserRoleUser, Status: model.UserStatusActive}).Error; err != nil {
@@ -35,7 +35,10 @@ func TestWalletUsageHTTPContract(t *testing.T) {
 	if err := db.Create(&model.AuthSession{ID: "user", UserID: "user", TokenHash: auth.HashToken("test-token"), ExpiresAt: time.Now().Add(time.Hour)}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Create(&model.CreditLedgerEntry{ID: "entry", UserID: "user", Type: model.CreditLedgerConsume, AmountMicrocredits: -1_500_000, CreatedAt: time.Now()}).Error; err != nil {
+	if err := db.Create(&model.CreditLedgerEntry{ID: "entry", UserID: "user", Type: model.CreditLedgerConsume, AmountMicrocredits: -1_500_000, Model: "nano-banana-pro", CreatedAt: time.Now()}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&model.LogicalModel{ID: "lm", Code: "nano-banana-pro", Name: "Nano Banana Pro"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	svc := service.New(repository.New(db), t.TempDir())
@@ -81,5 +84,9 @@ func TestWalletUsageHTTPContract(t *testing.T) {
 	}
 	if body.Code != 0 || body.Data.Days != 365 || body.Data.TimezoneOffset != 480 || len(body.Data.Daily) != 1 || body.Data.Daily[0].TotalMicrocredits != 1_500_000 {
 		t.Fatalf("report = %#v", body)
+	}
+	// 没有账单的消耗归入 other 类型；模型取流水上的编码，名称取前台模型。
+	if len(body.Data.Models) != 1 || body.Data.Models[0] != (service.CreditUsageModel{Model: "nano-banana-pro", Name: "Nano Banana Pro", Capability: "other", TotalMicrocredits: 1_500_000, Count: 1}) {
+		t.Fatalf("models = %#v", body.Data.Models)
 	}
 }
