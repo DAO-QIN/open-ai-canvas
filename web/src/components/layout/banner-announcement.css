@@ -1,6 +1,6 @@
 /* 首页顶部常驻通知条（前台轮播与后台预览共用）。
  * 视觉层次：深色底 → 沿椭圆轨道缓慢公转的光环 → 文字区压光层 → 倒计时数字块 / 标题 → 白色实心行动按钮；
- * 深色主题下底边渐隐融进页面。光带整条流动、经过文字时减弱，两端保持鲜亮。
+ * 深色主题下底边挂一条颗粒带溶进下方界面。光带整条流动、经过文字时减弱，两端保持鲜亮。
  * 颜色全部来自 globals.css 的 --notice-banner-* token；「减少动态效果」时所有动画停用。 */
 
 /* 注册为颜色属性后，轮播切换不同类型时底色与光晕可以平滑过渡。 */
@@ -22,7 +22,14 @@
     --nb-ink: var(--notice-banner-ink-notice);
     --nb-height: 56px;
     --nb-side: 112px;
+    /* 底边颗粒的边长（一个像素格）；桌面端根元素 zoom 0.9（styles/ui-scale.css），按比例补回，颗粒落在整数物理像素上。 */
+    --nb-pixel: 3px;
+    /* 底边颗粒带挂在通知条下方的高度：只在深色主题挂出来，浅色主题为 0，保持直边。 */
+    --nb-edge-h: 0px;
     position: relative;
+    /* 颗粒带要叠在下方侧栏与内容区的底色之上；顶栏（透明，--z-toolbar）、侧栏品牌行（z-index 2，见 styles/globals.css）
+     * 与窄屏侧栏遮罩仍在通知条之上，颗粒只衬在按钮、标志与字标后面。 */
+    z-index: 1;
     isolation: isolate;
     display: flex;
     width: 100%;
@@ -58,6 +65,12 @@
 
 /* 后台自定义配色以内联 --nb-base / --nb-glow / --nb-ink 写在外壳上，优先于上面按类型选择的预设。 */
 
+@media (min-width: 1024px) {
+    html:not([data-ui-scale-off]) .notice-banner {
+        --nb-pixel: calc(3px / 0.9);
+    }
+}
+
 /* 底层：深色底，光环与压光层都画在这一层里。 */
 .notice-banner-backdrop {
     position: absolute;
@@ -68,11 +81,25 @@
     background: var(--nb-base);
 }
 
-/* 深色主题：背景层下半段逐渐变透明，融进页面底色，取代一刀切的分界线；只作用在背景层，文字、数字块与按钮不受影响。
- * 浅色主题保持干净的直边——深色条渐隐到浅色页面会发灰，白字下半截也会变淡。 */
-.dark .notice-banner-backdrop {
-    -webkit-mask: linear-gradient(#000 45%, rgb(0 0 0 / 0.72) 68%, rgb(0 0 0 / 0.32) 87%, transparent);
-    mask: linear-gradient(#000 45%, rgb(0 0 0 / 0.72) 68%, rgb(0 0 0 / 0.32) 87%, transparent);
+/* 深色主题底边：背景层向下多画 --nb-edge-h，这一段按后台选的外形与波纹遮成颗粒，挂在通知条下方、叠在侧栏与内容区上，
+ * 颗粒之间露出的就是下层界面本身的颜色。不能在通知条内部挖空：那里背后是页面最底层的近黑色，会变成一排黑色方格。
+ * 遮罩图案、平铺宽度与行数由 lib/announcements/banner-edge.ts 生成，以 --nb-edge-mask / --nb-edge-columns / --nb-edge-rows 写在外壳上；
+ * 平滑 + 平直（直边）时外壳不带 data-edge-band，不挂颗粒带。颗粒带不接收指针，下方的侧栏与顶栏照常可点。
+ * 浅色主题保持干净的直边——深色颗粒散在浅色页面上像噪点。 */
+.dark .notice-banner[data-edge-band] {
+    --nb-edge-h: calc(var(--nb-pixel) * var(--nb-edge-rows));
+    overflow: visible;
+    clip-path: inset(0 0 calc(var(--nb-edge-h) * -1) 0);
+}
+
+.dark .notice-banner[data-edge-band] .notice-banner-backdrop {
+    bottom: calc(var(--nb-edge-h) * -1);
+    -webkit-mask:
+        linear-gradient(#000, #000) top / 100% calc(100% - var(--nb-edge-h)) no-repeat,
+        var(--nb-edge-mask) left bottom / calc(var(--nb-pixel) * var(--nb-edge-columns)) var(--nb-edge-h) repeat-x;
+    mask:
+        linear-gradient(#000, #000) top / 100% calc(100% - var(--nb-edge-h)) no-repeat,
+        var(--nb-edge-mask) left bottom / calc(var(--nb-pixel) * var(--nb-edge-columns)) var(--nb-edge-h) repeat-x;
 }
 
 /* 文字区压光层（盖在光环之上）：两侧留出 --nb-side 以外的区域，亮带经过文字时减到 80%，两端照常鲜亮。

@@ -7,6 +7,7 @@ import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { BannerAnnouncementBody, BannerAnnouncementShell, useBannerNow } from "@/components/layout/banner-announcement-content";
+import { bannerEdgeLabel } from "@/lib/announcements/banner-edge";
 import { bannerCtaLabel, bannerNoticeTypeLabel } from "@/lib/announcements/banner-notice";
 import {
     BANNER_EFFECTS,
@@ -169,8 +170,8 @@ export function BannerTitleEditor({ value, onChange }: { value: BannerTitleRun[]
 }
 
 /**
- * 前台效果预览：与首页通知条共用外壳与内容组件，配色、动效、按钮文案和倒计时实时联动，因此预览即前台结果。
- * 通知条深色底不随明暗主题切换，只需一条预览；按实际底色与光晕给出白字和标题颜色的对比度提示。
+ * 前台效果预览：与首页通知条共用外壳与内容组件，配色、动效、底边样式、按钮文案和倒计时实时联动，因此预览即前台结果。
+ * 通知条深色底不随明暗主题切换，只需一条预览（底边颗粒带只在深色主题显示）；按实际底色与光晕给出白字和标题颜色的对比度提示。
  */
 export function BannerNoticePreview({
     runs,
@@ -234,6 +235,7 @@ export function BannerNoticePreview({
                 {bannerNoticeTypeLabel(noticeType)}
                 {custom ? " · 自定义配色" : " · 类型预设配色"}
                 {effect ? ` · ${effect}` : ""}
+                {` · 底边${bannerEdgeLabel(theme)}`}
                 {ctaLabel ? ` · 按钮「${ctaLabel}」` : " · 未设置跳转链接，不显示按钮"}
                 {countdownEndsAt && !countdownTarget ? " · 结束时间已过，倒计时不会显示" : ""}
                 {!themeWarning && !lowContrast.length ? " · 对比度达标" : ""}

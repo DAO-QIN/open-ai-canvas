@@ -23639,7 +23639,11 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
     background: #f7f7f8;
 }
 
+/* 品牌行压在首页通知条之上（通知条 z-index 1，见 components/layout/banner-announcement.css）：
+ * 深色主题下通知条底边的颗粒带挂进侧栏顶部，只能衬在标志与字标后面，不能盖住它们。 */
 .app-user-workspace .app-workspace-sidebar-brand-row {
+    position: relative;
+    z-index: 2;
     display: flex;
     height: var(--workspace-reference-topbar);
     min-height: var(--workspace-reference-topbar);

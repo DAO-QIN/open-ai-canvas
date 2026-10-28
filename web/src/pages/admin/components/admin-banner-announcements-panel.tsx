@@ -22,11 +22,12 @@ import {
     type BannerNoticeType,
 } from "@/lib/announcements/banner-notice";
 import { bannerAnnouncementBarStyle } from "@/components/layout/banner-announcement-content";
+import { BANNER_EDGE_SHAPE_DEFAULT, BANNER_EDGE_WAVE_DEFAULT, normalizeBannerEdgeShape, normalizeBannerEdgeWave } from "@/lib/announcements/banner-edge";
 import { BANNER_EFFECT_DEFAULT, bannerColorHex, bannerHasCustomTheme, normalizeBannerEffect, readBannerPresetColors } from "@/lib/announcements/banner-theme";
 import { BANNER_TITLE_MAX_CHARS, bannerTitleCharCount, bannerTitlePlainText, normalizeBannerTitleRuns, type BannerTitleRun } from "@/lib/announcements/banner-title";
 import { AdminDataTable } from "./admin-ui";
 import { BannerNoticeTypeSelector } from "./banner-notice-type-selector";
-import { BannerThemePicker, bannerThemeSwatchStyle, type BannerThemeValue } from "./banner-theme-picker";
+import { BannerEdgePicker, BannerThemePicker, bannerThemeSwatchStyle, type BannerThemeValue } from "./banner-theme-picker";
 import { BannerNoticePreview, BannerTitleEditor } from "./banner-title-editor";
 import { Select } from "@/components/ui/base/select";
 
@@ -42,7 +43,7 @@ type FormValues = {
 
 type BannerDialog = { mode: "create" } | { mode: "edit"; banner: BannerAnnouncement };
 
-const DEFAULT_THEME: BannerThemeValue = { bgColor: "", glowColor: "", bgEffect: BANNER_EFFECT_DEFAULT };
+const DEFAULT_THEME: BannerThemeValue = { bgColor: "", glowColor: "", bgEffect: BANNER_EFFECT_DEFAULT, edgeShape: BANNER_EDGE_SHAPE_DEFAULT, edgeWave: BANNER_EDGE_WAVE_DEFAULT };
 
 /** 编辑已有通知时还原配色；只存了一种自定义颜色时，另一种用类型预设补齐，便于在取色器里继续调整。 */
 function bannerThemeDraft(banner: BannerAnnouncement): BannerThemeValue {
@@ -53,6 +54,8 @@ function bannerThemeDraft(banner: BannerAnnouncement): BannerThemeValue {
         bgColor: bgColor || (preset ? preset.base : ""),
         glowColor: glowColor || (preset ? preset.glow : ""),
         bgEffect: normalizeBannerEffect(banner.bgEffect),
+        edgeShape: normalizeBannerEdgeShape(banner.edgeShape),
+        edgeWave: normalizeBannerEdgeWave(banner.edgeWave),
     };
 }
 
@@ -65,6 +68,8 @@ function bannerPayload(banner: BannerAnnouncement, patch: Partial<AdminBannerPay
         bgColor: banner.bgColor || "",
         glowColor: banner.glowColor || "",
         bgEffect: normalizeBannerEffect(banner.bgEffect),
+        edgeShape: normalizeBannerEdgeShape(banner.edgeShape),
+        edgeWave: normalizeBannerEdgeWave(banner.edgeWave),
         ctaText: banner.ctaText,
         link: banner.link,
         status: banner.status,
@@ -199,7 +204,7 @@ export default function AdminBannerAnnouncementsPanel({
 
     const handleToggleStatus = async (banner: BannerAnnouncement, nextStatus: boolean) => {
         try {
-            // 只改状态，其余字段原样带回（含样式分段、类型、配色与动效、按钮文案、倒计时与展示顺序）。
+            // 只改状态，其余字段原样带回（含样式分段、类型、配色与动效、底边样式、按钮文案、倒计时与展示顺序）。
             await updateAdminBanner(banner.id, bannerPayload(banner, { status: nextStatus ? "active" : "disabled" }));
             message.success(nextStatus ? "常驻通知已启用" : "常驻通知已禁用");
             void queryClient.invalidateQueries({ queryKey: ["active-banner-announcements"] });
@@ -233,6 +238,8 @@ export default function AdminBannerAnnouncementsPanel({
                 bgColor: theme.bgColor,
                 glowColor: theme.glowColor,
                 bgEffect: theme.bgEffect,
+                edgeShape: theme.edgeShape,
+                edgeWave: theme.edgeWave,
                 ctaText: values.ctaText?.trim() || undefined,
                 link: values.link?.trim() || undefined,
                 status: values.status ? "active" : "disabled",
@@ -461,6 +468,16 @@ export default function AdminBannerAnnouncementsPanel({
                         <BannerThemePicker
                             value={theme}
                             noticeType={noticeType}
+                            onChange={(next) => {
+                                setTheme(next);
+                                setDirty(true);
+                            }}
+                        />
+                    </Form.Item>
+
+                    <Form.Item label="底边样式" extra="深色主题下，通知条底边用颗粒溶进下方的侧栏与内容区，颗粒之间露出的就是下层界面的颜色。外形是颗粒形状（平滑不加颗粒），波纹是底边起伏；浅色主题保持直边">
+                        <BannerEdgePicker
+                            value={theme}
                             onChange={(next) => {
                                 setTheme(next);
                                 setDirty(true);

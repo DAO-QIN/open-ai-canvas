@@ -10,6 +10,7 @@
 
 import type { CSSProperties } from "react";
 
+import type { BannerEdgeFields } from "./banner-edge";
 import { bannerNoticeTypeMeta } from "./banner-notice";
 import { bannerTitleContrastRatio, normalizeBannerTitleHex, parseBannerTitleColor } from "./banner-title";
 
@@ -55,7 +56,8 @@ export const BANNER_GLOW_PEAK = Math.round(BANNER_RING_PEAK * (1 - BANNER_TEXT_S
 /** 按钮与倒计时数字的文字色在白底上的目标对比度。 */
 export const BANNER_INK_CONTRAST = 11.5;
 
-export type BannerThemeFields = {
+/** 通知条外观字段：配色、背景动效与底边样式（底边见 banner-edge.ts）。 */
+export type BannerThemeFields = BannerEdgeFields & {
     bgColor?: string | null;
     glowColor?: string | null;
     bgEffect?: string | null;

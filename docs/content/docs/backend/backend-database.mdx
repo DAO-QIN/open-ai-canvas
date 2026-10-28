@@ -5,6 +5,10 @@ description: 影策后端核心持久化表与状态边界
 
 # 后端数据库
 
+## 常驻通知底边样式（Schema 80）
+
+版本 80 `banner_edge` 为 `banner_announcements` 增加 `edge_shape`（列宽 16、非空、默认 `square`）和 `edge_wave`（列宽 16、非空、默认 `flat`），对应深色主题下通知条底边颗粒带的外形与波纹。`edge_shape` 取 `square`（方格）/ `dot`（圆点）/ `diamond`（菱形）/ `smooth`（平滑，不加颗粒），`edge_wave` 取 `flat`（平直）/ `wave`（波浪）/ `ripple`（涟漪）；`smooth` + `flat` 即直边。两个字段写入前统一小写、空值取默认，白名单在 `backend/internal/app/announcement.go` 的 `bannerEdgeShapes` / `bannerEdgeWaves`，与前端 `lib/announcements/banner-edge.ts` 的一致性由 `web/test/banner-edge.test.ts` 校验。颗粒图案不入库，由前端按这两个取值确定性生成。旧通知升级后为方格、平直。
+
 ## 常驻通知自定义配色（Schema 79）
 
 版本 79 `banner_theme` 为 `banner_announcements` 增加 `bg_color`、`glow_color`（列宽 7、非空、默认空串）和 `bg_effect`（列宽 16、非空、默认 `aurora`）。两种颜色只接受 `#RRGGBB` 并统一大写，空串表示跟随通知类型的预设配色，可以只自定义其中一种；`bg_effect` 取 `aurora`（光晕流动）或 `static`（光晕静止），白名单在 `backend/internal/app/announcement.go` 的 `bannerEffects`，与前端 `lib/announcements/banner-theme.ts` 的一致性由 `web/test/banner-theme.test.ts` 校验。按钮与倒计时数字的文字色不入库，由前端从光晕色压暗到在白底上 ≥ 11.5:1 得出。旧通知升级后颜色为空、动效为 `aurora`，展示不变。
@@ -472,7 +476,7 @@ schema v27 为 `channel_model_price_tiers` 和 `billing_orders` 添加 `cost_con
 | `announcements`             | 保存管理员发布的系统公告         | `pinned` 只改变排序；`image_resource_id` 只能绑定由当前管理员上传并在发布事务中消费的公告配图草稿                                                                                                                                                                                                                                                   |
 | `announcement_image_drafts` | 标记尚未发布的公告配图资源       | 发布/更新事务消费草稿；取消编辑显式回收，超过 24 小时的异常遗留草稿由后台清理                                                                                                                                                                                                                                                                       |
 | `user_announcement_reads`   | 保存用户已读状态                 | 同一用户和公告唯一；公告重新发布时清除旧已读记录                                                                                                                                                                                                                                                                                                    |
-| `banner_announcements`      | 保存首页顶部常驻展示的滚动通知条 | 与系统公告完全独立：只有标题、按钮文案与跳转链接，无正文、无配图、无已读状态；`link` 仅接受 `http(s)` 外链或 `/` 开头的站内路径；`status` 为 `active` / `disabled`，`sort_order` 越小越靠前，`starts_at` / `ends_at` 构成生效窗口（可预约未来开始）；`title_runs` 以 JSON 文本保存标题的样式分段；`notice_type` 决定预设配色与默认按钮文案；`bg_color` / `glow_color` 是自定义底色与光晕色（空串跟随类型），`bg_effect` 为 `aurora` / `static`；`cta_text` 是行动按钮文案（空串按类型取默认）；`show_countdown` 开启后倒计时到 `ends_at` |
+| `banner_announcements`      | 保存首页顶部常驻展示的滚动通知条 | 与系统公告完全独立：只有标题、按钮文案与跳转链接，无正文、无配图、无已读状态；`link` 仅接受 `http(s)` 外链或 `/` 开头的站内路径；`status` 为 `active` / `disabled`，`sort_order` 越小越靠前，`starts_at` / `ends_at` 构成生效窗口（可预约未来开始）；`title_runs` 以 JSON 文本保存标题的样式分段；`notice_type` 决定预设配色与默认按钮文案；`bg_color` / `glow_color` 是自定义底色与光晕色（空串跟随类型），`bg_effect` 为 `aurora` / `static`；`edge_shape` / `edge_wave` 是深色主题底边颗粒带的外形与波纹；`cta_text` 是行动按钮文案（空串按类型取默认）；`show_countdown` 开启后倒计时到 `ends_at` |
 
 活动公告按置顶状态优先、发布时间倒序返回；置顶不会绕过关闭状态或用户登录校验。公告只要求标题，正文和配图均可为空。用户首次进入工作区时会自动看到未读公告，可以只关闭本次或选择今日不再提醒；主动打开公告中心后才会写入服务端已读状态。替换或移除配图时，公告更新、旧资源记录删除和物理删除任务入队在同一数据库事务完成。
 

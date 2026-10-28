@@ -188,6 +188,8 @@ func (r *Repository) UpdateBannerAnnouncement(banner *model.BannerAnnouncement) 
 		"bg_color":       banner.BgColor,
 		"glow_color":     banner.GlowColor,
 		"bg_effect":      banner.BgEffect,
+		"edge_shape":     banner.EdgeShape,
+		"edge_wave":      banner.EdgeWave,
 		"cta_text":       banner.CtaText,
 		"link":           banner.Link,
 		"status":         banner.Status,

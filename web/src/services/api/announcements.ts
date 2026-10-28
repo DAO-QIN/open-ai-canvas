@@ -1,5 +1,6 @@
 import { http, apiBaseURL } from "@/services/api/request";
 import type { RemoteResource } from "@/services/api/resources";
+import type { BannerEdgeShape, BannerEdgeWave } from "@/lib/announcements/banner-edge";
 import type { BannerNoticeType } from "@/lib/announcements/banner-notice";
 import type { BannerEffect } from "@/lib/announcements/banner-theme";
 import type { BannerTitleRun } from "@/lib/announcements/banner-title";
@@ -91,6 +92,9 @@ export type BannerAnnouncement = {
     glowColor?: string;
     /** 背景动效；未知或空值按光晕流动处理。 */
     bgEffect?: BannerEffect;
+    /** 深色主题下底边颗粒带的外形与波纹；未知或空值按方格、平直处理。 */
+    edgeShape?: BannerEdgeShape;
+    edgeWave?: BannerEdgeWave;
     /** 行动按钮文案；为空时按通知类型取默认文案，只在有跳转链接时展示。 */
     ctaText?: string;
     link?: string;
@@ -127,6 +131,8 @@ export type AdminBannerPayload = {
     bgColor?: string;
     glowColor?: string;
     bgEffect?: BannerEffect;
+    edgeShape?: BannerEdgeShape;
+    edgeWave?: BannerEdgeWave;
     ctaText?: string;
     link?: string;
     status: "active" | "disabled";
