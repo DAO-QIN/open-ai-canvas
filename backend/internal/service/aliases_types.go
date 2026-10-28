@@ -158,6 +158,9 @@ type (
 	CreateRedeemBatchRequest               = app.CreateRedeemBatchRequest
 	CreateRedeemBatchResult                = app.CreateRedeemBatchResult
 	CreateTaskRequest                      = app.CreateTaskRequest
+	CreditUsageCategory                    = app.CreditUsageCategory
+	CreditUsageDay                         = app.CreditUsageDay
+	CreditUsageReport                      = app.CreditUsageReport
 	CreationCanvasOp                       = app.CreationCanvasOp
 	CreationDetail                         = app.CreationDetail
 	CreationGuard                          = app.CreationGuard

@@ -7,6 +7,17 @@ description: 信封、错误码与 OpenAPI
 
 存储容量进入只读后，`POST /promotion/transfers` 仍允许用户把已有可用返利转入积分余额；归属、冻结期、余额与幂等校验继续由返利服务执行。创建推广码等其他写入不继承该例外。存储商品仅发放容量，不参与积分充值返利。
 
+## 用量看板
+
+`GET /api/wallet/usage?tzOffset=480` 返回当前登录账号截至今天（含）最近 365 个自然日的积分消耗，需积分功能开启，私有且 `Cache-Control: private, no-store`，每用户每分钟 30 次。`tzOffset` 是浏览器的 UTC 偏移分钟数（东八区为 480，范围 -720 到 840，缺省为 0），服务端按它划分自然日；非整数或越界返回 400。
+
+- `data = { from, to, days, timezoneOffset, daily, categories }`。`from`/`to` 为含首尾的本地日期 `YYYY-MM-DD`，`days` 固定 365。
+- `daily` 只含有消耗的日期，按日期升序，项为 `{ date, totalMicrocredits, agentMicrocredits, count, agentCount }`；前端按窗口补零。
+- `categories` 按账单能力汇总窗口内消耗，`capability` 为 `image|video|audio|text|other`（无账单或未知能力归入 other），按消耗降序。
+- 口径与钱包流水一致：只统计 `type = consume` 且金额为负的流水（结算后的最终扣费），按流水时间（结算时刻）计入当天；冻结、预授权差额与失败退款、管理员调整、充值和赠送都不计入。金额为整数微积分。
+- Agent 用量为关联任务带 `agent_run_id`（云端 Agent 子任务）、带 `creation_submission_id`（首页智能创作提交），或操作名为 `cloud_agent`、`cloud_agent_step`、`cloud_agent_context_compaction`、`agent_memory_compact` 的消耗。系统代理调用等没有任务的消耗只计入总量。
+- 只读接口，不新增数据表或迁移；PostgreSQL 按 `created_at` 时间范围走 `(user_id, created_at)` 索引，SQLite 用 `unixepoch(created_at)` 比较时刻。
+
 ## 管理端模型测试
 
 `POST /api/admin/channels/:id/models/test` 仅管理员可调用，沿用模型协议与能力配置请求，可选 `prompt`（最多 8000 字符），留空使用通用测试内容。视频使用能力画像中的默认时长、比例与分辨率。测试不要求模型已启用或已有价格规格，不保存模型配置，不创建用户任务或站内计费订单，但会真实调用上游并可能产生费用。

@@ -1,0 +1,666 @@
+/* 用量看板。图表颜色是本页组件 token：数据色只用于消耗强度，界面其余部分保持工作台中性色。 */
+.usage-dashboard {
+    --usage-accent: #1f8ad3;
+    --usage-heat-0: color-mix(in srgb, var(--user-ink) 6%, transparent);
+    --usage-heat-1: color-mix(in srgb, var(--usage-accent) 26%, var(--user-surface));
+    --usage-heat-2: color-mix(in srgb, var(--usage-accent) 48%, var(--user-surface));
+    --usage-heat-3: color-mix(in srgb, var(--usage-accent) 74%, var(--user-surface));
+    --usage-heat-4: var(--usage-accent);
+    --usage-video: #7c5cf0;
+    --usage-audio: #db8a1f;
+    --usage-text: #14a07a;
+    --usage-other: color-mix(in srgb, var(--user-ink) 32%, transparent);
+    --usage-tooltip-bg: var(--user-surface-raised);
+    --usage-gap: 3px;
+    --usage-panel-radius: 20px;
+    container-type: inline-size;
+    padding-bottom: var(--space-6);
+}
+
+.dark .usage-dashboard {
+    --usage-accent: #6cc6f2;
+    --usage-heat-0: color-mix(in srgb, var(--user-ink) 5.5%, transparent);
+    /* 暗色下最低一级也要和空格子拉开，避免少量消耗的日子看不出来。 */
+    --usage-heat-1: color-mix(in srgb, var(--usage-accent) 30%, var(--user-surface));
+    --usage-heat-2: color-mix(in srgb, var(--usage-accent) 52%, var(--user-surface));
+    --usage-heat-3: color-mix(in srgb, var(--usage-accent) 76%, var(--user-surface));
+    --usage-video: #a58fff;
+    --usage-audio: #f0b061;
+    --usage-text: #4fcda4;
+    --usage-tooltip-bg: var(--user-surface-hover);
+}
+
+.usage-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+/* 统计范围：账号 + 时间窗口，右侧切换口径。 */
+.usage-scope {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.usage-scope-identity {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.usage-scope-avatar {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: var(--user-surface-muted);
+    color: var(--user-ink-muted);
+}
+
+.usage-scope-identity strong {
+    display: block;
+    overflow: hidden;
+    color: var(--user-ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.usage-scope-identity strong > span {
+    color: var(--user-ink-soft);
+}
+
+.usage-scope-identity strong + span {
+    display: block;
+    margin-top: 2px;
+    color: var(--user-ink-soft);
+    font-size: var(--fs-caption);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 分段切换：与参考看板一致的胶囊轨道，选中块是更亮一级的表面。 */
+.usage-dashboard .app-segmented.usage-segmented {
+    /* 分段项自带 z-index，隔离在轨道内，图表提示框才能盖在它上面。 */
+    isolation: isolate;
+    height: 34px;
+    flex-shrink: 0;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--user-surface-muted);
+    box-shadow: inset 0 0 0 1px var(--user-border);
+}
+
+.usage-dashboard .app-segmented.usage-segmented.is-sm {
+    height: 30px;
+    border-radius: 9px;
+}
+
+.usage-dashboard .usage-segmented .app-segmented-thumb {
+    inset-block: 3px;
+    border-radius: 7px;
+    background: var(--user-surface);
+    box-shadow: var(--elevation-hairline), var(--elevation-card);
+}
+
+.dark .usage-dashboard .usage-segmented .app-segmented-thumb {
+    background: var(--user-surface-hover);
+}
+
+.usage-dashboard .usage-segmented .app-segmented-item {
+    padding-inline: var(--space-3);
+    border-radius: 7px;
+    color: var(--user-ink-muted);
+    font-size: var(--fs-ui);
+}
+
+.usage-dashboard .usage-segmented .app-segmented-item:not(:disabled):hover {
+    background: transparent;
+    color: var(--user-ink);
+}
+
+.usage-dashboard .usage-segmented .app-segmented-item[aria-checked="true"] {
+    color: var(--user-ink);
+}
+
+.usage-dashboard .usage-segmented.is-sm .app-segmented-item {
+    padding-inline: 10px;
+    font-size: var(--fs-caption);
+}
+
+/* 统计卡：大数字 + 说明，不加图标，靠字号和明度区分层级。 */
+.usage-stats {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.usage-stat {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+    padding: var(--space-5) var(--space-5) var(--space-4);
+    border-radius: var(--user-radius-card);
+    background: var(--user-surface);
+    box-shadow: var(--elevation-hairline);
+}
+
+.usage-stat-label {
+    overflow: hidden;
+    color: var(--user-ink-muted);
+    font-size: var(--fs-caption);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.usage-stat-value {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 4px;
+    color: var(--user-ink);
+    font-size: var(--fs-title);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--ls-title);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.usage-stat-value small {
+    color: var(--user-ink-soft);
+    font-size: var(--fs-caption);
+    font-weight: 500;
+    letter-spacing: 0;
+}
+
+.usage-stat-hint {
+    overflow: hidden;
+    color: var(--user-ink-soft);
+    font-size: var(--fs-caption);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 图表与构成卡片。 */
+.usage-panel {
+    margin-top: var(--space-4);
+    padding: var(--space-5) var(--space-6) var(--space-5);
+    border-radius: var(--usage-panel-radius);
+    background: var(--user-surface);
+    box-shadow: var(--elevation-hairline);
+}
+
+.usage-panel-header {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+}
+
+.usage-panel-header h3 {
+    margin: 0;
+    color: var(--user-ink);
+    font-size: var(--fs-heading);
+    font-weight: 600;
+    line-height: var(--lh-heading);
+}
+
+.usage-panel-header p {
+    margin: 4px 0 0;
+    color: var(--user-ink-soft);
+    font-size: var(--fs-caption);
+    line-height: 1.6;
+}
+
+.usage-panel-footer {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+    margin-top: var(--space-4);
+    color: var(--user-ink-soft);
+    font-size: var(--fs-caption);
+}
+
+.usage-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.usage-legend .usage-cell {
+    width: 11px;
+    height: 11px;
+}
+
+/* 活动图：热力图格子决定整体高度，柱状图与面积图覆盖在同一区域。 */
+.usage-chart {
+    position: relative;
+    min-width: 0;
+}
+
+.usage-chart-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin: -4px;
+    padding: 4px;
+    border-radius: var(--r-lg);
+    scrollbar-width: thin;
+}
+
+.usage-chart-scroll:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 0;
+}
+
+.usage-chart-body {
+    min-width: calc(var(--usage-columns) * 11px);
+}
+
+.usage-chart-plot {
+    position: relative;
+}
+
+.usage-heatmap {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-columns: repeat(var(--usage-columns), minmax(0, 1fr));
+    grid-template-rows: repeat(7, auto);
+    gap: var(--usage-gap);
+}
+
+.usage-cell {
+    display: block;
+    aspect-ratio: 1;
+    border-radius: 3px;
+    background: var(--usage-heat-0);
+    transition: background-color var(--motion-dur-base) var(--motion-ease-out);
+}
+
+.usage-cell[data-level="1"] {
+    background: var(--usage-heat-1);
+}
+
+.usage-cell[data-level="2"] {
+    background: var(--usage-heat-2);
+}
+
+.usage-cell[data-level="3"] {
+    background: var(--usage-heat-3);
+}
+
+.usage-cell[data-level="4"] {
+    background: var(--usage-heat-4);
+}
+
+.usage-cell.is-padding {
+    background: transparent;
+}
+
+.usage-cell[data-active="true"] {
+    outline: 2px solid var(--user-ink);
+    outline-offset: 1px;
+}
+
+.usage-chart[data-view="weekly"] .usage-heatmap,
+.usage-chart[data-view="cumulative"] .usage-heatmap {
+    visibility: hidden;
+}
+
+.usage-bars {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--usage-columns), minmax(0, 1fr));
+    gap: var(--usage-gap);
+    align-items: end;
+}
+
+.usage-bar-slot {
+    display: flex;
+    height: 100%;
+    align-items: flex-end;
+    border-radius: 4px;
+}
+
+.usage-bar-slot[data-active="true"] {
+    background: color-mix(in srgb, var(--user-ink) 5%, transparent);
+}
+
+.usage-bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: 3px 3px 1px 1px;
+    background: var(--usage-heat-0);
+    transition: height var(--motion-dur-slow) var(--motion-ease-out);
+}
+
+.usage-bar[data-level="1"] {
+    background: var(--usage-heat-2);
+}
+
+.usage-bar[data-level="2"] {
+    background: var(--usage-heat-3);
+}
+
+.usage-bar[data-level="3"],
+.usage-bar[data-level="4"] {
+    background: var(--usage-heat-4);
+}
+
+.usage-area {
+    position: absolute;
+    inset: 0;
+    color: var(--usage-accent);
+}
+
+.usage-area svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.usage-area-line {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linejoin: round;
+}
+
+.usage-area-baseline {
+    stroke: var(--user-border);
+    stroke-width: 1;
+}
+
+.usage-area-guide {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: color-mix(in srgb, var(--user-ink) 22%, transparent);
+    transform: translateX(-0.5px);
+}
+
+.usage-area-dot {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--usage-accent);
+    box-shadow: 0 0 0 3px var(--user-surface);
+    transform: translate(-50%, -50%);
+}
+
+.usage-months {
+    display: grid;
+    grid-template-columns: repeat(var(--usage-columns), minmax(0, 1fr));
+    column-gap: var(--usage-gap);
+    margin-top: var(--space-2);
+    color: var(--user-ink-soft);
+    font-size: var(--fs-label);
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.usage-months > span {
+    grid-row: 1;
+    min-width: 0;
+}
+
+.usage-tooltip {
+    position: absolute;
+    z-index: 20;
+    display: grid;
+    gap: 2px;
+    min-width: 128px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--usage-tooltip-bg);
+    color: var(--user-ink);
+    box-shadow: var(--elevation-hairline), var(--elevation-overlay);
+    font-size: var(--fs-caption);
+    line-height: 1.5;
+    pointer-events: none;
+    transform: translate(-50%, calc(-100% - 10px));
+    white-space: nowrap;
+}
+
+.usage-tooltip[data-align="start"] {
+    transform: translate(-14px, calc(-100% - 10px));
+}
+
+.usage-tooltip[data-align="end"] {
+    transform: translate(calc(-100% + 14px), calc(-100% - 10px));
+}
+
+.usage-tooltip strong {
+    font-size: var(--fs-caption);
+    font-weight: 600;
+}
+
+.usage-tooltip span {
+    color: var(--user-ink-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-tooltip em {
+    color: var(--user-ink-soft);
+    font-style: normal;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 消耗构成：一条分段条 + 明细列表。 */
+.usage-breakdown-bar {
+    display: flex;
+    height: 10px;
+    gap: 3px;
+    overflow: hidden;
+    border-radius: var(--r-full);
+}
+
+.usage-breakdown-segment {
+    min-width: 4px;
+    flex-basis: 0;
+    border-radius: 2px;
+    background: var(--usage-other);
+}
+
+.usage-breakdown-segment:first-child {
+    border-top-left-radius: var(--r-full);
+    border-bottom-left-radius: var(--r-full);
+}
+
+.usage-breakdown-segment:last-child {
+    border-top-right-radius: var(--r-full);
+    border-bottom-right-radius: var(--r-full);
+}
+
+.usage-breakdown-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--space-2) var(--space-6);
+    margin: var(--space-5) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.usage-breakdown-list li {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--user-border);
+    font-size: var(--fs-ui);
+}
+
+.usage-breakdown-name {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--user-ink);
+}
+
+.usage-breakdown-count {
+    display: none;
+}
+
+.usage-breakdown-value {
+    color: var(--user-ink-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-breakdown-share {
+    min-width: 48px;
+    color: var(--user-ink);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    text-align: right;
+}
+
+.usage-breakdown-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--usage-other);
+}
+
+:is(.usage-breakdown-segment, .usage-breakdown-dot)[data-capability="image"] {
+    background: var(--usage-accent);
+}
+
+:is(.usage-breakdown-segment, .usage-breakdown-dot)[data-capability="video"] {
+    background: var(--usage-video);
+}
+
+:is(.usage-breakdown-segment, .usage-breakdown-dot)[data-capability="audio"] {
+    background: var(--usage-audio);
+}
+
+:is(.usage-breakdown-segment, .usage-breakdown-dot)[data-capability="text"] {
+    background: var(--usage-text);
+}
+
+.usage-empty-note {
+    margin: 0;
+    padding: var(--space-4) 0 var(--space-2);
+    color: var(--user-ink-soft);
+    font-size: var(--fs-ui);
+}
+
+/* 加载占位。 */
+.usage-skeleton {
+    display: block;
+    border-radius: var(--user-radius-card);
+    background: color-mix(in srgb, var(--user-ink) 6%, transparent);
+    animation: usage-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.usage-skeleton-header {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-6);
+}
+
+.usage-skeleton-line {
+    height: 14px;
+    border-radius: 6px;
+}
+
+.usage-skeleton-line.is-title {
+    width: 132px;
+    height: 26px;
+}
+
+.usage-skeleton-line.is-subtitle {
+    width: min(420px, 80%);
+}
+
+.usage-skeleton-scope {
+    height: 36px;
+    margin-bottom: var(--space-4);
+    border-radius: 10px;
+}
+
+.usage-skeleton-stat {
+    height: 104px;
+}
+
+.usage-skeleton-panel {
+    height: 248px;
+    margin-top: var(--space-4);
+    border-radius: var(--usage-panel-radius);
+}
+
+@keyframes usage-skeleton-pulse {
+    50% {
+        opacity: 0.55;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .usage-skeleton {
+        animation: none;
+    }
+    .usage-cell,
+    .usage-bar {
+        transition: none;
+    }
+}
+
+@container (min-width: 760px) {
+    .usage-breakdown-count {
+        display: inline;
+        color: var(--user-ink-soft);
+        font-size: var(--fs-caption);
+        font-variant-numeric: tabular-nums;
+    }
+    .usage-breakdown-list li {
+        grid-template-columns: minmax(0, 1fr) auto auto auto;
+    }
+}
+
+@container (max-width: 860px) {
+    .usage-stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@container (max-width: 560px) {
+    .usage-scope {
+        flex-wrap: wrap;
+    }
+    .usage-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .usage-stat {
+        padding: var(--space-4);
+    }
+    .usage-panel {
+        padding: var(--space-4);
+        border-radius: var(--user-radius-card);
+    }
+    .usage-panel-header {
+        flex-wrap: wrap;
+    }
+}

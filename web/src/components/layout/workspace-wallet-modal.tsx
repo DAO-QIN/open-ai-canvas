@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Input, Skeleton } from "antd";
-import { ChevronLeft, ChevronRight, CircleAlert, Coins, CreditCard, HardDrive, History, RefreshCw, TicketCheck, WalletCards } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, CircleAlert, Coins, CreditCard, HardDrive, History, RefreshCw, TicketCheck, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -11,6 +11,7 @@ import { formatCredits } from "@/constant/credits";
 import { useAccountFileStorageUsage } from "@/hooks/use-account-file-storage-usage";
 import { accountFileStorageUsageQueryKey, accountStorageMeter } from "@/lib/account-storage-usage";
 import { generationErrorMessage } from "@/lib/generation-error";
+import { settingsPath } from "@/lib/settings-navigation";
 import { listPaymentProviders, listTopupProducts, type PaymentOrder, type PaymentProvider, type TopupProduct, type TopupProductKind } from "@/services/api/payments";
 import { listMyStorageGrants } from "@/services/api/storage-grants";
 import { getWallet, redeemCredits, type CreditLedgerEntry, type WalletSummary } from "@/services/api/wallet";
@@ -340,9 +341,21 @@ export function WorkspaceWalletModal({
                                     <h3>积分消耗历史</h3>
                                     <p>包含充值、兑换、生成消费、冻结与退款。</p>
                                 </div>
-                                <Button type="text" icon={<RefreshCw />} loading={walletLoading} onClick={() => void reloadWallet(page)}>
-                                    刷新
-                                </Button>
+                                <div className="flex shrink-0 items-center gap-1">
+                                    <Button
+                                        type="text"
+                                        icon={<BarChart3 />}
+                                        onClick={() => {
+                                            onClose();
+                                            navigate(settingsPath("usage"));
+                                        }}
+                                    >
+                                        用量看板
+                                    </Button>
+                                    <Button type="text" icon={<RefreshCw />} loading={walletLoading} onClick={() => void reloadWallet(page)}>
+                                        刷新
+                                    </Button>
+                                </div>
                             </div>
                             <div className="workspace-wallet-history-scroll">
                                 {walletError ? (

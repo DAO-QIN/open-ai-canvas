@@ -17,10 +17,16 @@ const defaultAvatarIcons: Record<LegacyUserAvatarID, LucideIcon> = {
     sparkles: Sparkles,
 };
 
+/** 头像图片地址：精灵预设图或上传头像；旧版图标预设没有图片，返回空字符串。 */
+export function userAvatarImageURL(user: LocalUser) {
+    const spirit = user.avatarMode === "default" ? getSpiritAvatar(user.avatarPreset) : undefined;
+    return spirit?.src || (user.avatarMode === "default" ? "" : resolveUserAvatarURL(user.avatarUrl, apiBaseURL));
+}
+
 export function UserAvatar({ user, className, iconClassName, loading }: { user: LocalUser; className?: string; iconClassName?: string; loading?: "eager" | "lazy" }) {
     const [failedUrl, setFailedUrl] = useState("");
     const spirit = user.avatarMode === "default" ? getSpiritAvatar(user.avatarPreset) : undefined;
-    const avatarUrl = spirit?.src || (user.avatarMode === "default" ? "" : resolveUserAvatarURL(user.avatarUrl, apiBaseURL));
+    const avatarUrl = userAvatarImageURL(user);
     const DefaultAvatarIcon = defaultAvatarIcons[isLegacyUserAvatarID(user.avatarPreset) ? user.avatarPreset : "person"];
 
     return (

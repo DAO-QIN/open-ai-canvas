@@ -4,21 +4,70 @@
 .profile-sections {
     display: flex;
     flex-direction: column;
-    gap: var(--space-6);
+    gap: var(--space-8);
     padding-bottom: var(--space-6);
 }
-/* 资料卡：头像可直接点击更换，身份与安全状态一眼可见。 */
+/* 资料卡：封面 + 压在封面边缘的头像 + 账户概览。头像可直接点击更换。 */
 .profile-hero {
+    --profile-cover-base: #e7edf4;
+    --profile-cover-tint: #9ccff2;
+    --profile-cover-tint-2: #c3b4f6;
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 20px;
+    background: var(--user-surface);
+    box-shadow: var(--elevation-hairline);
+}
+.dark .profile-hero {
+    --profile-cover-base: #111418;
+    --profile-cover-tint: #1f5d80;
+    --profile-cover-tint-2: #3d3278;
+}
+.profile-cover {
+    position: relative;
+    height: 136px;
+    overflow: hidden;
+    isolation: isolate;
+    background:
+        radial-gradient(110% 150% at 8% 0%, color-mix(in srgb, var(--profile-cover-tint) 70%, transparent) 0%, transparent 62%), radial-gradient(80% 130% at 92% 0%, color-mix(in srgb, var(--profile-cover-tint-2) 60%, transparent) 0%, transparent 66%),
+        var(--profile-cover-base);
+}
+.profile-cover-image {
+    position: absolute;
+    inset: -48px;
+    width: calc(100% + 96px);
+    height: calc(100% + 96px);
+    object-fit: cover;
+    opacity: 0.78;
+    filter: blur(40px) saturate(1.3);
+    transform: scale(1.08);
+}
+.dark .profile-cover-image {
+    opacity: 0.56;
+}
+/* 封面底部完全渐隐到卡片表面：没有接缝，名字与按钮也不压在高对比的图像上。 */
+.profile-cover::after {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 38%, color-mix(in srgb, var(--user-surface) 74%, transparent) 76%, var(--user-surface) 100%);
+    content: "";
+}
+.profile-hero-body {
     position: relative;
     display: flex;
     min-width: 0;
-    align-items: center;
+    align-items: flex-end;
     gap: var(--space-5);
-    padding: var(--space-6);
-    overflow: hidden;
-    border: 1px solid var(--user-border);
-    border-radius: var(--r-lg);
-    background: radial-gradient(90% 160% at 0% 0%, color-mix(in srgb, var(--user-accent) 14%, transparent) 0%, transparent 55%), var(--user-surface-muted);
+    margin-top: -48px;
+    padding: 0 var(--space-6) var(--space-5);
+}
+.profile-hero-actions {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding-bottom: var(--space-1);
 }
 .profile-hero-avatar {
     position: relative;
@@ -38,17 +87,17 @@
 }
 .profile-avatar-preview {
     display: block;
-    width: 88px;
-    height: 88px;
+    width: 96px;
+    height: 96px;
     flex-shrink: 0;
     border-radius: 50%;
     object-fit: cover;
     object-position: center;
-    background: var(--user-surface);
+    background: var(--user-surface-muted);
     color: var(--user-ink-muted);
     box-shadow:
-        0 0 0 3px var(--user-surface),
-        0 8px 24px -10px rgba(0, 0, 0, 0.45);
+        0 0 0 4px var(--user-surface),
+        0 12px 32px -12px rgba(0, 0, 0, 0.5);
 }
 .profile-hero-avatar-overlay {
     position: absolute;
@@ -71,13 +120,15 @@
     flex: 1;
     flex-direction: column;
     gap: 2px;
+    padding-bottom: var(--space-1);
 }
 .profile-hero-identity > strong {
     overflow: hidden;
     color: var(--user-ink);
     font-size: var(--fs-title);
-    font-weight: 650;
-    line-height: 1.3;
+    font-weight: 600;
+    letter-spacing: var(--ls-title);
+    line-height: var(--lh-heading);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -100,12 +151,86 @@
     gap: 4px;
     height: 24px;
     padding: 0 10px;
-    border: 1px solid var(--user-border);
-    border-radius: 999px;
-    background: var(--user-surface);
+    border-radius: var(--r-full);
+    background: color-mix(in srgb, var(--user-ink) 6%, transparent);
     color: var(--user-ink-muted);
-    font-size: 12px;
+    font-size: var(--fs-caption);
     white-space: nowrap;
+}
+
+/* 账户概览：一行等分的指标，1px 竖向分隔；可跳转的项整块可点。 */
+.profile-stats {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--user-border);
+    list-style: none;
+}
+.profile-stats > li {
+    min-width: 0;
+}
+.profile-stats > li + li {
+    border-left: 1px solid var(--user-border);
+}
+.profile-stat {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: var(--space-4) var(--space-6);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+.profile-stat.is-action {
+    cursor: pointer;
+    transition: background-color var(--motion-dur-fast) var(--motion-ease-out);
+}
+.profile-stat.is-action:hover {
+    background: color-mix(in srgb, var(--user-ink) 4%, transparent);
+}
+.profile-stat.is-action:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+}
+.profile-stat-label {
+    color: var(--user-ink-soft);
+    font-size: var(--fs-caption);
+}
+.profile-stat-value {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    color: var(--user-ink);
+    font-size: var(--fs-heading);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.4;
+}
+.profile-stat-value small {
+    color: var(--user-ink-soft);
+    font-size: var(--fs-caption);
+    font-weight: 500;
+}
+.profile-stat-hint {
+    color: var(--user-ink-soft);
+    font-size: var(--fs-caption);
+}
+.profile-stat-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    transition: color var(--motion-dur-fast) var(--motion-ease-out);
+}
+.profile-stat.is-action:hover .profile-stat-action {
+    color: var(--user-ink);
 }
 .profile-chip.is-success {
     color: var(--status-success);
@@ -123,7 +248,7 @@
 .profile-security-heading h3 {
     margin: 0;
     color: var(--user-ink);
-    font-size: var(--fs-body-lg);
+    font-size: var(--fs-heading);
     font-weight: 600;
 }
 .profile-security-heading p {
@@ -134,16 +259,16 @@
 }
 .profile-security-list {
     overflow: hidden;
-    border: 1px solid var(--user-border);
-    border-radius: var(--r-lg);
+    border-radius: var(--user-radius-card);
     background: var(--user-surface);
+    box-shadow: var(--elevation-hairline);
 }
 .profile-security-row {
     display: flex;
     min-width: 0;
     align-items: center;
     gap: var(--space-4);
-    padding: var(--space-4) var(--space-5);
+    padding: var(--space-4) var(--space-6);
 }
 .profile-security-row + .profile-security-row {
     border-top: 1px solid var(--user-border);
@@ -426,22 +551,46 @@
     stroke-width: 3;
 }
 @media (prefers-reduced-motion: reduce) {
-    .profile-default-avatar-choice {
+    .profile-default-avatar-choice,
+    .profile-stat.is-action,
+    .profile-stat-action {
         transition: none;
     }
 }
 @container (max-width: 560px) {
-    .profile-hero {
-        flex-wrap: wrap;
-        gap: var(--space-4);
-        padding: var(--space-5);
+    .profile-cover {
+        height: 112px;
     }
-    .profile-hero > .ant-btn {
-        width: 100%;
+    .profile-hero-body {
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        margin-top: -40px;
+        padding: 0 var(--space-4) var(--space-4);
+    }
+    .profile-hero-actions {
+        order: 1;
+        margin-left: auto;
+    }
+    .profile-hero-identity {
+        order: 2;
+        flex-basis: 100%;
     }
     .profile-avatar-preview {
-        width: 72px;
-        height: 72px;
+        width: 80px;
+        height: 80px;
+    }
+    .profile-stats {
+        grid-auto-flow: row;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .profile-stats > li:nth-child(odd) {
+        border-left: 0;
+    }
+    .profile-stats > li:nth-child(n + 3) {
+        border-top: 1px solid var(--user-border);
+    }
+    .profile-stat {
+        padding: var(--space-3) var(--space-4);
     }
     .profile-security-row {
         flex-wrap: wrap;

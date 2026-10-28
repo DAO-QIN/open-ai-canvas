@@ -1,7 +1,7 @@
 import { App, Button, InputNumber } from "antd";
 import { SettingsRow } from "@/components/ui/product/settings-row";
-import { ArrowLeft, Boxes, Brain, Bug, Cloud, Inbox, MessageSquareText, RadioTower, SlidersHorizontal, UserRound, Workflow } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ArrowLeft, BarChart3, Boxes, Brain, Bug, Cloud, Inbox, MessageSquareText, RadioTower, SlidersHorizontal, UserRound, Workflow } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { UserOSSSettingsForm } from "@/components/layout/user-oss-settings-form";
@@ -18,21 +18,36 @@ import { RUNNINGHUB_PLUGIN_ID } from "@/lib/plugins/builtin/workflows";
 import { usePluginStore } from "@/stores/use-plugin-store";
 import { ProfilePane } from "./profile-pane";
 import { FeedbackInboxPane } from "./feedback-inbox-pane";
+import { UsageDashboardSkeleton } from "./usage-dashboard-skeleton";
 
-type ConfigSectionKey = "profile" | "channels" | "models" | "runninghub" | "preferences" | "prompts" | "agent-memory" | "storage" | "diagnostics" | "feedbacks";
+// 用量看板只在打开时加载图表代码，不拖慢其他设置分区。
+const UsageDashboardPane = lazy(() => import("./usage-dashboard-pane"));
 
-const configSections: Array<{ key: ConfigSectionKey; label: string; description: string; icon: ReactNode }> = [
-    { key: "profile", label: "个人信息", description: "头像、密码与邮箱", icon: <UserRound className="size-4" /> },
-    { key: "channels", label: "个人渠道", description: "模型服务与个人工作流", icon: <RadioTower className="size-4" /> },
-    { key: "runninghub", label: "RunningHub 工作流", description: "个人渠道的云端工作流配置", icon: <Workflow className="size-4" /> },
-    { key: "models", label: "模型选择", description: "按领域选择默认模型", icon: <Boxes className="size-4" /> },
-    { key: "preferences", label: "生成偏好", description: "画布生成默认值", icon: <SlidersHorizontal className="size-4" /> },
-    { key: "prompts", label: "提示词偏好", description: "按任务定制平台模板", icon: <MessageSquareText className="size-4" /> },
-    { key: "agent-memory", label: "Agent 记忆", description: "批准、添加、导出导入、压缩", icon: <Brain className="size-4" /> },
-    { key: "storage", label: "我的对象存储", description: "管理个人媒体存储", icon: <Cloud className="size-4" /> },
-    { key: "diagnostics", label: "问题诊断", description: "导出日志协助排查", icon: <Bug className="size-4" /> },
-    { key: "feedbacks", label: "我的反馈", description: "提交问题、建议与官方答复", icon: <Inbox className="size-4" /> },
+type ConfigSectionKey = "profile" | "usage" | "channels" | "models" | "runninghub" | "preferences" | "prompts" | "agent-memory" | "storage" | "diagnostics" | "feedbacks";
+type ConfigSectionGroup = "account" | "creation" | "support";
+
+const configSections: Array<{ key: ConfigSectionKey; label: string; description: string; icon: ReactNode; group: ConfigSectionGroup }> = [
+    { key: "profile", label: "个人信息", description: "头像、密码与邮箱", icon: <UserRound className="size-4" />, group: "account" },
+    { key: "usage", label: "用量看板", description: "最近 365 天的积分消耗", icon: <BarChart3 className="size-4" />, group: "account" },
+    { key: "channels", label: "个人渠道", description: "模型服务与个人工作流", icon: <RadioTower className="size-4" />, group: "creation" },
+    { key: "runninghub", label: "RunningHub 工作流", description: "个人渠道的云端工作流配置", icon: <Workflow className="size-4" />, group: "creation" },
+    { key: "models", label: "模型选择", description: "按领域选择默认模型", icon: <Boxes className="size-4" />, group: "creation" },
+    { key: "preferences", label: "生成偏好", description: "画布生成默认值", icon: <SlidersHorizontal className="size-4" />, group: "creation" },
+    { key: "prompts", label: "提示词偏好", description: "按任务定制平台模板", icon: <MessageSquareText className="size-4" />, group: "creation" },
+    { key: "agent-memory", label: "Agent 记忆", description: "批准、添加、导出导入、压缩", icon: <Brain className="size-4" />, group: "creation" },
+    { key: "storage", label: "我的对象存储", description: "管理个人媒体存储", icon: <Cloud className="size-4" />, group: "support" },
+    { key: "diagnostics", label: "问题诊断", description: "导出日志协助排查", icon: <Bug className="size-4" />, group: "support" },
+    { key: "feedbacks", label: "我的反馈", description: "提交问题、建议与官方答复", icon: <Inbox className="size-4" />, group: "support" },
 ];
+
+const configSectionGroups: Array<{ key: ConfigSectionGroup; label: string }> = [
+    { key: "account", label: "账户" },
+    { key: "creation", label: "创作" },
+    { key: "support", label: "数据与支持" },
+];
+
+/** 编辑器类分区需要更宽的工作区，其余分区保持易读的内容宽度。 */
+const wideSections = new Set<ConfigSectionKey>(["channels", "runninghub", "prompts"]);
 
 export function isConfigSection(value: string | null): value is ConfigSectionKey {
     return configSections.some((section) => section.key === value);
@@ -44,9 +59,10 @@ export default function SettingsPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const requestedSection = searchParams.get("section");
     const customChannelsEnabled = useUserStore((state) => state.features.customChannelsEnabled);
+    const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const runtimeStatuses = usePluginStore((state) => state.runtimeStatuses);
     const runningHubPluginEnabled = runtimeStatuses[RUNNINGHUB_PLUGIN_ID] === "enabled";
-    const requestedSectionEnabled = requestedSection !== "runninghub" || runningHubPluginEnabled;
+    const requestedSectionEnabled = (requestedSection !== "runninghub" || runningHubPluginEnabled) && (requestedSection !== "usage" || creditsEnabled);
     const initialSection = isConfigSection(requestedSection) && requestedSectionEnabled ? requestedSection : "profile";
     const [activeTab, setActiveTab] = useState<ConfigSectionKey>(initialSection === "channels" && !customChannelsEnabled ? "models" : initialSection);
     const config = useConfigStore((state) => state.config);
@@ -55,8 +71,10 @@ export default function SettingsPage() {
     const shouldPromptContinue = searchParams.get("continue") === "1";
     const userId = useUserStore((state) => state.user?.id);
     const userChannels = config.channels.filter((channel) => channel.scope !== "system");
-    const visibleConfigSections = useMemo(() => (customChannelsEnabled ? configSections : configSections.filter((section) => section.key !== "channels"))
-        .filter((section) => section.key !== "runninghub" || runningHubPluginEnabled), [customChannelsEnabled, runningHubPluginEnabled]);
+    const visibleConfigSections = useMemo(
+        () => configSections.filter((section) => (section.key !== "channels" || customChannelsEnabled) && (section.key !== "runninghub" || runningHubPluginEnabled) && (section.key !== "usage" || creditsEnabled)),
+        [creditsEnabled, customChannelsEnabled, runningHubPluginEnabled],
+    );
 
     const isVisibleConfigSection = (value: string | null): value is ConfigSectionKey => isConfigSection(value) && visibleConfigSections.some((section) => section.key === value);
 
@@ -81,6 +99,7 @@ export default function SettingsPage() {
 
     const selectSection = (section: ConfigSectionKey) => {
         if (section === "runninghub" && !runningHubPluginEnabled) return;
+        if (section === "usage" && !creditsEnabled) return;
         setActiveTab(section);
         const next = new URLSearchParams(searchParams);
         next.set("section", section);
@@ -106,8 +125,23 @@ export default function SettingsPage() {
     };
 
     const panes: Record<ConfigSectionKey, ReactNode> = {
-        profile: <SettingsPane><ProfilePane key={userId} /></SettingsPane>,
-        channels: <SettingsPane><ChannelSettingsPane onOpenModels={() => selectSection("models")} onOpenRunningHub={runningHubPluginEnabled ? () => selectSection("runninghub") : undefined} /></SettingsPane>,
+        profile: (
+            <SettingsPane>
+                <ProfilePane key={userId} onOpenUsage={creditsEnabled ? () => selectSection("usage") : undefined} />
+            </SettingsPane>
+        ),
+        usage: (
+            <SettingsPane>
+                <Suspense fallback={<UsageDashboardSkeleton />}>
+                    <UsageDashboardPane key={userId} />
+                </Suspense>
+            </SettingsPane>
+        ),
+        channels: (
+            <SettingsPane>
+                <ChannelSettingsPane onOpenModels={() => selectSection("models")} onOpenRunningHub={runningHubPluginEnabled ? () => selectSection("runninghub") : undefined} />
+            </SettingsPane>
+        ),
         models: (
             <SettingsPane>
                 <div className="settings-pane-header">
@@ -121,7 +155,11 @@ export default function SettingsPage() {
                 </div>
             </SettingsPane>
         ),
-        runninghub: <SettingsPane><RunningHubSettingsPane /></SettingsPane>,
+        runninghub: (
+            <SettingsPane>
+                <RunningHubSettingsPane />
+            </SettingsPane>
+        ),
         preferences: (
             <SettingsPane>
                 <div className="settings-pane-header">
@@ -154,7 +192,11 @@ export default function SettingsPage() {
                 </div>
             </SettingsPane>
         ),
-        prompts: <SettingsPane fill><PromptPreferencesPane /></SettingsPane>,
+        prompts: (
+            <SettingsPane fill>
+                <PromptPreferencesPane />
+            </SettingsPane>
+        ),
         "agent-memory": (
             <SettingsPane>
                 <div className="settings-pane-header">
@@ -168,7 +210,11 @@ export default function SettingsPage() {
                 </div>
             </SettingsPane>
         ),
-        diagnostics: <SettingsPane><DiagnosticsPanel taskId={searchParams.get("taskId") || undefined} projectId={searchParams.get("projectId") || undefined} /></SettingsPane>,
+        diagnostics: (
+            <SettingsPane>
+                <DiagnosticsPanel taskId={searchParams.get("taskId") || undefined} projectId={searchParams.get("projectId") || undefined} />
+            </SettingsPane>
+        ),
         storage: (
             <SettingsPane>
                 <div className="settings-section">
@@ -176,56 +222,73 @@ export default function SettingsPage() {
                 </div>
             </SettingsPane>
         ),
-        feedbacks: <SettingsPane><FeedbackInboxPane /></SettingsPane>,
+        feedbacks: (
+            <SettingsPane>
+                <FeedbackInboxPane />
+            </SettingsPane>
+        ),
     };
 
     return (
-        <main className="settings-page app-workspace-page app-user-workspace flex h-full min-h-0 flex-col text-foreground">
+        <main className={`settings-page app-workspace-page app-user-workspace flex h-full min-h-0 flex-col text-foreground${wideSections.has(activeTab) ? " is-wide" : ""}`}>
             {shouldPromptContinue ? (
                 <div className="settings-topbar shrink-0">
                     <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                        <Button icon={<ArrowLeft className="size-4" />} onClick={() => navigate(-1)}>返回创作</Button>
-                        <Button type="primary" onClick={finishConfig}>保存并返回</Button>
+                        <Button icon={<ArrowLeft className="size-4" />} onClick={() => navigate(-1)}>
+                            返回创作
+                        </Button>
+                        <Button type="primary" onClick={finishConfig}>
+                            保存并返回
+                        </Button>
                     </div>
                 </div>
             ) : null}
-            <div className="settings-library-frame flex min-h-0 flex-1 flex-col md:flex-row">
-                <aside className="settings-nav-panel w-full shrink-0 md:w-[200px]">
-                    <nav className="thin-scrollbar flex gap-1 overflow-x-auto p-2 md:block md:space-y-1 md:overflow-x-hidden md:p-2" aria-label="配置分类">
-                        {visibleConfigSections.map((item) => {
-                            const selected = item.key === activeTab;
-                            return (
-                                <button
-                                    key={item.key}
-                                    type="button"
-                                    className={`settings-nav-item flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-auto md:w-full md:items-start md:gap-3 md:py-2 ${selected ? "is-active" : "text-foreground/58 hover:bg-muted/55 hover:text-foreground"}`}
-                                    onClick={() => selectSection(item.key)}
-                                    aria-current={selected ? "page" : undefined}
-                                >
-                                    <span className={`shrink-0 md:mt-0.5 ${selected ? "text-[var(--workspace-accent)]" : ""}`}>{item.icon}</span>
-                                    <span className="min-w-0">
-                                        <span className="block whitespace-nowrap text-sm font-medium">{item.label}</span>
-                                        <span className="mt-1 hidden text-[var(--fs-label)] leading-4 text-current opacity-65 md:block">{item.description}</span>
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </nav>
-                </aside>
-                <section className="settings-content flex min-h-0 min-w-0 flex-1 flex-col">
-                    <div className="app-workspace-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-6 md:py-5">
-                        <div className={`settings-pane-root ${activeTab === "prompts" ? "h-full w-full" : "mx-auto w-full max-w-none"}`}>
-                            {panes[activeTab]}
-                        </div>
-                    </div>
-                </section>
+            <div className="settings-scroll app-workspace-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <div className="settings-library-frame">
+                    <aside className="settings-nav-panel">
+                        <nav className="settings-nav" aria-label="配置分类">
+                            {configSectionGroups.map((group) => {
+                                const items = visibleConfigSections.filter((section) => section.group === group.key);
+                                if (items.length === 0) return null;
+                                return (
+                                    <div key={group.key} className="settings-nav-group" role="group" aria-label={group.label}>
+                                        <span className="settings-nav-group-label" aria-hidden="true">
+                                            {group.label}
+                                        </span>
+                                        {items.map((item) => {
+                                            const selected = item.key === activeTab;
+                                            return (
+                                                <button
+                                                    key={item.key}
+                                                    type="button"
+                                                    className={`settings-nav-item${selected ? " is-active" : ""}`}
+                                                    title={item.description}
+                                                    onClick={() => selectSection(item.key)}
+                                                    aria-current={selected ? "page" : undefined}
+                                                >
+                                                    <span className="settings-nav-item-icon" aria-hidden="true">
+                                                        {item.icon}
+                                                    </span>
+                                                    <span className="settings-nav-item-label">{item.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })}
+                        </nav>
+                    </aside>
+                    <section className="settings-content" aria-label={visibleConfigSections.find((section) => section.key === activeTab)?.label}>
+                        <div className="settings-pane-root">{panes[activeTab]}</div>
+                    </section>
+                </div>
             </div>
         </main>
     );
 }
 
 function SettingsPane({ children, fill = false }: { children: ReactNode; fill?: boolean }) {
-    return <div className={fill ? "settings-pane h-full" : "settings-pane"}>{children}</div>;
+    return <div className={fill ? "settings-pane is-fill" : "settings-pane"}>{children}</div>;
 }
 
 function normalizeImageCount(value: string) {
