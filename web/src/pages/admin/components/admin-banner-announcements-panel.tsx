@@ -10,10 +10,13 @@ import {
     deleteAdminBanner,
     listAdminBanners,
     updateAdminBanner,
+    type AdminBannerPayload,
     type BannerAnnouncement,
 } from "@/services/api/announcements";
 import {
+    BANNER_CTA_MAX_CHARS,
     BANNER_NOTICE_DEFAULT_TYPE,
+    bannerCtaLabel,
     bannerNoticeTypeLabel,
     normalizeBannerNoticeType,
     type BannerNoticeType,
@@ -27,13 +30,32 @@ import { Select } from "@/components/ui/base/select";
 
 type FormValues = {
     noticeType: BannerNoticeType;
+    ctaText?: string;
     link?: string;
     status: boolean;
+    showCountdown?: boolean;
     sortOrder?: number;
     dateRange?: [Dayjs | null, Dayjs | null] | null;
 };
 
 type BannerDialog = { mode: "create" } | { mode: "edit"; banner: BannerAnnouncement };
+
+/** 后端更新走显式字段表，漏传的字段会被清空：状态开关等局部修改也必须带上全部字段。 */
+function bannerPayload(banner: BannerAnnouncement, patch: Partial<AdminBannerPayload> = {}): AdminBannerPayload {
+    return {
+        title: banner.title,
+        titleRuns: banner.titleRuns,
+        noticeType: normalizeBannerNoticeType(banner.noticeType),
+        ctaText: banner.ctaText,
+        link: banner.link,
+        status: banner.status,
+        showCountdown: Boolean(banner.showCountdown),
+        sortOrder: banner.sortOrder ?? 0,
+        startsAt: banner.startsAt,
+        endsAt: banner.endsAt,
+        ...patch,
+    };
+}
 
 export default function AdminBannerAnnouncementsPanel({
     createOpen,
@@ -46,6 +68,9 @@ export default function AdminBannerAnnouncementsPanel({
     const queryClient = useQueryClient();
     const [form] = Form.useForm<FormValues>();
     const linkValue = Form.useWatch("link", form);
+    const ctaValue = Form.useWatch("ctaText", form);
+    const countdownValue = Form.useWatch("showCountdown", form);
+    const dateRangeValue = Form.useWatch("dateRange", form);
     const [banners, setBanners] = useState<BannerAnnouncement[]>([]);
     const [keyword, setKeyword] = useState("");
     const [status, setStatus] = useState<string>("all");
@@ -91,6 +116,7 @@ export default function AdminBannerAnnouncementsPanel({
         form.setFieldsValue({
             noticeType: BANNER_NOTICE_DEFAULT_TYPE,
             status: true,
+            showCountdown: false,
             sortOrder: 0,
         });
         setDialog({ mode: "create" });
@@ -112,8 +138,10 @@ export default function AdminBannerAnnouncementsPanel({
         setDirty(false);
         form.setFieldsValue({
             noticeType: type,
+            ctaText: banner.ctaText || undefined,
             link: banner.link || undefined,
             status: banner.status === "active",
+            showCountdown: Boolean(banner.showCountdown),
             sortOrder: banner.sortOrder ?? 0,
             dateRange: banner.startsAt || banner.endsAt ? [banner.startsAt ? dayjs(banner.startsAt) : null, banner.endsAt ? dayjs(banner.endsAt) : null] : null,
         });
@@ -149,16 +177,8 @@ export default function AdminBannerAnnouncementsPanel({
 
     const handleToggleStatus = async (banner: BannerAnnouncement, nextStatus: boolean) => {
         try {
-            await updateAdminBanner(banner.id, {
-                title: banner.title,
-                // 必须带上样式分段与通知类型：后端更新走显式字段表，漏传会把它们清空。
-                titleRuns: banner.titleRuns,
-                noticeType: normalizeBannerNoticeType(banner.noticeType),
-                link: banner.link,
-                status: nextStatus ? "active" : "disabled",
-                startsAt: banner.startsAt,
-                endsAt: banner.endsAt,
-            });
+            // 只改状态，其余字段原样带回（含样式分段、类型、按钮文案、倒计时与展示顺序）。
+            await updateAdminBanner(banner.id, bannerPayload(banner, { status: nextStatus ? "active" : "disabled" }));
             message.success(nextStatus ? "常驻通知已启用" : "常驻通知已禁用");
             void queryClient.invalidateQueries({ queryKey: ["active-banner-announcements"] });
             void reload(page, pageSize);
@@ -184,12 +204,14 @@ export default function AdminBannerAnnouncementsPanel({
             const startsAt = values.dateRange?.[0] ? values.dateRange[0].toISOString() : undefined;
             const endsAt = values.dateRange?.[1] ? values.dateRange[1].toISOString() : undefined;
             const selectedNoticeType = values.noticeType || noticeType;
-            const payload = {
+            const payload: AdminBannerPayload = {
                 title: plain,
                 titleRuns: runs,
                 noticeType: selectedNoticeType,
+                ctaText: values.ctaText?.trim() || undefined,
                 link: values.link?.trim() || undefined,
-                status: (values.status ? "active" : "disabled") as "active" | "disabled",
+                status: values.status ? "active" : "disabled",
+                showCountdown: Boolean(values.showCountdown),
                 sortOrder: values.sortOrder || 0,
                 startsAt,
                 endsAt,
@@ -223,7 +245,7 @@ export default function AdminBannerAnnouncementsPanel({
                     <span className="font-medium text-foreground">{text}</span>
                     {record.link ? (
                         <span className="font-mono text-[var(--fs-label)] text-foreground/45" title={record.link}>
-                            {record.link.length > 44 ? `${record.link.slice(0, 44)}…` : record.link}
+                            「{bannerCtaLabel(record.ctaText, record.noticeType)}」→ {record.link.length > 44 ? `${record.link.slice(0, 44)}…` : record.link}
                         </span>
                     ) : null}
                 </div>
@@ -267,8 +289,11 @@ export default function AdminBannerAnnouncementsPanel({
                 const startStr = record.startsAt ? dayjs(record.startsAt).format("YYYY-MM-DD HH:mm") : "不限";
                 const endStr = record.endsAt ? dayjs(record.endsAt).format("YYYY-MM-DD HH:mm") : "不限";
                 return (
-                    <span className="text-xs text-foreground/75 font-mono">
-                        {startStr} 至 {endStr}
+                    <span className="flex flex-col gap-0.5">
+                        <span className="text-xs text-foreground/75 font-mono">
+                            {startStr} 至 {endStr}
+                        </span>
+                        {record.showCountdown ? <span className="text-[var(--fs-label)] text-foreground/45">前台显示倒计时</span> : null}
                     </span>
                 );
             },
@@ -417,16 +442,31 @@ export default function AdminBannerAnnouncementsPanel({
                     {/* 预览放在 Form 内但不用 Form.Item：避免 AntD 向非表单控件注入 value/onChange/ref。 */}
                     <div className="mb-6">
                         <div className="mb-2 text-sm text-foreground/85">前台效果预览</div>
-                        <BannerNoticePreview runs={titleRuns} hasLink={Boolean(linkValue?.trim())} noticeType={noticeType} />
+                        <BannerNoticePreview
+                            runs={titleRuns}
+                            hasLink={Boolean(linkValue?.trim())}
+                            noticeType={noticeType}
+                            ctaText={ctaValue}
+                            countdownEndsAt={countdownValue && dateRangeValue?.[1] ? dateRangeValue[1].valueOf() : null}
+                        />
                     </div>
 
                     <Form.Item
                         name="link"
                         label="跳转链接（可选）"
-                        extra="支持 https:// 外链或以 / 开头的站内路径（如 /projects）；留空表示不可点击"
+                        extra="支持 https:// 外链或以 / 开头的站内路径（如 /projects）；留空表示不可点击，也不显示按钮"
                         rules={[{ max: 500, message: "链接最多 500 字符" }]}
                     >
                         <Input maxLength={500} placeholder="https://… 或 /projects" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="ctaText"
+                        label="按钮文案（可选）"
+                        extra={`标题右侧白色按钮上的文字，写明点击后能得到什么，如「进群领积分」；留空显示「${bannerCtaLabel("", noticeType)}」`}
+                        rules={[{ max: BANNER_CTA_MAX_CHARS, message: `按钮文案最多 ${BANNER_CTA_MAX_CHARS} 个字` }]}
+                    >
+                        <Input maxLength={BANNER_CTA_MAX_CHARS} showCount placeholder={bannerCtaLabel("", noticeType)} />
                     </Form.Item>
 
                     <Form.Item name="status" label="发布状态" valuePropName="checked">
@@ -436,8 +476,24 @@ export default function AdminBannerAnnouncementsPanel({
                         <InputNumber min={0} max={999999} precision={0} className="w-full" />
                     </Form.Item>
 
-                    <Form.Item name="dateRange" label="有效期（可选）" extra="留空表示长期有效；设置时间段后仅在有效期内于前台展示">
-                        <DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm" className="w-full" />
+                    <Form.Item name="dateRange" label="有效期（可选）" extra="留空表示长期有效；设置后仅在有效期内展示，到开始时间自动上线、到结束时间自动下线">
+                        <DatePicker.RangePicker showTime format="YYYY-MM-DD HH:mm" className="w-full" allowEmpty={[true, true]} />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="showCountdown"
+                        label="显示倒计时"
+                        valuePropName="checked"
+                        dependencies={["dateRange"]}
+                        extra="在标题前显示距结束还剩多久，适合限时活动；需要先设置有效期结束时间"
+                        rules={[
+                            ({ getFieldValue }) => ({
+                                validator: (_, value) =>
+                                    value && !getFieldValue("dateRange")?.[1] ? Promise.reject(new Error("开启倒计时需要设置有效期结束时间")) : Promise.resolve(),
+                            }),
+                        ]}
+                    >
+                        <Switch checkedChildren="显示" unCheckedChildren="不显示" />
                     </Form.Item>
                 </Form>
             </Modal>

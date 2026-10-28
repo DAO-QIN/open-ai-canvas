@@ -3,14 +3,11 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { Button, ColorPicker } from "antd";
 import { AntTooltip as Tooltip } from "@/components/ui/base/tooltip/ant-tooltip";
 import { Eraser, X } from "lucide-react";
+import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
-import {
-    BannerAnnouncementLinkHint,
-    BannerAnnouncementTitle,
-    bannerAnnouncementBarStyle,
-} from "@/components/layout/banner-announcement-content";
-import { readBannerNoticeSurface, bannerNoticeTypeLabel } from "@/lib/announcements/banner-notice";
+import { BannerAnnouncementBody, BannerAnnouncementShell, useBannerNow } from "@/components/layout/banner-announcement-content";
+import { bannerCtaLabel, bannerNoticeTypeLabel, readBannerNoticeBase } from "@/lib/announcements/banner-notice";
 import { BannerNoticeEmojiPopover } from "./banner-notice-emoji-picker";
 import { Select } from "@/components/ui/base/select";
 import {
@@ -120,7 +117,7 @@ export function BannerTitleEditor({ value, onChange }: { value: BannerTitleRun[]
                     aria-label="标题颜色"
                     value={selectionStyle.color || "#FFFFFF"}
                     onChange={(color) => applyStyle({ color: color.toHexString().toUpperCase() })}
-                    presets={[{ label: "通知条常用", colors: ["#FFFFFF", "#FFE58F", "#FFB37B", "#FF9AA2", "#B7EB8F", "#8FD3FF", "#D3ADF7", "#1F1F1F"] }]}
+                    presets={[{ label: "通知条常用（深色底上醒目）", colors: ["#FFFFFF", "#FFE58F", "#FFB37B", "#FF9AA2", "#B7EB8F", "#8FD3FF", "#D3ADF7", "#9EF0E6"] }]}
                 />
                 {/* 不能用 Tooltip 包住 EmojiPopover：Tooltip 会向 Popover 要 ref，嵌套弹层行为不可靠。 */}
                 <BannerNoticeEmojiPopover
@@ -163,53 +160,59 @@ export function BannerTitleEditor({ value, onChange }: { value: BannerTitleRun[]
 }
 
 /**
- * 前台效果预览：明暗两态各一条，按当前通知类型取各自主题下的真实底色。
- * 标题分段全部走前台同一份展示单元，因此预览即前台结果。
+ * 前台效果预览：与首页通知条共用外壳与内容组件，类型配色、按钮文案和倒计时实时联动，因此预览即前台结果。
+ * 通知条深色底不随明暗主题切换，只需一条预览；标题颜色按该底色给出对比度提示。
  */
-export function BannerNoticePreview({ runs, hasLink, noticeType }: { runs: BannerTitleRun[]; hasLink: boolean; noticeType: string }) {
-    const lightRef = useRef<HTMLDivElement | null>(null);
-    const darkRef = useRef<HTMLDivElement | null>(null);
-    const [backgrounds, setBackgrounds] = useState({ light: "", dark: "" });
+export function BannerNoticePreview({
+    runs,
+    hasLink,
+    noticeType,
+    ctaText,
+    countdownEndsAt,
+}: {
+    runs: BannerTitleRun[];
+    hasLink: boolean;
+    noticeType: string;
+    ctaText?: string;
+    countdownEndsAt?: number | null;
+}) {
+    const reducedMotion = Boolean(useReducedMotion());
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [background, setBackground] = useState("");
+    const now = useBannerNow(0, Boolean(countdownEndsAt));
 
     useEffect(() => {
-        // 底色由类型决定，切换类型后需要重新解析两个预览容器里的实际取值。
-        setBackgrounds({
-            light: readBannerNoticeSurface(noticeType, lightRef.current),
-            dark: readBannerNoticeSurface(noticeType, darkRef.current),
-        });
+        // 底色由类型决定，切换类型后重新解析实际取值。
+        setBackground(readBannerNoticeBase(noticeType, containerRef.current));
     }, [noticeType]);
 
-    const themes = [
-        { key: "light", label: "浅色主题", background: backgrounds.light, ref: lightRef, className: "admin-banner-title-preview-light" },
-        { key: "dark", label: "深色主题", background: backgrounds.dark, ref: darkRef, className: "admin-banner-title-preview-dark" },
-    ] as const;
+    const ctaLabel = hasLink ? bannerCtaLabel(ctaText, noticeType) : undefined;
+    const countdownTarget = countdownEndsAt && countdownEndsAt > now ? countdownEndsAt : null;
+    const lowContrast = lowContrastBannerTitleColors(runs, background);
 
     return (
-        <div className="space-y-2">
-            {themes.map((theme) => {
-                const lowContrast = lowContrastBannerTitleColors(runs, theme.background);
-                return (
-                    <div key={theme.key} className="space-y-1">
-                        <div
-                            ref={theme.ref}
-                            className={`relative flex min-h-10 w-full items-center justify-center px-4 py-2 text-white ${theme.className}`}
-                            style={bannerAnnouncementBarStyle(noticeType)}
-                        >
-                            <span className="flex w-full min-w-0 items-center justify-center gap-2 px-8">
-                                <span className="min-w-0 truncate font-semibold">
-                                    <BannerAnnouncementTitle runs={runs} fallbackText="通知标题预览" />
-                                </span>
-                                {hasLink ? <BannerAnnouncementLinkHint /> : null}
-                            </span>
-                            <X className="absolute right-4 size-3.5 shrink-0 text-white" aria-hidden="true" />
-                        </div>
-                        <p className="text-[var(--fs-label)] text-foreground/45">
-                            {theme.label} · {bannerNoticeTypeLabel(noticeType)}
-                            {lowContrast.length ? ` · ${lowContrast.join("、")} 在该底色上对比度不足 4.5:1，建议调亮或调暗` : " · 对比度达标"}
-                        </p>
+        <div ref={containerRef} className="space-y-1">
+            <BannerAnnouncementShell
+                noticeType={noticeType}
+                className="admin-banner-preview"
+                trailing={
+                    <span className="notice-banner-close" aria-hidden="true">
+                        <X />
+                    </span>
+                }
+            >
+                <div className="notice-banner-slide">
+                    <div className="notice-banner-content">
+                        <BannerAnnouncementBody titleRuns={runs} title="通知标题预览" ctaLabel={ctaLabel} countdownTarget={countdownTarget} now={now} motion={!reducedMotion} />
                     </div>
-                );
-            })}
+                </div>
+            </BannerAnnouncementShell>
+            <p className="text-[var(--fs-label)] text-foreground/45">
+                {bannerNoticeTypeLabel(noticeType)}
+                {ctaLabel ? ` · 按钮「${ctaLabel}」` : " · 未设置跳转链接，不显示按钮"}
+                {countdownEndsAt && !countdownTarget ? " · 结束时间已过，倒计时不会显示" : ""}
+                {lowContrast.length ? ` · ${lowContrast.join("、")} 在该底色上对比度不足 4.5:1，建议调亮` : " · 对比度达标"}
+            </p>
         </div>
     );
 }

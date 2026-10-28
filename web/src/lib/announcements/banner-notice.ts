@@ -1,7 +1,7 @@
 /**
  * 首页常驻通知条的「通知类型」与「标题图标素材」模型。
  *
- * 通知类型决定通知条底色（后台与前台共用同一套 token）。
+ * 通知类型决定通知条配色（深色底、流动光晕、按钮文字色）和默认按钮文案，后台与前台共用同一套 token。
  * 图标素材是 emoji 字符：它就是普通文本，随 TitleRuns 的文本分段一起存储与渲染，
  * 因此可以插到标题任意位置、跟随分段样式、参与关键字检索，后端不需要单独字段或白名单。
  *
@@ -13,17 +13,64 @@ export type BannerNoticeType = "notice" | "activity" | "update" | "warning";
 /** 未指定类型时的兜底：平台公告。 */
 export const BANNER_NOTICE_DEFAULT_TYPE: BannerNoticeType = "notice";
 
+/** 行动按钮文案上限，与后端 bannerCtaMaxRunes 一致。 */
+export const BANNER_CTA_MAX_CHARS = 12;
+
 export const BANNER_NOTICE_TYPES: {
     key: BannerNoticeType;
     label: string;
     hint: string;
-    /** 该类型的语义底色 token；由 globals.css 按明暗主题分别取值。 */
+    /** 后台未填写按钮文案时的默认文案。 */
+    cta: string;
+    /** 该类型的实色 token（后台类型标签用）；由 globals.css 按明暗主题分别取值。 */
     surfaceVar: string;
+    /** 通知条深色底，不随主题变化，白字对比度 ≥ 7:1。 */
+    baseVar: string;
+    /** 通知条流动光晕与描边的亮色。 */
+    glowVar: string;
+    /** 白色按钮与倒计时数字的文字色。 */
+    inkVar: string;
 }[] = [
-    { key: "notice", label: "公告", hint: "平台公告、规则与流程变更", surfaceVar: "--notice-banner-surface-notice" },
-    { key: "activity", label: "活动", hint: "运营活动、限时促销与福利", surfaceVar: "--notice-banner-surface-activity" },
-    { key: "update", label: "更新", hint: "版本发布、功能上新与改版", surfaceVar: "--notice-banner-surface-update" },
-    { key: "warning", label: "警告", hint: "维护窗口、风险与服务异常", surfaceVar: "--notice-banner-surface-warning" },
+    {
+        key: "notice",
+        label: "公告",
+        hint: "平台公告、规则与流程变更",
+        cta: "查看详情",
+        surfaceVar: "--notice-banner-surface-notice",
+        baseVar: "--notice-banner-base-notice",
+        glowVar: "--notice-banner-glow-notice",
+        inkVar: "--notice-banner-ink-notice",
+    },
+    {
+        key: "activity",
+        label: "活动",
+        hint: "运营活动、限时促销与福利",
+        cta: "立即参与",
+        surfaceVar: "--notice-banner-surface-activity",
+        baseVar: "--notice-banner-base-activity",
+        glowVar: "--notice-banner-glow-activity",
+        inkVar: "--notice-banner-ink-activity",
+    },
+    {
+        key: "update",
+        label: "更新",
+        hint: "版本发布、功能上新与改版",
+        cta: "立即体验",
+        surfaceVar: "--notice-banner-surface-update",
+        baseVar: "--notice-banner-base-update",
+        glowVar: "--notice-banner-glow-update",
+        inkVar: "--notice-banner-ink-update",
+    },
+    {
+        key: "warning",
+        label: "警告",
+        hint: "维护窗口、风险与服务异常",
+        cta: "了解详情",
+        surfaceVar: "--notice-banner-surface-warning",
+        baseVar: "--notice-banner-base-warning",
+        glowVar: "--notice-banner-glow-warning",
+        inkVar: "--notice-banner-ink-warning",
+    },
 ];
 
 const BANNER_NOTICE_TYPE_KEYS = new Set<string>(BANNER_NOTICE_TYPES.map((item) => item.key));
@@ -45,6 +92,12 @@ export function bannerNoticeTypeLabel(value?: string | null) {
 
 export function bannerNoticeTypeHint(value?: string | null) {
     return bannerNoticeTypeMeta(value).hint;
+}
+
+/** 按钮最终文案：后台填写的优先，留空时用通知类型的默认文案。 */
+export function bannerCtaLabel(ctaText?: string | null, noticeType?: string | null) {
+    const text = (ctaText || "").trim();
+    return text || bannerNoticeTypeMeta(noticeType).cta;
 }
 
 /** 该类型底色的 CSS 引用（含 var()）；scope 内可被预览容器覆盖成明暗指定档。 */
@@ -165,15 +218,14 @@ export function searchBannerNoticeEmojis(keyword: string) {
 }
 
 /**
- * 读取指定类型在当前主题下的通知条实底色，避免把设计 token 的色值复制到 TS 里。
- * scope 传后台预览容器可在该容器强制指定的明 / 暗档里取值。
+ * 读取指定类型通知条的实际深色底，避免把设计 token 的色值复制到 TS 里；后台用它做标题颜色的对比度提示。
  */
-export function readBannerNoticeSurface(noticeType?: string | null, scope?: HTMLElement | null) {
+export function readBannerNoticeBase(noticeType?: string | null, scope?: HTMLElement | null) {
     if (typeof window === "undefined") return "";
     const host = scope || window.document.body || window.document.documentElement;
     if (!host) return "";
     const probe = window.document.createElement("span");
-    probe.style.cssText = `position:absolute;left:-9999px;top:-9999px;background-color:${bannerNoticeSurfaceCSS(noticeType)}`;
+    probe.style.cssText = `position:absolute;left:-9999px;top:-9999px;background-color:var(${bannerNoticeTypeMeta(noticeType).baseVar})`;
     host.appendChild(probe);
     const resolved = window.getComputedStyle(probe).backgroundColor;
     probe.remove();

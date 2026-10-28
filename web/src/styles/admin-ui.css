@@ -11104,8 +11104,8 @@ html[data-magicui-theme-vt="active"] .admin-shell * {
     }
 }
 
-/* 常驻通知标题：富文本编辑区与明暗两态预览。
- * 预览固定明暗两套底色，编辑时不受当前主题影响，便于同时校验两种主题下的可读性。 */
+/* 常驻通知标题：富文本编辑区与前台效果预览。
+ * 预览直接复用前台通知条组件（深色底不随主题切换），这里只收窄两侧留白并加圆角。 */
 .admin-banner-title-editor {
     border: 1px solid var(--admin-card-border);
     border-radius: 8px;
@@ -11138,19 +11138,9 @@ html[data-magicui-theme-vt="active"] .admin-shell * {
     pointer-events: none;
 }
 
-/* 预览容器强制指定四种通知类型的明 / 暗底色，不依赖页面当前主题。 */
-.admin-banner-title-preview-light {
-    --notice-banner-surface-notice: var(--palette-banner-notice-500);
-    --notice-banner-surface-activity: var(--palette-banner-activity-500);
-    --notice-banner-surface-update: var(--palette-banner-update-500);
-    --notice-banner-surface-warning: var(--palette-banner-warning-500);
-}
-
-.admin-banner-title-preview-dark {
-    --notice-banner-surface-notice: var(--palette-banner-notice-700);
-    --notice-banner-surface-activity: var(--palette-banner-activity-700);
-    --notice-banner-surface-update: var(--palette-banner-update-700);
-    --notice-banner-surface-warning: var(--palette-banner-warning-700);
+.admin-banner-preview.notice-banner {
+    --nb-side: 52px;
+    border-radius: 10px;
 }
 
 /* 常驻通知标题图标选择器 */
@@ -11288,33 +11278,37 @@ html[data-magicui-theme-vt="active"] .admin-shell * {
     line-height: 1.5;
 }
 
-/* 类型卡片上的真实底色条；颜色由卡片的 data-banner-type 选中对应 token。 */
+/* 类型卡片上的配色条：与前台通知条同一组深色底与光晕 token，颜色由卡片的 data-banner-type 选中。 */
 .admin-banner-type-card-preview {
+    --admin-banner-card-base: var(--notice-banner-base-notice);
+    --admin-banner-card-glow: var(--notice-banner-glow-notice);
     display: flex;
     align-items: center;
     gap: 8px;
     margin-top: 8px;
-    border-radius: 4px;
-    padding: 4px 8px;
-    color: #ffffff;
+    border-radius: 6px;
+    padding: 6px 8px;
+    background:
+        radial-gradient(90% 220% at 92% 50%, color-mix(in srgb, var(--admin-banner-card-glow) 55%, transparent), transparent 72%),
+        var(--admin-banner-card-base);
+    color: var(--notice-banner-foreground);
     font-size: var(--fs-micro);
     line-height: 1.4;
 }
 
-.admin-banner-type-card[data-banner-type="notice"] .admin-banner-type-card-preview {
-    background: var(--notice-banner-surface-notice);
-}
-
 .admin-banner-type-card[data-banner-type="activity"] .admin-banner-type-card-preview {
-    background: var(--notice-banner-surface-activity);
+    --admin-banner-card-base: var(--notice-banner-base-activity);
+    --admin-banner-card-glow: var(--notice-banner-glow-activity);
 }
 
 .admin-banner-type-card[data-banner-type="update"] .admin-banner-type-card-preview {
-    background: var(--notice-banner-surface-update);
+    --admin-banner-card-base: var(--notice-banner-base-update);
+    --admin-banner-card-glow: var(--notice-banner-glow-update);
 }
 
 .admin-banner-type-card[data-banner-type="warning"] .admin-banner-type-card-preview {
-    background: var(--notice-banner-surface-warning);
+    --admin-banner-card-base: var(--notice-banner-base-warning);
+    --admin-banner-card-glow: var(--notice-banner-glow-warning);
 }
 
 /* 模型定价编辑器：弹窗内只保留一个滚动区域。 */

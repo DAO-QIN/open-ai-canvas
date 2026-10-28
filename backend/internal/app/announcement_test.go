@@ -666,6 +666,104 @@ func TestBannerAnnouncementTitleRunsWithEmoji(t *testing.T) {
 	}
 }
 
+// 更新走显式字段表：展示顺序、按钮文案与倒计时都必须真正落库，不能只在返回值里看起来改了。
+func TestBannerAnnouncementUpdatePersistsOrderCtaAndCountdown(t *testing.T) {
+	svc, _ := newAnnouncementImageTestService(t)
+	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin, Status: model.UserStatusActive}
+
+	end := time.Now().Add(6 * time.Hour)
+	banner, err := svc.CreateBannerAnnouncement(admin, CreateBannerAnnouncementRequest{
+		Title: "限时活动", NoticeType: "activity", CtaText: "进群领积分", Link: "/projects",
+		Status: "active", SortOrder: 5, ShowCountdown: true, EndsAt: &end,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := svc.repo.BannerAnnouncement(banner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.CtaText != "进群领积分" || !stored.ShowCountdown || stored.SortOrder != 5 {
+		t.Fatalf("created = %+v", stored)
+	}
+
+	if _, err := svc.UpdateBannerAnnouncement(admin, banner.ID, UpdateBannerAnnouncementRequest{
+		Title: "限时活动", NoticeType: "activity", CtaText: "  立即\n参与 ", Link: "/projects",
+		Status: "active", SortOrder: 2, EndsAt: &end,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := svc.repo.BannerAnnouncement(banner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.SortOrder != 2 || reloaded.CtaText != "立即 参与" || reloaded.ShowCountdown {
+		t.Fatalf("reloaded = %+v", reloaded)
+	}
+}
+
+func TestBannerAnnouncementRejectsInvalidCtaOrderAndCountdown(t *testing.T) {
+	svc, _ := newAnnouncementImageTestService(t)
+	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin, Status: model.UserStatusActive}
+
+	end := time.Now().Add(time.Hour)
+	cases := []struct {
+		name string
+		req  CreateBannerAnnouncementRequest
+	}{
+		{name: "按钮文案超长", req: CreateBannerAnnouncementRequest{Title: "标题", CtaText: "一二三四五六七八九十十一十二", Status: "active"}},
+		{name: "倒计时缺结束时间", req: CreateBannerAnnouncementRequest{Title: "标题", ShowCountdown: true, Status: "active"}},
+		{name: "展示顺序为负", req: CreateBannerAnnouncementRequest{Title: "标题", SortOrder: -1, Status: "active"}},
+	}
+	for _, testCase := range cases {
+		if _, err := svc.CreateBannerAnnouncement(admin, testCase.req); err == nil {
+			t.Fatalf("%s: expected rejection", testCase.name)
+		}
+	}
+	if _, err := svc.CreateBannerAnnouncement(admin, CreateBannerAnnouncementRequest{Title: "标题", CtaText: "一二三四五六七八九十一二", ShowCountdown: true, EndsAt: &end, Status: "active"}); err != nil {
+		t.Fatalf("12-character cta with end time should be accepted: %v", err)
+	}
+}
+
+// 公开接口带服务端时间与下一次变化时间：前台据此校准倒计时，并在预约通知开始时准时刷新。
+func TestBannerAnnouncementFeedReportsServerTimeAndNextChange(t *testing.T) {
+	svc, _ := newAnnouncementImageTestService(t)
+	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin, Status: model.UserStatusActive}
+
+	now := time.Now()
+	end := now.Add(2 * time.Hour)
+	soon := now.Add(30 * time.Minute)
+	sooner := now.Add(10 * time.Minute)
+	if _, err := svc.CreateBannerAnnouncement(admin, CreateBannerAnnouncementRequest{Title: "进行中", Status: "active", ShowCountdown: true, EndsAt: &end}); err != nil {
+		t.Fatal(err)
+	}
+	feed, err := svc.BannerAnnouncementFeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(feed.Banners) != 1 || feed.ServerTime.Sub(now).Abs() > 5*time.Second {
+		t.Fatalf("feed = %+v", feed)
+	}
+	if feed.NextChangeAt == nil || feed.NextChangeAt.Sub(end).Abs() > time.Millisecond {
+		t.Fatalf("nextChangeAt = %v, want current banner end %v", feed.NextChangeAt, end)
+	}
+
+	// 预约通知更早开始时，下一次变化取最早的开始时间；被禁用的预约不算。
+	if _, err := svc.CreateBannerAnnouncement(admin, CreateBannerAnnouncementRequest{Title: "预约", Status: "active", StartsAt: &soon}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.CreateBannerAnnouncement(admin, CreateBannerAnnouncementRequest{Title: "已禁用的预约", Status: "disabled", StartsAt: &sooner}); err != nil {
+		t.Fatal(err)
+	}
+	feed, err = svc.BannerAnnouncementFeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(feed.Banners) != 1 || feed.NextChangeAt == nil || feed.NextChangeAt.Sub(soon).Abs() > time.Millisecond {
+		t.Fatalf("feed = %+v, want nextChangeAt %v", feed, soon)
+	}
+}
+
 func newAnnouncementImageTestService(t *testing.T) (*Service, *gorm.DB) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

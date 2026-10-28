@@ -491,14 +491,18 @@ type BannerAnnouncement struct {
 	// TitleRuns 是标题的样式分段，前端按段渲染；持久化在 title_runs 文本列，由仓储层显式编解码。
 	TitleRuns     []BannerTitleRun `json:"titleRuns,omitempty" gorm:"-"`
 	TitleRunsJSON string           `json:"-" gorm:"column:title_runs;type:text"`
-	// NoticeType 决定通知条底色（"notice" | "activity" | "update" | "warning"），取值白名单见 app 层。
-	NoticeType string     `json:"noticeType" gorm:"size:24"`
-	Link       string     `json:"link" gorm:"size:500"`        // 点击跳转目标：http(s) 外链或 / 开头的站内路径；空表示不可点击
-	Status     string     `json:"status" gorm:"size:24;index"` // "active" | "disabled"
-	SortOrder  int        `json:"sortOrder" gorm:"index"`
-	StartsAt   *time.Time `json:"startsAt,omitempty" gorm:"index"`
-	EndsAt     *time.Time `json:"endsAt,omitempty" gorm:"index"`
-	CreatedBy  string     `json:"createdBy" gorm:"size:36"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
+	// NoticeType 决定通知条配色（"notice" | "activity" | "update" | "warning"），取值白名单见 app 层。
+	NoticeType string `json:"noticeType" gorm:"size:24"`
+	// CtaText 是通知条行动按钮的文案；空串由前端按通知类型取默认文案，只在有跳转链接时展示。
+	CtaText string `json:"ctaText" gorm:"size:32;not null;default:''"`
+	Link    string `json:"link" gorm:"size:500"`        // 点击跳转目标：http(s) 外链或 / 开头的站内路径；空表示不可点击
+	Status  string `json:"status" gorm:"size:24;index"` // "active" | "disabled"
+	// ShowCountdown 为 true 时通知条倒计时到 EndsAt；开启时必须设置结束时间。
+	ShowCountdown bool       `json:"showCountdown" gorm:"not null;default:false"`
+	SortOrder     int        `json:"sortOrder" gorm:"index"`
+	StartsAt      *time.Time `json:"startsAt,omitempty" gorm:"index"`
+	EndsAt        *time.Time `json:"endsAt,omitempty" gorm:"index"`
+	CreatedBy     string     `json:"createdBy" gorm:"size:36"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
 }

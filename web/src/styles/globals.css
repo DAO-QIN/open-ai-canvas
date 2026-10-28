@@ -64,6 +64,20 @@
     --palette-banner-update-700: #235450; /* 白字 8.55:1 */
     --palette-banner-warning-500: #b55b0c; /* 警告 · 白字 4.70:1 */
     --palette-banner-warning-700: #6a4424; /* 白字 8.52:1 */
+    /* 通知条本体：950 深色底（白字 ≥ 7:1）、300 流动光晕、900 白色按钮上的文字（≥ 7:1）。
+       深色底不随明暗主题切换；色相与上面同类型的实色一致，后台类型标签与通知条看起来是同一种颜色。 */
+    --palette-banner-notice-950: #0d1035;
+    --palette-banner-notice-300: #7d87ff;
+    --palette-banner-notice-900: #262d86;
+    --palette-banner-activity-950: #2b0418;
+    --palette-banner-activity-300: #ff4f9a;
+    --palette-banner-activity-900: #6b0f3a;
+    --palette-banner-update-950: #001b24;
+    --palette-banner-update-300: #19d3c5;
+    --palette-banner-update-900: #053b3a;
+    --palette-banner-warning-950: #2b1203;
+    --palette-banner-warning-300: #ffa23a;
+    --palette-banner-warning-900: #5e2a00;
 
     /* --- 2. 间距（4px 栅格 + 半距）--- */
     --space-0: 0px;
@@ -827,6 +841,23 @@
     --notice-banner-surface-update: var(--palette-banner-update-500);
     --notice-banner-surface-warning: var(--palette-banner-warning-500);
     --notice-banner-surface: var(--notice-banner-surface-notice);
+
+    /* 通知条本体（components/layout/banner-announcement.css 引用）：深色底、流动光晕与按钮文字色按类型取值，
+       明暗主题共用一套，不在 .dark 覆盖。 */
+    --notice-banner-foreground: #ffffff;
+    --notice-banner-cta-surface: #ffffff;
+    --notice-banner-base-notice: var(--palette-banner-notice-950);
+    --notice-banner-glow-notice: var(--palette-banner-notice-300);
+    --notice-banner-ink-notice: var(--palette-banner-notice-900);
+    --notice-banner-base-activity: var(--palette-banner-activity-950);
+    --notice-banner-glow-activity: var(--palette-banner-activity-300);
+    --notice-banner-ink-activity: var(--palette-banner-activity-900);
+    --notice-banner-base-update: var(--palette-banner-update-950);
+    --notice-banner-glow-update: var(--palette-banner-update-300);
+    --notice-banner-ink-update: var(--palette-banner-update-900);
+    --notice-banner-base-warning: var(--palette-banner-warning-950);
+    --notice-banner-glow-warning: var(--palette-banner-warning-300);
+    --notice-banner-ink-warning: var(--palette-banner-warning-900);
 
     /* Canvas Theme 语义（从 CSS 变量反序列化到 TS 主题对象，对应 #96 决策3）*/
     --cn-text: var(--color-neutral-950);

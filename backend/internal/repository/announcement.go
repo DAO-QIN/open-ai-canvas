@@ -91,6 +91,21 @@ func (r *Repository) ActiveBannerAnnouncements(now time.Time) ([]model.BannerAnn
 	return banners, err
 }
 
+// NextBannerAnnouncementStart 返回已启用、尚未开始的通知中最早的开始时间；没有预约时返回 nil。
+func (r *Repository) NextBannerAnnouncementStart(now time.Time) (*time.Time, error) {
+	var upcoming []model.BannerAnnouncement
+	err := r.db.Model(&model.BannerAnnouncement{}).
+		Select("id", "starts_at").
+		Where("status = ? AND starts_at > ?", "active", now).
+		Order("starts_at asc").
+		Limit(1).
+		Find(&upcoming).Error
+	if err != nil || len(upcoming) == 0 {
+		return nil, err
+	}
+	return upcoming[0].StartsAt, nil
+}
+
 func (r *Repository) AdminBannerAnnouncements(keyword string, status string, limit int, offset int) ([]model.BannerAnnouncement, int64, error) {
 	var banners []model.BannerAnnouncement
 	var total int64
@@ -165,15 +180,19 @@ func (r *Repository) UpdateBannerAnnouncement(banner *model.BannerAnnouncement) 
 	if err := encodeBannerTitleRuns(banner); err != nil {
 		return err
 	}
+	// 显式字段表：新增可编辑字段必须同时加在这里，否则后台修改会返回成功但不落库。
 	updates := map[string]any{
-		"title":       banner.Title,
-		"title_runs":  banner.TitleRunsJSON,
-		"notice_type": banner.NoticeType,
-		"link":        banner.Link,
-		"status":      banner.Status,
-		"updated_at":  banner.UpdatedAt,
-		"starts_at":   banner.StartsAt,
-		"ends_at":     banner.EndsAt,
+		"title":          banner.Title,
+		"title_runs":     banner.TitleRunsJSON,
+		"notice_type":    banner.NoticeType,
+		"cta_text":       banner.CtaText,
+		"link":           banner.Link,
+		"status":         banner.Status,
+		"show_countdown": banner.ShowCountdown,
+		"sort_order":     banner.SortOrder,
+		"updated_at":     banner.UpdatedAt,
+		"starts_at":      banner.StartsAt,
+		"ends_at":        banner.EndsAt,
 	}
 	return r.db.Model(&model.BannerAnnouncement{}).
 		Where("id = ?", banner.ID).

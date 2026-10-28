@@ -572,6 +572,48 @@ func TestMigrateSchemaV22AddsBannerAnnouncementNoticeType(t *testing.T) {
 	}
 }
 
+func TestMigrateSchemaV78AddsBannerCtaAndCountdown(t *testing.T) {
+	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-banner-cta-countdown-v78?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	legacy := &model.BannerAnnouncement{ID: "legacy-banner-v77", Title: "旧库通知", NoticeType: "notice", Link: "/projects", Status: "active", SortOrder: 3}
+	if err := db.Create(legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, column := range []string{"cta_text", "show_countdown"} {
+		if err := db.Migrator().DropColumn(&model.BannerAnnouncement{}, column); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Where("version = ?", 78).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatalf("upgrade from v77: %v", err)
+	}
+	for _, column := range []string{"cta_text", "show_countdown"} {
+		if !db.Migrator().HasColumn(&model.BannerAnnouncement{}, column) {
+			t.Fatalf("v78 upgrade did not add banner_announcements.%s", column)
+		}
+	}
+	var stored model.BannerAnnouncement
+	if err := db.First(&stored, "id = ?", "legacy-banner-v77").Error; err != nil {
+		t.Fatal(err)
+	}
+	// 旧通知升级后没有按钮文案、不显示倒计时，其余字段原样保留。
+	if stored.CtaText != "" || stored.ShowCountdown || stored.Title != "旧库通知" || stored.Link != "/projects" || stored.SortOrder != 3 {
+		t.Fatalf("legacy banner changed during upgrade: %+v", stored)
+	}
+	status, err := ReadSchemaStatus(db)
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
+		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
+	}
+}
+
 func TestMigrateSchemaV23BackfillsCanvasRevisions(t *testing.T) {
 	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-canvas-revisions-v23?mode=memory&cache=shared"})
 	if err != nil {

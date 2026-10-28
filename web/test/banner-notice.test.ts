@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+    BANNER_CTA_MAX_CHARS,
     BANNER_NOTICE_DEFAULT_TYPE,
     BANNER_NOTICE_EMOJI_GROUPS,
     BANNER_NOTICE_EMOJIS,
     BANNER_NOTICE_TYPE_VALUES,
     BANNER_NOTICE_TYPES,
+    bannerCtaLabel,
     bannerNoticeSurfaceCSS,
     bannerNoticeTypeLabel,
     normalizeBannerNoticeType,
@@ -44,6 +46,16 @@ describe("通知类型", () => {
         }
         // 未知类型也必须拿到可用底色，不能渲染成透明条。
         expect(bannerNoticeSurfaceCSS("rainbow")).toBe(bannerNoticeSurfaceCSS(BANNER_NOTICE_DEFAULT_TYPE));
+    });
+
+    test("按钮文案：后台填写的优先，留空按类型取默认文案", () => {
+        for (const type of BANNER_NOTICE_TYPES) {
+            expect(type.cta.length).toBeGreaterThan(0);
+            expect(Array.from(type.cta).length).toBeLessThanOrEqual(BANNER_CTA_MAX_CHARS);
+            expect(bannerCtaLabel("", type.key)).toBe(type.cta);
+        }
+        expect(bannerCtaLabel("  进群领积分 ", "notice")).toBe("进群领积分");
+        expect(bannerCtaLabel(undefined, "rainbow")).toBe(bannerCtaLabel(undefined, BANNER_NOTICE_DEFAULT_TYPE));
     });
 });
 
@@ -98,6 +110,16 @@ describe("与后端白名单保持一致", () => {
     test("后端默认值常量与前端一致", async () => {
         const goSource = await readSource("../../backend/internal/app/announcement.go");
         expect(goSource).toContain(`bannerNoticeDefaultType = "${BANNER_NOTICE_DEFAULT_TYPE}"`);
+        expect(goSource).toMatch(new RegExp(`bannerCtaMaxRunes\\s*=\\s*${BANNER_CTA_MAX_CHARS}\\b`));
+    });
+
+    test("后端更新字段表包含全部可编辑字段，后台修改不会只在返回值里生效", async () => {
+        const goRepo = await readSource("../../backend/internal/repository/announcement.go");
+        const start = goRepo.indexOf("func (r *Repository) UpdateBannerAnnouncement");
+        const body = goRepo.slice(start, goRepo.indexOf("\n}", start));
+        for (const column of ["title", "title_runs", "notice_type", "cta_text", "link", "status", "show_countdown", "sort_order", "starts_at", "ends_at"]) {
+            expect(body).toContain(`"${column}":`);
+        }
     });
 
     test("后端不保存独立图标字段：emoji 必须内嵌在标题分段里", async () => {
@@ -131,17 +153,60 @@ describe("通知条主题色", () => {
         }
     });
 
-    test("前台与预览都引用按类型取值的语义 token", async () => {
-        const [globals, adminUi] = await Promise.all([readSource("../src/styles/globals.css"), readSource("../src/styles/admin-ui.css")]);
+    test("类型标签实色在明暗主题各定义一次", async () => {
+        const globals = await readSource("../src/styles/globals.css");
         for (const type of BANNER_NOTICE_TYPES) {
             // surfaceVar 自带 `--` 前缀，拼接时不要再加一次。
             const name = type.surfaceVar.replace(/^--/, "");
-            // 语义层明暗各定义一次：:root 一次、.dark 一次。
             const semantic = new RegExp(`--${name}: var\\(--palette-banner-${type.key}-\\d00\\)`, "g");
             expect(globals.match(semantic)?.length).toBe(2);
-            // 后台预览强制两套底色，不受页面当前主题影响。
-            expect(adminUi).toContain(`--${name}: var(--palette-banner-${type.key}-500)`);
-            expect(adminUi).toContain(`--${name}: var(--palette-banner-${type.key}-700)`);
         }
+    });
+
+    test("通知条深色底、按钮文字与流动光晕最亮处都保证文字可读", async () => {
+        const css = await readSource("../src/styles/globals.css");
+        const value = (token: string) => {
+            const match = css.match(new RegExp(`--${token}:\\s*(#[0-9a-fA-F]{6})`));
+            if (!match) throw new Error(`globals.css 缺少 --${token}`);
+            return match[1];
+        };
+        const channels = (hex: string) => [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
+        // 与 banner-announcement.css 的 color-mix(in srgb, glow 56%, base) 一致：sRGB 通道线性混合。
+        const mix = (glow: string, base: string, weight: number) =>
+            `#${channels(glow)
+                .map((channel, index) => Math.round(channel * weight + channels(base)[index] * (1 - weight)))
+                .map((channel) => channel.toString(16).padStart(2, "0"))
+                .join("")}`;
+        for (const type of BANNER_NOTICE_TYPES) {
+            const base = value(`palette-banner-${type.key}-950`);
+            const glow = value(`palette-banner-${type.key}-300`);
+            const ink = value(`palette-banner-${type.key}-900`);
+            expect(bannerTitleContrastRatio("#FFFFFF", base)).toBeGreaterThanOrEqual(7);
+            expect(bannerTitleContrastRatio(ink, "#FFFFFF")).toBeGreaterThanOrEqual(7);
+            expect(bannerTitleContrastRatio("#FFFFFF", mix(glow, base, 0.56))).toBeGreaterThanOrEqual(4.5);
+        }
+    });
+
+    test("通知条与类型卡片引用按类型取值的 token，且不随明暗主题覆盖", async () => {
+        const [globals, bannerCss, adminUi] = await Promise.all([
+            readSource("../src/styles/globals.css"),
+            readSource("../src/components/layout/banner-announcement.css"),
+            readSource("../src/styles/admin-ui.css"),
+        ]);
+        for (const type of BANNER_NOTICE_TYPES) {
+            for (const [variable, step] of [
+                [type.baseVar, 950],
+                [type.glowVar, 300],
+                [type.inkVar, 900],
+            ] as const) {
+                const declaration = new RegExp(`${variable}: var\\(--palette-banner-${type.key}-${step}\\)`, "g");
+                expect(globals.match(declaration)?.length).toBe(1);
+                expect(bannerCss).toContain(`var(${variable})`);
+            }
+            expect(adminUi).toContain(`var(${type.baseVar})`);
+            expect(adminUi).toContain(`var(${type.glowVar})`);
+        }
+        // 光效与按钮动画在减少动态效果时必须关闭。
+        expect(bannerCss).toContain("@media (prefers-reduced-motion: reduce)");
     });
 });

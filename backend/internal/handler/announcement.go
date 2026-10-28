@@ -11,12 +11,12 @@ import (
 
 func RegisterAnnouncementRoutes(r *gin.RouterGroup, svc *service.Service) {
 	r.GET("/banner-announcements", func(c *gin.Context) {
-		banners, err := svc.ActiveBannerAnnouncements()
+		feed, err := svc.BannerAnnouncementFeed()
 		if err != nil {
 			failService(c, err)
 			return
 		}
-		ok(c, gin.H{"banners": banners})
+		ok(c, feed)
 	})
 	r.GET("/announcements", func(c *gin.Context) {
 		user, err := currentUser(c, svc)
