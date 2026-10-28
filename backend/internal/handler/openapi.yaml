@@ -145,7 +145,7 @@ paths:
       responses:
         "200":
           {
-            description: "成功信封 data={from,to,days,timezoneOffset,daily:[{date,totalMicrocredits,agentMicrocredits,count,agentCount}],categories:[{capability,totalMicrocredits,agentMicrocredits,count,agentCount}]}；daily 只含有消耗的日期并按日期升序，categories 的 capability 为 image|video|audio|text|other，按消耗降序",
+            description: "成功信封 data={from,to,days,timezoneOffset,daily:[{date,totalMicrocredits,agentMicrocredits,count,agentCount}],categories:[{capability,totalMicrocredits,agentMicrocredits,count,agentCount}],models:[{model,name,capability,totalMicrocredits,agentMicrocredits,count,agentCount}]}；daily 只含有消耗的日期并按日期升序，categories 的 capability 为 image|video|audio|text|other，按消耗降序；models 按 (capability, model) 汇总并按消耗降序，model 为账单记录的前台模型编码（未记录时为空串），name 为当前前台模型名称（查不到时为空串）",
           }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }

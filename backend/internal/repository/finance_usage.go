@@ -1,16 +1,19 @@
 package repository
 
 import (
+	"strings"
 	"time"
 
 	"yingce/backend/internal/model"
 )
 
-// CreditUsageRow 是一个本地自然日内、某一账单能力（image/video/audio/text）的积分消耗汇总。
+// CreditUsageRow 是一个本地自然日内、某一账单能力（image/video/audio/text）下某个模型的积分消耗汇总。
 // DayIndex 为 floor((UTC 秒 + 时区偏移秒) / 86400)，由调用方换算为日期。
+// Model 是账单记录的前台模型编码（与积分明细显示的一致），没有记录时为空串。
 type CreditUsageRow struct {
 	DayIndex          int64
 	Capability        string
+	Model             string
 	TotalMicrocredits int64
 	AgentMicrocredits int64
 	EntryCount        int64
@@ -24,7 +27,9 @@ type CreditUsageRow struct {
 const (
 	creditUsageAgentCondition = "(COALESCE(t.agent_run_id, '') <> '' OR COALESCE(t.creation_submission_id, '') <> '' OR COALESCE(t.operation, '') IN ?)"
 	creditUsageCapability     = "COALESCE(o.capability, '')"
-	creditUsageSums           = "CAST(COALESCE(SUM(-e.amount_microcredits), 0) AS BIGINT) AS total_microcredits, " +
+	// 流水上的模型在预留与结算时从账单复制；流水为空的老数据回落到账单上的模型。
+	creditUsageModel = "COALESCE(NULLIF(e.model, ''), o.model, '')"
+	creditUsageSums  = "CAST(COALESCE(SUM(-e.amount_microcredits), 0) AS BIGINT) AS total_microcredits, " +
 		"CAST(COALESCE(SUM(CASE WHEN " + creditUsageAgentCondition + " THEN -e.amount_microcredits ELSE 0 END), 0) AS BIGINT) AS agent_microcredits, " +
 		"COUNT(*) AS entry_count, " +
 		"CAST(COALESCE(SUM(CASE WHEN " + creditUsageAgentCondition + " THEN 1 ELSE 0 END), 0) AS BIGINT) AS agent_entry_count"
@@ -34,8 +39,8 @@ const (
 		" WHERE e.user_id = ? AND e.type = ? AND e.amount_microcredits < 0 AND "
 )
 
-// CreditUsage 汇总用户在 [from, to) 内每个本地自然日、每种账单能力的积分消耗，
-// 一次扫描同时支撑日趋势和类型构成；只返回有消耗的组合。
+// CreditUsage 汇总用户在 [from, to) 内每个本地自然日、每种账单能力、每个模型的积分消耗，
+// 一次扫描同时支撑日趋势、类型构成和模型构成；只返回有消耗的组合。
 //
 // SQLite 把 time.Time 存为带偏移的文本，只能用 unixepoch() 比较时刻，不能比较文本；
 // PostgreSQL 直接按 created_at 范围走 (user_id, created_at) 索引。
@@ -52,12 +57,32 @@ func (r *Repository) CreditUsage(userID string, from, to time.Time, offsetSecond
 		rangeExpr = "unixepoch(e.created_at) >= ? AND unixepoch(e.created_at) < ?"
 		rangeArgs = []any{from.Unix(), to.Unix()}
 	}
-	query := "SELECT " + dayExpr + " AS day_index, " + creditUsageCapability + " AS capability, " + creditUsageSums + creditUsageSource + rangeExpr +
-		" GROUP BY day_index, " + creditUsageCapability + " ORDER BY day_index"
+	query := "SELECT " + dayExpr + " AS day_index, " + creditUsageCapability + " AS capability, " + creditUsageModel + " AS model, " + creditUsageSums + creditUsageSource + rangeExpr +
+		" GROUP BY day_index, " + creditUsageCapability + ", " + creditUsageModel + " ORDER BY day_index"
 	args := append([]any{offsetSeconds, agentOperations, agentOperations, userID, model.CreditLedgerConsume}, rangeArgs...)
 	rows := []CreditUsageRow{}
 	if err := r.db.Raw(query, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	return rows, nil
+}
+
+// LogicalModelNamesByCode 返回前台模型编码当前的显示名称。同一编码优先取未归档的模型，
+// 其次取最近更新的归档模型；查不到或名称为空的编码不出现在结果里。
+func (r *Repository) LogicalModelNamesByCode(codes []string) (map[string]string, error) {
+	names := map[string]string{}
+	if len(codes) == 0 {
+		return names, nil
+	}
+	var rows []model.LogicalModel
+	if err := r.db.Select("code", "name", "archived_at", "updated_at").Where("code IN ?", codes).Order("archived_at IS NOT NULL").Order("updated_at DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		name := strings.TrimSpace(row.Name)
+		if _, seen := names[row.Code]; !seen && name != "" {
+			names[row.Code] = name
+		}
+	}
+	return names, nil
 }

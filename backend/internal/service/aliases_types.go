@@ -160,6 +160,7 @@ type (
 	CreateTaskRequest                      = app.CreateTaskRequest
 	CreditUsageCategory                    = app.CreditUsageCategory
 	CreditUsageDay                         = app.CreditUsageDay
+	CreditUsageModel                       = app.CreditUsageModel
 	CreditUsageReport                      = app.CreditUsageReport
 	CreationCanvasOp                       = app.CreationCanvasOp
 	CreationDetail                         = app.CreationDetail

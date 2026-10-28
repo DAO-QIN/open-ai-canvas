@@ -266,6 +266,17 @@ export type CreditUsageCategory = {
     agentCount: number;
 };
 
+/** 按 (类型, 模型) 汇总的消耗。model 为积分明细里显示的前台模型编码，未记录时为空串；name 为当前前台模型名称，查不到时为空串。 */
+export type CreditUsageModel = {
+    model: string;
+    name: string;
+    capability: CreditUsageCapability;
+    totalMicrocredits: number;
+    agentMicrocredits: number;
+    count: number;
+    agentCount: number;
+};
+
 /** 用量看板：截至今天（含）最近 365 个自然日，from/to 为含首尾的本地日期。 */
 export type CreditUsageReport = {
     from: string;
@@ -274,6 +285,7 @@ export type CreditUsageReport = {
     timezoneOffset: number;
     daily: CreditUsageDay[];
     categories: CreditUsageCategory[];
+    models: CreditUsageModel[];
 };
 
 /** timezoneOffset 为 UTC 偏移分钟数（东八区 480），服务端按它划分自然日。 */

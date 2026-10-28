@@ -6,7 +6,21 @@ import { UserAvatar } from "@/components/layout/user-avatar";
 import { SegmentedControl } from "@/components/ui/base/segmented-control/segmented-control";
 import { Callout } from "@/components/ui/product/callout";
 import { useCreditUsage } from "@/hooks/use-credit-usage";
-import { buildUsageDays, buildUsageMonthLabels, buildUsageWeeks, formatUsageCredits, formatUsageCreditsExact, formatUsageDay, formatUsageFullDate, summarizeUsage, usageCapabilityLabels, usageCategoryShares, type UsageMetric } from "@/lib/credit-usage";
+import {
+    buildUsageDays,
+    buildUsageMonthLabels,
+    buildUsageWeeks,
+    formatUsageCredits,
+    formatUsageCreditsExact,
+    formatUsageDay,
+    formatUsageFullDate,
+    summarizeUsage,
+    usageCapabilityLabels,
+    usageCategoryShares,
+    usageModelShares,
+    type UsageMetric,
+    type UsageModelShare,
+} from "@/lib/credit-usage";
 import { openWorkspaceWallet } from "@/lib/workspace-wallet";
 import { useUserStore } from "@/stores/use-user-store";
 import { UsageActivityChart, type UsageView } from "./usage-activity-chart";
@@ -23,6 +37,13 @@ const viewOptions: Array<{ value: UsageView; label: string }> = [
     { value: "cumulative", label: "累计" },
 ];
 
+type UsageBreakdown = "capability" | "model";
+
+const breakdownOptions: Array<{ value: UsageBreakdown; label: string }> = [
+    { value: "capability", label: "按类型" },
+    { value: "model", label: "按模型" },
+];
+
 const percentFormatter = new Intl.NumberFormat("zh-CN", { style: "percent", maximumFractionDigits: 1 });
 
 /** 用量看板：最近 365 个自然日的积分消耗统计、活动图与消耗构成。 */
@@ -31,12 +52,14 @@ export default function UsageDashboardPane() {
     const query = useCreditUsage(user?.id);
     const [metric, setMetric] = useState<UsageMetric>("total");
     const [view, setView] = useState<UsageView>("daily");
+    const [breakdown, setBreakdown] = useState<UsageBreakdown>("capability");
     const report = query.data;
     const days = useMemo(() => (report ? buildUsageDays(report, metric) : []), [report, metric]);
     const weeks = useMemo(() => buildUsageWeeks(days), [days]);
     const monthLabels = useMemo(() => buildUsageMonthLabels(weeks), [weeks]);
     const summary = useMemo(() => summarizeUsage(days), [days]);
     const categories = useMemo(() => (report ? usageCategoryShares(report.categories, metric) : []), [report, metric]);
+    const models = useMemo(() => (report ? usageModelShares(report.models, metric) : []), [report, metric]);
 
     if (!user) return null;
     if (query.isPending) return <UsageDashboardSkeleton />;
@@ -152,10 +175,13 @@ export default function UsageDashboardPane() {
                 <div className="usage-panel-header">
                     <div className="min-w-0">
                         <h3 id="usage-breakdown-title">消耗构成</h3>
-                        <p>按生成类型汇总最近 365 天的{metricName}积分消耗。</p>
+                        <p>{breakdown === "model" ? `按模型汇总最近 365 天的${metricName}积分消耗，并给出平均每笔消耗。` : `按生成类型汇总最近 365 天的${metricName}积分消耗。`}</p>
                     </div>
+                    <SegmentedControl size="sm" ariaLabel="构成维度" value={breakdown} onChange={setBreakdown} options={breakdownOptions} className="usage-segmented" />
                 </div>
-                {categories.length > 0 ? (
+                {breakdown === "model" ? (
+                    <UsageModelList items={models} metricName={metricName} />
+                ) : categories.length > 0 ? (
                     <>
                         <div className="usage-breakdown-bar" role="img" aria-label={categories.map((item) => `${usageCapabilityLabels[item.capability]} ${percentFormatter.format(item.share)}`).join("，")}>
                             {categories.map((item) => (
@@ -181,6 +207,38 @@ export default function UsageDashboardPane() {
                 )}
             </section>
         </div>
+    );
+}
+
+/** 模型排行：每行一个模型，条长按最多的那一行归一，便于横向比较。 */
+function UsageModelList({ items, metricName }: { items: UsageModelShare[]; metricName: string }) {
+    if (items.length === 0) {
+        return <p className="usage-empty-note">最近 365 天还没有{metricName}积分消耗，开始创作后这里会列出各模型的消耗。</p>;
+    }
+    const max = items.reduce((value, item) => Math.max(value, item.value), 0);
+    return (
+        <ol className="usage-model-list" aria-label={`${metricName}模型消耗排行`}>
+            {items.map((item) => (
+                <li key={item.key} className="usage-model-row">
+                    <span className="usage-model-name">
+                        <i className="usage-breakdown-dot" data-capability={item.capability ?? "other"} aria-hidden="true" />
+                        <span className="usage-model-label" title={item.code && item.code !== item.label ? item.code : undefined}>
+                            {item.label}
+                        </span>
+                        {item.capability ? <span className="usage-model-tag">{usageCapabilityLabels[item.capability]}</span> : null}
+                    </span>
+                    <span className="usage-model-bar" aria-hidden="true">
+                        <i data-capability={item.capability ?? "other"} style={{ width: `${max > 0 ? Math.max(2, (item.value / max) * 100).toFixed(2) : 0}%` }} />
+                    </span>
+                    <span className="usage-model-meta">
+                        <span>{item.count.toLocaleString("zh-CN")} 笔</span>
+                        <span>平均每笔 {formatUsageCreditsExact(item.average)}</span>
+                        <strong>{formatUsageCreditsExact(item.value)} 积分</strong>
+                    </span>
+                    <span className="usage-model-share">{percentFormatter.format(item.share)}</span>
+                </li>
+            ))}
+        </ol>
     );
 }
 
