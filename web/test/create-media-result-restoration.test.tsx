@@ -123,7 +123,7 @@ test("历史图片续签前后保留同一叠图、计数和操作栏，不闪�
         expect(host.querySelector(".creation-image-result-stack")).toBe(stack);
         expect(host.querySelector(".creation-media-actions")).toBe(actions);
         expect(actions?.textContent).toContain("2 张图片 · 成功 2/2");
-        expect(host.querySelector<HTMLImageElement>(".creation-image-result-stack-front .creation-image-square-original")?.src).toBe("https://media.example/restore-first.png");
+        expect(host.querySelector<HTMLImageElement>(".creation-image-result-stack-front .creation-result-image img")?.src).toBe("https://media.example/restore-first.png");
         expect(host.querySelector<HTMLButtonElement>(".creation-image-result-stack-front")?.disabled).toBe(false);
     } finally {
         await act(async () => root.unmount());
@@ -165,14 +165,14 @@ test("非方图批次展开为方形卡，部分地址续签仍保留卡片和�
 
         await act(release);
         expect(Array.from(host.querySelectorAll(".creation-image-result-grid-expanded .creation-image-result"))).toEqual(cards);
-        expect(cards[1].querySelector<HTMLImageElement>(".creation-image-square-original")?.src).toBe("https://media.example/partial-second.png");
+        expect(cards[1].querySelector<HTMLImageElement>(".creation-result-image img")?.src).toBe("https://media.example/partial-second.png");
         expect((cards[1] as HTMLElement).style.aspectRatio).toBe("1 / 1");
         await act(async () =>
             Array.from(host.querySelectorAll("button"))
                 .find((button) => button.textContent === "收起")!
                 .click(),
         );
-        expect(host.querySelector<HTMLImageElement>(".creation-image-result-stack-front .creation-image-square-original")?.src).toBe("https://media.example/partial-second.png");
+        expect(host.querySelector<HTMLImageElement>(".creation-image-result-stack-front .creation-result-image img")?.src).toBe("https://media.example/partial-second.png");
     } finally {
         await act(async () => root.unmount());
         await release();
