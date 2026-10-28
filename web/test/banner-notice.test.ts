@@ -206,6 +206,10 @@ describe("通知条主题色", () => {
             expect(adminUi).toContain(`var(${type.baseVar})`);
             expect(adminUi).toContain(`var(${type.glowVar})`);
         }
+        // 两端收边色各类型共用：只声明一次，通知条与类型卡片都引用它，不再各写一个色值。
+        expect(globals.match(/--notice-banner-edge: var\(--palette-banner-edge\)/g)?.length).toBe(1);
+        expect(bannerCss).toContain("var(--notice-banner-edge)");
+        expect(adminUi).toContain("var(--notice-banner-edge)");
         // 光效与按钮动画在减少动态效果时必须关闭。
         expect(bannerCss).toContain("@media (prefers-reduced-motion: reduce)");
     });

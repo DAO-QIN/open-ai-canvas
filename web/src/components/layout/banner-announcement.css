@@ -1,5 +1,6 @@
 /* 首页顶部常驻通知条（前台轮播与后台预览共用）。
- * 视觉层次：类型深色底 → 缓慢公转的光晕 → 倒计时数字块 / 标题 → 白色实心行动按钮。
+ * 视觉层次：深色底 → 文字背后缓慢游移的光晕 → 两端与底边收进中性深色 → 倒计时数字块 / 标题 → 白色实心行动按钮。
+ * 颜色集中在内容区，两端与导航栏同色衔接，换任何配色都不会在页面顶部切出一块孤立的色块。
  * 颜色全部来自 globals.css 的 --notice-banner-* token；「减少动态效果」时所有动画停用。 */
 
 /* 注册为颜色属性后，轮播切换不同类型时底色与光晕可以平滑过渡。 */
@@ -19,6 +20,7 @@
     --nb-base: var(--notice-banner-base-notice);
     --nb-glow: var(--notice-banner-glow-notice);
     --nb-ink: var(--notice-banner-ink-notice);
+    --nb-edge: var(--notice-banner-edge);
     --nb-height: 56px;
     --nb-side: 112px;
     position: relative;
@@ -58,59 +60,50 @@
 
 /* 后台自定义配色以内联 --nb-base / --nb-glow / --nb-ink 写在外壳上，优先于上面按类型选择的预设。 */
 
-/* 静态层：两侧柔光与底部细描边，动效关闭时依然有层次。 */
+/* 底层：深色底；不画光晕色描边，底边交给下面的收边层与导航栏自然衔接。 */
 .notice-banner-backdrop {
     position: absolute;
     inset: 0;
     z-index: -1;
     overflow: hidden;
     pointer-events: none;
-    background: radial-gradient(60% 150% at 100% 50%, color-mix(in srgb, var(--nb-glow) 30%, transparent), transparent 70%), radial-gradient(45% 130% at 0% 50%, color-mix(in srgb, var(--nb-glow) 16%, transparent), transparent 70%), var(--nb-base);
-    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--nb-glow) 34%, transparent);
+    background: var(--nb-base);
 }
 
-/* 流动光晕：比通知条大得多的椭圆光环绕中心缓慢公转，通知条只露出其中一段，形成持续流动的光带。
- * 光环最亮处为光晕色 56%，叠在深色底上白字仍满足 4.5:1（见 web/test/banner-notice.test.ts）。 */
+/* 收边层（盖在光晕之上）：左右两端渐变到中性深色，底边略微压暗，
+ * 通知条在页面两侧和下方都与导航栏同色衔接，颜色只留在内容区。 */
+.notice-banner-backdrop::after {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, var(--nb-edge), transparent 24%, transparent 76%, var(--nb-edge)), linear-gradient(0deg, color-mix(in srgb, var(--nb-edge) 45%, transparent), transparent 60%);
+    content: "";
+}
+
+/* 流动光晕：一团柔和的椭圆光停在文字和按钮背后，缓慢左右游移（起点和「光晕静止」都在正中）。
+ * 最亮处为光晕色 56%，叠在深色底上白字仍满足 4.5:1（见 web/test/banner-notice.test.ts）。 */
 .notice-banner-aurora {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 170%;
-    aspect-ratio: 1.3;
-    background: radial-gradient(
-        closest-side,
-        transparent 30%,
-        color-mix(in srgb, var(--nb-glow) 10%, transparent) 40%,
-        color-mix(in srgb, var(--nb-glow) 38%, transparent) 52%,
-        color-mix(in srgb, var(--nb-glow) 56%, transparent) 62%,
-        color-mix(in srgb, var(--nb-glow) 30%, transparent) 76%,
-        transparent 92%
-    );
-    transform: translate(-50%, -50%) rotate(0turn) translate(16%, 10%) scale(1.06);
-    animation: notice-banner-aurora 18s linear infinite;
+    inset: 0;
+    background: radial-gradient(44% 170% at 50% 50%, color-mix(in srgb, var(--nb-glow) 56%, transparent), color-mix(in srgb, var(--nb-glow) 25%, transparent) 45%, transparent 75%);
+    animation: notice-banner-aurora 16s ease-in-out infinite;
     will-change: transform;
 }
 
-/* 后台选择「光晕静止」：光晕停在初始位置，配色与按钮扫光保留。 */
+/* 后台选择「光晕静止」：光晕停在正中，配色与按钮扫光保留。 */
 .notice-banner[data-effect="static"] .notice-banner-aurora {
     animation: none;
 }
 
 @keyframes notice-banner-aurora {
-    0% {
-        transform: translate(-50%, -50%) rotate(0turn) translate(16%, 10%) scale(1.06);
+    0%,
+    100% {
+        transform: translateX(0);
     }
     25% {
-        transform: translate(-50%, -50%) rotate(0.25turn) translate(16%, 10%) scale(1);
-    }
-    50% {
-        transform: translate(-50%, -50%) rotate(0.5turn) translate(16%, 10%) scale(1.1);
+        transform: translateX(-12%);
     }
     75% {
-        transform: translate(-50%, -50%) rotate(0.75turn) translate(16%, 10%) scale(1.02);
-    }
-    100% {
-        transform: translate(-50%, -50%) rotate(1turn) translate(16%, 10%) scale(1.06);
+        transform: translateX(12%);
     }
 }
 
