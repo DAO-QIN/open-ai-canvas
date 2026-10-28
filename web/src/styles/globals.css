@@ -78,6 +78,8 @@
     --palette-banner-warning-950: #2b1203;
     --palette-banner-warning-300: #ffa23a;
     --palette-banner-warning-900: #5e2a00;
+    /* 通知条两端与底边收进的中性深色，与深色主题顶栏（--workspace-content）同色，通知条和导航栏连成一片。 */
+    --palette-banner-edge: #121213;
 
     /* --- 2. 间距（4px 栅格 + 半距）--- */
     --space-0: 0px;
@@ -843,9 +845,10 @@
     --notice-banner-surface: var(--notice-banner-surface-notice);
 
     /* 通知条本体（components/layout/banner-announcement.css 引用）：深色底、流动光晕与按钮文字色按类型取值，
-       明暗主题共用一套，不在 .dark 覆盖。 */
+       两端收边色各类型共用；明暗主题共用一套，不在 .dark 覆盖。 */
     --notice-banner-foreground: #ffffff;
     --notice-banner-cta-surface: #ffffff;
+    --notice-banner-edge: var(--palette-banner-edge);
     --notice-banner-base-notice: var(--palette-banner-notice-950);
     --notice-banner-glow-notice: var(--palette-banner-notice-300);
     --notice-banner-ink-notice: var(--palette-banner-notice-900);
