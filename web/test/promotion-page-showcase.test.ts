@@ -21,3 +21,18 @@ test("removed sticker copy stays out and reward accent is defined once per theme
     expect(styles.match(/--promo-accent:/g)?.length).toBe(1);
     expect(styles).toContain("prefers-reduced-motion");
 });
+
+test("consumer surfaces around the invite page use reward wording", () => {
+    const topBar = readFileSync(join(root, "src/components/layout/workspace-top-bar.tsx"), "utf8");
+    const wallet = readFileSync(join(root, "src/components/layout/workspace-wallet-modal.tsx"), "utf8");
+    // 活动关闭时顶栏沿用页面标题「我的奖励」，钱包流水同样不出现「返利」。
+    expect(topBar).toContain("promotionView.title");
+    expect(topBar).not.toContain('"返利"');
+    expect(wallet).toContain("邀请奖励领取");
+    expect(wallet).not.toContain("返利");
+});
+
+test("portrait product shots placed in wide tiles keep the product in frame", () => {
+    expect(page).toMatch(/case-96017ad7706f\.webp", label: "耳机广告", shape: "wide", focus: "\d+% \d+%"/);
+    expect(page).toContain("objectPosition: item.focus");
+});

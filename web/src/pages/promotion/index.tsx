@@ -25,7 +25,9 @@ const recordTabs = [
 ];
 
 // 首屏拼贴：AI 短剧与电商作品各半，全部来自站内已打包的灵感缩略图，不额外请求。
-const showcase = [
+// focus 指定裁切焦点：竖图放进横向卡片时，商品主体不在画面中央。
+type ShowcaseShot = { src: string; label: string; shape: "tall" | "wide"; focus?: string };
+const showcase: ShowcaseShot[][] = [
     [
         { src: "/short-drama-styles/retro-hong-kong.jpg", label: "港风短剧", shape: "tall" },
         { src: "/inspiration-thumbs/haohaoxue/luxury-skincare-ad.webp", label: "护肤主图", shape: "wide" },
@@ -36,9 +38,9 @@ const showcase = [
     ],
     [
         { src: "/short-drama-styles/cyberpunk-neon.jpg", label: "雨夜霓虹", shape: "tall" },
-        { src: "/inspiration-thumbs/seedance/case-96017ad7706f.webp", label: "耳机广告", shape: "wide" },
+        { src: "/inspiration-thumbs/seedance/case-96017ad7706f.webp", label: "耳机广告", shape: "wide", focus: "60% 76%" },
     ],
-] as const;
+];
 const tapeWords = ["AI 短剧", "商品主图", "电影预告", "带货视频", "模特换装", "角色设定", "详情页", "种草海报", "分镜画布", "产品大片"];
 
 export default function PromotionPage() {
@@ -261,7 +263,7 @@ function PromotionWorkspace({ userID }: { userID: string }) {
                                 <div className="promotion-collage-col" key={index}>
                                     {column.map((item) => (
                                         <figure className={`promotion-shot is-${item.shape}`} key={item.src}>
-                                            <img src={item.src} alt="" loading="lazy" decoding="async" draggable={false} />
+                                            <img src={item.src} alt="" loading="lazy" decoding="async" draggable={false} style={item.focus ? { objectPosition: item.focus } : undefined} />
                                             <figcaption>{item.label}</figcaption>
                                         </figure>
                                     ))}
