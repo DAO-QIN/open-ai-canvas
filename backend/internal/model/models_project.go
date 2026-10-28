@@ -491,8 +491,13 @@ type BannerAnnouncement struct {
 	// TitleRuns 是标题的样式分段，前端按段渲染；持久化在 title_runs 文本列，由仓储层显式编解码。
 	TitleRuns     []BannerTitleRun `json:"titleRuns,omitempty" gorm:"-"`
 	TitleRunsJSON string           `json:"-" gorm:"column:title_runs;type:text"`
-	// NoticeType 决定通知条配色（"notice" | "activity" | "update" | "warning"），取值白名单见 app 层。
+	// NoticeType 决定通知条的预设配色与默认按钮文案（"notice" | "activity" | "update" | "warning"），取值白名单见 app 层。
 	NoticeType string `json:"noticeType" gorm:"size:24"`
+	// BgColor / GlowColor 是自定义的通知条底色与光晕色（#RRGGBB）；空串跟随通知类型的预设配色。
+	BgColor   string `json:"bgColor" gorm:"size:7;not null;default:''"`
+	GlowColor string `json:"glowColor" gorm:"size:7;not null;default:''"`
+	// BgEffect 是通知条背景动效："aurora" 光晕流动，"static" 光晕静止。
+	BgEffect string `json:"bgEffect" gorm:"size:16;not null;default:'aurora'"`
 	// CtaText 是通知条行动按钮的文案；空串由前端按通知类型取默认文案，只在有跳转链接时展示。
 	CtaText string `json:"ctaText" gorm:"size:32;not null;default:''"`
 	Link    string `json:"link" gorm:"size:500"`        // 点击跳转目标：http(s) 外链或 / 开头的站内路径；空表示不可点击

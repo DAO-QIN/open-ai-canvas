@@ -22,9 +22,11 @@ import {
     type BannerNoticeType,
 } from "@/lib/announcements/banner-notice";
 import { bannerAnnouncementBarStyle } from "@/components/layout/banner-announcement-content";
+import { BANNER_EFFECT_DEFAULT, bannerColorHex, bannerHasCustomTheme, normalizeBannerEffect, readBannerPresetColors } from "@/lib/announcements/banner-theme";
 import { BANNER_TITLE_MAX_CHARS, bannerTitleCharCount, bannerTitlePlainText, normalizeBannerTitleRuns, type BannerTitleRun } from "@/lib/announcements/banner-title";
 import { AdminDataTable } from "./admin-ui";
 import { BannerNoticeTypeSelector } from "./banner-notice-type-selector";
+import { BannerThemePicker, bannerThemeSwatchStyle, type BannerThemeValue } from "./banner-theme-picker";
 import { BannerNoticePreview, BannerTitleEditor } from "./banner-title-editor";
 import { Select } from "@/components/ui/base/select";
 
@@ -40,12 +42,29 @@ type FormValues = {
 
 type BannerDialog = { mode: "create" } | { mode: "edit"; banner: BannerAnnouncement };
 
+const DEFAULT_THEME: BannerThemeValue = { bgColor: "", glowColor: "", bgEffect: BANNER_EFFECT_DEFAULT };
+
+/** 编辑已有通知时还原配色；只存了一种自定义颜色时，另一种用类型预设补齐，便于在取色器里继续调整。 */
+function bannerThemeDraft(banner: BannerAnnouncement): BannerThemeValue {
+    const bgColor = bannerColorHex(banner.bgColor);
+    const glowColor = bannerColorHex(banner.glowColor);
+    const preset = bgColor && glowColor ? null : bgColor || glowColor ? readBannerPresetColors(banner.noticeType) : null;
+    return {
+        bgColor: bgColor || (preset ? preset.base : ""),
+        glowColor: glowColor || (preset ? preset.glow : ""),
+        bgEffect: normalizeBannerEffect(banner.bgEffect),
+    };
+}
+
 /** 后端更新走显式字段表，漏传的字段会被清空：状态开关等局部修改也必须带上全部字段。 */
 function bannerPayload(banner: BannerAnnouncement, patch: Partial<AdminBannerPayload> = {}): AdminBannerPayload {
     return {
         title: banner.title,
         titleRuns: banner.titleRuns,
         noticeType: normalizeBannerNoticeType(banner.noticeType),
+        bgColor: banner.bgColor || "",
+        glowColor: banner.glowColor || "",
+        bgEffect: normalizeBannerEffect(banner.bgEffect),
         ctaText: banner.ctaText,
         link: banner.link,
         status: banner.status,
@@ -81,6 +100,7 @@ export default function AdminBannerAnnouncementsPanel({
     const [dialog, setDialog] = useState<BannerDialog | null>(null);
     const [titleRuns, setTitleRuns] = useState<BannerTitleRun[]>([]);
     const [noticeType, setNoticeType] = useState<BannerNoticeType>(BANNER_NOTICE_DEFAULT_TYPE);
+    const [theme, setTheme] = useState<BannerThemeValue>(DEFAULT_THEME);
     const [titleTouched, setTitleTouched] = useState(false);
     const [dirty, setDirty] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -110,6 +130,7 @@ export default function AdminBannerAnnouncementsPanel({
     const openCreate = useCallback(() => {
         setTitleRuns([]);
         setNoticeType(BANNER_NOTICE_DEFAULT_TYPE);
+        setTheme(DEFAULT_THEME);
         setTitleTouched(false);
         setDirty(false);
         form.resetFields();
@@ -134,6 +155,7 @@ export default function AdminBannerAnnouncementsPanel({
         const type = normalizeBannerNoticeType(banner.noticeType);
         setTitleRuns(initialRuns);
         setNoticeType(type);
+        setTheme(bannerThemeDraft(banner));
         setTitleTouched(false);
         setDirty(false);
         form.setFieldsValue({
@@ -177,7 +199,7 @@ export default function AdminBannerAnnouncementsPanel({
 
     const handleToggleStatus = async (banner: BannerAnnouncement, nextStatus: boolean) => {
         try {
-            // 只改状态，其余字段原样带回（含样式分段、类型、按钮文案、倒计时与展示顺序）。
+            // 只改状态，其余字段原样带回（含样式分段、类型、配色与动效、按钮文案、倒计时与展示顺序）。
             await updateAdminBanner(banner.id, bannerPayload(banner, { status: nextStatus ? "active" : "disabled" }));
             message.success(nextStatus ? "常驻通知已启用" : "常驻通知已禁用");
             void queryClient.invalidateQueries({ queryKey: ["active-banner-announcements"] });
@@ -208,6 +230,9 @@ export default function AdminBannerAnnouncementsPanel({
                 title: plain,
                 titleRuns: runs,
                 noticeType: selectedNoticeType,
+                bgColor: theme.bgColor,
+                glowColor: theme.glowColor,
+                bgEffect: theme.bgEffect,
                 ctaText: values.ctaText?.trim() || undefined,
                 link: values.link?.trim() || undefined,
                 status: values.status ? "active" : "disabled",
@@ -254,16 +279,31 @@ export default function AdminBannerAnnouncementsPanel({
         {
             title: "类型",
             key: "noticeType",
-            width: 92,
-            // 用真实底色渲染类型，和前台/预览看到的是同一个 token。
-            render: (_, record) => (
-                <span
-                    className="inline-flex items-center rounded-full px-2 py-0.5 text-[var(--fs-micro)] font-semibold text-white"
-                    style={bannerAnnouncementBarStyle(record.noticeType)}
-                >
-                    {bannerNoticeTypeLabel(record.noticeType)}
-                </span>
-            ),
+            width: 112,
+            // 用真实底色渲染类型，和前台/预览看到的是同一个 token；自定义配色在旁边显示实际色块。
+            render: (_, record) => {
+                const custom = bannerHasCustomTheme(record);
+                const preset = custom ? readBannerPresetColors(record.noticeType) : null;
+                return (
+                    <span className="inline-flex items-center gap-1.5">
+                        <span
+                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[var(--fs-micro)] font-semibold text-white"
+                            style={bannerAnnouncementBarStyle(record.noticeType)}
+                        >
+                            {bannerNoticeTypeLabel(record.noticeType)}
+                        </span>
+                        {preset ? (
+                            <span
+                                className="admin-banner-theme-swatch"
+                                style={bannerThemeSwatchStyle(bannerColorHex(record.bgColor) || preset.base, bannerColorHex(record.glowColor) || preset.glow)}
+                                title="自定义配色"
+                                aria-label="自定义配色"
+                                role="img"
+                            />
+                        ) : null}
+                    </span>
+                );
+            },
         },
         {
             title: "状态",
@@ -406,12 +446,23 @@ export default function AdminBannerAnnouncementsPanel({
                     onFinish={(values) => void handleSubmit(values)}
                     onValuesChange={() => setDirty(true)}
                 >
-                    <Form.Item name="noticeType" label="通知类型" extra="决定通知条底色；浅色 / 深色主题各有一档取值">
+                    <Form.Item name="noticeType" label="通知类型" extra="决定预设配色与默认按钮文案；配色可在下方改为自定义">
                         <BannerNoticeTypeSelector
                             value={noticeType}
                             onChange={(next) => {
                                 setNoticeType(next);
                                 form.setFieldValue("noticeType", next);
+                                setDirty(true);
+                            }}
+                        />
+                    </Form.Item>
+
+                    <Form.Item label="配色与动效" extra="跟随类型使用该类型的预设配色；自定义可挑推荐配色或自选底色、光晕色，按钮文字色自动匹配光晕色。深色底更醒目，明暗主题下效果一致">
+                        <BannerThemePicker
+                            value={theme}
+                            noticeType={noticeType}
+                            onChange={(next) => {
+                                setTheme(next);
                                 setDirty(true);
                             }}
                         />
@@ -448,6 +499,7 @@ export default function AdminBannerAnnouncementsPanel({
                             noticeType={noticeType}
                             ctaText={ctaValue}
                             countdownEndsAt={countdownValue && dateRangeValue?.[1] ? dateRangeValue[1].valueOf() : null}
+                            theme={theme}
                         />
                     </div>
 

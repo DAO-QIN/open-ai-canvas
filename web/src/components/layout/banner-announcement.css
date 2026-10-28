@@ -56,6 +56,8 @@
     --nb-ink: var(--notice-banner-ink-warning);
 }
 
+/* 后台自定义配色以内联 --nb-base / --nb-glow / --nb-ink 写在外壳上，优先于上面按类型选择的预设。 */
+
 /* 静态层：两侧柔光与底部细描边，动效关闭时依然有层次。 */
 .notice-banner-backdrop {
     position: absolute;
@@ -87,6 +89,11 @@
     transform: translate(-50%, -50%) rotate(0turn) translate(16%, 10%) scale(1.06);
     animation: notice-banner-aurora 18s linear infinite;
     will-change: transform;
+}
+
+/* 后台选择「光晕静止」：光晕停在初始位置，配色与按钮扫光保留。 */
+.notice-banner[data-effect="static"] .notice-banner-aurora {
+    animation: none;
 }
 
 @keyframes notice-banner-aurora {

@@ -11143,6 +11143,78 @@ html[data-magicui-theme-vt="active"] .admin-shell * {
     border-radius: 10px;
 }
 
+/* 通知条配色：跟随类型 / 自定义、动效切换、推荐配色与取色器。 */
+.admin-banner-theme {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.admin-banner-theme-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+}
+
+.admin-banner-theme-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.admin-banner-theme-preset {
+    display: inline-flex;
+    height: 28px;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--admin-card-border);
+    border-radius: 999px;
+    background: var(--admin-layer-1);
+    padding: 0 10px 0 4px;
+    color: var(--foreground);
+    font-size: var(--fs-label);
+    cursor: pointer;
+    transition:
+        border-color 160ms ease,
+        background-color 160ms ease;
+}
+
+.admin-banner-theme-preset:hover {
+    background: color-mix(in srgb, var(--foreground) 5%, var(--admin-layer-1));
+}
+
+.admin-banner-theme-preset.is-active {
+    border-color: color-mix(in srgb, var(--foreground) 32%, transparent);
+    background: var(--control-selected-bg);
+}
+
+.admin-banner-theme-preset:focus-visible {
+    outline: 1px solid color-mix(in srgb, var(--ring) 62%, transparent);
+    outline-offset: 1px;
+}
+
+/* 小圆色块：深色底上叠一团光晕，与通知条观感一致；颜色由内联变量传入。 */
+.admin-banner-theme-swatch {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background:
+        radial-gradient(circle at 70% 40%, var(--admin-banner-swatch-glow) 0, transparent 68%),
+        var(--admin-banner-swatch-base);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+
+.admin-banner-theme-color {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: color-mix(in srgb, var(--foreground) 70%, transparent);
+    font-size: var(--fs-label);
+}
+
 /* 常驻通知标题图标选择器 */
 .admin-banner-icon-picker {
     border: 1px solid var(--admin-card-border);

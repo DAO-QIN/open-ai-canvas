@@ -3,6 +3,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSPropert
 
 import { BANNER_TIMER_MAX_DELAY_MS, bannerCountdownParts, nextBoundaryAfter } from "@/lib/announcements/banner-feed";
 import { bannerNoticeSurfaceCSS, normalizeBannerNoticeType } from "@/lib/announcements/banner-notice";
+import { bannerThemeStyle, normalizeBannerEffect, type BannerThemeFields } from "@/lib/announcements/banner-theme";
 import { bannerTitlePlainText, bannerTitleRunStyle, type BannerTitleRun } from "@/lib/announcements/banner-title";
 import { cn } from "@/lib/utils";
 
@@ -55,10 +56,22 @@ export function useBannerNow(offset: number, ticking: boolean, boundaries: numbe
     return now;
 }
 
-/** 配色光效外壳：深色底 + 缓慢流动的光晕，内容与尾部操作由调用方放入。 */
-export function BannerAnnouncementShell({ noticeType, paused, trailing, className, children, ...rest }: HTMLAttributes<HTMLDivElement> & { noticeType?: string | null; paused?: boolean; trailing?: ReactNode }) {
+/**
+ * 配色光效外壳：深色底 + 光晕，内容与尾部操作由调用方放入。
+ * 预设配色由 data-notice-type 选择；theme 里的自定义颜色以 CSS 变量写在外壳上，优先于预设。
+ */
+export function BannerAnnouncementShell({
+    noticeType,
+    theme,
+    paused,
+    trailing,
+    className,
+    style,
+    children,
+    ...rest
+}: HTMLAttributes<HTMLDivElement> & { noticeType?: string | null; theme?: BannerThemeFields | null; paused?: boolean; trailing?: ReactNode }) {
     return (
-        <div {...rest} className={cn("notice-banner", paused && "is-paused", className)} data-notice-type={normalizeBannerNoticeType(noticeType)}>
+        <div {...rest} className={cn("notice-banner", paused && "is-paused", className)} style={{ ...bannerThemeStyle(theme), ...style }} data-notice-type={normalizeBannerNoticeType(noticeType)} data-effect={normalizeBannerEffect(theme?.bgEffect)}>
             <span className="notice-banner-backdrop" aria-hidden="true">
                 <span className="notice-banner-aurora" />
             </span>

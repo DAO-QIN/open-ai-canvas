@@ -318,6 +318,13 @@ test("banner announcement editor keeps title styles through edit, save and statu
     expect(panel).toContain("ctaText: banner.ctaText");
     expect(panel).toContain("showCountdown: Boolean(banner.showCountdown)");
     expect(panel).toContain("sortOrder: banner.sortOrder ?? 0");
+    // 自定义配色与动效同样随整包带回，并从编辑弹窗写入保存请求、实时联动预览。
+    expect(panel).toContain('bgColor: banner.bgColor || ""');
+    expect(panel).toContain('glowColor: banner.glowColor || ""');
+    expect(panel).toContain("bgEffect: normalizeBannerEffect(banner.bgEffect)");
+    expect(panel).toContain("bgColor: theme.bgColor, glowColor: theme.glowColor, bgEffect: theme.bgEffect");
+    expect(panel).toContain("<BannerThemePicker value={theme} noticeType={noticeType}");
+    expect(panel).toContain("theme={theme} />");
     // 通知类型在后台要有独立入口；emoji 图标不设独立字段，经编辑器「图标」按钮插入。
     expect(panel).toContain("<BannerNoticeTypeSelector");
     expect(panel).not.toContain("BannerNoticeIconPicker");
@@ -332,9 +339,11 @@ test("banner announcement editor keeps title styles through edit, save and statu
     expect(editorSource).toContain("<BannerNoticeEmojiPopover");
     expect(editorSource).toContain("insertContent(emoji)");
     expect(editorSource).not.toContain("BannerAnnouncementIcon");
-    // 预览必须走前台同一份展示单元，否则「预览即前台」不成立。
+    // 预览必须走前台同一份展示单元，否则「预览即前台」不成立；自定义配色同样传给外壳。
     expect(editorSource).toContain("<BannerAnnouncementShell");
     expect(editorSource).toContain("<BannerAnnouncementBody");
+    expect(compactSource(editorSource)).toContain("<BannerAnnouncementShell noticeType={noticeType} theme={theme}");
+    expect(slider).toContain("<BannerAnnouncementShell noticeType={current.noticeType} theme={current}");
 
     // 前台通知条必须按分段渲染，不能退回纯文本；配色来自当前通知的类型，标题前不再有固定图标。
     expect(sliderSource).toContain("<BannerAnnouncementBody");

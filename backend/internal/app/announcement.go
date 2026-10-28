@@ -518,6 +518,11 @@ type CreateBannerAnnouncementRequest struct {
 	// NoticeType 通知类型，决定通知条底色；空值按默认类型（公告）处理。
 	// 图标素材（emoji）内嵌在 TitleRuns 的文本里，不单独存字段。
 	NoticeType string `json:"noticeType"`
+	// BgColor / GlowColor 自定义底色与光晕色（#RRGGBB），空值跟随通知类型的预设配色。
+	BgColor   string `json:"bgColor"`
+	GlowColor string `json:"glowColor"`
+	// BgEffect 背景动效（aurora / static），空值按光晕流动处理。
+	BgEffect string `json:"bgEffect"`
 	// CtaText 行动按钮文案，空值由前端按通知类型取默认文案。
 	CtaText string `json:"ctaText"`
 	Link    string `json:"link"`
@@ -773,6 +778,37 @@ const (
 	bannerSortOrderMaximum = 999999
 )
 
+// 背景动效的取值白名单，必须与前端 web/src/lib/announcements/banner-theme.ts 的 BANNER_EFFECTS 逐项一致
+// （web/test/banner-theme.test.ts 会读本文件做双向校验）。
+var bannerEffects = map[string]struct{}{
+	"aurora": {}, "static": {},
+}
+
+const bannerEffectDefault = "aurora"
+
+func normalizeBannerEffect(value string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return bannerEffectDefault, nil
+	}
+	if _, ok := bannerEffects[normalized]; !ok {
+		return "", BadAuthRequest("背景动效无效，仅支持流动或静止")
+	}
+	return normalized, nil
+}
+
+// normalizeBannerColor 只接受 #RRGGBB，统一大写；空值表示跟随通知类型的预设配色。
+func normalizeBannerColor(value string, label string) (string, error) {
+	color := strings.ToUpper(strings.TrimSpace(value))
+	if color == "" {
+		return "", nil
+	}
+	if !isBannerTitleHexColor(color) {
+		return "", BadAuthRequest(label + "需为 #RRGGBB 格式")
+	}
+	return color, nil
+}
+
 // normalizeBannerCta 收拢按钮文案的空白；按钮固定单行，超过 12 个字会挤占标题。
 func normalizeBannerCta(text string) (string, error) {
 	text = strings.Join(strings.Fields(text), " ")
@@ -800,6 +836,18 @@ func applyBannerRequest(banner *model.BannerAnnouncement, req CreateBannerAnnoun
 	if err != nil {
 		return err
 	}
+	bgColor, err := normalizeBannerColor(req.BgColor, "通知条底色")
+	if err != nil {
+		return err
+	}
+	glowColor, err := normalizeBannerColor(req.GlowColor, "通知条光晕色")
+	if err != nil {
+		return err
+	}
+	bgEffect, err := normalizeBannerEffect(req.BgEffect)
+	if err != nil {
+		return err
+	}
 	status := strings.TrimSpace(req.Status)
 	if status != "active" && status != "disabled" {
 		return BadAuthRequest("通知状态无效，仅支持 active 或 disabled")
@@ -816,6 +864,9 @@ func applyBannerRequest(banner *model.BannerAnnouncement, req CreateBannerAnnoun
 	banner.Title = title
 	banner.TitleRuns = titleRuns
 	banner.NoticeType = noticeType
+	banner.BgColor = bgColor
+	banner.GlowColor = glowColor
+	banner.BgEffect = bgEffect
 	banner.CtaText = ctaText
 	banner.Link = link
 	banner.Status = status

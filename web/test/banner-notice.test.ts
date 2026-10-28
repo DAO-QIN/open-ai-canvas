@@ -117,7 +117,7 @@ describe("与后端白名单保持一致", () => {
         const goRepo = await readSource("../../backend/internal/repository/announcement.go");
         const start = goRepo.indexOf("func (r *Repository) UpdateBannerAnnouncement");
         const body = goRepo.slice(start, goRepo.indexOf("\n}", start));
-        for (const column of ["title", "title_runs", "notice_type", "cta_text", "link", "status", "show_countdown", "sort_order", "starts_at", "ends_at"]) {
+        for (const column of ["title", "title_runs", "notice_type", "bg_color", "glow_color", "bg_effect", "cta_text", "link", "status", "show_countdown", "sort_order", "starts_at", "ends_at"]) {
             expect(body).toContain(`"${column}":`);
         }
     });

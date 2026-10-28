@@ -120,6 +120,7 @@ export function BannerAnnouncementsSlider() {
     return (
         <BannerAnnouncementShell
             noticeType={current.noticeType}
+            theme={current}
             paused={paused}
             role="region"
             aria-label="站点通知"

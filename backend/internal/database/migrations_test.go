@@ -614,6 +614,49 @@ func TestMigrateSchemaV78AddsBannerCtaAndCountdown(t *testing.T) {
 	}
 }
 
+func TestMigrateSchemaV79AddsBannerTheme(t *testing.T) {
+	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-banner-theme-v79?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	legacy := &model.BannerAnnouncement{ID: "legacy-banner-v78", Title: "旧库通知", NoticeType: "activity", CtaText: "立即参与", Link: "/projects", Status: "active", SortOrder: 2}
+	if err := db.Create(legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	columns := []string{"bg_color", "glow_color", "bg_effect"}
+	for _, column := range columns {
+		if err := db.Migrator().DropColumn(&model.BannerAnnouncement{}, column); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Where("version = ?", 79).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatalf("upgrade from v78: %v", err)
+	}
+	for _, column := range columns {
+		if !db.Migrator().HasColumn(&model.BannerAnnouncement{}, column) {
+			t.Fatalf("v79 upgrade did not add banner_announcements.%s", column)
+		}
+	}
+	var stored model.BannerAnnouncement
+	if err := db.First(&stored, "id = ?", "legacy-banner-v78").Error; err != nil {
+		t.Fatal(err)
+	}
+	// 旧通知升级后跟随类型配色、光晕流动，其余字段原样保留。
+	if stored.BgColor != "" || stored.GlowColor != "" || stored.BgEffect != "aurora" || stored.NoticeType != "activity" || stored.CtaText != "立即参与" || stored.SortOrder != 2 {
+		t.Fatalf("legacy banner changed during upgrade: %+v", stored)
+	}
+	status, err := ReadSchemaStatus(db)
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
+		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
+	}
+}
+
 func TestMigrateSchemaV23BackfillsCanvasRevisions(t *testing.T) {
 	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-canvas-revisions-v23?mode=memory&cache=shared"})
 	if err != nil {
