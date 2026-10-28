@@ -207,9 +207,11 @@ describe("通知条主题色", () => {
             expect(adminUi).toContain(`var(${type.baseVar})`);
             expect(adminUi).toContain(`var(${type.glowVar})`);
         }
-        // 底边像素颗粒只在深色主题使用，颗粒边长按桌面端 0.9 缩放补偿。
-        expect(bannerCss).toMatch(/\.dark \.notice-banner-backdrop \{\s*-webkit-mask:/);
-        expect(bannerCss).toContain("--nb-pixel: calc(3px / 0.9)");
+        // 深色主题底边只做透明度渐隐（渐变遮罩、最底部完全透明），不再用像素颗粒图案；浅色主题不加遮罩。
+        const fade = bannerCss.match(/\.dark \.notice-banner-backdrop \{([^}]*)\}/)?.[1] ?? "";
+        expect(fade).toMatch(/-webkit-mask: linear-gradient\([^;]*transparent\);/);
+        expect(fade).toMatch(/\bmask: linear-gradient\([^;]*transparent\);/);
+        expect(bannerCss).not.toContain("svg+xml");
         // 光效与按钮动画在减少动态效果时必须关闭。
         expect(bannerCss).toContain("@media (prefers-reduced-motion: reduce)");
     });
