@@ -1,7 +1,6 @@
 import { http } from "@/services/api/request";
 import type { ModelTag } from "@/lib/model-tags";
 
-
 export type CreditAccount = {
     userId: string;
     availableMicrocredits: number;
@@ -246,6 +245,40 @@ export type BillingOrder = {
 
 export function getWallet(page = 1, pageSize = 30, type = "all") {
     return http.get<WalletSummary>("/wallet", { params: { type, page, pageSize } });
+}
+
+/** 一个本地自然日的积分消耗；服务端只返回有消耗的日期。 */
+export type CreditUsageDay = {
+    date: string;
+    totalMicrocredits: number;
+    agentMicrocredits: number;
+    count: number;
+    agentCount: number;
+};
+
+export type CreditUsageCapability = "image" | "video" | "audio" | "text" | "other";
+
+export type CreditUsageCategory = {
+    capability: CreditUsageCapability;
+    totalMicrocredits: number;
+    agentMicrocredits: number;
+    count: number;
+    agentCount: number;
+};
+
+/** 用量看板：截至今天（含）最近 365 个自然日，from/to 为含首尾的本地日期。 */
+export type CreditUsageReport = {
+    from: string;
+    to: string;
+    days: number;
+    timezoneOffset: number;
+    daily: CreditUsageDay[];
+    categories: CreditUsageCategory[];
+};
+
+/** timezoneOffset 为 UTC 偏移分钟数（东八区 480），服务端按它划分自然日。 */
+export function getCreditUsage(timezoneOffset: number, signal?: AbortSignal) {
+    return http.get<CreditUsageReport>("/wallet/usage", { params: { tzOffset: timezoneOffset }, signal });
 }
 
 export function redeemCredits(code: string) {

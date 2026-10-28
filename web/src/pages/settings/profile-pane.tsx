@@ -1,10 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Form, Input, Skeleton } from "antd";
-import { BadgeCheck, Camera, Check, ImagePlus, KeyRound, Mail, RefreshCw, ShieldCheck } from "lucide-react";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { BadgeCheck, Camera, Check, ChevronRight, ImagePlus, KeyRound, Mail, RefreshCw, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { UserAvatar } from "@/components/layout/user-avatar";
+import { UserAvatar, userAvatarImageURL } from "@/components/layout/user-avatar";
+import { useCreditUsage } from "@/hooks/use-credit-usage";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
+import { buildUsageDays, formatUsageCredits, recentUsageTotal, summarizeUsage } from "@/lib/credit-usage";
+import { openWorkspaceWallet } from "@/lib/workspace-wallet";
 import { ImageCropDialog, type ImageCropRect } from "@/components/image-crop-dialog";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { Callout } from "@/components/ui/product/callout";
@@ -16,7 +20,7 @@ import { invalidateAuthSessionCache, type LocalUser } from "@/services/api/auth"
 import { changeProfileEmail, changeProfilePassword, profileLinuxDOReauthURL, requestProfileEmailCode, selectDefaultProfileAvatar, uploadProfileAvatar, type UserProfile } from "@/services/api/profile";
 import { ApiError } from "@/services/api/request";
 import { useUserStore } from "@/stores/use-user-store";
-import { maskEmail, profileAvatarError, profilePasswordError, profilePasswordStrength, profileReauthReady, profileSecondsRemaining } from "./profile-validation";
+import { maskEmail, profileAvatarError, profileJoinedLabel, profilePasswordError, profilePasswordStrength, profileReauthReady, profileSecondsRemaining } from "./profile-validation";
 import "./profile-pane.css";
 
 type PasswordFields = { currentPassword: string; newPassword: string; confirmPassword: string };
@@ -28,15 +32,23 @@ type SecurityDialog = "password" | "email";
 
 const errorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
-export function ProfilePane() {
+export function ProfilePane({ onOpenUsage }: { onOpenUsage?: () => void } = {}) {
     const { message } = App.useApp();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const queryClient = useQueryClient();
     const userId = useUserStore((state) => state.user?.id);
+    const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const queryKey = ["user-profile", userId];
     const profileQuery = useQuery({ queryKey, queryFn: ({ signal }) => loadProfileSession(userId, signal), enabled: !!userId, retry: false, refetchOnWindowFocus: false, staleTime: 0 });
     const profile = profileQuery.data;
+    const wallet = useWalletBalance(userId, creditsEnabled);
+    const usageQuery = useCreditUsage(userId, creditsEnabled);
+    const usage = useMemo(() => {
+        if (!usageQuery.data) return null;
+        const days = buildUsageDays(usageQuery.data, "total");
+        return { recent30: recentUsageTotal(days, 30), activeDays: summarizeUsage(days).activeDays };
+    }, [usageQuery.data]);
     const [passwordForm] = Form.useForm<PasswordFields>();
     const [emailForm] = Form.useForm<EmailFields>();
     const [pending, setPending] = useState<PendingAction | null>(null);
@@ -293,6 +305,8 @@ export function ProfilePane() {
 
     const passwordStrength = profilePasswordStrength(newPasswordValue || "");
     const emailStatus = profile?.user.email ? (profile.user.emailVerifiedAt ? "verified" : "unverified") : "none";
+    const coverImage = profile ? userAvatarImageURL(profile.user) : "";
+    const joined = profileJoinedLabel(profile?.user.createdAt, now);
 
     return (
         <div className="profile-pane">
@@ -326,30 +340,48 @@ export function ProfilePane() {
                         <h3 id="profile-avatar-title" className="sr-only">
                             头像与账号
                         </h3>
-                        <button type="button" className="profile-hero-avatar" aria-label="更换头像图片" title="更换头像" disabled={!!pending} onClick={openAvatarDialog}>
-                            <UserAvatar user={profile.user} className="profile-avatar-preview" />
-                            <span className="profile-hero-avatar-overlay" aria-hidden>
-                                <Camera className="size-5" />
-                            </span>
-                        </button>
-                        <div className="profile-hero-identity">
-                            <strong>{profile.user.displayName || profile.user.username}</strong>
-                            <span>@{profile.user.username}</span>
-                            <div className="profile-hero-chips">
-                                <span className="profile-chip">{profile.user.role === "admin" ? "管理员" : "创作者"}</span>
-                                <span className={`profile-chip${emailStatus === "verified" ? " is-success" : emailStatus === "unverified" ? " is-warning" : ""}`}>
-                                    {emailStatus === "verified" ? <BadgeCheck className="size-3.5" /> : <Mail className="size-3.5" />}
-                                    {emailStatus === "verified" ? "邮箱已验证" : emailStatus === "unverified" ? "邮箱未验证" : "未绑定邮箱"}
+                        {/* 封面取自头像的大幅模糊，未设置图片头像时使用默认渐变。 */}
+                        <div className="profile-cover" aria-hidden="true">
+                            {coverImage ? <img className="profile-cover-image" src={coverImage} alt="" referrerPolicy="no-referrer" decoding="async" /> : null}
+                        </div>
+                        <div className="profile-hero-body">
+                            <button type="button" className="profile-hero-avatar" aria-label="更换头像图片" title="更换头像" disabled={!!pending} onClick={openAvatarDialog}>
+                                <UserAvatar user={profile.user} className="profile-avatar-preview" />
+                                <span className="profile-hero-avatar-overlay" aria-hidden>
+                                    <Camera className="size-5" />
                                 </span>
-                                <span className={`profile-chip${profile.hasPassword ? " is-success" : " is-warning"}`}>
-                                    <KeyRound className="size-3.5" />
-                                    {profile.hasPassword ? "已设置密码" : "未设置密码"}
-                                </span>
+                            </button>
+                            <div className="profile-hero-identity">
+                                <strong>{profile.user.displayName || profile.user.username}</strong>
+                                <span>@{profile.user.username}</span>
+                                <div className="profile-hero-chips">
+                                    <span className="profile-chip">{profile.user.role === "admin" ? "管理员" : "创作者"}</span>
+                                    <span className={`profile-chip${emailStatus === "verified" ? " is-success" : emailStatus === "unverified" ? " is-warning" : ""}`}>
+                                        {emailStatus === "verified" ? <BadgeCheck className="size-3.5" /> : <Mail className="size-3.5" />}
+                                        {emailStatus === "verified" ? "邮箱已验证" : emailStatus === "unverified" ? "邮箱未验证" : "未绑定邮箱"}
+                                    </span>
+                                    <span className={`profile-chip${profile.hasPassword ? " is-success" : " is-warning"}`}>
+                                        <KeyRound className="size-3.5" />
+                                        {profile.hasPassword ? "已设置密码" : "未设置密码"}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="profile-hero-actions">
+                                <Button icon={<ImagePlus className="size-4" />} disabled={!!pending} onClick={openAvatarDialog}>
+                                    更换头像
+                                </Button>
                             </div>
                         </div>
-                        <Button icon={<ImagePlus className="size-4" />} disabled={!!pending} onClick={openAvatarDialog}>
-                            更换头像
-                        </Button>
+                        <ul className="profile-stats" aria-label="账户概览">
+                            {creditsEnabled ? (
+                                <>
+                                    <ProfileStat label="可用积分" value={wallet.availableMicrocredits === null ? "—" : formatUsageCredits(wallet.availableMicrocredits)} actionLabel="打开积分中心" onClick={() => openWorkspaceWallet()} />
+                                    <ProfileStat label="近 30 天消耗" value={usage ? formatUsageCredits(usage.recent30) : "—"} actionLabel={onOpenUsage ? "查看用量看板" : undefined} onClick={onOpenUsage} />
+                                    <ProfileStat label="活跃天数" value={usage ? usage.activeDays.toLocaleString("zh-CN") : "—"} unit={usage ? "天" : undefined} hint="最近 365 天" />
+                                </>
+                            ) : null}
+                            <ProfileStat label="加入时间" value={joined.date} hint={joined.days} />
+                        </ul>
                     </section>
 
                     {!profile.hasPassword ? (
@@ -662,5 +694,34 @@ export function ProfilePane() {
                 />
             ) : null}
         </div>
+    );
+}
+
+/** 账户概览中的一项；可跳转的项整块可点，并保留与静态项相同的排版。 */
+function ProfileStat({ label, value, unit, hint, actionLabel, onClick }: { label: string; value: string; unit?: string; hint?: string; actionLabel?: string; onClick?: () => void }) {
+    const content = (
+        <>
+            <span className="profile-stat-label">{label}</span>
+            <span className="profile-stat-value">
+                {value}
+                {unit ? <small>{unit}</small> : null}
+            </span>
+            {hint ? <span className="profile-stat-hint">{hint}</span> : null}
+        </>
+    );
+    return (
+        <li>
+            {onClick ? (
+                <button type="button" className="profile-stat is-action" onClick={onClick} title={actionLabel}>
+                    {content}
+                    <span className="profile-stat-hint profile-stat-action">
+                        {actionLabel}
+                        <ChevronRight className="size-3.5" aria-hidden />
+                    </span>
+                </button>
+            ) : (
+                <div className="profile-stat">{content}</div>
+            )}
+        </li>
     );
 }

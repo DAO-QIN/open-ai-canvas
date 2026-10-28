@@ -42,3 +42,12 @@ export function maskEmail(email: string): string {
     const keep = name.length <= 5 ? 1 : 3;
     return `${name.slice(0, keep)}${"*".repeat(Math.min(4, Math.max(2, name.length - keep * 2)))}${name.slice(-keep)}${domain}`;
 }
+
+/** 账户概览的加入时间：按浏览器本地日期展示，加入当天记为第 1 天。 */
+export function profileJoinedLabel(createdAt: string | undefined, now: number): { date: string; days: string } {
+    const created = createdAt ? new Date(createdAt) : null;
+    if (!created || Number.isNaN(created.getTime())) return { date: "—", days: "" };
+    const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+    const days = Math.max(1, Math.round((startOfDay(new Date(now)) - startOfDay(created)) / 86_400_000) + 1);
+    return { date: `${created.getFullYear()}年${created.getMonth() + 1}月${created.getDate()}日`, days: `已加入 ${days.toLocaleString("zh-CN")} 天` };
+}

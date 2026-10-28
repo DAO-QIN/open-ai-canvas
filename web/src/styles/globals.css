@@ -18571,12 +18571,29 @@ html:not(.dark) .creation-history-drawer-root {
     background: var(--popover) !important;
     box-shadow: var(--elevation-overlay) !important;
 }
-.workspace-modal.library-modal.libtv-work-detail-dialog { width: min(1200px, calc(100vw - 32px)) !important; }
-.libtv-work-detail-dialog .ant-modal-close { top: 14px; right: 14px; color: color-mix(in srgb, var(--foreground) 48%, transparent); }
-.libtv-work-detail-dialog .ant-modal-close:hover { background: var(--surface-hover); color: var(--foreground); }
-.libtv-work-detail-dialog .ant-modal-body { max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+.workspace-modal.library-modal.libtv-work-detail-dialog {
+    width: min(1200px, calc(100vw - 32px)) !important;
+}
+.libtv-work-detail-dialog .ant-modal-close {
+    top: 14px;
+    right: 14px;
+    color: color-mix(in srgb, var(--foreground) 48%, transparent);
+}
+.libtv-work-detail-dialog .ant-modal-close:hover {
+    background: var(--surface-hover);
+    color: var(--foreground);
+}
+.libtv-work-detail-dialog .ant-modal-body {
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
 @media (min-width: 1024px) {
-    .libtv-work-detail-dialog .ant-modal-body { height: min(88dvh, 920px); max-height: none; overflow: hidden; }
+    .libtv-work-detail-dialog .ant-modal-body {
+        height: min(88dvh, 920px);
+        max-height: none;
+        overflow: hidden;
+    }
 }
 .canvas-shortcuts-modal .ant-modal-close {
     top: 16px;
@@ -26507,50 +26524,155 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
     }
 }
 
+/* 设置页：导航与内容直接落在页面底色上，内容由分组卡片承载；整页滚动，导航吸顶。
+   不再用一整块带边框的大面板包住导航和内容。明暗主题只切换语义 token。 */
 .app-user-workspace.settings-page {
+    --settings-frame-width: min(1240px, calc(100% - 64px));
+    --settings-nav-width: 208px;
     background: var(--user-page-bg);
+}
+
+/* 渠道、工作流与提示词编辑器需要更宽的工作区。 */
+.app-user-workspace.settings-page.is-wide {
+    --settings-frame-width: min(1680px, calc(100% - 64px));
 }
 
 .app-user-workspace.settings-page .settings-topbar {
     display: block;
+    width: var(--settings-frame-width);
     min-height: 0;
-    padding: 16px 32px 0;
+    margin: 0 auto;
+    padding: var(--space-4) 0 0;
     color: var(--user-ink);
 }
 
 .app-user-workspace.settings-page .settings-library-frame {
-    width: min(1680px, calc(100% - 64px));
-    margin: 20px auto 32px;
-    border: 1px solid var(--user-border);
-    border-radius: 16px;
-    background: var(--user-surface);
-    box-shadow:
-        0 1px 2px color-mix(in srgb, rgba(25, 25, 30, 0.035) 50%, transparent),
-        0 8px 24px rgba(25, 25, 30, 0.035);
+    display: grid;
+    width: var(--settings-frame-width);
+    grid-template-columns: var(--settings-nav-width) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-10);
+    margin: 0 auto;
+    padding: var(--space-7) 0 var(--space-16);
+    /* 导航吸顶依赖整页滚动容器，外框不能裁剪溢出。 */
+    overflow: visible;
 }
 
 .app-user-workspace.settings-page .settings-nav-panel {
-    border-right: 1px solid var(--user-border);
-    background: var(--user-surface-muted);
+    position: sticky;
+    top: var(--space-7);
+    min-width: 0;
+    background: transparent;
+}
+
+.app-user-workspace.settings-page .settings-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.app-user-workspace.settings-page .settings-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-half);
+}
+
+.app-user-workspace.settings-page .settings-nav-group-label {
+    padding: 0 var(--space-3) var(--space-1);
+    color: var(--user-ink-soft);
+    font-size: var(--fs-caption);
+    font-weight: 500;
+    letter-spacing: var(--ls-caps);
 }
 
 .app-user-workspace.settings-page .settings-nav-item {
-    margin: 4px 8px;
-    border-radius: 8px;
-    color: #6b6b73;
+    display: flex;
+    width: 100%;
+    min-height: 36px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--user-ink-muted);
+    font-size: var(--fs-ui);
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition:
+        background-color var(--motion-dur-fast) var(--motion-ease-out),
+        color var(--motion-dur-fast) var(--motion-ease-out),
+        box-shadow var(--motion-dur-fast) var(--motion-ease-out);
+}
+
+.app-user-workspace.settings-page .settings-nav-item-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--user-ink-soft);
+    transition: color var(--motion-dur-fast) var(--motion-ease-out);
+}
+
+.app-user-workspace.settings-page .settings-nav-item-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-user-workspace.settings-page .settings-nav-item:hover {
+    background: color-mix(in srgb, var(--user-ink) 5%, transparent);
+    color: var(--user-ink);
+}
+
+.app-user-workspace.settings-page .settings-nav-item:hover .settings-nav-item-icon,
+.app-user-workspace.settings-page .settings-nav-item.is-active .settings-nav-item-icon {
+    color: var(--user-ink);
 }
 
 .app-user-workspace.settings-page .settings-nav-item.is-active {
-    background: #ecebff;
-    color: #5148c2;
+    background: var(--user-surface);
+    color: var(--user-ink);
+    box-shadow: var(--elevation-hairline), var(--elevation-card);
+}
+
+.app-user-workspace.settings-page .settings-nav-item:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
 }
 
 .app-user-workspace.settings-page .settings-content {
-    background: var(--user-surface);
+    min-width: 0;
+    background: transparent;
+}
+
+/* 编辑器类分区（提示词偏好）在整页滚动下仍占满一屏：外壳给出最小高度，子树按 flex 撑开。 */
+.app-user-workspace.settings-page .settings-pane.is-fill {
+    display: flex;
+    min-height: max(560px, calc(100dvh - 220px));
+    flex-direction: column;
+}
+
+.app-user-workspace.settings-page .settings-pane.is-fill > * {
+    flex: 1 1 auto;
+}
+
+.app-user-workspace.settings-page .settings-pane-header {
+    gap: var(--space-3) var(--space-6);
+    margin-bottom: var(--space-6);
 }
 
 .app-user-workspace.settings-page .settings-pane-header h2 {
     color: var(--user-ink);
+    font-size: var(--fs-title);
+    font-weight: 600;
+    line-height: var(--lh-heading);
+    letter-spacing: var(--ls-title);
+}
+
+.app-user-workspace.settings-page .settings-pane-header p {
+    margin-top: 6px;
+    font-size: var(--fs-ui);
 }
 
 .app-user-workspace.settings-page .settings-pane-header p,
@@ -26561,7 +26683,7 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
 .app-user-workspace.settings-page .settings-channel,
 .app-user-workspace.settings-page .settings-preference-block {
     border: 1px solid var(--user-border);
-    border-radius: 12px;
+    border-radius: var(--user-radius-card);
     background: var(--user-surface);
 }
 
@@ -26577,17 +26699,52 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
     color: var(--user-ink-muted);
 }
 
-@media (max-width: 720px) {
-    .app-user-workspace.settings-page .settings-library-frame {
-        width: calc(100% - 24px);
-        margin-bottom: 16px;
+@media (prefers-reduced-motion: reduce) {
+    .app-user-workspace.settings-page .settings-nav-item,
+    .app-user-workspace.settings-page .settings-nav-item-icon {
+        transition: none;
     }
-    .app-user-workspace.settings-page .settings-topbar {
-        padding-inline: 16px;
+}
+
+@media (max-width: 767px) {
+    .app-user-workspace.settings-page,
+    .app-user-workspace.settings-page.is-wide {
+        --settings-frame-width: calc(100% - 24px);
+    }
+    /* 单列改用 flex：网格项的吸顶范围只有自己所在的行，flex 子项才能在整页范围内吸顶。 */
+    .app-user-workspace.settings-page .settings-library-frame {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-4);
+        padding: 0 0 var(--space-10);
     }
     .app-user-workspace.settings-page .settings-nav-panel {
-        border-right: 0;
+        top: 0;
+        z-index: 2;
+        margin-inline: calc(var(--space-3) * -1);
+        padding: var(--space-2) var(--space-3);
         border-bottom: 1px solid var(--user-border);
+        background: var(--user-page-bg);
+    }
+    .app-user-workspace.settings-page .settings-nav {
+        flex-direction: row;
+        gap: var(--space-1);
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .app-user-workspace.settings-page .settings-nav::-webkit-scrollbar {
+        display: none;
+    }
+    .app-user-workspace.settings-page .settings-nav-group {
+        display: contents;
+    }
+    .app-user-workspace.settings-page .settings-nav-group-label {
+        display: none;
+    }
+    .app-user-workspace.settings-page .settings-nav-item {
+        width: auto;
+        flex-shrink: 0;
     }
 }
 
@@ -27338,7 +27495,6 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
 /* Shared library surfaces: no dark-mode geometry fork, only token changes. */
 .app-user-workspace .library-page > div,
 .app-user-workspace .task-library-frame,
-.app-user-workspace .settings-library-frame,
 .app-user-workspace .assets-library-page .canvas-library-frame,
 .app-user-workspace .project-library-card,
 .app-user-workspace .task-grid-card,
@@ -27346,14 +27502,12 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
     color: var(--user-ink) !important;
 }
 .app-user-workspace .task-library-frame,
-.app-user-workspace .settings-library-frame,
 .app-user-workspace .assets-library-page .canvas-library-frame {
     border-color: var(--user-border) !important;
     background: var(--user-surface) !important;
     box-shadow: var(--user-shadow-card) !important;
 }
 .dark .app-user-workspace .task-library-frame,
-.dark .app-user-workspace .settings-library-frame,
 .dark .app-user-workspace .assets-library-page .canvas-library-frame {
     background: var(--user-surface) !important;
 }
@@ -27477,8 +27631,6 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
 .app-user-workspace .project-library-card,
 .app-user-workspace .skill-library-card,
 .app-user-workspace .assets-library-page .canvas-library-frame,
-.app-user-workspace .settings-library-frame,
-.app-user-workspace .settings-nav-panel,
 .app-user-workspace .settings-channel,
 .app-user-workspace .settings-preference-block {
     background: var(--user-surface) !important;
@@ -27497,13 +27649,6 @@ html:not(.dark) .creation-home .creation-user-message-copy-wrap {
     background: var(--user-surface-hover) !important;
     border-color: var(--user-border-strong) !important;
     box-shadow: var(--user-shadow-hover) !important;
-}
-.app-user-workspace .settings-nav-item {
-    color: var(--user-ink-muted) !important;
-}
-.app-user-workspace .settings-nav-item.is-active {
-    background: var(--user-accent-soft) !important;
-    color: var(--user-accent) !important;
 }
 .app-user-workspace :where(.ant-input, .ant-input-affix-wrapper, .ant-select-selector, .ant-picker, .ant-input-number) {
     border-color: var(--user-border) !important;

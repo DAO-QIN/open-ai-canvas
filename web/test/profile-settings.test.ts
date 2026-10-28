@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { maskEmail, profileAvatarError, PROFILE_AVATAR_MAX_BYTES, profilePasswordError, profilePasswordStrength, profileReauthReady, profileSecondsRemaining } from "../src/pages/settings/profile-validation";
+import { maskEmail, profileAvatarError, PROFILE_AVATAR_MAX_BYTES, profileJoinedLabel, profilePasswordError, profilePasswordStrength, profileReauthReady, profileSecondsRemaining } from "../src/pages/settings/profile-validation";
 import { settingsPath } from "../src/lib/settings-navigation";
 import { changeProfileEmail, changeProfilePassword, getUserProfile, profileLinuxDOReauthURL, requestProfileEmailCode, resetProfileAvatar, selectDefaultProfileAvatar, uploadProfileAvatar } from "../src/services/api/profile";
 import { ApiError, apiClient } from "../src/services/api/request";
@@ -49,6 +49,14 @@ describe("profile input and security expiry", () => {
         expect(settingsPath(undefined, true)).toBe("/settings?section=channels&continue=1");
         expect(settingsPath("models", true)).toBe("/settings?section=models&continue=1");
         expect(settingsPath("profile")).toBe("/settings?section=profile");
+        expect(settingsPath("usage")).toBe("/settings?section=usage");
+    });
+    test("labels the join date in local time and counts the join day as day one", () => {
+        const joined = new Date(2026, 8, 12, 23, 30).toISOString();
+        expect(profileJoinedLabel(joined, new Date(2026, 8, 12, 23, 59).getTime())).toEqual({ date: "2026年9月12日", days: "已加入 1 天" });
+        expect(profileJoinedLabel(joined, new Date(2026, 9, 28, 9, 0).getTime())).toEqual({ date: "2026年9月12日", days: "已加入 47 天" });
+        expect(profileJoinedLabel(undefined, Date.now())).toEqual({ date: "—", days: "" });
+        expect(profileJoinedLabel("not-a-date", Date.now())).toEqual({ date: "—", days: "" });
     });
 });
 

@@ -27,6 +27,7 @@ tags:
   - name: admin
   - name: skills
   - name: promotion
+  - name: wallet
   - name: workbench
 paths:
   /libtv/gallery:
@@ -134,6 +135,22 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
+  /wallet/usage:
+    get:
+      tags: [wallet]
+      summary: 读取当前账号最近 365 天的积分用量看板
+      description: 私有且不缓存，需积分功能开启。只统计 consume 流水（结算后的最终扣费），不含冻结、退款与收入；按 tzOffset 划分自然日，窗口为截至今天（含）的 365 天。Agent 用量包含 Agent 子任务、首页智能创作提交，以及 Agent 文本步骤、上下文压缩和记忆压缩。每用户每分钟 30 次。
+      parameters:
+        - { in: query, name: tzOffset, required: false, schema: { type: integer, minimum: -720, maximum: 840, default: 0 }, description: "UTC 偏移分钟数，东八区为 480" }
+      responses:
+        "200":
+          {
+            description: "成功信封 data={from,to,days,timezoneOffset,daily:[{date,totalMicrocredits,agentMicrocredits,count,agentCount}],categories:[{capability,totalMicrocredits,agentMicrocredits,count,agentCount}]}；daily 只含有消耗的日期并按日期升序，categories 的 capability 为 image|video|audio|text|other，按消耗降序",
+          }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /projects/{id}/assets/{assetId}/image:
     put:
       tags: [projects, assets]

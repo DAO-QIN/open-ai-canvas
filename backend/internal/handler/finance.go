@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"yingce/backend/internal/service"
@@ -67,6 +69,33 @@ func RegisterFinanceRoutes(r *gin.RouterGroup, svc *service.Service) {
 			return
 		}
 		ok(c, gin.H{"account": account, "granted": true})
+	})
+	// 用量看板：最近 365 个自然日的积分消耗，tzOffset 为浏览器 UTC 偏移分钟数（东八区 480）。
+	r.GET("/wallet/usage", func(c *gin.Context) {
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		if !enforceRateLimit(c, "wallet-usage:"+user.ID, 30, time.Minute) {
+			return
+		}
+		offset := 0
+		if raw := strings.TrimSpace(c.Query("tzOffset")); raw != "" {
+			parsed, parseErr := strconv.Atoi(raw)
+			if parseErr != nil {
+				failService(c, service.BadAuthRequest("tzOffset 必须是整数分钟"))
+				return
+			}
+			offset = parsed
+		}
+		report, err := svc.CreditUsage(user, offset)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		c.Header("Cache-Control", "private, no-store")
+		ok(c, report)
 	})
 
 	r.GET("/admin/settings/linuxdo", func(c *gin.Context) {
