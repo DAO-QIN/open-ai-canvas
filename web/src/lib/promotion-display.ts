@@ -5,7 +5,7 @@ export function promotionDisplay(overview?: PromotionOverview, readFailed = fals
     const hasHistory = Boolean(overview && (overview.inviteCount > 0 || BigInt(overview.totalMicrocredits) > BigInt(0)));
     return {
         canInvite,
-        title: canInvite ? "邀请有礼" : "我的返利",
+        title: canInvite ? "邀请有礼" : "我的奖励",
         // Unknown results and unfinished transfers must not hide access to existing rewards.
         showEntry: canInvite || hasHistory || !overview || readFailed || unresolvedTransfer,
     };
