@@ -65,7 +65,7 @@ export function CreationHistoryDrawer({
     const renameInputRef = useRef<HTMLInputElement>(null);
     const skipRenameCommitRef = useRef(false);
 
-    const assistantName = useAppearanceStore((state) => state.appearance.brandName);
+    const assistantName = useAppearanceStore((state) => state.appearance.canvas?.agentName || state.appearance.brandName);
     const exportUser = useUserStore((state) => state.user);
 
     const { message: drawerToast } = App.useApp();

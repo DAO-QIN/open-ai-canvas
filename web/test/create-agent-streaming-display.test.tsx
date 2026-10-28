@@ -25,6 +25,7 @@ for (const [key, value] of Object.entries({
 const { act } = await import("react");
 const { createRoot } = await import("react-dom/client");
 const { CreationMessageView } = await import("../src/pages/create/creation-workspace-messages");
+const { CreationResultImage } = await import("../src/pages/create/creation-result-image");
 afterAll(() => {
     dom.happyDOM.abort();
     for (const [key, value] of originals) {
@@ -95,6 +96,49 @@ test("等待媒体时展示真实任务状态而非思考，工具反馈与正�
         expect(host.querySelector(".creation-message-content")?.textContent).toContain("已查询创作素材");
         await act(async () => root.render(<CreationMessageView item={{ ...reply, status: "done", agentTextStreaming: false, agentActivity: "已查询创作素材" }} outputPreference="detailed" {...actions} />));
         expect(host.querySelector(".creation-message-content")?.textContent).not.toContain("已查询创作素材");
+    } finally {
+        await act(async () => root.unmount());
+        host.remove();
+    }
+});
+
+test("单图完成后去掉交付计数和通用处理动画，具体工具工作仍可展示", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const completed = { ...imageTask, status: "done" as const, resultUrls: ["/result.png"], batchTotal: 1, batchCompletedCount: 1 };
+    try {
+        await act(async () => root.render(<CreationMessageView item={{ ...reply, agentTextStreaming: false, content: "" }} agentTasks={[completed]} outputPreference="concise" {...actions} />));
+        expect(host.textContent).toContain("图片已生成");
+        for (const text of ["项交付", "成功 1/1", "正在处理请求", "批量下载"]) expect(host.textContent).not.toContain(text);
+        await act(async () => root.render(<CreationMessageView item={{ ...reply, agentTextStreaming: false, agentActivity: "正在整理创作方案" }} agentTasks={[completed]} outputPreference="concise" {...actions} />));
+        expect(host.textContent).toContain("正在整理创作方案");
+    } finally {
+        await act(async () => root.unmount());
+        host.remove();
+    }
+});
+
+test("图片加载失败后刷新原素材地址，成功后才允许预览", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    let reloads = 0;
+    let preview = "";
+    try {
+        await act(async () => root.render(<CreationResultImage url="/expired.png" alt="生成结果 1" onPreview={(url) => { preview = url; }} onReload={async () => { reloads++; return "/renewed.png"; }} />));
+        expect(host.textContent).toContain("图片加载中");
+        expect(host.querySelector<HTMLButtonElement>(".creation-result-image-open")!.disabled).toBe(true);
+        await act(async () => host.querySelector("img")!.dispatchEvent(new dom.Event("error")));
+        expect(host.querySelector(".creation-result-image")?.classList.contains("is-error")).toBe(true);
+        expect(host.textContent).toContain("图片暂时无法显示");
+        await act(async () => host.querySelector<HTMLButtonElement>(".creation-result-image-state button")!.click());
+        expect(reloads).toBe(1);
+        expect(host.querySelector("img")!.getAttribute("src")).toBe("/renewed.png");
+        await act(async () => host.querySelector("img")!.dispatchEvent(new dom.Event("load")));
+        expect(host.querySelector(".creation-result-image-state")).toBeNull();
+        await act(async () => host.querySelector<HTMLButtonElement>(".creation-result-image-open")!.click());
+        expect(preview).toBe("/renewed.png");
     } finally {
         await act(async () => root.unmount());
         host.remove();

@@ -1,4 +1,5 @@
 import { usableResultUrl } from "./creation-result-urls";
+import { CreationResultImage } from "./creation-result-image";
 import "./creation-results.css";
 // 创作页消息流：用户消息、媒体结果、生成中占位、引用素材与预览。
 
@@ -73,6 +74,7 @@ export function CreationMessageView({
     nested?: boolean;
 }) {
     const brandName = useAppearanceStore((state) => state.appearance.brandName);
+    const assistantName = useAppearanceStore((state) => state.appearance.canvas?.agentName || state.appearance.brandName);
     const [replyExpanded, setReplyExpanded] = useState(false);
     const [retryPending, setRetryPending] = useState(false);
     const replyId = useId();
@@ -89,6 +91,7 @@ export function CreationMessageView({
     const compactStructuredOutput = compactOutput && !item.agentQuestion && Boolean(item.commercePlan || agentTasks?.length);
     const collapsibleReply = compactStructuredOutput && !agentRunning && !textStreaming;
     const runningMediaCount = mediaTasks.filter((task) => task.agentRunId === item.agentRunId && !task.taskStatePending && (task.status === "pending" || task.status === "streaming")).length;
+    const mediaSettled = mediaTasks.length > 0 && mediaTasks.length >= Math.max(item.batchTotal || 0, item.commercePlan?.items.length || 0) && mediaTasks.every((task) => !task.taskStatePending && (task.status === "done" || task.status === "error" || task.status === "cancelled"));
     const agentActivity =
         mode === "agent" && agentRunning && !textStreaming && !item.agentQuestion
             ? item.agentActivity === "等待你确认"
@@ -97,7 +100,7 @@ export function CreationMessageView({
                   ? "正在同步任务状态…"
                   : runningMediaCount
                     ? `${runningMediaCount} 项媒体任务生成中…`
-                    : item.agentActivity || "正在处理请求…"
+                    : item.agentActivity || (mediaSettled ? "" : "正在处理请求…")
             : "";
     const failedMediaTasks = mode === "agent" && !agentRunning ? mediaTasks.filter((task) => task.agentRunId === item.agentRunId && task.status === "error") : [];
     const retryFailedItems = async () => {
@@ -138,7 +141,10 @@ export function CreationMessageView({
         .join("，");
     const deliveryTotal = Math.max(mediaTasks.length, item.batchTotal || 0, item.commercePlan?.items.length || 0);
     const multipleDeliveries = deliveryTotal > 1 || mediaTasks.some((task) => (task.batchTotal || 0) > 1);
-    const compactSummary = mediaTasks.length
+    const singleMedia = mediaTasks.length === 1 && deliveryTotal === 1 ? mediaTasks[0] : undefined;
+    const compactSummary = singleMedia?.status === "done" && !singleMedia.taskStatePending
+        ? `${singleMedia.mode === "video" ? "视频" : "图片"}已生成。`
+        : mediaTasks.length
         ? `${deliveryTotal} 项交付${taskSummary ? `：${taskSummary}${deliveryTotal > mediaTasks.length ? `，${deliveryTotal - mediaTasks.length} 项待提交` : ""}` : "，状态待确认"}。`
         : `创作方案已准备，共 ${deliveryTotal} 项交付。`;
     const stateLabel = item.submissionPending
@@ -179,7 +185,7 @@ export function CreationMessageView({
                         )}
                     </span>
                 ) : item.status === "done" ? (
-                    <span className="creation-message-progress-copy">你的{mode === "video" ? "视频" : "图像"}已创建</span>
+                    <span className="creation-message-progress-copy">{mode === "video" ? "视频" : "图片"}已生成</span>
                 ) : null}
                 {item.status === "done" && !item.agentRunId ? (
                     <button type="button" className="creation-message-variant-action" onClick={onCreateVariant}>
@@ -195,7 +201,7 @@ export function CreationMessageView({
                 {shotNumber > 0 ? <span className="creation-shot-badge">镜 {shotNumber}</span> : null}
                 <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<Sparkles />} />
                 <strong>
-                    <BrandWordmark name={brandName} />
+                    <BrandWordmark name={assistantName} />
                 </strong>
                 {item.createdAt ? <time dateTime={item.createdAt}>{formatMessageTime(item.createdAt)}</time> : null}
                 {stateLabel ? <span className={`creation-message-state is-${item.status}`}>{stateLabel}</span> : null}
@@ -255,7 +261,7 @@ export function CreationMessageView({
                         </div>
                     ) : null}
                     <div className="creation-message-content">
-                        {compactStructuredOutput ? (
+                        {compactStructuredOutput && !(singleMedia?.status === "done" && !singleMedia.taskStatePending) ? (
                             <p className="creation-agent-output-summary" role="status">
                                 {compactSummary}
                             </p>
@@ -499,14 +505,6 @@ function usableResultUrls(urls: string[]) {
     });
 }
 
-function SquareResultImage({ url, alt }: { url: string; alt: string }) {
-    return (
-        <span className="creation-image-square">
-            <img className="creation-image-square-original" src={url} alt={alt} />
-        </span>
-    );
-}
-
 export function MediaResult({
     item,
     submitting = false,
@@ -689,28 +687,30 @@ export function MediaResult({
             setDownloadingBatch(false);
         }
     };
+    const reloadImage = async (index: number) => {
+        const image = downloadImages[index];
+        if (!image.storageKey) return image.url;
+        if (resourceIdFromStorageKey(image.storageKey)) {
+            const access = await getResourceAccess(image.storageKey, "display", "original", "", { forceRefresh: true });
+            const url = resolveResourceAccessURL(access.url);
+            setResolvedByKey((current) => ({ ...current, [image.storageKey!]: url }));
+            return url;
+        }
+        return resolveImageUrl(image.storageKey, image.url);
+    };
     const imageResult = (url: string, index: number) => (
         <div key={downloadImages[index].storageKey || index} className="creation-image-result" style={displayResultUrls.length > 1 ? { aspectRatio: "1" } : !url ? { aspectRatio: creationMediaAspectRatio(item.settings?.ratio, "image") } : undefined}>
-            <button
-                type="button"
-                className="creation-image-result-preview"
-                disabled={!url}
-                onClick={() => {
+            <CreationResultImage
+                url={url}
+                alt={`生成结果 ${index + 1}`}
+                square={displayResultUrls.length > 1}
+                ratio={creationMediaAspectRatio(item.settings?.ratio, "image")}
+                onReload={() => reloadImage(index)}
+                onPreview={(loadedUrl) => {
                     setPreviewType("image");
-                    setPreviewUrl(url);
+                    setPreviewUrl(loadedUrl);
                 }}
-                aria-label={displayResultUrls.length === 1 ? "预览生成图片" : `预览生成图片 ${index + 1}`}
-            >
-                {url ? (
-                    displayResultUrls.length > 1 ? (
-                        <SquareResultImage url={url} alt={`生成结果 ${index + 1}`} />
-                    ) : (
-                        <img src={url} alt={`生成结果 ${index + 1}`} style={{ aspectRatio: `auto ${creationMediaAspectRatio(item.settings?.ratio, "image")}` }} />
-                    )
-                ) : (
-                    loadingResult
-                )}
-            </button>
+            />
             <button type="button" className="creation-image-result-download" onClick={() => void downloadImage(index)} disabled={downloadingBatch || downloadingImage !== null} aria-label={`下载生成图片 ${index + 1}`} title="下载图片">
                 <Download aria-hidden="true" />
             </button>
@@ -746,12 +746,12 @@ export function MediaResult({
                         <span className="creation-image-result-stack-cards">
                             {stackedUrls.map((url, index) => (
                                 <span key={index} className={`creation-image-result-stack-back is-back-${index + 1}`} aria-hidden="true">
-                                    {url ? <SquareResultImage url={url} alt="" /> : null}
+                                    {url ? <CreationResultImage url={url} alt="" square /> : null}
                                 </span>
                             ))}
-                            <button type="button" className="creation-image-result-stack-front" disabled={!activeBatchUrl} onClick={() => setBatchPreviewOpen(true)} aria-label={`展开预览第 ${batchPreviewIndex + 1} 张图片`}>
-                                {activeBatchUrl ? <SquareResultImage url={activeBatchUrl} alt={`生成结果 ${batchPreviewIndex + 1}`} /> : loadingResult}
-                            </button>
+                            <span className="creation-image-result-stack-front">
+                                <CreationResultImage key={batchPreviewIndex} url={activeBatchUrl} alt={`生成结果 ${batchPreviewIndex + 1}`} square previewLabel={`展开预览第 ${batchPreviewIndex + 1} 张图片`} onPreview={() => setBatchPreviewOpen(true)} onReload={() => reloadImage(batchPreviewIndex)} />
+                            </span>
                         </span>
                         <span className="creation-image-result-stack-controls" aria-label="切换批次图片">
                             <button type="button" onClick={() => moveBatchPreview(-1)} aria-label="上一张生成图片" title="上一张">
@@ -777,7 +777,7 @@ export function MediaResult({
                 <div className="creation-image-result-grid is-single">{imageResult(displayResultUrls[0], 0)}</div>
             )}
             <div className="creation-media-actions">
-                <span>{isVideo ? "视频结果" : `${displayResultUrls.length} 张图片${item.agentRunId && item.batchTotal ? ` · 成功 ${item.batchCompletedCount || 0}/${item.batchTotal}` : ""}`}</span>
+                {isVideo || displayResultUrls.length > 1 || (item.batchTotal || 0) > 1 ? <span>{isVideo ? "视频结果" : `已生成 ${displayResultUrls.length} 张${item.status === "pending" ? "，其余生成中" : item.batchFailedCount ? `，${item.batchFailedCount} 项未成功` : ""}`}</span> : null}
                 <Button type="link" size="small" loading={openingCanvas} disabled={!canContinueWithResults} title={canContinueWithResults ? undefined : "素材保存完成后才能转入画布"} onClick={() => onContinueCanvas(resultAssetIds)}>
                     添加到画布
                 </Button>
@@ -792,9 +792,9 @@ export function MediaResult({
                         下载
                     </a>
                 ) : (
-                    <Button type="link" size="small" loading={downloadingBatch} disabled={downloadingImage !== null} onClick={() => void downloadBatch()}>
+                    <Button type="link" size="small" loading={downloadingBatch || downloadingImage !== null} disabled={downloadingBatch || downloadingImage !== null} onClick={() => void (displayResultUrls.length > 1 ? downloadBatch() : downloadImage(0))}>
                         <Download />
-                        批量下载
+                        {displayResultUrls.length > 1 ? "批量下载" : "下载"}
                     </Button>
                 )}
             </div>
@@ -820,7 +820,7 @@ export function MediaResult({
                         <button type="button" className="creation-image-batch-preview-nav is-prev" onClick={() => moveBatchPreview(-1)} aria-label="上一张生成图片" title="上一张">
                             <ChevronLeft aria-hidden="true" />
                         </button>
-                        {activeBatchUrl ? <img src={activeBatchUrl} alt={`生成结果 ${batchPreviewIndex + 1}`} /> : loadingResult}
+                        <CreationResultImage key={batchPreviewIndex} url={activeBatchUrl} alt={`生成结果 ${batchPreviewIndex + 1}`} onReload={() => reloadImage(batchPreviewIndex)} />
                         <button type="button" className="creation-image-batch-preview-nav is-next" onClick={() => moveBatchPreview(1)} aria-label="下一张生成图片" title="下一张">
                             <ChevronRight aria-hidden="true" />
                         </button>
@@ -835,7 +835,7 @@ export function MediaResult({
                                 aria-label={`预览第 ${index + 1} 张图片`}
                                 aria-current={index === batchPreviewIndex ? "true" : undefined}
                             >
-                                {url ? <img src={url} alt={`生成结果缩略图 ${index + 1}`} /> : null}
+                                {url ? <CreationResultImage url={url} alt={`生成结果缩略图 ${index + 1}`} square /> : null}
                                 <span>{index + 1}</span>
                             </button>
                         ))}

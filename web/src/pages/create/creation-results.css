@@ -1,17 +1,30 @@
 /* Result components own their geometry: legacy message styles also target every span. */
 .creation-home .creation-image-result { position: relative; overflow: hidden; }
-.creation-home .creation-image-result-preview { display: block; width: 100%; height: 100%; border: 0; padding: 0; background: transparent; cursor: zoom-in; }
 .creation-home .creation-image-result-grid-expanded { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
 .creation-home .creation-image-result-grid-expanded .creation-image-result { width: 100%; }
-.creation-home .creation-image-result-grid-expanded .creation-image-result-preview { position: absolute; inset: 0; }
-.creation-home .creation-image-square,
-.creation-home .creation-image-result .creation-image-square { position: relative; inset: auto; display: block; width: 100%; height: 100%; overflow: hidden; border-radius: 0; background: var(--creation-surface-muted); color: inherit; opacity: 1; backdrop-filter: none; }
-.creation-home .creation-image-square > img,
-.creation-home .creation-image-result .creation-image-square > img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-height: none; object-fit: cover; object-position: center; }
+.creation-result-image,
+.creation-home .creation-image-result .creation-result-image { position: relative; inset: auto; display: block; width: 100%; overflow: hidden; border-radius: inherit; background: var(--creation-surface-muted); color: var(--creation-muted); opacity: 1; backdrop-filter: none; }
+.creation-result-image.is-square { height: 100%; }
+.creation-result-image-open { display: block; width: 100%; height: 100%; border: 0; padding: 0; background: transparent; cursor: zoom-in; }
+.creation-result-image-open:disabled { cursor: default; }
+.creation-result-image img,
+.creation-home .creation-image-result .creation-result-image img { display: block; width: 100%; height: auto; max-height: 68vh; object-fit: contain; }
+.creation-result-image.is-square img,
+.creation-home .creation-image-result .creation-result-image.is-square img { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; object-fit: cover; }
+.creation-result-image:not(.is-ready) img { visibility: hidden; }
+.creation-result-image-state,
+.creation-home .creation-image-result .creation-result-image-state { position: absolute; inset: 0; display: flex; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); border-radius: inherit; background: var(--creation-surface-muted); color: var(--creation-muted); opacity: 1; backdrop-filter: none; font-size: var(--fs-label); }
+.creation-result-image-state > span,
+.creation-home .creation-image-result .creation-result-image-state > span { position: static; display: block; width: auto; height: auto; background: transparent; color: inherit; opacity: 1; backdrop-filter: none; }
+.creation-result-image-state > svg { width: 24px; height: 24px; opacity: .55; }
+.creation-result-image-state button { display: inline-flex; align-items: center; gap: var(--space-1); border: 0; border-radius: var(--radius-sm); padding: var(--space-2); background: transparent; color: var(--creation-text); cursor: pointer; }
+.creation-result-image-state button svg { width: 14px; height: 14px; }
+.creation-result-image.is-loading .creation-result-image-state > svg { animation: creation-result-loading 1.8s ease-in-out infinite; }
+.creation-result-image button:focus-visible { outline: 2px solid var(--user-accent); outline-offset: -3px; }
+@keyframes creation-result-loading { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .creation-result-image.is-loading .creation-result-image-state > svg { animation: none; } }
 .creation-home .creation-image-result .creation-media-result-placeholder,
 .creation-home .creation-media-result-placeholder { position: static; display: grid; width: 100%; height: 100%; min-height: 120px; place-items: center; border-radius: 0; background: var(--creation-surface-muted); color: var(--creation-muted); opacity: 1; backdrop-filter: none; font-size: var(--fs-label); }
-.creation-home .creation-image-result-preview:disabled,
-.creation-home .creation-image-result-stack-front:disabled { cursor: default; }
 .creation-home .creation-image-result-stack { position: relative; display: block; width: min(320px, calc(100% - 24px)); aspect-ratio: 1; margin-bottom: 24px; color: var(--creation-text); }
 .creation-home .creation-image-result-stack-cards { position: absolute; inset: 0; display: block; }
 .creation-home .creation-image-result-stack-back { position: absolute; inset: 0; display: block; overflow: hidden; border-radius: 12px; background: var(--creation-surface-muted); opacity: .72; pointer-events: none; box-shadow: 0 8px 20px rgb(0 0 0 / 12%); }
@@ -34,7 +47,8 @@
 .creation-home .creation-image-result-stack-download:disabled { cursor: wait; opacity: .5; }
 .creation-image-batch-preview-viewer { display: flex; min-width: 0; flex-direction: column; gap: 12px; }
 .creation-image-batch-preview-stage { position: relative; display: flex; min-height: min(58vh, 620px); align-items: center; justify-content: center; overflow: hidden; }
-.creation-image-batch-preview-stage > img { display: block; max-width: 100%; max-height: 68vh; object-fit: contain; border-radius: 8px; }
+.creation-image-batch-preview-stage > .creation-result-image { display: block; width: auto; max-width: 100%; max-height: 68vh; border-radius: 8px; }
+.creation-image-batch-preview-stage .creation-result-image img { width: auto; max-width: 100%; max-height: 68vh; }
 .creation-image-batch-preview-nav { position: absolute; z-index: 1; top: 50%; display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; background: rgb(12 14 18 / 65%); color: white; transform: translateY(-50%); cursor: pointer; }
 .creation-image-batch-preview-nav.is-prev { left: 8px; }
 .creation-image-batch-preview-nav.is-next { right: 8px; }
@@ -42,7 +56,7 @@
 .creation-image-batch-preview-thumbs button { position: relative; width: 64px; height: 64px; flex: 0 0 64px; overflow: hidden; border: 2px solid transparent; border-radius: 8px; padding: 0; background: var(--library-cover-surface); cursor: pointer; }
 .creation-image-batch-preview-thumbs button.is-active { border-color: var(--user-accent, #818cf8); }
 .creation-image-batch-preview-thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.creation-image-batch-preview-thumbs span { position: absolute; right: 3px; bottom: 3px; border-radius: 4px; background: rgb(0 0 0 / 60%); color: white; padding: 0 4px; font-size: 11px; }
+.creation-image-batch-preview-thumbs button > span:not(.creation-result-image) { position: absolute; right: 3px; bottom: 3px; border-radius: 4px; background: rgb(0 0 0 / 60%); color: white; padding: 0 4px; font-size: 11px; }
 @media (max-width: 480px) {
     .creation-home .creation-image-result-grid-expanded { gap: 8px; }
     .creation-home .creation-image-result-download { width: 32px; height: 32px; right: 6px; bottom: 6px; }
