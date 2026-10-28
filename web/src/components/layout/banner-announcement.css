@@ -1,0 +1,507 @@
+/* 首页顶部常驻通知条（前台轮播与后台预览共用）。
+ * 视觉层次：类型深色底 → 缓慢公转的光晕 → 倒计时数字块 / 标题 → 白色实心行动按钮。
+ * 颜色全部来自 globals.css 的 --notice-banner-* token；「减少动态效果」时所有动画停用。 */
+
+/* 注册为颜色属性后，轮播切换不同类型时底色与光晕可以平滑过渡。 */
+@property --nb-base {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: transparent;
+}
+
+@property --nb-glow {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: transparent;
+}
+
+.notice-banner {
+    --nb-base: var(--notice-banner-base-notice);
+    --nb-glow: var(--notice-banner-glow-notice);
+    --nb-ink: var(--notice-banner-ink-notice);
+    --nb-height: 56px;
+    --nb-side: 112px;
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    width: 100%;
+    height: var(--nb-height);
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding-inline: var(--nb-side);
+    background-color: var(--nb-base);
+    color: var(--notice-banner-foreground);
+    transition:
+        --nb-base 420ms ease,
+        --nb-glow 420ms ease;
+}
+
+.notice-banner[data-notice-type="activity"] {
+    --nb-base: var(--notice-banner-base-activity);
+    --nb-glow: var(--notice-banner-glow-activity);
+    --nb-ink: var(--notice-banner-ink-activity);
+}
+
+.notice-banner[data-notice-type="update"] {
+    --nb-base: var(--notice-banner-base-update);
+    --nb-glow: var(--notice-banner-glow-update);
+    --nb-ink: var(--notice-banner-ink-update);
+}
+
+.notice-banner[data-notice-type="warning"] {
+    --nb-base: var(--notice-banner-base-warning);
+    --nb-glow: var(--notice-banner-glow-warning);
+    --nb-ink: var(--notice-banner-ink-warning);
+}
+
+/* 静态层：两侧柔光与底部细描边，动效关闭时依然有层次。 */
+.notice-banner-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    background: radial-gradient(60% 150% at 100% 50%, color-mix(in srgb, var(--nb-glow) 30%, transparent), transparent 70%), radial-gradient(45% 130% at 0% 50%, color-mix(in srgb, var(--nb-glow) 16%, transparent), transparent 70%), var(--nb-base);
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--nb-glow) 34%, transparent);
+}
+
+/* 流动光晕：比通知条大得多的椭圆光环绕中心缓慢公转，通知条只露出其中一段，形成持续流动的光带。
+ * 光环最亮处为光晕色 56%，叠在深色底上白字仍满足 4.5:1（见 web/test/banner-notice.test.ts）。 */
+.notice-banner-aurora {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 170%;
+    aspect-ratio: 1.3;
+    background: radial-gradient(
+        closest-side,
+        transparent 30%,
+        color-mix(in srgb, var(--nb-glow) 10%, transparent) 40%,
+        color-mix(in srgb, var(--nb-glow) 38%, transparent) 52%,
+        color-mix(in srgb, var(--nb-glow) 56%, transparent) 62%,
+        color-mix(in srgb, var(--nb-glow) 30%, transparent) 76%,
+        transparent 92%
+    );
+    transform: translate(-50%, -50%) rotate(0turn) translate(16%, 10%) scale(1.06);
+    animation: notice-banner-aurora 18s linear infinite;
+    will-change: transform;
+}
+
+@keyframes notice-banner-aurora {
+    0% {
+        transform: translate(-50%, -50%) rotate(0turn) translate(16%, 10%) scale(1.06);
+    }
+    25% {
+        transform: translate(-50%, -50%) rotate(0.25turn) translate(16%, 10%) scale(1);
+    }
+    50% {
+        transform: translate(-50%, -50%) rotate(0.5turn) translate(16%, 10%) scale(1.1);
+    }
+    75% {
+        transform: translate(-50%, -50%) rotate(0.75turn) translate(16%, 10%) scale(1.02);
+    }
+    100% {
+        transform: translate(-50%, -50%) rotate(1turn) translate(16%, 10%) scale(1.06);
+    }
+}
+
+.notice-banner-slide {
+    display: flex;
+    height: 100%;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 可点击区域（链接）或静态容器；按钮是其中的视觉落点，整段都能点。 */
+.notice-banner-content {
+    display: flex;
+    height: 44px;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 16px;
+    padding-inline: 10px;
+    border-radius: 12px;
+    color: inherit;
+    text-decoration: none;
+    outline: none;
+}
+
+a.notice-banner-content {
+    cursor: pointer;
+}
+
+a.notice-banner-content:hover {
+    color: inherit;
+}
+
+.notice-banner-content:focus-visible {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--notice-banner-foreground) 85%, transparent);
+}
+
+.notice-banner-title {
+    display: block;
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+    letter-spacing: 0.01em;
+    text-shadow: 0 1px 2px color-mix(in srgb, var(--nb-base) 70%, transparent);
+}
+
+.notice-banner-title-track {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: top;
+    white-space: nowrap;
+}
+
+.notice-banner-title.is-scrolling {
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 14px, black calc(100% - 14px), transparent);
+    mask-image: linear-gradient(90deg, transparent, black 14px, black calc(100% - 14px), transparent);
+}
+
+.notice-banner-title.is-scrolling .notice-banner-title-track {
+    max-width: none;
+    overflow: visible;
+    padding-inline: 14px;
+    animation: notice-banner-marquee var(--nb-marquee-duration, 10s) ease-in-out infinite alternate;
+}
+
+@keyframes notice-banner-marquee {
+    0%,
+    12% {
+        transform: translateX(0);
+    }
+    88%,
+    100% {
+        transform: translateX(var(--nb-marquee-distance, 0px));
+    }
+}
+
+/* 倒计时数字块：白底深字，与按钮同一组颜色。 */
+.notice-banner-countdown {
+    display: inline-flex;
+    height: 28px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 3px;
+    font-variant-numeric: tabular-nums;
+}
+
+.notice-banner-digit {
+    display: inline-grid;
+    width: 22px;
+    height: 28px;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 7px;
+    background: var(--notice-banner-cta-surface);
+    color: var(--nb-ink);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--nb-ink) 14%, transparent);
+}
+
+.notice-banner-digit-value {
+    display: block;
+    animation: notice-banner-digit-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes notice-banner-digit-in {
+    from {
+        opacity: 0;
+        transform: translateY(-70%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.notice-banner-countdown-colon {
+    width: 6px;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    opacity: 0.55;
+}
+
+/* 行动按钮：白底深字，悬停轻抬、箭头前探；每隔几秒一道淡淡的扫光提示可点击。 */
+.notice-banner-cta {
+    position: relative;
+    display: inline-flex;
+    height: 34px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    padding: 0 12px 0 14px;
+    border-radius: 9px;
+    background: var(--notice-banner-cta-surface);
+    color: var(--nb-ink);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--nb-glow) 90%, transparent);
+    transition:
+        transform 160ms ease,
+        box-shadow 160ms ease,
+        background-color 160ms ease;
+}
+
+.notice-banner-cta::after {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--nb-glow) 30%, transparent) 50%, transparent 70%);
+    content: "";
+    transform: translateX(-120%);
+    animation: notice-banner-cta-sheen 4.2s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes notice-banner-cta-sheen {
+    0%,
+    58% {
+        transform: translateX(-120%);
+    }
+    86%,
+    100% {
+        transform: translateX(120%);
+    }
+}
+
+.notice-banner-cta-label {
+    position: relative;
+}
+
+.notice-banner-cta-icon {
+    position: relative;
+    width: 15px;
+    height: 15px;
+    transition: transform 160ms ease;
+}
+
+a.notice-banner-content:hover .notice-banner-cta,
+.notice-banner-content:focus-visible .notice-banner-cta {
+    background: color-mix(in srgb, var(--nb-glow) 12%, var(--notice-banner-cta-surface));
+    box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--nb-glow) 95%, transparent);
+    transform: translateY(-1px);
+}
+
+a.notice-banner-content:hover .notice-banner-cta-icon,
+.notice-banner-content:focus-visible .notice-banner-cta-icon {
+    transform: translateX(3px);
+}
+
+a.notice-banner-content:active .notice-banner-cta {
+    transform: translateY(0);
+}
+
+/* 右侧：多条通知的切换圆点与关闭按钮。 */
+.notice-banner-trailing {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transform: translateY(-50%);
+}
+
+.notice-banner-dots {
+    display: flex;
+    align-items: center;
+}
+
+.notice-banner-dot {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.notice-banner-dot-mark {
+    position: relative;
+    display: block;
+    width: 6px;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--notice-banner-foreground) 38%, transparent);
+    transition:
+        width 200ms ease,
+        background-color 200ms ease;
+}
+
+.notice-banner-dot:hover .notice-banner-dot-mark {
+    background: color-mix(in srgb, var(--notice-banner-foreground) 62%, transparent);
+}
+
+.notice-banner-dot[aria-current="true"] .notice-banner-dot-mark {
+    width: 18px;
+    background: color-mix(in srgb, var(--notice-banner-foreground) 30%, transparent);
+}
+
+.notice-banner-dot-progress {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--notice-banner-foreground);
+    transform-origin: left center;
+    animation: notice-banner-progress var(--nb-rotate-ms, 6000ms) linear forwards;
+}
+
+@keyframes notice-banner-progress {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
+}
+
+.notice-banner-dot:focus-visible {
+    outline: 2px solid var(--notice-banner-foreground);
+    outline-offset: -2px;
+}
+
+.notice-banner-close {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: color-mix(in srgb, var(--notice-banner-foreground) 78%, transparent);
+    cursor: pointer;
+    transition:
+        background-color 160ms ease,
+        color 160ms ease;
+}
+
+.notice-banner-close:hover {
+    background: color-mix(in srgb, var(--notice-banner-foreground) 12%, transparent);
+    color: var(--notice-banner-foreground);
+}
+
+.notice-banner-close:focus-visible {
+    outline: 2px solid var(--notice-banner-foreground);
+    outline-offset: -2px;
+}
+
+.notice-banner-close svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* 悬停或聚焦时暂停轮播，进度、滚动标题一起停住。 */
+.notice-banner.is-paused .notice-banner-dot-progress,
+.notice-banner.is-paused .notice-banner-title-track {
+    animation-play-state: paused;
+}
+
+@media (max-width: 639px) {
+    .notice-banner {
+        --nb-height: 48px;
+        justify-content: flex-start;
+        padding-inline: 2px 44px;
+    }
+
+    .notice-banner-slide {
+        justify-content: flex-start;
+    }
+
+    .notice-banner-content {
+        height: 40px;
+        gap: 10px;
+        padding-inline: 8px;
+    }
+
+    .notice-banner-title {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .notice-banner-countdown {
+        height: 24px;
+        gap: 2px;
+    }
+
+    .notice-banner-digit {
+        width: 18px;
+        height: 24px;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .notice-banner-countdown-colon {
+        width: 5px;
+        font-size: 14px;
+    }
+
+    .notice-banner-cta {
+        height: 30px;
+        padding: 0 9px 0 11px;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+
+    .notice-banner-cta-icon {
+        width: 14px;
+        height: 14px;
+    }
+
+    .notice-banner-trailing {
+        right: 6px;
+    }
+
+    .notice-banner-dots {
+        display: none;
+    }
+}
+
+/* 窄屏放不下倒计时与标题，只保留标题和按钮。 */
+@media (max-width: 479px) {
+    .notice-banner-countdown {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .notice-banner {
+        transition: none;
+    }
+
+    .notice-banner-aurora,
+    .notice-banner-cta::after,
+    .notice-banner-digit-value,
+    .notice-banner-dot-progress,
+    .notice-banner-title.is-scrolling .notice-banner-title-track {
+        animation: none;
+    }
+
+    .notice-banner-cta,
+    .notice-banner-cta-icon,
+    .notice-banner-dot-mark {
+        transition: none;
+    }
+}

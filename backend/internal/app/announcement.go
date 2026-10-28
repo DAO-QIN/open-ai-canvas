@@ -517,12 +517,16 @@ type CreateBannerAnnouncementRequest struct {
 	TitleRuns []model.BannerTitleRun `json:"titleRuns"`
 	// NoticeType 通知类型，决定通知条底色；空值按默认类型（公告）处理。
 	// 图标素材（emoji）内嵌在 TitleRuns 的文本里，不单独存字段。
-	NoticeType string     `json:"noticeType"`
-	Link       string     `json:"link"`
-	Status     string     `json:"status"` // "active" | "disabled"
-	SortOrder  int        `json:"sortOrder"`
-	StartsAt   *time.Time `json:"startsAt"`
-	EndsAt     *time.Time `json:"endsAt"`
+	NoticeType string `json:"noticeType"`
+	// CtaText 行动按钮文案，空值由前端按通知类型取默认文案。
+	CtaText string `json:"ctaText"`
+	Link    string `json:"link"`
+	Status  string `json:"status"` // "active" | "disabled"
+	// ShowCountdown 开启后通知条倒计时到 EndsAt，必须同时设置结束时间。
+	ShowCountdown bool       `json:"showCountdown"`
+	SortOrder     int        `json:"sortOrder"`
+	StartsAt      *time.Time `json:"startsAt"`
+	EndsAt        *time.Time `json:"endsAt"`
 }
 
 type UpdateBannerAnnouncementRequest = CreateBannerAnnouncementRequest
@@ -534,6 +538,15 @@ type BannerAnnouncementPage struct {
 	Limit   int                        `json:"pageSize"`
 }
 
+// BannerAnnouncementFeed 是前台通知条的公开数据。
+// ServerTime 让前台用服务端时钟计算倒计时和到点下线；NextChangeAt 是下一次生效列表变化的时间
+// （预约通知开始或当前通知到期），前台到点重新拉取，预约的通知能准时出现。
+type BannerAnnouncementFeed struct {
+	Banners      []model.BannerAnnouncement `json:"banners"`
+	ServerTime   time.Time                  `json:"serverTime"`
+	NextChangeAt *time.Time                 `json:"nextChangeAt,omitempty"`
+}
+
 func (s *Service) ActiveBannerAnnouncements() ([]model.BannerAnnouncement, error) {
 	banners, err := s.repo.ActiveBannerAnnouncements(time.Now())
 	if err != nil {
@@ -543,6 +556,28 @@ func (s *Service) ActiveBannerAnnouncements() ([]model.BannerAnnouncement, error
 		banners = []model.BannerAnnouncement{}
 	}
 	return banners, nil
+}
+
+func (s *Service) BannerAnnouncementFeed() (*BannerAnnouncementFeed, error) {
+	now := time.Now()
+	banners, err := s.repo.ActiveBannerAnnouncements(now)
+	if err != nil {
+		return nil, err
+	}
+	if banners == nil {
+		banners = []model.BannerAnnouncement{}
+	}
+	next, err := s.repo.NextBannerAnnouncementStart(now)
+	if err != nil {
+		return nil, err
+	}
+	for _, banner := range banners {
+		if banner.EndsAt != nil && banner.EndsAt.After(now) && (next == nil || banner.EndsAt.Before(*next)) {
+			end := *banner.EndsAt
+			next = &end
+		}
+	}
+	return &BannerAnnouncementFeed{Banners: banners, ServerTime: now.UTC(), NextChangeAt: next}, nil
 }
 
 func (s *Service) AdminBannerAnnouncementPage(actor *model.User, query AdminListQuery) (*BannerAnnouncementPage, error) {
@@ -733,43 +768,72 @@ func normalizeBannerNoticeType(value string) (string, error) {
 	return normalized, nil
 }
 
+const (
+	bannerCtaMaxRunes      = 12
+	bannerSortOrderMaximum = 999999
+)
+
+// normalizeBannerCta 收拢按钮文案的空白；按钮固定单行，超过 12 个字会挤占标题。
+func normalizeBannerCta(text string) (string, error) {
+	text = strings.Join(strings.Fields(text), " ")
+	if utf8.RuneCountInString(text) > bannerCtaMaxRunes {
+		return "", BadAuthRequest("按钮文案不能超过 12 个字")
+	}
+	return text, nil
+}
+
+// applyBannerRequest 校验创建与更新共用的字段并写入 banner；任一字段非法时 banner 保持原样。
+func applyBannerRequest(banner *model.BannerAnnouncement, req CreateBannerAnnouncementRequest) error {
+	title, titleRuns, err := normalizeBannerTitle(req.Title, req.TitleRuns)
+	if err != nil {
+		return err
+	}
+	link, err := normalizeBannerLink(req.Link)
+	if err != nil {
+		return err
+	}
+	noticeType, err := normalizeBannerNoticeType(req.NoticeType)
+	if err != nil {
+		return err
+	}
+	ctaText, err := normalizeBannerCta(req.CtaText)
+	if err != nil {
+		return err
+	}
+	status := strings.TrimSpace(req.Status)
+	if status != "active" && status != "disabled" {
+		return BadAuthRequest("通知状态无效，仅支持 active 或 disabled")
+	}
+	if req.SortOrder < 0 || req.SortOrder > bannerSortOrderMaximum {
+		return BadAuthRequest("展示顺序需在 0 到 999999 之间")
+	}
+	if req.StartsAt != nil && req.EndsAt != nil && req.EndsAt.Before(*req.StartsAt) {
+		return BadAuthRequest("有效期结束时间不能早于开始时间")
+	}
+	if req.ShowCountdown && req.EndsAt == nil {
+		return BadAuthRequest("开启倒计时需要设置有效期结束时间")
+	}
+	banner.Title = title
+	banner.TitleRuns = titleRuns
+	banner.NoticeType = noticeType
+	banner.CtaText = ctaText
+	banner.Link = link
+	banner.Status = status
+	banner.ShowCountdown = req.ShowCountdown
+	banner.SortOrder = req.SortOrder
+	banner.StartsAt = req.StartsAt
+	banner.EndsAt = req.EndsAt
+	return nil
+}
+
 func (s *Service) CreateBannerAnnouncement(actor *model.User, req CreateBannerAnnouncementRequest) (*model.BannerAnnouncement, error) {
 	if err := s.RequireAdmin(actor); err != nil {
 		return nil, err
 	}
-	title, titleRuns, err := normalizeBannerTitle(req.Title, req.TitleRuns)
-	if err != nil {
-		return nil, err
-	}
-	link, err := normalizeBannerLink(req.Link)
-	if err != nil {
-		return nil, err
-	}
-	noticeType, err := normalizeBannerNoticeType(req.NoticeType)
-	if err != nil {
-		return nil, err
-	}
-	status := strings.TrimSpace(req.Status)
-	if status != "active" && status != "disabled" {
-		return nil, BadAuthRequest("通知状态无效，仅支持 active 或 disabled")
-	}
-	if req.StartsAt != nil && req.EndsAt != nil && req.EndsAt.Before(*req.StartsAt) {
-		return nil, BadAuthRequest("有效期结束时间不能早于开始时间")
-	}
 	now := time.Now()
-	banner := &model.BannerAnnouncement{
-		ID:         newID(),
-		Title:      title,
-		TitleRuns:  titleRuns,
-		NoticeType: noticeType,
-		Link:       link,
-		Status:     status,
-		SortOrder:  req.SortOrder,
-		StartsAt:   req.StartsAt,
-		EndsAt:     req.EndsAt,
-		CreatedBy:  actor.ID,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+	banner := &model.BannerAnnouncement{ID: newID(), CreatedBy: actor.ID, CreatedAt: now, UpdatedAt: now}
+	if err := applyBannerRequest(banner, req); err != nil {
+		return nil, err
 	}
 	if err := s.repo.CreateBannerAnnouncement(banner); err != nil {
 		return nil, err
@@ -788,35 +852,10 @@ func (s *Service) UpdateBannerAnnouncement(actor *model.User, id string, req Upd
 		}
 		return nil, err
 	}
-	title, titleRuns, err := normalizeBannerTitle(req.Title, req.TitleRuns)
-	if err != nil {
+	if err := applyBannerRequest(banner, req); err != nil {
 		return nil, err
 	}
-	link, err := normalizeBannerLink(req.Link)
-	if err != nil {
-		return nil, err
-	}
-	noticeType, err := normalizeBannerNoticeType(req.NoticeType)
-	if err != nil {
-		return nil, err
-	}
-	status := strings.TrimSpace(req.Status)
-	if status != "active" && status != "disabled" {
-		return nil, BadAuthRequest("通知状态无效，仅支持 active 或 disabled")
-	}
-	if req.StartsAt != nil && req.EndsAt != nil && req.EndsAt.Before(*req.StartsAt) {
-		return nil, BadAuthRequest("有效期结束时间不能早于开始时间")
-	}
-	banner.Title = title
-	banner.TitleRuns = titleRuns
-	banner.NoticeType = noticeType
-	banner.Link = link
-	banner.Status = status
-	banner.SortOrder = req.SortOrder
-	banner.StartsAt = req.StartsAt
-	banner.EndsAt = req.EndsAt
 	banner.UpdatedAt = time.Now()
-
 	if err := s.repo.UpdateBannerAnnouncement(banner); err != nil {
 		return nil, err
 	}

@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 77
+const CurrentSchemaVersion int64 = 78
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -289,6 +289,21 @@ var schemaMigrations = []migration{
 		}
 		return tx.Migrator().AddColumn(&model.DramaSegment{}, "ReferenceCastIDsJSON")
 	}},
+	{version: 78, name: "banner_cta_countdown", checksum: "sha256:banner-cta-countdown-v78-20261028", apply: migrateBannerCtaCountdown},
+}
+
+// migrateBannerCtaCountdown 为常驻通知增加行动按钮文案与倒计时开关。
+// 旧通知为空文案（前台按类型取默认文案）、不显示倒计时，展示内容不变。
+func migrateBannerCtaCountdown(tx *gorm.DB) error {
+	for _, field := range []string{"CtaText", "ShowCountdown"} {
+		if tx.Migrator().HasColumn(&model.BannerAnnouncement{}, field) {
+			continue
+		}
+		if err := tx.Migrator().AddColumn(&model.BannerAnnouncement{}, field); err != nil {
+			return fmt.Errorf("为常驻通知增加 %s：%w", field, err)
+		}
+	}
+	return nil
 }
 
 // migrateDramaSegmentMode 把旧的剧情段目标秒数改写为新的切段模式：大于 0 的是用户指定的固定时长，0 表示按模型上限，即智能。

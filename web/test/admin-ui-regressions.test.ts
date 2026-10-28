@@ -311,8 +311,13 @@ test("banner announcement editor keeps title styles through edit, save and statu
     // Modal 渲染在 body portal 里，必须挂 admin-modal-root 才能拿到弹窗作用域的强边框 / 分层 token，
     // 否则编辑器等自绘控件的边框回落到 :root 的 8% 透明度，肉眼不可见。
     expect(panel).toContain('rootClassName="admin-modal-root"');
-    // 非表单控件不能放进 Form.Item（会被注入 value/onChange/ref）。
-    expect(panel).toContain("<BannerNoticePreview runs={titleRuns} hasLink={Boolean(linkValue?.trim())} noticeType={noticeType} />");
+    // 非表单控件不能放进 Form.Item（会被注入 value/onChange/ref）；预览随按钮文案与倒计时实时联动。
+    expect(panel).toContain("<BannerNoticePreview runs={titleRuns} hasLink={Boolean(linkValue?.trim())} noticeType={noticeType} ctaText={ctaValue}");
+    // 状态开关只改 status，其余字段（含按钮文案、倒计时、展示顺序）由同一个整包函数带回。
+    expect(panel).toContain('bannerPayload(banner, { status: nextStatus ? "active" : "disabled" })');
+    expect(panel).toContain("ctaText: banner.ctaText");
+    expect(panel).toContain("showCountdown: Boolean(banner.showCountdown)");
+    expect(panel).toContain("sortOrder: banner.sortOrder ?? 0");
     // 通知类型在后台要有独立入口；emoji 图标不设独立字段，经编辑器「图标」按钮插入。
     expect(panel).toContain("<BannerNoticeTypeSelector");
     expect(panel).not.toContain("BannerNoticeIconPicker");
@@ -328,19 +333,22 @@ test("banner announcement editor keeps title styles through edit, save and statu
     expect(editorSource).toContain("insertContent(emoji)");
     expect(editorSource).not.toContain("BannerAnnouncementIcon");
     // 预览必须走前台同一份展示单元，否则「预览即前台」不成立。
-    expect(editorSource).toContain("bannerAnnouncementBarStyle(noticeType)");
+    expect(editorSource).toContain("<BannerAnnouncementShell");
+    expect(editorSource).toContain("<BannerAnnouncementBody");
 
-    // 前台通知条必须按分段渲染，不能退回纯文本；底色来自当前通知的类型，标题前不再有固定图标。
-    expect(sliderSource).toContain("BannerAnnouncementTitle");
-    expect(sliderSource).toContain("currentBanner.titleRuns");
-    expect(slider).toContain("bannerAnnouncementBarStyle(currentBanner.noticeType)");
+    // 前台通知条必须按分段渲染，不能退回纯文本；配色来自当前通知的类型，标题前不再有固定图标。
+    expect(sliderSource).toContain("<BannerAnnouncementBody");
+    expect(sliderSource).toContain("titleRuns={current.titleRuns}");
+    expect(slider).toContain("<BannerAnnouncementShell noticeType={current.noticeType}");
     expect(slider).not.toContain("BannerAnnouncementIcon");
     expect(slider).not.toContain("notice-banner-surface");
 
-    // 展示单元是唯一来源：底色、富文本标题、详情入口都在这里定义，前台与预览共用；
+    // 展示单元是唯一来源：配色外壳、倒计时、富文本标题、行动按钮都在这里定义，前台与预览共用；
     // 图标素材是标题文本的一部分，展示单元不再单独处理图标。
     expect(contentSource).toContain("export function bannerAnnouncementBarStyle");
-    expect(contentSource).toContain("export function BannerAnnouncementLinkHint");
+    expect(contentSource).toContain("export function BannerAnnouncementShell");
+    expect(contentSource).toContain("export function BannerAnnouncementCta");
+    expect(contentSource).toContain("export function BannerAnnouncementCountdown");
     expect(contentSource).toContain("export function BannerAnnouncementTitle");
     expect(contentSource).not.toContain("BannerAnnouncementIcon");
 
@@ -352,6 +360,9 @@ test("banner announcement editor keeps title styles through edit, save and statu
 
     expect(apiSource).toContain("titleRuns?: BannerTitleRun[]");
     expect(apiSource).toContain("noticeType?: BannerNoticeType");
+    expect(apiSource).toContain("ctaText?: string");
+    expect(apiSource).toContain("showCountdown?: boolean");
+    expect(apiSource).toContain("http.get<BannerAnnouncementFeed>");
     expect(apiSource).not.toContain("icon?:");
     expect(apiSource).toContain("export type { BannerTitleRun }");
 });

@@ -1,143 +1,194 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
+import { Link } from "react-router";
 
 import { getActiveBanners, type BannerAnnouncement } from "@/services/api/announcements";
-import {
-    BannerAnnouncementLinkHint,
-    BannerAnnouncementTitle,
-    bannerAnnouncementBarStyle,
-} from "@/components/layout/banner-announcement-content";
+import { BannerAnnouncementBody, BannerAnnouncementShell, useBannerNow } from "@/components/layout/banner-announcement-content";
+import { bannerBoundaries, bannerClockOffset, bannerCountdownTarget, bannerRefreshDelay, bannerVersion, mergeBannerDismissals, parseBannerDismissals, serializeBannerDismissals, visibleBanners } from "@/lib/announcements/banner-feed";
+import { bannerCtaLabel } from "@/lib/announcements/banner-notice";
 import { useUserStore } from "@/stores/use-user-store";
 
-const BANNER_AUTO_SLIDE_MS = 4000;
+const BANNER_ROTATE_MS = 6000;
+const BANNER_POLL_MS = 3 * 60_000;
 const BANNER_DISMISS_STORAGE_PREFIX = "yingce.banner-announcements.dismissed";
+const EMPTY_BANNERS: BannerAnnouncement[] = [];
 
 export function BannerAnnouncementsSlider() {
-    const navigate = useNavigate();
-    const reducedMotion = useReducedMotion();
+    const reducedMotion = Boolean(useReducedMotion());
     const userId = useUserStore((state) => state.user?.id);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [dismissed, setDismissed] = useState(false);
-
-    const { data } = useQuery({
+    const { data, dataUpdatedAt, refetch } = useQuery({
         queryKey: ["active-banner-announcements"],
         queryFn: getActiveBanners,
         staleTime: 60_000,
-        refetchInterval: 3 * 60_000,
+        refetchInterval: BANNER_POLL_MS,
     });
 
-    const banners = data?.banners || [];
-    const fingerprint = bannerFeedFingerprint(banners);
-    const hasLink = Boolean(banners[currentIndex % Math.max(banners.length, 1)]?.link);
+    const feed = data?.banners ?? EMPTY_BANNERS;
+    // 倒计时、到点下线都按服务端时钟计算，本机时间不准也不会提前或延后。
+    const offset = useMemo(() => bannerClockOffset(data?.serverTime, dataUpdatedAt), [data?.serverTime, dataUpdatedAt]);
+
+    // 关闭记录按「用户 + 条目版本」保存：后台新增或重新编辑的通知会再次出现，其他通知到期不会让已关闭的复现。
+    const [dismissed, setDismissed] = useState(() => readDismissals(userId));
+    useEffect(() => {
+        setDismissed(readDismissals(userId));
+    }, [userId]);
+
+    const candidates = useMemo(() => feed.filter((banner) => !dismissed.has(bannerVersion(banner))), [feed, dismissed]);
+    const boundaries = useMemo(() => bannerBoundaries(candidates), [candidates]);
+    const ticking = candidates.some((banner) => banner.showCountdown && banner.endsAt);
+    const now = useBannerNow(offset, ticking, boundaries);
+    const visible = useMemo(() => visibleBanners(feed, now, dismissed), [feed, now, dismissed]);
+
+    // 预约通知开始或当前通知到期时立即重新拉取，不等常规轮询。
+    useEffect(() => {
+        const delay = bannerRefreshDelay(data?.nextChangeAt, Date.now() + offset);
+        if (delay === null) return;
+        const timer = window.setTimeout(() => void refetch(), delay + 600);
+        return () => window.clearTimeout(timer);
+    }, [data?.nextChangeAt, offset, refetch]);
+
+    const [hovered, setHovered] = useState(false);
+    const [focused, setFocused] = useState(false);
+    const pageHidden = usePageHidden();
+    const paused = hovered || focused || pageHidden;
+
+    // 轮播按条目 ID 跟踪当前项：列表刷新、排序变化或某条到期时不会跳到别的通知上。
+    const [activeId, setActiveId] = useState<string>();
+    const current = visible.find((banner) => banner.id === activeId) ?? visible[0];
+    const currentId = current?.id;
+    const ids = visible.map((banner) => banner.id);
+    const idsKey = ids.join("|");
+    const remainingRef = useRef(BANNER_ROTATE_MS);
 
     useEffect(() => {
-        if (banners.length <= 1) return;
-        const timer = window.setInterval(() => {
-            setCurrentIndex((prev) => (prev + 1) % banners.length);
-        }, BANNER_AUTO_SLIDE_MS);
-        return () => window.clearInterval(timer);
-    }, [banners.length]);
+        remainingRef.current = BANNER_ROTATE_MS;
+    }, [currentId]);
 
-    const handleClick = () => {
-        const current = banners[currentIndex % Math.max(banners.length, 1)];
-        if (!current?.link) return;
-        if (/^https?:\/\//i.test(current.link)) {
-            window.open(current.link, "_blank", "noopener,noreferrer");
-            return;
-        }
-        navigate(current.link);
-    };
-
-    // banners 数量变化时把下标收拢到有效范围，避免残留越界值。
     useEffect(() => {
-        if (banners.length > 0 && currentIndex >= banners.length) {
-            setCurrentIndex(0);
-        }
-    }, [banners.length, currentIndex]);
+        if (!currentId || ids.length <= 1 || paused) return;
+        const startedAt = performance.now();
+        const timer = window.setTimeout(() => {
+            const index = ids.indexOf(currentId);
+            setActiveId(ids[(index + 1) % ids.length]);
+        }, remainingRef.current);
+        // 暂停时记下剩余时间，恢复后接着走，与圆点进度条保持一致。
+        return () => {
+            window.clearTimeout(timer);
+            remainingRef.current = Math.max(0, remainingRef.current - (performance.now() - startedAt));
+        };
+        // ids 的内容由 idsKey 表达。
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentId, idsKey, paused]);
 
-    // 关闭状态按「用户 + 通知快照」记录：后台新增或重新编辑通知后快照变化，通知条会再次出现。
-    useEffect(() => {
-        setDismissed(fingerprint ? hasBannerDismissal(userId, fingerprint) : false);
-    }, [fingerprint, userId]);
+    if (!current) return null;
 
     const handleDismiss = () => {
-        rememberBannerDismissal(userId, fingerprint);
-        setDismissed(true);
+        const next = mergeBannerDismissals(dismissed, feed, visible);
+        writeDismissals(userId, next);
+        setDismissed(next);
     };
 
-    if (!banners.length || dismissed) return null;
-    const currentBanner = banners[currentIndex % banners.length];
+    const handleBlur = (event: FocusEvent<HTMLDivElement>) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
+    };
 
-    // 底色随每条通知的类型切换：加过渡让不同风格的条目轮播时平滑换色，与标题动画节奏一致。
+    const link = current.link?.trim();
+    const body = (
+        <BannerAnnouncementBody
+            titleRuns={current.titleRuns}
+            title={current.title}
+            ctaLabel={link ? bannerCtaLabel(current.ctaText, current.noticeType) : undefined}
+            countdownTarget={bannerCountdownTarget(current, now)}
+            now={now}
+            motion={!reducedMotion}
+        />
+    );
+    const content = !link ? (
+        <div className="notice-banner-content">{body}</div>
+    ) : /^https?:\/\//i.test(link) ? (
+        <a className="notice-banner-content" href={link} target="_blank" rel="noopener noreferrer">
+            {body}
+        </a>
+    ) : (
+        <Link className="notice-banner-content" to={link}>
+            {body}
+        </Link>
+    );
+
     return (
-        <div
-            className="relative flex min-h-10 w-full shrink-0 items-center justify-center px-4 py-2 text-white transition-colors duration-200 ease-out"
-            style={bannerAnnouncementBarStyle(currentBanner.noticeType)}
+        <BannerAnnouncementShell
+            noticeType={current.noticeType}
+            paused={paused}
+            role="region"
+            aria-label="站点通知"
+            style={{ "--nb-rotate-ms": `${BANNER_ROTATE_MS}ms` } as CSSProperties}
+            onPointerEnter={() => setHovered(true)}
+            onPointerLeave={() => setHovered(false)}
+            onFocus={() => setFocused(true)}
+            onBlur={handleBlur}
+            trailing={
+                <>
+                    {visible.length > 1 ? (
+                        <div className="notice-banner-dots" role="group" aria-label="切换通知">
+                            {visible.map((banner, index) => {
+                                const active = banner.id === current.id;
+                                return (
+                                    <button key={banner.id} type="button" className="notice-banner-dot" aria-label={`第 ${index + 1} 条通知`} aria-current={active ? "true" : undefined} onClick={() => setActiveId(banner.id)}>
+                                        <span className="notice-banner-dot-mark">{active ? <span key={banner.id} className="notice-banner-dot-progress" /> : null}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+                    <button type="button" className="notice-banner-close" onClick={handleDismiss} aria-label="关闭通知" title="关闭">
+                        <X aria-hidden="true" />
+                    </button>
+                </>
+            }
         >
-            <button
-                type="button"
-                onClick={handleClick}
-                disabled={!hasLink}
-                className="group flex h-full w-full min-w-0 items-center justify-center px-8 transition-opacity enabled:hover:opacity-90 disabled:cursor-default"
-                title={hasLink ? "点击查看详情" : undefined}
-            >
-                <span className="flex min-w-0 items-center justify-center gap-2">
-                    {/* 标题内容区：通过外层弹性居中对齐，不用固定高度控制 */}
-                    <span className="relative flex min-w-0 items-center justify-center">
-                        <AnimatePresence mode="wait">
-                            <motion.span
-                                key={currentBanner.id}
-                                initial={reducedMotion ? { opacity: 0, y: 0 } : { opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={reducedMotion ? { opacity: 0, y: 0 } : { opacity: 0, y: -10 }}
-                                transition={{ duration: 0.2, ease: "easeOut" }}
-                                className="inline-flex items-center justify-center truncate font-semibold tracking-wide drop-shadow-sm"
-                            >
-                                <BannerAnnouncementTitle runs={currentBanner.titleRuns} fallbackText={currentBanner.title} />
-                            </motion.span>
-                        </AnimatePresence>
-                    </span>
-                    {hasLink ? <BannerAnnouncementLinkHint chevronClassName="size-3.5 opacity-80 transition-opacity duration-150 group-hover:opacity-100" /> : null}
-                </span>
-            </button>
-            <button
-                type="button"
-                onClick={handleDismiss}
-                aria-label="关闭通知"
-                title="关闭"
-                className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-white transition-colors hover:bg-white/20"
-            >
-                <X className="size-3.5" aria-hidden="true" />
-            </button>
-        </div>
+            <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                    key={current.id}
+                    className="notice-banner-slide"
+                    initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -14 }}
+                    transition={{ duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
+                >
+                    {content}
+                </motion.div>
+            </AnimatePresence>
+        </BannerAnnouncementShell>
     );
 }
 
-function bannerFeedFingerprint(banners: BannerAnnouncement[]) {
-    return banners
-        .map((banner) => `${banner.id}:${banner.updatedAt}`)
-        .sort()
-        .join("|");
+function usePageHidden() {
+    const [hidden, setHidden] = useState(() => typeof document !== "undefined" && document.visibilityState === "hidden");
+    useEffect(() => {
+        const update = () => setHidden(document.visibilityState === "hidden");
+        document.addEventListener("visibilitychange", update);
+        return () => document.removeEventListener("visibilitychange", update);
+    }, []);
+    return hidden;
 }
 
-function bannerDismissalKey(userId?: string) {
+function dismissalKey(userId?: string) {
     return `${BANNER_DISMISS_STORAGE_PREFIX}.${userId || "anonymous"}`;
 }
 
-function hasBannerDismissal(userId: string | undefined, fingerprint: string) {
+function readDismissals(userId?: string) {
     try {
-        return localStorage.getItem(bannerDismissalKey(userId)) === fingerprint;
+        return parseBannerDismissals(localStorage.getItem(dismissalKey(userId)));
     } catch {
-        return false;
+        return new Set<string>();
     }
 }
 
-function rememberBannerDismissal(userId: string | undefined, fingerprint: string) {
+function writeDismissals(userId: string | undefined, versions: Set<string>) {
     try {
-        localStorage.setItem(bannerDismissalKey(userId), fingerprint);
+        localStorage.setItem(dismissalKey(userId), serializeBannerDismissals(versions));
     } catch {
         // 浏览器禁用存储时仍允许关闭，本次组件生命周期内不会重复出现。
     }

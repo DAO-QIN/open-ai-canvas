@@ -21,10 +21,10 @@ export const BANNER_TITLE_MAX_CHARS = 120;
 export const BANNER_TITLE_MIN_FONT_SIZE = 10;
 export const BANNER_TITLE_MAX_FONT_SIZE = 20;
 
-/** 通知条标题默认字号，与前台 `text-xs` 一致。 */
-export const BANNER_TITLE_DEFAULT_FONT_SIZE = 12;
-/** 通知条标题默认字重，与前台 `font-semibold` 一致。 */
-export const BANNER_TITLE_DEFAULT_FONT_WEIGHT = 600;
+/** 通知条标题默认字号，与 banner-announcement.css 的 `.notice-banner-title` 一致（手机端自动缩到 14px）。 */
+export const BANNER_TITLE_DEFAULT_FONT_SIZE = 16;
+/** 通知条标题默认字重，与 `.notice-banner-title` 一致。 */
+export const BANNER_TITLE_DEFAULT_FONT_WEIGHT = 500;
 
 export const BANNER_TITLE_FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 18, 20];
 
@@ -108,7 +108,7 @@ export function normalizeBannerTitleHex(value?: string) {
     return /^[0-9A-F]{6}$/.test(hex) ? `#${hex}` : "";
 }
 
-/** 分段对应的内联样式；未设置的维度交给外层类名（通知条默认白色文字、12px）。 */
+/** 分段对应的内联样式；未设置的维度交给外层类名（通知条默认白色文字、16px）。 */
 export function bannerTitleRunStyle(run: BannerTitleRun) {
     const style: Record<string, string | number> = {};
     if (run.fontSize) {
