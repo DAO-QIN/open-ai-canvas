@@ -1,6 +1,6 @@
 /* 首页顶部常驻通知条（前台轮播与后台预览共用）。
  * 视觉层次：深色底 → 沿椭圆轨道缓慢公转的光环 → 文字区压光层 → 倒计时数字块 / 标题 → 白色实心行动按钮；
- * 深色主题下底边以像素颗粒溶进页面。光带整条流动、经过文字时减弱，两端保持鲜亮。
+ * 深色主题下底边渐隐融进页面。光带整条流动、经过文字时减弱，两端保持鲜亮。
  * 颜色全部来自 globals.css 的 --notice-banner-* token；「减少动态效果」时所有动画停用。 */
 
 /* 注册为颜色属性后，轮播切换不同类型时底色与光晕可以平滑过渡。 */
@@ -22,8 +22,6 @@
     --nb-ink: var(--notice-banner-ink-notice);
     --nb-height: 56px;
     --nb-side: 112px;
-    /* 底边像素颗粒的边长；桌面端根元素 zoom 0.9（styles/ui-scale.css），按比例补回，颗粒落在整数物理像素上。 */
-    --nb-pixel: 3px;
     position: relative;
     isolation: isolate;
     display: flex;
@@ -60,12 +58,6 @@
 
 /* 后台自定义配色以内联 --nb-base / --nb-glow / --nb-ink 写在外壳上，优先于上面按类型选择的预设。 */
 
-@media (min-width: 1024px) {
-    html:not([data-ui-scale-off]) .notice-banner {
-        --nb-pixel: calc(3px / 0.9);
-    }
-}
-
 /* 底层：深色底，光环与压光层都画在这一层里。 */
 .notice-banner-backdrop {
     position: absolute;
@@ -76,17 +68,11 @@
     background: var(--nb-base);
 }
 
-/* 深色主题：底边两行像素颗粒（上密下疏）溶进页面，取代一刀切的分界线；
- * 浅色主题保持干净的直边——深色颗粒散在浅色页面上像噪点。颗粒图案 48 格一组横向平铺。 */
+/* 深色主题：背景层下半段逐渐变透明，融进页面底色，取代一刀切的分界线；只作用在背景层，文字、数字块与按钮不受影响。
+ * 浅色主题保持干净的直边——深色条渐隐到浅色页面会发灰，白字下半截也会变淡。 */
 .dark .notice-banner-backdrop {
-    -webkit-mask:
-        linear-gradient(#000, #000) top / 100% calc(100% - var(--nb-pixel) * 2) no-repeat,
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 2' preserveAspectRatio='none' shape-rendering='crispEdges'%3E%3Cpath d='M1 0h1v1H1zM3 0h2v1H3zM8 0h2v1H8zM11 0h1v1H11zM13 0h1v1H13zM16 0h1v1H16zM18 0h1v1H18zM21 0h3v1H21zM25 0h4v1H25zM30 0h4v1H30zM36 0h3v1H36zM40 0h8v1H40zM7 1h1v1H7zM9 1h3v1H9zM13 1h1v1H13zM19 1h2v1H19zM22 1h1v1H22zM24 1h1v1H24zM37 1h1v1H37zM47 1h1v1H47z'/%3E%3C/svg%3E")
-            left bottom / calc(var(--nb-pixel) * 48) calc(var(--nb-pixel) * 2) repeat-x;
-    mask:
-        linear-gradient(#000, #000) top / 100% calc(100% - var(--nb-pixel) * 2) no-repeat,
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 2' preserveAspectRatio='none' shape-rendering='crispEdges'%3E%3Cpath d='M1 0h1v1H1zM3 0h2v1H3zM8 0h2v1H8zM11 0h1v1H11zM13 0h1v1H13zM16 0h1v1H16zM18 0h1v1H18zM21 0h3v1H21zM25 0h4v1H25zM30 0h4v1H30zM36 0h3v1H36zM40 0h8v1H40zM7 1h1v1H7zM9 1h3v1H9zM13 1h1v1H13zM19 1h2v1H19zM22 1h1v1H22zM24 1h1v1H24zM37 1h1v1H37zM47 1h1v1H47z'/%3E%3C/svg%3E")
-            left bottom / calc(var(--nb-pixel) * 48) calc(var(--nb-pixel) * 2) repeat-x;
+    -webkit-mask: linear-gradient(#000 45%, rgb(0 0 0 / 0.72) 68%, rgb(0 0 0 / 0.32) 87%, transparent);
+    mask: linear-gradient(#000 45%, rgb(0 0 0 / 0.72) 68%, rgb(0 0 0 / 0.32) 87%, transparent);
 }
 
 /* 文字区压光层（盖在光环之上）：两侧留出 --nb-side 以外的区域，亮带经过文字时减到 80%，两端照常鲜亮。
