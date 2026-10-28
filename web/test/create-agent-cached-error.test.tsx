@@ -66,7 +66,7 @@ test("刷新第一帧不展示缓存旧超时，保留已成功图片并从事�
     const restored = mergeCreationConversationHistory([cached], [], cached.id).conversations[0];
     const html = render(restored);
     expect(html).toContain("done.png");
-    expect(html).toContain("成功 1/5");
+    expect(html).toContain("已生成 1 张，其余生成中");
     expect(html).not.toContain("等待超时");
     expect(html).not.toContain("0/5，失败 1");
     expect(html).not.toContain("重试失败项");
@@ -132,5 +132,5 @@ test("原任务状态查询失败显示待确认与刷新状态，不能冒充�
     expect(html).not.toContain("4 项生成中");
     expect(html).not.toContain("等待超时");
     expect(html).not.toContain("重试失败项");
-    expect(html).toContain("成功 1/5");
+    expect(html).toContain("已生成 1 张，其余生成中");
 });

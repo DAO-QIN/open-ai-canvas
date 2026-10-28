@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	cloudAgentCompilerVersion              = "cloud-agent-policy-compiler/v5"
+	cloudAgentCompilerVersion              = "cloud-agent-policy-compiler/v6"
 	cloudAgentDefaultReasoning             = "off"
 	cloudAgentCreationCapabilitySetVersion = "creation-agent-capabilities/v7"
 )
@@ -154,10 +154,10 @@ func cloudAgentSkillManifestDescription(description string) string {
 }
 
 func compileCloudAgentPolicies(req CloudAgentRequest, skills []cloudAgentSkill, canvasSummary string, profile cloudAgentProfileSnapshot, anchors ...cloudAgentCreativeAnchor) (string, cloudAgentPolicySnapshot, error) {
-	return compileCloudAgentPoliciesForIdentity(req, defaultCanvasAppearance().AgentName, skills, canvasSummary, profile, anchors...)
+	return compileCloudAgentPoliciesForIdentity(req, defaultCanvasAppearance().AgentName, "", skills, canvasSummary, profile, anchors...)
 }
 
-func compileCloudAgentPoliciesForIdentity(req CloudAgentRequest, agentName string, skills []cloudAgentSkill, canvasSummary string, profile cloudAgentProfileSnapshot, anchors ...cloudAgentCreativeAnchor) (string, cloudAgentPolicySnapshot, error) {
+func compileCloudAgentPoliciesForIdentity(req CloudAgentRequest, agentName, platformName string, skills []cloudAgentSkill, canvasSummary string, profile cloudAgentProfileSnapshot, anchors ...cloudAgentCreativeAnchor) (string, cloudAgentPolicySnapshot, error) {
 	system, media, err := prompts.LoadAgentPolicies()
 	creation := req.Surface == "creation"
 	if creation {
@@ -199,9 +199,13 @@ func compileCloudAgentPoliciesForIdentity(req CloudAgentRequest, agentName strin
 		recorder.mark(&b, "capabilities", "节点能力与选型")
 	}
 	// Behavior belongs to versioned policies; the compiler only projects facts.
+	identity := map[string]string{"name": firstNonEmpty(strings.TrimSpace(agentName), defaultCanvasAppearance().AgentName)}
+	if creation {
+		identity["platformName"] = firstNonEmpty(strings.TrimSpace(platformName), defaultAppearanceBrandName)
+	}
 	context := map[string]any{
 		"source": "server_snapshot", "permissionMode": req.PermissionMode,
-		"agentIdentity": map[string]string{"name": firstNonEmpty(strings.TrimSpace(agentName), defaultCanvasAppearance().AgentName)},
+		"agentIdentity": identity,
 		"reasoningMode": mode,
 		"budget": map[string]any{
 			"maxCredits": req.Budget.MaxCredits, "maxSteps": cloudAgentStepLimit(req),

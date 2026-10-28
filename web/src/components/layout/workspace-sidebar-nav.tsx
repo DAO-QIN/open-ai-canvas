@@ -44,13 +44,13 @@ function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
 }
 
 function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
-    // 参考 leyi.my：首页 / 项目 / 创作 / 灵感，下面是可折叠的「资源与工具」与历史。
+    // 首页 / 短剧 / 创作 / 灵感，下面是可折叠的「资源与工具」与历史。
     // 生图、视频工作台仍按后台开关出现在「资源与工具」里。
     const groups: WorkspaceNavGroup[] = [
         {
             items: [
                 toolItem("home", "/"),
-                ...(features.shortDramaEnabled ? [{ ...toolItem("projects", "/projects"), title: "项目" }] : []),
+                ...(features.shortDramaEnabled ? [{ ...toolItem("projects", "/projects"), title: "短剧" }] : []),
                 toolItem("canvas", "/canvas"),
                 toolItem("create", "/create"),
                 toolItem("inspirations", "/inspirations"),

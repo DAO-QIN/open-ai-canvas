@@ -841,7 +841,7 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 	if err != nil {
 		return nil, err
 	}
-	system, policy, err := compileCloudAgentPoliciesForIdentity(req, appearance.Canvas.AgentName, skillSnapshots, "", profile, creativeAnchor)
+	system, policy, err := compileCloudAgentPoliciesForIdentity(req, appearance.Canvas.AgentName, appearance.BrandName, skillSnapshots, "", profile, creativeAnchor)
 	if err != nil {
 		return nil, err
 	}
