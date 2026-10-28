@@ -539,6 +539,9 @@ func RegisterAgentRoutes(r *gin.RouterGroup, svc *service.Service) {
 			return
 		}
 		options := service.CloudAgentRunViewOptions{SinceSeq: int(after)}
+		// 先订阅再读：两次读之间提交的变化也会留下一次唤醒，不会漏推。
+		changed, signalsEnabled, stopChanges := svc.CloudAgentRunChanges(c.Param("id"))
+		defer stopChanges()
 		run, err := svc.CloudAgentRun(user.ID, c.Param("id"), options)
 		if err != nil {
 			failService(c, err)
@@ -549,10 +552,14 @@ func RegisterAgentRoutes(r *gin.RouterGroup, svc *service.Service) {
 		c.Header("Content-Encoding", "identity")
 		c.Header("Connection", "keep-alive")
 		c.Header("X-Accel-Buffering", "no")
-		ticker := time.NewTicker(100 * time.Millisecond)
+		poll := agentRunEventsMinGap
+		if signalsEnabled {
+			poll = agentRunEventsFallbackPoll
+		}
+		ticker := time.NewTicker(poll)
 		defer ticker.Stop()
 		revision := run.Revision
-		lastWrite := time.Now()
+		lastWrite, lastRead := time.Now(), time.Now()
 		for {
 			if err != nil {
 				c.SSEvent("error", gin.H{"message": "Agent 状态读取失败"})
@@ -583,10 +590,21 @@ func RegisterAgentRoutes(r *gin.RouterGroup, svc *service.Service) {
 			select {
 			case <-c.Request.Context().Done():
 				return
+			case <-changed:
+				if wait := agentRunEventsMinGap - time.Since(lastRead); wait > 0 {
+					timer := time.NewTimer(wait)
+					select {
+					case <-c.Request.Context().Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+				}
 			case <-ticker.C:
-				options.SinceSeq = int(after)
-				run, err = svc.CloudAgentRunIfChanged(user.ID, c.Param("id"), revision, options)
 			}
+			options.SinceSeq = int(after)
+			run, err = svc.CloudAgentRunIfChanged(user.ID, c.Param("id"), revision, options)
+			lastRead = time.Now()
 		}
 	})
 }
@@ -617,6 +635,14 @@ func writeAgentSSE(c *gin.Context, event string, id int64, value any) {
 // agentRunEventQueryLimit 是 eventLimit 允许的最大值，与 app 侧的增量上限一致：
 // 请求更大的页没有意义（单次响应体积），直接拒绝比静默截断更容易被发现。
 const agentRunEventQueryLimit = 500
+
+// 运行事件流由同进程的运行变化信号唤醒；兜底轮询只覆盖其他实例写入或通知丢失，
+// 仍保证新文字在 350ms 内送达。连续变化时两次读库至少间隔 agentRunEventsMinGap，
+// 读库频率不会高于原来的固定 100ms 轮询。
+const (
+	agentRunEventsFallbackPoll = 250 * time.Millisecond
+	agentRunEventsMinGap       = 100 * time.Millisecond
+)
 
 func agentConversationLimit(c *gin.Context) (int, error) {
 	raw, present := c.GetQuery("limit")

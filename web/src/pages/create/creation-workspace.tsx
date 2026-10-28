@@ -9,37 +9,11 @@ import { Button, Dropdown, Popover } from "antd";
 import { useWorkspaceTopBarMount } from "@/components/layout/workspace-top-bar-extension";
 import { Tooltip } from "@/components/ui/base/tooltip";
 import { Reorder } from "motion/react";
-import {
-    ArrowUp,
-    Brain,
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
-    Clapperboard,
-    Clock3,
-    Film,
-    History,
-    Image as ImageIcon,
-    LoaderCircle,
-    Maximize2,
-    MessageSquareText,
-    Minimize2,
-    Plus,
-    SlidersHorizontal,
-    Sparkles,
-    Square,
-    Trash2,
-    WandSparkles,
-    Waves,
-    X,
-} from "lucide-react";
+import { Brain, ChevronDown, ChevronLeft, ChevronRight, Clapperboard, Clock3, History, LoaderCircle, Maximize2, Minimize2, Plus, SlidersHorizontal, Square, Trash2, Waves, X } from "lucide-react";
 
-import { WorkingGlow } from "@/components/ai/working-indicator";
 import { formatVideoResolutionLabel as videoResolutionLabel } from "@/lib/video-generation-options";
 import { CanvasResourceMentionTextarea } from "@/components/canvas/canvas-resource-mention-textarea";
 import { VoiceRecordingButton } from "@/components/conversation/voice-recording-button";
-import { HoverBorderGradient } from "@/components/ui/aceternity/hover-border-gradient";
-import { SpotlightSurface } from "@/components/ui/aceternity/spotlight-surface";
 import { ModelPicker } from "@/components/model-picker";
 import { AgentContextRing, AgentPermissionControl } from "@/components/canvas/canvas-cloud-agent-panel-parts";
 import type { AgentContextUsageView } from "@/lib/canvas/agent-context-usage";
@@ -64,10 +38,11 @@ import "./creation-product.css";
 import "./creation-scrollbars.css";
 import "@/components/canvas/canvas-cloud-agent.css";
 import { CreationAttachmentThumbnail, CreationMediaPreviewModal } from "./creation-workspace-messages";
+import { CreationIcon } from "./creation-icons";
 
 export { CreationHistoryDrawer } from "./creation-workspace-history";
 export { CreationMessageView } from "./creation-workspace-messages";
-export { CreationEmptyBanner, CreationEmptySuggest, CreationFeaturedWorks } from "./creation-workspace-empty";
+export { CreationEmptyBanner, CreationFeaturedWorks, CreationPlayStrip } from "./creation-workspace-empty";
 
 const CanvasPromptOptimizerDrawer = lazy(() => import("@/components/canvas/canvas-prompt-optimizer-drawer").then((module) => ({ default: module.CanvasPromptOptimizerDrawer })));
 
@@ -193,6 +168,8 @@ type ComposerProps = {
     onPasteFiles: (files: File[]) => void;
     onOpenLibrary: () => void;
     onModeChange: (mode: CreationMode) => void;
+    /** 类型菜单分隔线下的"短剧制作"入口；不传则不显示。 */
+    onOpenShortDrama?: () => void;
     model: string;
     modelRequirements: ModelRequirements;
     videoProfile: VideoCapabilityConfig;
@@ -353,9 +330,9 @@ export function CreationComposer(props: ComposerProps) {
     // own progress while this composer is immediately available for another
     // prompt. Only work that still blocks submission owns the spinner.
     const showWorkingSpinner = stopping || (interactionBusy && !canStop);
-    const showWorkingGlow = interactionBusy && !canStop;
-    const placeholder = props.mode === "text" || props.mode === "agent" ? "描述你的故事、角色或想继续讨论的创意" : props.mode === "image" ? "描述画面、人物、场景、构图与风格" : "描述镜头内容、运动、光线与节奏";
-    const emptyPlaceholder = "输入你的镜头、画面或故事。也可以添加参考图开始创作";
+    // 占位文字不超过 14 个字，细节交给示例和玩法，不在输入框里写说明书。
+    const placeholder = props.mode === "video" ? "接着改，或描述下一个镜头" : "接着改，或 @ 某一张";
+    const emptyPlaceholder = props.mode === "video" ? "描述镜头，或拖入一张首帧" : "描述画面，或拖入一张图";
     const imageReferencesSupported = props.imageProfile.references.maxImages > 0;
     const referencesSupported = props.mode === "image" ? imageReferencesSupported : props.mode !== "video" || props.maxReferences > 0;
     const canAddMoreReferences = referencesSupported && props.attachments.length < props.maxReferences;
@@ -476,9 +453,10 @@ export function CreationComposer(props: ComposerProps) {
         }
         return undefined;
     };
+    // 输入框不再套流光描边和跟随鼠标的聚光：一层细描边加半透明底，焦点时描边加深。
     const composer = (
-        <HoverBorderGradient as="div" duration={2.2} containerClassName="creation-composer-shell" className="creation-composer-shell-inner">
-            <SpotlightSurface className={`creation-chat-composer is-${props.variant}`} contentClassName="contents" spotlightColor="color-mix(in srgb, var(--user-ink) 12%, transparent)" spotlightRadius={280}>
+        <div className="creation-composer-shell">
+            <div className={`creation-chat-composer is-${props.variant}`}>
                 <div className="creation-chat-writing-surface">
                     <div className="creation-chat-editor">
                         <CanvasResourceMentionTextarea
@@ -628,7 +606,7 @@ export function CreationComposer(props: ComposerProps) {
                 </div>
                 <footer className="creation-chat-dock">
                     <div className="creation-chat-controls">
-                        <ModePicker mode={props.mode} variant={props.variant} onModeChange={props.onModeChange} />
+                        <ModePicker mode={props.mode} variant={props.variant} onModeChange={props.onModeChange} onOpenShortDrama={props.onOpenShortDrama} />
                         {canOptimizePrompt ? (
                             <Tooltip title="用 AI 优化提示词">
                                 <button
@@ -640,7 +618,7 @@ export function CreationComposer(props: ComposerProps) {
                                     aria-haspopup="dialog"
                                     disabled={props.smartCreationActive || interactionBusy}
                                 >
-                                    <WandSparkles />
+                                    <CreationIcon name="edit" />
                                     <span>优化</span>
                                 </button>
                             </Tooltip>
@@ -652,7 +630,7 @@ export function CreationComposer(props: ComposerProps) {
                             capability={creationModelCapability(props.mode)}
                             requirements={props.modelRequirements}
                             className="creation-model-picker"
-                            placeholder={`选择${props.mode === "agent" ? "对话" : modeLabels[props.mode]}模型`}
+                            placeholder={props.mode === "agent" ? "选择模型" : `选择${modeLabels[props.mode]}模型`}
                             showSelectedPrice={false}
                             showOptionPrices
                             variant="creation"
@@ -726,16 +704,15 @@ export function CreationComposer(props: ComposerProps) {
                             aria-label={actionLabel}
                             title={!canStop && !stopping && !canSubmit && !interactionBusy ? "输入创作想法后即可生成" : actionLabel}
                         >
-                            {showWorkingGlow ? <WorkingGlow active color="var(--creation-text)" radius="999px" /> : null}
                             <span className="creation-submit-action" aria-hidden>
-                                {showWorkingSpinner ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+                                {showWorkingSpinner ? <LoaderCircle className="size-4 animate-spin" /> : <CreationIcon name="send" size={18} />}
                             </span>
                         </Button>
                     </div>
                 </footer>
                 <CreationMediaPreviewModal url={previewUrl} type={previewType} onClose={() => setPreviewUrl("")} />
-            </SpotlightSurface>
-        </HoverBorderGradient>
+            </div>
+        </div>
     );
 
     if (!promptOptimizerOpen) return composer;
@@ -761,59 +738,79 @@ export function CreationComposer(props: ComposerProps) {
     );
 }
 
-function ModePicker({ mode, variant, onModeChange }: { mode: CreationMode; variant: "empty" | "thread"; onModeChange: (mode: CreationMode) => void }) {
-    const triggerRef = useRef<HTMLButtonElement>(null);
+const creationModeIcons = { agent: "auto", image: "image", video: "video" } as const;
+
+/**
+ * 输入框左下角的"创作类型"菜单（参考即梦 Agent 页）：按钮显示当前类型，点开是一张带说明的菜单，
+ * 选中项打勾。分隔线下的"短剧制作"只是去短剧工作台的入口，不是生成类型；后台关闭短剧时不显示。
+ */
+function ModePicker({ mode, variant, onModeChange, onOpenShortDrama }: { mode: CreationMode; variant: "empty" | "thread"; onModeChange: (mode: CreationMode) => void; onOpenShortDrama?: () => void }) {
     const [open, setOpen] = useState(false);
-    const [popupStyle, setPopupStyle] = useState<CSSProperties>();
-    const syncPopupStyle = useCallback(() => {
-        const trigger = triggerRef.current;
-        if (!trigger) return;
-        const width = trigger.offsetWidth;
-        const style = window.getComputedStyle(trigger);
-        setPopupStyle({ width, minWidth: width, fontFamily: style.fontFamily, fontSize: style.fontSize, fontWeight: style.fontWeight, "--creation-mode-font-size": style.fontSize, "--creation-mode-font-weight": style.fontWeight } as CSSProperties);
-    }, []);
-    useEffect(() => {
-        const trigger = triggerRef.current;
-        if (!trigger || typeof ResizeObserver === "undefined") return;
-        const observer = new ResizeObserver(syncPopupStyle);
-        observer.observe(trigger);
-        return () => observer.disconnect();
-    }, [syncPopupStyle]);
-    const icons = { agent: <Sparkles />, image: <ImageIcon />, video: <Film /> };
-    const modeItems = creationComposerModeOptions.map((item) => ({ ...item, icon: icons[item.key] }));
-    const activeItem = modeItems.find((item) => item.key === mode) || modeItems[0];
+    const shortDramaEnabled = useUserStore((state) => state.features.shortDramaEnabled) && Boolean(onOpenShortDrama);
+    const activeItem = creationComposerModeOptions.find((item) => item.key === mode) || creationComposerModeOptions[0];
     const selectMode = (key: string) => {
-        if (key === "agent" || key === "image" || key === "video") {
-            setOpen(false);
-            if (key !== mode) onModeChange(key);
+        setOpen(false);
+        if (key === "short-drama") {
+            onOpenShortDrama?.();
+            return;
         }
+        if ((key === "agent" || key === "image" || key === "video") && key !== mode) onModeChange(key);
     };
-    const menuItems = modeItems.map((item) => ({
-        key: item.key,
-        icon: item.icon,
-        label: <span className="creation-mode-menu-item">{item.label}</span>,
-    }));
+    const menuItems = [
+        {
+            type: "group" as const,
+            key: "types",
+            label: "创作类型",
+            children: creationComposerModeOptions.map((item) => ({
+                key: item.key,
+                icon: <CreationIcon name={creationModeIcons[item.key]} size={20} />,
+                label: (
+                    <span className="creation-mode-menu-item">
+                        <span className="creation-mode-menu-name">{item.label}</span>
+                        <span className="creation-mode-menu-description">{item.description}</span>
+                        {item.key === mode ? (
+                            <>
+                                <CreationIcon name="check" className="creation-mode-menu-check" />
+                                <span className="sr-only">（当前）</span>
+                            </>
+                        ) : null}
+                    </span>
+                ),
+            })),
+        },
+        ...(shortDramaEnabled
+            ? [
+                  { type: "divider" as const, key: "short-drama-divider" },
+                  {
+                      key: "short-drama",
+                      icon: <CreationIcon name="film" size={20} />,
+                      label: (
+                          <span className="creation-mode-menu-item">
+                              <span className="creation-mode-menu-name">短剧制作</span>
+                              <span className="creation-mode-menu-description">去工作台</span>
+                          </span>
+                      ),
+                  },
+              ]
+            : []),
+    ];
     return (
         <div className="creation-mode-dropdown" data-active-mode={mode}>
             <Dropdown
                 open={open}
-                onOpenChange={(nextOpen) => {
-                    if (nextOpen) syncPopupStyle();
-                    setOpen(nextOpen);
-                }}
+                onOpenChange={setOpen}
                 trigger={["click"]}
                 menu={{ items: menuItems, selectedKeys: [mode], onClick: ({ key }) => selectMode(String(key)) }}
                 placement={variant === "thread" ? "topLeft" : "bottomLeft"}
                 autoAdjustOverflow
                 arrow={false}
                 classNames={{ root: "creation-mode-menu" }}
-                styles={{ root: popupStyle }}
                 getPopupContainer={() => document.body}
             >
-                <button ref={triggerRef} type="button" className="creation-mode-select" aria-haspopup="menu" aria-expanded={open} aria-label={`创作方式：${activeItem.label}`}>
-                    {activeItem.icon}
+                <button type="button" className="creation-mode-select" aria-haspopup="menu" aria-expanded={open} aria-label={`创作类型：${activeItem.label}`}>
+                    <CreationIcon name={creationModeIcons[activeItem.key]} />
                     <span>{activeItem.label}</span>
-                    <ChevronDown aria-hidden="true" />
+                    <CreationIcon name="chevronDown" className="creation-mode-select-chevron" />
                 </button>
             </Dropdown>
         </div>

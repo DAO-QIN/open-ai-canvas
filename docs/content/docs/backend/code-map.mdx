@@ -119,7 +119,7 @@ AI 拆图每层的 `generation.prompt/background` 由 `canvas-image-layer-plan.t
 ## 首页 Agent 完整链路
 
 - 私有会话链接与普通历史：`pages/create/use-creation-conversation-route.ts`、`creation-conversation-history.ts` 和 `services/api/creation-history.ts`；后端 `app/creation_history.go` 校验权限及资源，`repository/creation_history.go` 关联任务和并发准入，`app/creation_history_retention.go` 清理过期索引，策略入口在 `platform/runtime_policy.go`。
-- 首页与交付 UI：`web/src/pages/create/index.tsx`、`creation-workspace.tsx`、`creation-workspace-messages.tsx`；图库规则同时依赖 `web/src/styles/globals.css` 与页面 CSS。
+- 首页与交付 UI：`web/src/pages/create/index.tsx`、`creation-workspace.tsx`、`creation-workspace-messages.tsx`；图库规则同时依赖 `web/src/styles/globals.css` 与页面 CSS。创作页自绘图标在 `creation-icons.tsx`（只在创作页使用），空态点阵背景与对话背景在 `creation-backdrops.tsx` / `.css`，玩法条在 `creation-workspace-empty.tsx`（封面 `web/public/creation-plays/`）。
 - 账号偏好：`lib/user-session.ts` 的初始化/停止接线 → `services/creation-preferences-sync.ts` → `services/api/creation-preferences.ts`；后端 `handler/creation_preferences.go` → `app/creation_preferences.go` → `repository/creation_preferences.go`。
 - 会话、上下文、停止与重试：`creation-agent-conversation.ts`、`creation-agent-cancel.ts`、`creation-agent-request.ts`，后端 `cloud_agent_session.go`、`cloud_agent_creation_*.go` 和 Pi runtime；根任务准入与会话删除通过 `repository/finance.go` 共用账号锁。
 - 图片优先展示与补存：`services/api/resources.ts` → `generated-resource-transfer.ts`、`resource-thumbnail.ts`；后端 `resource_generated_browser.go`、`resource_generated_transfer.go`，Worker 在 `app/service.go` 启动。
@@ -130,6 +130,7 @@ AI 拆图每层的 `generation.prompt/background` 由 `canvas-image-layer-plan.t
 
 - 传输入口：`backend/internal/handler/canvas_realtime.go` 校验登录与 Origin、管理 WebSocket；`app/canvas_realtime.go` 校验画布归属，`internal/canvas/realtime.go` 负责临时 Presence、房间隔离与 Redis 分发，`realtime_devices.go` 管理跨实例统一窗口编号及临时租期。
 - 提交通知：`repository/canvas_change_notifications.go` 与 `repository.go` 在外层事务提交后合并通知，回滚丢弃；operations、历史保存、租约、Agent 任务创建及任务结果回写沿用该边界。
+- 运行与任务变化信号：`repository/change_signals.go` 用同一提交边界，在 Agent 运行修订号提交、任务进入终态后唤醒同进程的等待方（`handler/agent.go` 的运行事件流、`app/cloud_agent_pi_model.go` 的 `waitCloudAgentTask`）。信号只决定何时重读，内容以数据库为准；跨实例靠兜底轮询。
 - 前端连接：`web/src/services/canvas-realtime-client.ts` 管理合并发送和重连，`canvas-realtime.ts` 按账号与画布共享窗口内连接；`pages/canvas/use-canvas-project-lifecycle.ts` 联动状态校验和独立租约维护。
 - 光标与拖拽：`components/canvas/canvas-collaboration-layer.tsx` 管理设备列表和多人事件采集，单窗口停止采集；`canvas-presence-renderer.ts` 负责按帧复用 DOM 投影远端图形，高频坐标不经过 React。`nginx.conf`、`web/vite.config.ts` 转发 WebSocket Upgrade。
 

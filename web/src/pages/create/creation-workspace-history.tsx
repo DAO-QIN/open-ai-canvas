@@ -7,7 +7,11 @@ import { useUserStore } from "@/stores/use-user-store";
 import { App, Dropdown } from "antd";
 import { displayCreationPrompt } from "./creation-references";
 import { AppDrawer } from "@/components/ui/product/app-drawer";
-import { Clapperboard, Download, Image as ImageIcon, Link as LinkIcon, MessageSquareText, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Clapperboard, Download, Image as ImageIcon, Link as LinkIcon, MessageSquareText, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { CreationIcon } from "./creation-icons";
+
+/** "自动"会话在历史列表里用满月条纹图标，不再用星星。 */
+const AutoGlyph = () => <CreationIcon name="auto" />;
 import { Link } from "react-router";
 import { conversationTimestamp } from "./creation-conversations";
 import { formatMessageTime } from "./creation-workspace-messages";
@@ -168,7 +172,7 @@ export function CreationHistoryDrawer({
                             const showGroupHead = !keyword.trim() && (index === 0 || creationConversationBucket(conversation.updatedAt) !== creationConversationBucket(visibleConversations[index - 1].updatedAt));
                             const latest = conversationPreviewMessage(conversation);
                             const active = conversation.id === activeId;
-                            const HistoryTypeIcon = latest?.mode === "video" ? Clapperboard : latest?.mode === "image" ? ImageIcon : latest?.mode === "text" ? MessageSquareText : Sparkles;
+                            const HistoryTypeIcon = latest?.mode === "video" ? Clapperboard : latest?.mode === "image" ? ImageIcon : latest?.mode === "text" ? MessageSquareText : AutoGlyph;
                             return [
                                 showGroupHead ? (
                                     <li key={`${conversation.id}-group`} className="creation-history-group-head">
