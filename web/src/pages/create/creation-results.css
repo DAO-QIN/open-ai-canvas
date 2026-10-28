@@ -62,3 +62,52 @@
     .creation-home .creation-image-result-grid-expanded { gap: 8px; }
     .creation-home .creation-image-result-download { width: 32px; height: 32px; right: 6px; bottom: 6px; }
 }
+
+/* 结果图上的操作条（CreationImageActions）：深色玻璃，亮图暗图上都看得清。
+   桌面端悬停或键盘聚焦到这张图时浮出，触屏设备常驻；下载仍在右下角。 */
+.creation-home .creation-image-actions {
+    --creation-glass-bg: rgb(14 14 17 / 52%);
+    --creation-glass-line: rgb(255 255 255 / 14%);
+    position: absolute;
+    z-index: 4;
+    left: 10px;
+    bottom: 10px;
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--creation-glass-bg);
+    box-shadow: inset 0 0 0 1px var(--creation-glass-line);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 150ms ease, transform 150ms ease;
+}
+.creation-home .creation-image-actions button {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+}
+.creation-home .creation-image-actions button:hover:not(:disabled) { background: rgb(255 255 255 / 18%); }
+.creation-home .creation-image-actions button:disabled { cursor: default; opacity: .45; }
+.creation-home .creation-image-actions button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.creation-home :is(.creation-image-result, .creation-image-result-stack-front):hover .creation-image-actions,
+.creation-home :is(.creation-image-result, .creation-image-result-stack-front):focus-within .creation-image-actions { opacity: 1; transform: none; }
+@media (hover: none) {
+    .creation-home .creation-image-actions { opacity: 1; transform: none; }
+    .creation-home .creation-image-actions button { width: 28px; height: 28px; }
+}
+@media (max-width: 480px) {
+    .creation-home .creation-image-actions { left: 6px; bottom: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .creation-home .creation-image-actions { transition: none; }
+}

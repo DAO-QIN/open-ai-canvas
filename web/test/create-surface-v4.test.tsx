@@ -1,0 +1,96 @@
+import { expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { renderToStaticMarkup } from "react-dom/server";
+import { Window } from "happy-dom";
+
+import { CreationAmbientBackdrop, CreationLaunchBackdrop, latestCreationResultImage } from "../src/pages/create/creation-backdrops";
+import { CreationIcon } from "../src/pages/create/creation-icons";
+import { CreationPlayStrip, creationPlays } from "../src/pages/create/creation-workspace-empty";
+import { MediaResult } from "../src/pages/create/creation-workspace-messages";
+import type { CreationMessage } from "../src/pages/create/creation-types";
+
+const createDir = join(import.meta.dir, "../src/pages/create");
+const read = (name: string) => readFileSync(join(createDir, name), "utf8");
+
+test("创作页不再使用流光描边、跟随鼠标的聚光、发光按钮和星星图标", () => {
+    for (const name of ["creation-workspace.tsx", "creation-workspace-messages.tsx", "creation-workspace-history.tsx", "creation-workspace-empty.tsx", "index.tsx"]) {
+        const source = read(name);
+        for (const banned of ["HoverBorderGradient", "SpotlightSurface", "WorkingGlow", "Sparkles", "WandSparkles"]) expect(`${name}:${source.includes(banned)}`).toBe(`${name}:false`);
+    }
+    // 走不到的旧画布 Agent 入口卡已删除。
+    expect(existsSync(join(createDir, "creation-agent-entry.tsx"))).toBe(false);
+});
+
+test("创作页图标：24 栅格、1.75 线宽、圆角端点，只用 currentColor，默认对读屏隐藏", () => {
+    const html = renderToStaticMarkup(<CreationIcon name="variant" />);
+    expect(html).toContain('viewBox="0 0 24 24"');
+    expect(html).toContain('stroke-width="1.75"');
+    expect(html).toContain('stroke-linecap="round"');
+    expect(html).toContain('stroke="currentColor"');
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).not.toMatch(/#[0-9a-f]{3,8}/i);
+});
+
+test("玩法条：六种常用玩法，封面是仓库里的小图，点了只预填类型和提示词", () => {
+    expect(creationPlays.map((play) => play.label)).toEqual(["头像", "海报", "商品图", "表情包", "故事分镜", "短视频"]);
+    for (const play of creationPlays) {
+        const file = join(import.meta.dir, "../public", play.cover);
+        expect(existsSync(file)).toBe(true);
+        expect(readFileSync(file).byteLength).toBeLessThan(16 * 1024);
+        expect(["agent", "image", "video"]).toContain(play.mode);
+        expect(play.prompt.endsWith("：")).toBe(true);
+    }
+    const dom = new Window();
+    try {
+        const calls: Array<[string, string]> = [];
+        dom.document.body.innerHTML = renderToStaticMarkup(<CreationPlayStrip onStartPrompt={(mode, prompt) => calls.push([mode, prompt])} />);
+        const buttons = Array.from(dom.document.querySelectorAll("button.creation-play-chip"));
+        expect(buttons.map((button) => button.textContent)).toEqual(creationPlays.map((play) => play.label));
+        expect(dom.document.querySelector(".creation-play-strip")?.getAttribute("aria-label")).toBe("玩法");
+        for (const image of Array.from(dom.document.querySelectorAll("img"))) expect(image.getAttribute("alt")).toBe("");
+    } finally {
+        dom.close();
+    }
+});
+
+test("空态背景是纯装饰；对话背景取最新一张完成的结果图，资源图只取缩略图", () => {
+    expect(renderToStaticMarkup(<CreationLaunchBackdrop />)).toContain('aria-hidden="true"');
+    const message = (patch: Partial<CreationMessage>): CreationMessage => ({ id: Math.random().toString(36), role: "assistant", content: "", createdAt: "2026-10-29T00:00:00Z", mode: "image", status: "done", ...patch });
+    expect(latestCreationResultImage([])).toBe("");
+    const messages = [
+        message({ resultStorageKeys: ["resource:old"] }),
+        message({ role: "user", resultStorageKeys: ["resource:user"] }),
+        message({ resultStorageKeys: ["resource:latest"] }),
+        message({ mode: "video", resultStorageKeys: ["resource:video"] }),
+        message({ status: "error", resultStorageKeys: ["resource:failed"] }),
+    ];
+    expect(latestCreationResultImage(messages)).toEndWith("/resources/latest/file?variant=thumbnail");
+    // 没有资源 ID 时退回未过期的地址；过期的签名地址不拿来当背景。
+    expect(latestCreationResultImage([message({ resultUrls: ["https://cdn.example/a.png?expires=1"] })])).toBe("");
+    expect(latestCreationResultImage([message({ resultUrls: ["https://cdn.example/b.png"] })])).toBe("https://cdn.example/b.png");
+    expect(renderToStaticMarkup(<CreationAmbientBackdrop url="" />)).toBe("");
+    const ambient = renderToStaticMarkup(<CreationAmbientBackdrop url="/x.png" />);
+    expect(ambient).toContain('aria-hidden="true"');
+    expect(ambient).toContain('alt=""');
+});
+
+test("结果图上的操作条：变体、转视频、作为参考只填输入框；不传回调时不显示", () => {
+    const item: CreationMessage = { id: "result", role: "assistant", content: "", createdAt: "2026-10-29T00:00:00Z", mode: "image", status: "done", resultUrls: ["https://cdn.example/one.png"] };
+    const base = { item, onCreateVariant: () => {}, onContinueCanvas: () => {}, openingCanvas: false };
+    expect(renderToStaticMarkup(<MediaResult {...base} />)).not.toContain("creation-image-actions");
+    const dom = new Window();
+    try {
+        dom.document.body.innerHTML = renderToStaticMarkup(<MediaResult {...base} onUseResultImage={() => {}} />);
+        const group = dom.document.querySelector(".creation-image-result .creation-image-actions");
+        expect(group?.getAttribute("role")).toBe("group");
+        const labels = Array.from(group?.querySelectorAll("button") || []).map((button) => button.getAttribute("aria-label"));
+        expect(labels).toEqual(["用这张图做变体", "用这张图做视频", "把这张图作为参考"]);
+        // 旧消息样式会隐藏结果卡里的每个 span，操作条里不能出现 span。
+        expect(group?.querySelector("span")).toBeNull();
+        // 下载仍是单独的按钮，不并进操作条。
+        expect(dom.document.querySelector('button[aria-label="下载生成图片 1"]')).not.toBeNull();
+    } finally {
+        dom.close();
+    }
+});

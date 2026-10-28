@@ -28,14 +28,17 @@ test("首页 Agent 权限与自动参数接入实际服务端执行流程", () =
     expect(page).not.toContain("<CreationAgentEntry");
 });
 
-test("模式菜单脱离 Composer 裁切容器，同宽展开并自动避让", () => {
+test("创作类型菜单脱离 Composer 裁切容器、自动避让；固定宽度，每项名字加一句说明，选中项打勾", () => {
     expect(workspace).toContain('placement={variant === "thread" ? "topLeft" : "bottomLeft"} autoAdjustOverflow');
-    expect(workspace).toContain('label: <span className="creation-mode-menu-item">{item.label}</span>');
-    expect(workspace).not.toContain("item.description}</small>");
-    expect(workspace).toContain("styles={{ root: popupStyle }} getPopupContainer={() => document.body}");
-    expect(workspace).toContain("setPopupStyle({ width, minWidth: width");
+    expect(workspace).toContain('getPopupContainer={() => document.body}');
+    expect(workspace).toContain('<span className="creation-mode-menu-name">{item.label}</span>');
+    expect(workspace).toContain('<span className="creation-mode-menu-description">{item.description}</span>');
+    expect(workspace).toContain('<CreationIcon name="check" className="creation-mode-menu-check" />');
+    // 菜单不再跟随按钮宽度：按钮只有"自动"两个字，跟随会把说明挤掉。
+    expect(workspace).not.toContain("setPopupStyle({ width, minWidth: width");
     expect(styles).not.toContain(".creation-mode-dropdown .creation-mode-menu");
-    expect(styles).toContain(".creation-mode-menu-item { display: block; min-width: 0; white-space: nowrap;");
+    expect(styles).toContain(".creation-mode-menu .ant-dropdown-menu { width: 300px;");
+    expect(styles).toContain(".creation-mode-menu .ant-dropdown-menu-item { display: flex; align-items: center; min-height: 50px;");
 });
 
 test("首页移除虚构上下文进度，发送继续走实际提交入口", () => {

@@ -118,11 +118,17 @@
     outline-offset: 2px;
 }
 .creation-mode-dropdown { position: relative; display: flex; align-items: center; gap: 8px; width: max-content; max-width: 100%; margin: 0; flex: 0 0 auto; }
-.creation-mode-menu .ant-dropdown-menu { width: 100%; padding: 4px; border: 1px solid var(--user-border); border-radius: 14px; background: var(--user-surface); box-shadow: var(--shadow-md); font: inherit; }
-.creation-mode-menu .ant-dropdown-menu-item { width: 100%; min-height: 32px; padding: 6px; border-radius: 10px; font: inherit; }
-.creation-mode-menu :where(.ant-dropdown-menu, .ant-dropdown-menu-item, .ant-dropdown-menu-title-content, .creation-mode-menu-item) { font-size: var(--creation-mode-font-size, 12px) !important; font-weight: var(--creation-mode-font-weight, 600) !important; }
-.creation-mode-menu .ant-dropdown-menu-item-icon { width: 14px; height: 14px; min-width: 14px; }
+/* 创作类型菜单（参考即梦 Agent 页）：宽 300、每项 50 高、图标 20；名字后面一句灰字说明，选中项打勾。 */
+.creation-mode-menu .ant-dropdown-menu { width: 300px; max-width: calc(100vw - 24px); padding: 8px; border: 1px solid var(--user-border); border-radius: 18px; background: var(--user-surface); box-shadow: var(--shadow-md); font: inherit; }
+.creation-mode-menu .ant-dropdown-menu-item-group-title { padding: 6px 12px 8px; color: var(--user-ink-muted); font-size: 12px; font-weight: 500; }
+.creation-mode-menu .ant-dropdown-menu-item-group-list { margin: 0 !important; }
+.creation-mode-menu .ant-dropdown-menu-item { display: flex; align-items: center; min-height: 50px; padding: 0 12px !important; border-radius: 12px; color: var(--user-ink); font-size: 14px; }
+.creation-mode-menu .ant-dropdown-menu-item-icon { width: 20px; height: 20px; min-width: 20px; margin-inline-end: 12px !important; color: var(--user-ink-muted); }
+.creation-mode-menu .ant-dropdown-menu-item:hover,
 .creation-mode-menu .ant-dropdown-menu-item-selected { background: var(--user-surface-hover); }
+.creation-mode-menu .ant-dropdown-menu-item-selected .ant-dropdown-menu-item-icon { color: var(--user-ink); }
+.creation-mode-menu .ant-dropdown-menu-item-divider { margin: 6px 10px !important; background: var(--user-border); }
+.creation-mode-menu .ant-dropdown-menu-title-content { flex: 1 1 auto; min-width: 0; }
 .creation-mode-select, .creation-mode-permission-select { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; height: 44px; padding: 0 14px; border: 1px solid var(--user-border); border-radius: 14px; background: var(--user-surface-muted); color: var(--user-ink); font-size: 14px; font-weight: 600; cursor: pointer; transition: background var(--user-motion), border-color var(--user-motion), color var(--user-motion), transform var(--user-motion); }
 .creation-mode-select { flex: 1 1 auto; }
 .creation-mode-permission-select { flex: 0 0 auto; color: var(--user-ink-muted); font-size: 13px; }
@@ -131,13 +137,17 @@
 .creation-mode-select:focus-visible, .creation-mode-permission-select:focus-visible { outline: 2px solid var(--user-accent); outline-offset: 2px; }
 .creation-mode-select > svg, .creation-mode-permission-select > svg { width: 17px; height: 17px; flex: 0 0 auto; }
 .creation-mode-select > svg:last-child, .creation-mode-permission-select > svg:last-child { width: 14px; height: 14px; color: var(--user-ink-muted); }
-.creation-mode-menu-item { display: block; min-width: 0; white-space: nowrap; line-height: 1.25; font: inherit; }
+.creation-mode-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; white-space: nowrap; line-height: 1.25; }
+.creation-mode-menu-name { font-weight: 500; }
+.ant-dropdown-menu-item-selected .creation-mode-menu-name { font-weight: 600; }
+.creation-mode-menu-description { margin-left: auto; color: var(--user-ink-muted); font-size: 12px; font-weight: 400; }
+.creation-mode-menu-check { flex: 0 0 auto; width: 16px; height: 16px; color: var(--user-ink); }
 .creation-mode-menu .ant-dropdown-menu-item { white-space: nowrap; }
 .app-user-workspace .creation-chat-composer.is-thread .creation-mode-dropdown { width: max-content; flex: 0 0 auto; margin: 0; gap: 4px; }
-.app-user-workspace .creation-chat-composer.is-thread .creation-mode-select, .app-user-workspace .creation-chat-composer.is-thread .creation-mode-permission-select { height: 32px; padding-inline: 9px; border-radius: 999px; font-size: 12px; }
+.app-user-workspace .creation-chat-composer.is-thread .creation-mode-select, .app-user-workspace .creation-chat-composer.is-thread .creation-mode-permission-select { height: 32px; padding-inline: 10px 8px; border-radius: 11px; font-size: 13px; }
 .app-user-workspace .creation-chat-composer.is-thread .creation-mode-select > svg, .app-user-workspace .creation-chat-composer.is-thread .creation-mode-permission-select > svg { width: 14px; height: 14px; }
 .app-user-workspace .creation-launchpad .creation-mode-dropdown { width: max-content; margin: 0; gap: 4px; }
-.app-user-workspace .creation-launchpad .creation-mode-select, .app-user-workspace .creation-launchpad .creation-mode-permission-select { height: 36px; padding-inline: 11px; border-radius: 999px; font-size: 12px; }
+.app-user-workspace .creation-launchpad .creation-mode-select, .app-user-workspace .creation-launchpad .creation-mode-permission-select { height: 36px; padding-inline: 11px 9px; border-radius: 12px; font-size: 13px; }
 .app-user-workspace .creation-launchpad .creation-mode-select > svg, .app-user-workspace .creation-launchpad .creation-mode-permission-select > svg { width: 14px; height: 14px; }
 .creation-mode-spark {
     width: 6px;
@@ -168,12 +178,6 @@
             0 0 16px rgba(99, 102, 241, 0.45);
     }
 }
-.creation-agent-entry { display: grid; grid-template-columns: 88px minmax(0, 1fr); align-items: center; gap: 16px 24px; padding: 28px; margin-bottom: 20px; border-radius: var(--user-radius-card); background: var(--user-surface); animation: product-card-enter var(--product-enter) var(--product-ease) backwards; }
-.creation-agent-orb { grid-row: span 2; }
-.creation-agent-eyebrow { font-size: 10px; font-weight: 650; letter-spacing: .14em; color: var(--user-accent); }
-.creation-agent-copy h2 { margin: 4px 0 8px; font-size: 21px; font-weight: 650; color: var(--user-ink); }
-.creation-agent-copy p { margin: 0; max-width: 62ch; font-size: 13px; line-height: 1.8; color: var(--user-ink-muted); }
-.creation-agent-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .creation-agent-error { grid-column: 1 / -1; color: var(--status-error); font-size: 12px; margin: 0; }
 .creation-home .creation-empty-composer[hidden] { display: none; }
 .creation-submit-wrap { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
@@ -298,10 +302,6 @@
     .creation-mode-dropdown { width: 100%; }
     .creation-mode-select, .creation-mode-permission-select { height: 40px; padding-inline: 10px; font-size: 12px; }
     .creation-mode-permission-select { max-width: 42%; }
-    .creation-agent-entry { grid-template-columns: 1fr; padding: 20px; gap: 12px; }
-    .creation-agent-orb { display: none; }
-    .creation-agent-copy h2 { font-size: 18px; }
-    .creation-agent-actions > .ant-btn { width: 100%; }
     .creation-inspiration-filters { gap: 4px; }
     .creation-inspiration-filters button { padding-inline: 10px; }
     .creation-inspiration-footer { align-items: flex-start; flex-direction: column; }
@@ -408,7 +408,6 @@
     }
 }
 @media (prefers-reduced-motion: reduce) {
-    .creation-agent-entry { animation: none; }
     .app-user-workspace .creation-chat-composer,
     .app-user-workspace .creation-chat-control,
     .app-user-workspace .creation-voice-trigger.ant-btn,
@@ -678,4 +677,19 @@ html:not(.dark) .app-product-overlays .creation-control-popover-surface {
 
 .creation-home .creation-chat-mention-container {
     min-height: 0 !important;
+}
+
+/* 玩法条（CreationPlayStrip）：圆形封面 + 名字，替代原来的四张说明卡；手机上横向滚动。 */
+.creation-play-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: var(--space-4); }
+.creation-play-chip { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; height: 36px; padding: 0 14px 0 4px; border: 1px solid var(--user-border); border-radius: 999px; background: color-mix(in srgb, var(--user-surface) 72%, transparent); color: var(--user-ink); font-size: 13px; cursor: pointer; transition: background var(--user-motion), border-color var(--user-motion), transform var(--user-motion); }
+.creation-play-chip img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.creation-play-chip:hover { border-color: var(--user-border-strong); background: var(--user-surface-hover); }
+.creation-play-chip:active { transform: scale(.98); }
+.creation-play-chip:focus-visible { outline: 2px solid var(--user-accent); outline-offset: 2px; }
+@media (max-width: 620px) {
+    .creation-play-strip { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; margin-inline: calc(var(--space-4) * -1); padding: 0 var(--space-4) 2px; scrollbar-width: none; }
+    .creation-play-strip::-webkit-scrollbar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .creation-play-chip { transition: none; }
 }

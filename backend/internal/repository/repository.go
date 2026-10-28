@@ -38,6 +38,8 @@ type Repository struct {
 	canvasEditProofs     []model.CanvasEditProof
 	canvasChangeNotifier func(string, string)
 	canvasChanges        map[canvasChange]struct{}
+	changeSignals        *ChangeSignals
+	pendingSignals       map[string]struct{}
 }
 
 type UserStorageUsage struct {
@@ -64,12 +66,16 @@ func (r *Repository) WithContext(ctx context.Context) *Repository {
 // services use it when a canvas mutation and its receipt must commit together.
 func (r *Repository) Transaction(fn func(*Repository) error) error {
 	changes := make(map[canvasChange]struct{})
+	signals := make(map[string]struct{})
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		return fn(&Repository{db: tx, canvasEditProofs: r.canvasEditProofs, canvasChangeNotifier: r.canvasChangeNotifier, canvasChanges: changes})
+		return fn(&Repository{db: tx, canvasEditProofs: r.canvasEditProofs, canvasChangeNotifier: r.canvasChangeNotifier, canvasChanges: changes, changeSignals: r.changeSignals, pendingSignals: signals})
 	})
 	if err == nil {
 		for change := range changes {
 			r.canvasChanged(change.userID, change.canvasID)
+		}
+		for key := range signals {
+			r.signalChanged(key)
 		}
 	}
 	return err

@@ -133,12 +133,14 @@ export type CreationConversation = {
 };
 export type CreationHistoryEntry = CreationConversation & { historyStatus?: "unloaded" | "loading" | "error" };
 
-export const modeLabels: Record<CreationMode, string> = { agent: "Agent", text: "文本", image: "图片", video: "视频" };
+// 面向 C 端的叫法："自动"交给阿Q规划，图片/视频直接出。内部 key 仍是 agent。
+export const modeLabels: Record<CreationMode, string> = { agent: "自动", text: "文本", image: "图片", video: "视频" };
 export const defaultCreationMode: CreationMode = "agent";
+/** 输入框左下角"创作类型"菜单：名字 + 一句说明，选中项打勾。 */
 export const creationComposerModeOptions = [
-    { key: "agent", label: "Agent", description: "对话与规划" },
-    { key: "image", label: "图片", description: "生成图片" },
-    { key: "video", label: "视频", description: "生成视频" },
+    { key: "agent", label: "自动", description: "阿Q 帮你规划" },
+    { key: "image", label: "图片生成", description: "直接出图" },
+    { key: "video", label: "视频生成", description: "直接出视频" },
 ] as const;
 export function creationModelCapability(mode: CreationMode) {
     return mode === "agent" ? "text" : mode;

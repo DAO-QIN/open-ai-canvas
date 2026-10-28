@@ -5,7 +5,10 @@ import "./creation-results.css";
 
 import { conversationTimeFormatter, type CreationMessage } from "./creation-types";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, FileText, Film, Image as ImageIcon, Maximize2, Music2, Pencil, RefreshCw, Sparkles, UserRound, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, FileText, Film, Image as ImageIcon, Maximize2, Music2, Pencil, RefreshCw, UserRound, X } from "lucide-react";
+import { CreationIcon, type CreationIconName } from "./creation-icons";
+
+const SkillGlyph = () => <CreationIcon name="skill" />;
 import { GenerationToolCard, type GenerationToolStatus } from "@/components/ai/generation-tool-card";
 import { MessageReasoning } from "@/components/ai/message-reasoning";
 import { AIMessageMarkdown } from "@/components/ai/ai-message-markdown";
@@ -51,6 +54,7 @@ export function CreationMessageView({
     retryDisabled = false,
     onCreateAgentTaskVariant,
     onQueryInterjection,
+    onUseResultImage,
     submitting = false,
     nested = false,
 }: {
@@ -70,6 +74,8 @@ export function CreationMessageView({
     retryDisabled?: boolean;
     onCreateAgentTaskVariant?: (task: CreationMessage) => void;
     onQueryInterjection?: (message: CreationMessage) => Promise<void>;
+    /** 结果图上的操作条：变体、转视频、作为参考。不传则不显示。 */
+    onUseResultImage?: CreationResultImageHandler;
     submitting?: boolean;
     nested?: boolean;
 }) {
@@ -166,7 +172,7 @@ export function CreationMessageView({
         mode !== "text" && mode !== "agent" ? (
             <>
                 {shotNumber > 0 ? <span className="creation-shot-badge">镜 {shotNumber}</span> : null}
-                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<Sparkles />} />
+                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<CreationIcon name="auto" />} />
                 <strong>{mode === "image" ? "图像生成" : "视频生成"}</strong>
                 {item.status === "pending" ? (
                     <span className="creation-message-progress-copy">
@@ -199,7 +205,7 @@ export function CreationMessageView({
         ) : (
             <>
                 {shotNumber > 0 ? <span className="creation-shot-badge">镜 {shotNumber}</span> : null}
-                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<Sparkles />} />
+                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<CreationIcon name="auto" />} />
                 <strong>
                     <BrandWordmark name={assistantName} />
                 </strong>
@@ -235,6 +241,7 @@ export function CreationMessageView({
                                 onEditUserMessage={onEditUserMessage}
                                 onContinueCanvas={onContinueCanvas}
                                 openingCanvas={openingCanvas}
+                                onUseResultImage={onUseResultImage}
                             />
                         </div>
                     );
@@ -335,7 +342,15 @@ export function CreationMessageView({
             ) : (
                 <GenerationToolCard status={toolStatus} heading={heading}>
                     {nested && (item.status === "error" || item.status === "cancelled") ? null : (
-                        <MediaResult item={item} submitting={submitting} onRetryFailure={nested ? undefined : onRetryFailure} onCreateVariant={onCreateVariant} onContinueCanvas={onContinueCanvas} openingCanvas={openingCanvas} />
+                        <MediaResult
+                            item={item}
+                            submitting={submitting}
+                            onRetryFailure={nested ? undefined : onRetryFailure}
+                            onCreateVariant={onCreateVariant}
+                            onContinueCanvas={onContinueCanvas}
+                            openingCanvas={openingCanvas}
+                            onUseResultImage={onUseResultImage}
+                        />
                     )}
                 </GenerationToolCard>
             )}
@@ -505,6 +520,35 @@ function usableResultUrls(urls: string[]) {
     });
 }
 
+export type CreationResultImageIntent = "variant" | "video" | "reference";
+export type CreationResultImageRef = { url: string; storageKey?: string; index: number };
+export type CreationResultImageHandler = (image: CreationResultImageRef, intent: CreationResultImageIntent) => void;
+
+const creationImageActionItems: Array<{ intent: CreationResultImageIntent; icon: CreationIconName; label: string; title: string }> = [
+    { intent: "variant", icon: "variant", label: "用这张图做变体", title: "变体" },
+    { intent: "video", icon: "toVideo", label: "用这张图做视频", title: "转视频" },
+    { intent: "reference", icon: "reference", label: "把这张图作为参考", title: "作为参考" },
+];
+
+/**
+ * 结果图上的操作条：只放和这一张图有关的操作，整组的操作（添加到画布、批量下载）留在图下面。
+ * 桌面端悬停或键盘聚焦时浮出；触屏设备常驻显示。操作只把图片和提示词填进输入框，不会直接生成。
+ */
+function CreationImageActions({ image, onUse }: { image: CreationResultImageRef; onUse?: CreationResultImageHandler }) {
+    if (!onUse) return null;
+    const ready = Boolean(image.url || image.storageKey);
+    // 用 div 和原生 title：旧的消息样式会把结果卡里的每个 span 压成 27px 并隐藏。
+    return (
+        <div className="creation-image-actions" role="group" aria-label={`第 ${image.index + 1} 张图的操作`}>
+            {creationImageActionItems.map((action) => (
+                <button key={action.intent} type="button" title={action.title} aria-label={action.label} disabled={!ready} onClick={() => onUse(image, action.intent)}>
+                    <CreationIcon name={action.icon} size={18} />
+                </button>
+            ))}
+        </div>
+    );
+}
+
 export function MediaResult({
     item,
     submitting = false,
@@ -512,6 +556,7 @@ export function MediaResult({
     onCreateVariant,
     onContinueCanvas,
     openingCanvas,
+    onUseResultImage,
 }: {
     item: CreationMessage;
     submitting?: boolean;
@@ -519,6 +564,7 @@ export function MediaResult({
     onCreateVariant: () => void;
     onContinueCanvas: (ids?: string[]) => void;
     openingCanvas: boolean;
+    onUseResultImage?: CreationResultImageHandler;
 }) {
     const [previewUrl, setPreviewUrl] = useState("");
     const [previewType, setPreviewType] = useState<"image" | "video">("image");
@@ -711,6 +757,7 @@ export function MediaResult({
                     setPreviewUrl(loadedUrl);
                 }}
             />
+            <CreationImageActions image={{ url, storageKey: downloadImages[index].storageKey, index }} onUse={onUseResultImage} />
             <button type="button" className="creation-image-result-download" onClick={() => void downloadImage(index)} disabled={downloadingBatch || downloadingImage !== null} aria-label={`下载生成图片 ${index + 1}`} title="下载图片">
                 <Download aria-hidden="true" />
             </button>
@@ -751,6 +798,7 @@ export function MediaResult({
                             ))}
                             <span className="creation-image-result-stack-front">
                                 <CreationResultImage key={batchPreviewIndex} url={activeBatchUrl} alt={`生成结果 ${batchPreviewIndex + 1}`} square previewLabel={`展开预览第 ${batchPreviewIndex + 1} 张图片`} onPreview={() => setBatchPreviewOpen(true)} onReload={() => reloadImage(batchPreviewIndex)} />
+                                <CreationImageActions image={{ url: activeBatchUrl, storageKey: downloadImages[batchPreviewIndex]?.storageKey, index: batchPreviewIndex }} onUse={onUseResultImage} />
                             </span>
                         </span>
                         <span className="creation-image-result-stack-controls" aria-label="切换批次图片">
@@ -867,7 +915,7 @@ export function CreationMessageReferences({ references }: { references: Creation
     return (
         <div className="creation-user-message-references" aria-label="本次引用">
             {references.map((reference) => {
-                const Icon = reference.kind === "skill" ? Sparkles : reference.kind === "image" ? ImageIcon : reference.kind === "video" ? Film : reference.kind === "audio" ? Music2 : FileText;
+                const Icon = reference.kind === "skill" ? SkillGlyph : reference.kind === "image" ? ImageIcon : reference.kind === "video" ? Film : reference.kind === "audio" ? Music2 : FileText;
                 const imageUrl = reference.kind === "image" ? resolveResourceUrl(reference.storageKey, reference.previewUrl) : reference.previewUrl;
                 return (
                     <span key={reference.id} className="creation-user-message-reference">

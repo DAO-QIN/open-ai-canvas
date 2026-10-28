@@ -201,12 +201,28 @@ for (const mode of ["image", "video"] as const) {
     });
 }
 
-test("Agent 主栏固定对话模型，不再显示二级模型类型选择；设置入口是偏好", () => {
+test("自动模式主栏固定对话模型，不再显示二级模型类型选择；设置入口是偏好", () => {
     const html = renderToStaticMarkup(<CreationComposer {...props} />);
     expect(html).not.toContain("creation-agent-model-tab");
-    expect(html).toContain("选择对话模型");
+    expect(html).not.toContain("选择对话模型");
     expect(html).toContain("Agent 创作偏好");
     expect(html).toContain(">偏好</span>");
+});
+
+test("输入框去掉流光描边和聚光；类型按钮与发送键用创作页自绘图标；占位文字不超过 14 个字", () => {
+    const html = renderToStaticMarkup(<CreationComposer {...props} />);
+    expect(html).toContain('aria-label="创作类型：自动"');
+    expect(html).toContain('data-icon="auto"');
+    expect(html).toContain('data-icon="send"');
+    expect(html).not.toContain("group/spotlight");
+    for (const [variant, mode, text] of [
+        ["empty", "agent", "描述画面，或拖入一张图"],
+        ["thread", "agent", "接着改，或 @ 某一张"],
+        ["empty", "video", "描述镜头，或拖入一张首帧"],
+    ] as const) {
+        expect(renderToStaticMarkup(<CreationComposer {...props} prompt="" variant={variant} mode={mode} />)).toContain(text);
+        expect(text.length).toBeLessThanOrEqual(14);
+    }
 });
 
 test("首页只显示上下文圆环，保留可访问名称；画布默认保留读数", () => {

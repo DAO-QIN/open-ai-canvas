@@ -546,6 +546,14 @@ func (s *Service) CloudAgentRunIfChanged(userID, id string, revision int64, opti
 	return s.CloudAgentRun(userID, id, options...)
 }
 
+// CloudAgentRunChanges 订阅运行修订号变化的唤醒信号。SSE 收到后仍用 CloudAgentRunIfChanged
+// 按修订号读库，信号只决定"什么时候读"，不代替数据库里的状态。enabled 为 false 表示
+// 没有接通知，调用方应保持原来的轮询间隔。
+func (s *Service) CloudAgentRunChanges(id string) (changes <-chan struct{}, enabled bool, stop func()) {
+	changes, stop = s.repo.SubscribeCloudAgentRun(id)
+	return changes, s.repo.ChangeSignalsEnabled(), stop
+}
+
 // CreateCloudAgentRun validates every capability before admission. The task PK
 // is deterministic per user/key. Competing requests may race, but task creation
 // and credit reservation share a transaction: only one can commit.
