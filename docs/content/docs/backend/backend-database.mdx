@@ -7,7 +7,7 @@ description: 影策后端核心持久化表与状态边界
 
 ## 常驻通知自定义配色（Schema 79）
 
-版本 79 `banner_theme` 为 `banner_announcements` 增加 `bg_color`、`glow_color`（列宽 7、非空、默认空串）和 `bg_effect`（列宽 16、非空、默认 `aurora`）。两种颜色只接受 `#RRGGBB` 并统一大写，空串表示跟随通知类型的预设配色，可以只自定义其中一种；`bg_effect` 取 `aurora`（光晕流动）或 `static`（光晕静止），白名单在 `backend/internal/app/announcement.go` 的 `bannerEffects`，与前端 `lib/announcements/banner-theme.ts` 的一致性由 `web/test/banner-theme.test.ts` 校验。按钮与倒计时数字的文字色不入库，由前端从光晕色压暗到在白底上 ≥ 7:1 得出。旧通知升级后颜色为空、动效为 `aurora`，展示不变。
+版本 79 `banner_theme` 为 `banner_announcements` 增加 `bg_color`、`glow_color`（列宽 7、非空、默认空串）和 `bg_effect`（列宽 16、非空、默认 `aurora`）。两种颜色只接受 `#RRGGBB` 并统一大写，空串表示跟随通知类型的预设配色，可以只自定义其中一种；`bg_effect` 取 `aurora`（光晕流动）或 `static`（光晕静止），白名单在 `backend/internal/app/announcement.go` 的 `bannerEffects`，与前端 `lib/announcements/banner-theme.ts` 的一致性由 `web/test/banner-theme.test.ts` 校验。按钮与倒计时数字的文字色不入库，由前端从光晕色压暗到在白底上 ≥ 11.5:1 得出。旧通知升级后颜色为空、动效为 `aurora`，展示不变。
 
 ## 常驻通知按钮文案与倒计时（Schema 78）
 

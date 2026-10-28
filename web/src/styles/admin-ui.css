@@ -11350,7 +11350,7 @@ html[data-magicui-theme-vt="active"] .admin-shell * {
     line-height: 1.5;
 }
 
-/* 类型卡片上的配色条：与前台通知条同一组 token 和构图（光晕在中间、两端收进中性深色），颜色由卡片的 data-banner-type 选中。 */
+/* 类型卡片上的配色条：与前台通知条同一组深色底与光晕 token，取光环流过两端时的一帧，颜色由卡片的 data-banner-type 选中。 */
 .admin-banner-type-card-preview {
     --admin-banner-card-base: var(--notice-banner-base-notice);
     --admin-banner-card-glow: var(--notice-banner-glow-notice);
@@ -11361,7 +11361,8 @@ html[data-magicui-theme-vt="active"] .admin-shell * {
     border-radius: 6px;
     padding: 6px 8px;
     background-color: var(--admin-banner-card-base);
-    background-image: linear-gradient(90deg, var(--notice-banner-edge), transparent 30%, transparent 70%, var(--notice-banner-edge)), radial-gradient(60% 200%, color-mix(in srgb, var(--admin-banner-card-glow) 56%, transparent), transparent 75%);
+    background-image:
+        radial-gradient(70% 260% at 0% 0%, color-mix(in srgb, var(--admin-banner-card-glow) 62%, transparent), transparent 70%), radial-gradient(60% 240% at 100% 100%, color-mix(in srgb, var(--admin-banner-card-glow) 48%, transparent), transparent 70%);
     color: var(--notice-banner-foreground);
     font-size: var(--fs-micro);
     line-height: 1.4;

@@ -13,6 +13,7 @@ import {
     normalizeBannerNoticeType,
     searchBannerNoticeEmojis,
 } from "@/lib/announcements/banner-notice";
+import { BANNER_GLOW_PEAK, BANNER_INK_CONTRAST } from "@/lib/announcements/banner-theme";
 import { bannerTitleContrastRatio } from "@/lib/announcements/banner-title";
 
 async function readSource(relativePath: string) {
@@ -171,7 +172,7 @@ describe("通知条主题色", () => {
             return match[1];
         };
         const channels = (hex: string) => [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
-        // 与 banner-announcement.css 的 color-mix(in srgb, glow 56%, base) 一致：sRGB 通道线性混合。
+        // 文字背后光晕最亮时相当于光晕色按 BANNER_GLOW_PEAK 叠在底色上：sRGB 通道线性混合，与浏览器合成一致。
         const mix = (glow: string, base: string, weight: number) =>
             `#${channels(glow)
                 .map((channel, index) => Math.round(channel * weight + channels(base)[index] * (1 - weight)))
@@ -182,8 +183,8 @@ describe("通知条主题色", () => {
             const glow = value(`palette-banner-${type.key}-300`);
             const ink = value(`palette-banner-${type.key}-900`);
             expect(bannerTitleContrastRatio("#FFFFFF", base)).toBeGreaterThanOrEqual(7);
-            expect(bannerTitleContrastRatio(ink, "#FFFFFF")).toBeGreaterThanOrEqual(7);
-            expect(bannerTitleContrastRatio("#FFFFFF", mix(glow, base, 0.56))).toBeGreaterThanOrEqual(4.5);
+            expect(bannerTitleContrastRatio(ink, "#FFFFFF")).toBeGreaterThanOrEqual(BANNER_INK_CONTRAST);
+            expect(bannerTitleContrastRatio("#FFFFFF", mix(glow, base, BANNER_GLOW_PEAK))).toBeGreaterThanOrEqual(4.5);
         }
     });
 
@@ -206,10 +207,9 @@ describe("通知条主题色", () => {
             expect(adminUi).toContain(`var(${type.baseVar})`);
             expect(adminUi).toContain(`var(${type.glowVar})`);
         }
-        // 两端收边色各类型共用：只声明一次，通知条与类型卡片都引用它，不再各写一个色值。
-        expect(globals.match(/--notice-banner-edge: var\(--palette-banner-edge\)/g)?.length).toBe(1);
-        expect(bannerCss).toContain("var(--notice-banner-edge)");
-        expect(adminUi).toContain("var(--notice-banner-edge)");
+        // 底边像素颗粒只在深色主题使用，颗粒边长按桌面端 0.9 缩放补偿。
+        expect(bannerCss).toMatch(/\.dark \.notice-banner-backdrop \{\s*-webkit-mask:/);
+        expect(bannerCss).toContain("--nb-pixel: calc(3px / 0.9)");
         // 光效与按钮动画在减少动态效果时必须关闭。
         expect(bannerCss).toContain("@media (prefers-reduced-motion: reduce)");
     });

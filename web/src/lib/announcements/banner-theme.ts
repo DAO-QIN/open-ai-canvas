@@ -1,10 +1,9 @@
 /**
  * 常驻通知条的配色：类型预设与后台自定义。
  *
- * 通知条只需要两种颜色：深色底（文字与按钮之下）和光晕色（内容背后的流动光晕与按钮投影）；
- * 两端收进的中性深色各配色共用，不需要管理员设置。
+ * 通知条只需要两种颜色：深色底（文字与按钮之下）和光晕色（流动光环与按钮扫光）。
  * 自定义颜色留空时跟随通知类型的预设；按钮与倒计时数字的文字色由光晕色压暗得到，
- * 在白色按钮上始终 ≥ 7:1，管理员不需要再单独挑一种文字色。
+ * 在白色按钮上始终 ≥ 11.5:1（与类型预设的按钮文字色同一深度），管理员不需要再单独挑一种文字色。
  *
  * 除 readBannerPresetColors 需要读取页面 token 外，本模块都是纯函数。
  */
@@ -32,7 +31,7 @@ export function normalizeBannerEffect(value?: string | null): BannerEffect {
     return BANNER_EFFECT_KEYS.has(raw) ? (raw as BannerEffect) : BANNER_EFFECT_DEFAULT;
 }
 
-/** 推荐配色：深色底 + 亮色光晕；白字在底色上 ≥ 7:1、在光晕最亮处 ≥ 4.5:1（见 web/test/banner-theme.test.ts）。 */
+/** 推荐配色：深色底 + 亮色光晕；白字在底色上 ≥ 7:1、在文字背后光晕最亮处 ≥ 4.5:1（见 web/test/banner-theme.test.ts）。 */
 export const BANNER_THEME_PRESETS: { key: string; label: string; base: string; glow: string }[] = [
     { key: "aurora-teal", label: "极光青", base: "#001328", glow: "#02C6C4" },
     { key: "nebula", label: "星云紫", base: "#130A33", glow: "#9A73FF" },
@@ -44,11 +43,17 @@ export const BANNER_THEME_PRESETS: { key: string; label: string; base: string; g
     { key: "forest", label: "森林绿", base: "#031D12", glow: "#2FCF7C" },
 ];
 
-/** 光晕在底色上最亮处的不透明度，与 banner-announcement.css 中 .notice-banner-aurora 渐变的峰值一致。 */
-export const BANNER_GLOW_PEAK = 0.56;
+/** 光环最亮处的光晕色不透明度，与 banner-announcement.css 中 .notice-banner-aurora 渐变的峰值一致。 */
+export const BANNER_RING_PEAK = 0.7;
+
+/** 文字区压光层的底色不透明度（banner-announcement.css 的 .notice-banner-backdrop::after），亮带经过文字时按此减弱。 */
+export const BANNER_TEXT_SCRIM = 0.2;
+
+/** 文字背后光晕最亮时相当于光晕色叠在底色上的比例（光环峰值经压光层减弱后），白字对比度按它检查。 */
+export const BANNER_GLOW_PEAK = Math.round(BANNER_RING_PEAK * (1 - BANNER_TEXT_SCRIM) * 100) / 100;
 
 /** 按钮与倒计时数字的文字色在白底上的目标对比度。 */
-const BANNER_INK_CONTRAST = 7;
+export const BANNER_INK_CONTRAST = 11.5;
 
 export type BannerThemeFields = {
     bgColor?: string | null;
@@ -82,7 +87,7 @@ export function bannerHasCustomTheme(theme?: BannerThemeFields | null) {
     return Boolean(bannerColorHex(theme?.bgColor) || bannerColorHex(theme?.glowColor));
 }
 
-/** 光晕色逐步压暗（向黑色混合），直到在白色按钮上达到 7:1；色相保持不变。 */
+/** 光晕色逐步压暗（向黑色混合），直到在白色按钮上达到 BANNER_INK_CONTRAST；色相保持不变。 */
 export function bannerInkColor(glow?: string | null) {
     const color = parseBannerTitleColor(bannerColorHex(glow));
     if (!color) return "";

@@ -27,7 +27,7 @@ export const BANNER_NOTICE_TYPES: {
     surfaceVar: string;
     /** 通知条深色底，不随主题变化，白字对比度 ≥ 7:1。 */
     baseVar: string;
-    /** 通知条流动光晕与描边的亮色。 */
+    /** 通知条流动光环与按钮扫光的亮色。 */
     glowVar: string;
     /** 白色按钮与倒计时数字的文字色。 */
     inkVar: string;
