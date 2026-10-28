@@ -1,6 +1,20 @@
 import { describe, expect, test } from "bun:test";
 
-import { BANNER_EFFECT_DEFAULT, BANNER_EFFECTS, BANNER_GLOW_PEAK, BANNER_THEME_PRESETS, bannerColorHex, bannerHasCustomTheme, bannerInkColor, bannerThemeContrast, bannerThemeStyle, normalizeBannerEffect } from "@/lib/announcements/banner-theme";
+import {
+    BANNER_EFFECT_DEFAULT,
+    BANNER_EFFECTS,
+    BANNER_GLOW_PEAK,
+    BANNER_INK_CONTRAST,
+    BANNER_RING_PEAK,
+    BANNER_TEXT_SCRIM,
+    BANNER_THEME_PRESETS,
+    bannerColorHex,
+    bannerHasCustomTheme,
+    bannerInkColor,
+    bannerThemeContrast,
+    bannerThemeStyle,
+    normalizeBannerEffect,
+} from "@/lib/announcements/banner-theme";
 import { bannerTitleContrastRatio } from "@/lib/announcements/banner-title";
 
 async function readSource(relativePath: string) {
@@ -76,10 +90,11 @@ describe("自定义配色写到通知条上的变量", () => {
 });
 
 describe("按钮文字色", () => {
-    test("任何光晕色压暗后在白色按钮上都 ≥ 7:1", () => {
+    test("任何光晕色压暗后在白色按钮上都达到目标对比度（与类型预设同一深度）", () => {
+        expect(BANNER_INK_CONTRAST).toBeGreaterThanOrEqual(11.5);
         for (const glow of ["#FFFFFF", "#FFFF00", "#02C6C4", "#7D87FF", "#FF4F9A", "#FFA23A", "#3DDC84"]) {
             const ink = bannerInkColor(glow);
-            expect(bannerTitleContrastRatio(ink, "#FFFFFF")).toBeGreaterThanOrEqual(7);
+            expect(bannerTitleContrastRatio(ink, "#FFFFFF")).toBeGreaterThanOrEqual(BANNER_INK_CONTRAST);
         }
     });
 
@@ -109,8 +124,14 @@ describe("推荐配色", () => {
         expect(bannerThemeContrast("", "#FFFFFF")).toBeNull();
     });
 
-    test("光晕峰值与 CSS 渐变一致，对比度检查不会和实际效果脱节", async () => {
+    test("光环峰值与文字区压光层和 CSS 一致，对比度检查不会和实际效果脱节", async () => {
         const css = await readSource("../src/components/layout/banner-announcement.css");
-        expect(css).toContain(`color-mix(in srgb, var(--nb-glow) ${Math.round(BANNER_GLOW_PEAK * 100)}%, transparent)`);
+        expect(css).toContain(`color-mix(in srgb, var(--nb-glow) ${Math.round(BANNER_RING_PEAK * 100)}%, transparent)`);
+        expect(css).toContain(`color-mix(in srgb, var(--nb-base) ${Math.round(BANNER_TEXT_SCRIM * 100)}%, transparent)`);
+        // 光环里不应再出现比峰值更亮的光晕色。
+        const glowStops = Array.from(css.matchAll(/var\(--nb-glow\) (\d+)%, transparent\)/g), (match) => Number(match[1]));
+        expect(Math.max(...glowStops)).toBe(Math.round(BANNER_RING_PEAK * 100));
+        expect(BANNER_GLOW_PEAK).toBeCloseTo(BANNER_RING_PEAK * (1 - BANNER_TEXT_SCRIM), 6);
+        expect(BANNER_GLOW_PEAK).toBe(0.56);
     });
 });
