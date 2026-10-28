@@ -1,6 +1,7 @@
 import { http, apiBaseURL } from "@/services/api/request";
 import type { RemoteResource } from "@/services/api/resources";
 import type { BannerNoticeType } from "@/lib/announcements/banner-notice";
+import type { BannerEffect } from "@/lib/announcements/banner-theme";
 import type { BannerTitleRun } from "@/lib/announcements/banner-title";
 
 export type { BannerTitleRun };
@@ -83,8 +84,13 @@ export type BannerAnnouncement = {
     title: string;
     /** 标题样式分段；为空表示纯文本标题（取值白名单见 lib/announcements/banner-title）。 */
     titleRuns?: BannerTitleRun[];
-    /** 通知类型，决定通知条配色与默认按钮文案；未知值按「公告」处理。 */
+    /** 通知类型，决定预设配色与默认按钮文案；未知值按「公告」处理。 */
     noticeType?: BannerNoticeType;
+    /** 自定义底色 / 光晕色（#RRGGBB）；为空时跟随通知类型的预设配色。 */
+    bgColor?: string;
+    glowColor?: string;
+    /** 背景动效；未知或空值按光晕流动处理。 */
+    bgEffect?: BannerEffect;
     /** 行动按钮文案；为空时按通知类型取默认文案，只在有跳转链接时展示。 */
     ctaText?: string;
     link?: string;
@@ -118,6 +124,9 @@ export type AdminBannerPayload = {
     title: string;
     titleRuns?: BannerTitleRun[];
     noticeType?: BannerNoticeType;
+    bgColor?: string;
+    glowColor?: string;
+    bgEffect?: BannerEffect;
     ctaText?: string;
     link?: string;
     status: "active" | "disabled";

@@ -1,7 +1,8 @@
 /**
  * 首页常驻通知条的「通知类型」与「标题图标素材」模型。
  *
- * 通知类型决定通知条配色（深色底、流动光晕、按钮文字色）和默认按钮文案，后台与前台共用同一套 token。
+ * 通知类型决定通知条的预设配色（深色底、流动光晕、按钮文字色）和默认按钮文案，后台与前台共用同一套 token；
+ * 后台自定义配色见 banner-theme.ts。
  * 图标素材是 emoji 字符：它就是普通文本，随 TitleRuns 的文本分段一起存储与渲染，
  * 因此可以插到标题任意位置、跟随分段样式、参与关键字检索，后端不需要单独字段或白名单。
  *
@@ -215,19 +216,4 @@ export function searchBannerNoticeEmojis(keyword: string) {
     const query = keyword.trim().toLowerCase();
     if (!query) return BANNER_NOTICE_EMOJIS;
     return BANNER_NOTICE_EMOJIS.filter((item) => item.char.includes(query) || item.label.includes(query) || item.groupLabel.includes(query));
-}
-
-/**
- * 读取指定类型通知条的实际深色底，避免把设计 token 的色值复制到 TS 里；后台用它做标题颜色的对比度提示。
- */
-export function readBannerNoticeBase(noticeType?: string | null, scope?: HTMLElement | null) {
-    if (typeof window === "undefined") return "";
-    const host = scope || window.document.body || window.document.documentElement;
-    if (!host) return "";
-    const probe = window.document.createElement("span");
-    probe.style.cssText = `position:absolute;left:-9999px;top:-9999px;background-color:var(${bannerNoticeTypeMeta(noticeType).baseVar})`;
-    host.appendChild(probe);
-    const resolved = window.getComputedStyle(probe).backgroundColor;
-    probe.remove();
-    return resolved;
 }

@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 78
+const CurrentSchemaVersion int64 = 79
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -290,6 +290,21 @@ var schemaMigrations = []migration{
 		return tx.Migrator().AddColumn(&model.DramaSegment{}, "ReferenceCastIDsJSON")
 	}},
 	{version: 78, name: "banner_cta_countdown", checksum: "sha256:banner-cta-countdown-v78-20261028", apply: migrateBannerCtaCountdown},
+	{version: 79, name: "banner_theme", checksum: "sha256:banner-theme-v79-20261028", apply: migrateBannerTheme},
+}
+
+// migrateBannerTheme 为常驻通知增加自定义底色、光晕色与背景动效。
+// 旧通知颜色为空（跟随通知类型的预设配色）、动效为光晕流动，展示不变。
+func migrateBannerTheme(tx *gorm.DB) error {
+	for _, field := range []string{"BgColor", "GlowColor", "BgEffect"} {
+		if tx.Migrator().HasColumn(&model.BannerAnnouncement{}, field) {
+			continue
+		}
+		if err := tx.Migrator().AddColumn(&model.BannerAnnouncement{}, field); err != nil {
+			return fmt.Errorf("为常驻通知增加 %s：%w", field, err)
+		}
+	}
+	return nil
 }
 
 // migrateBannerCtaCountdown 为常驻通知增加行动按钮文案与倒计时开关。

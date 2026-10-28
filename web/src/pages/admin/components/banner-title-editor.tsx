@@ -7,7 +7,16 @@ import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { BannerAnnouncementBody, BannerAnnouncementShell, useBannerNow } from "@/components/layout/banner-announcement-content";
-import { bannerCtaLabel, bannerNoticeTypeLabel, readBannerNoticeBase } from "@/lib/announcements/banner-notice";
+import { bannerCtaLabel, bannerNoticeTypeLabel } from "@/lib/announcements/banner-notice";
+import {
+    BANNER_EFFECTS,
+    bannerColorHex,
+    bannerHasCustomTheme,
+    bannerThemeContrast,
+    normalizeBannerEffect,
+    readBannerPresetColors,
+    type BannerThemeFields,
+} from "@/lib/announcements/banner-theme";
 import { BannerNoticeEmojiPopover } from "./banner-notice-emoji-picker";
 import { Select } from "@/components/ui/base/select";
 import {
@@ -160,40 +169,54 @@ export function BannerTitleEditor({ value, onChange }: { value: BannerTitleRun[]
 }
 
 /**
- * 前台效果预览：与首页通知条共用外壳与内容组件，类型配色、按钮文案和倒计时实时联动，因此预览即前台结果。
- * 通知条深色底不随明暗主题切换，只需一条预览；标题颜色按该底色给出对比度提示。
+ * 前台效果预览：与首页通知条共用外壳与内容组件，配色、动效、按钮文案和倒计时实时联动，因此预览即前台结果。
+ * 通知条深色底不随明暗主题切换，只需一条预览；按实际底色与光晕给出白字和标题颜色的对比度提示。
  */
 export function BannerNoticePreview({
     runs,
     hasLink,
     noticeType,
+    theme,
     ctaText,
     countdownEndsAt,
 }: {
     runs: BannerTitleRun[];
     hasLink: boolean;
     noticeType: string;
+    theme?: BannerThemeFields;
     ctaText?: string;
     countdownEndsAt?: number | null;
 }) {
     const reducedMotion = Boolean(useReducedMotion());
     const containerRef = useRef<HTMLDivElement | null>(null);
-    const [background, setBackground] = useState("");
+    const [preset, setPreset] = useState({ base: "", glow: "" });
     const now = useBannerNow(0, Boolean(countdownEndsAt));
 
     useEffect(() => {
-        // 底色由类型决定，切换类型后重新解析实际取值。
-        setBackground(readBannerNoticeBase(noticeType, containerRef.current));
+        // 预设配色由类型决定，切换类型后重新解析实际取值。
+        setPreset(readBannerPresetColors(noticeType, containerRef.current));
     }, [noticeType]);
 
+    const custom = bannerHasCustomTheme(theme);
+    const base = bannerColorHex(theme?.bgColor) || preset.base;
+    const glow = bannerColorHex(theme?.glowColor) || preset.glow;
+    const contrast = custom ? bannerThemeContrast(base, glow) : null;
+    const themeWarning =
+        contrast && contrast.base < 4.5
+            ? `底色偏亮，白字对比度 ${contrast.base.toFixed(1)}:1，建议换更深的底色`
+            : contrast && contrast.peak < 4.5
+              ? `光晕最亮处白字对比度 ${contrast.peak.toFixed(1)}:1，建议调暗光晕色或加深底色`
+              : "";
     const ctaLabel = hasLink ? bannerCtaLabel(ctaText, noticeType) : undefined;
     const countdownTarget = countdownEndsAt && countdownEndsAt > now ? countdownEndsAt : null;
-    const lowContrast = lowContrastBannerTitleColors(runs, background);
+    const lowContrast = lowContrastBannerTitleColors(runs, base);
+    const effect = BANNER_EFFECTS.find((item) => item.key === normalizeBannerEffect(theme?.bgEffect))?.label;
 
     return (
         <div ref={containerRef} className="space-y-1">
             <BannerAnnouncementShell
                 noticeType={noticeType}
+                theme={theme}
                 className="admin-banner-preview"
                 trailing={
                     <span className="notice-banner-close" aria-hidden="true">
@@ -209,10 +232,17 @@ export function BannerNoticePreview({
             </BannerAnnouncementShell>
             <p className="text-[var(--fs-label)] text-foreground/45">
                 {bannerNoticeTypeLabel(noticeType)}
+                {custom ? " · 自定义配色" : " · 类型预设配色"}
+                {effect ? ` · ${effect}` : ""}
                 {ctaLabel ? ` · 按钮「${ctaLabel}」` : " · 未设置跳转链接，不显示按钮"}
                 {countdownEndsAt && !countdownTarget ? " · 结束时间已过，倒计时不会显示" : ""}
-                {lowContrast.length ? ` · ${lowContrast.join("、")} 在该底色上对比度不足 4.5:1，建议调亮` : " · 对比度达标"}
+                {!themeWarning && !lowContrast.length ? " · 对比度达标" : ""}
             </p>
+            {themeWarning || lowContrast.length ? (
+                <p className="text-[var(--fs-label)] text-[var(--admin-status-warning)]" role="status">
+                    {[themeWarning, lowContrast.length ? `标题颜色 ${lowContrast.join("、")} 在该底色上对比度不足 4.5:1，建议调亮` : ""].filter(Boolean).join("；")}
+                </p>
+            ) : null}
         </div>
     );
 }

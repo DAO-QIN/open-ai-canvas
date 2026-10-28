@@ -725,6 +725,68 @@ func TestBannerAnnouncementRejectsInvalidCtaOrderAndCountdown(t *testing.T) {
 	}
 }
 
+// 自定义配色：颜色统一大写后落库，留空回到类型预设；动效走白名单，状态开关等整包更新不丢配色。
+func TestBannerAnnouncementThemePersistsAndValidates(t *testing.T) {
+	svc, _ := newAnnouncementImageTestService(t)
+	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin, Status: model.UserStatusActive}
+
+	banner, err := svc.CreateBannerAnnouncement(admin, CreateBannerAnnouncementRequest{Title: "限时活动", Status: "active", BgColor: " #001328 ", GlowColor: "#02c6c4"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := svc.repo.BannerAnnouncement(banner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.BgColor != "#001328" || stored.GlowColor != "#02C6C4" || stored.BgEffect != bannerEffectDefault {
+		t.Fatalf("created = %+v", stored)
+	}
+
+	if _, err := svc.UpdateBannerAnnouncement(admin, banner.ID, UpdateBannerAnnouncementRequest{Title: "限时活动", Status: "disabled", BgColor: "#001328", GlowColor: "#02C6C4", BgEffect: " STATIC "}); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := svc.repo.BannerAnnouncement(banner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.BgColor != "#001328" || reloaded.GlowColor != "#02C6C4" || reloaded.BgEffect != "static" || reloaded.Status != "disabled" {
+		t.Fatalf("reloaded = %+v", reloaded)
+	}
+
+	if _, err := svc.UpdateBannerAnnouncement(admin, banner.ID, UpdateBannerAnnouncementRequest{Title: "限时活动", Status: "active"}); err != nil {
+		t.Fatal(err)
+	}
+	cleared, err := svc.repo.BannerAnnouncement(banner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.BgColor != "" || cleared.GlowColor != "" || cleared.BgEffect != bannerEffectDefault {
+		t.Fatalf("cleared = %+v", cleared)
+	}
+
+	cases := []struct {
+		name string
+		req  CreateBannerAnnouncementRequest
+	}{
+		{name: "底色非十六进制", req: CreateBannerAnnouncementRequest{Title: "标题", Status: "active", BgColor: "red"}},
+		{name: "光晕色缺位", req: CreateBannerAnnouncementRequest{Title: "标题", Status: "active", GlowColor: "#12345"}},
+		{name: "光晕色注入", req: CreateBannerAnnouncementRequest{Title: "标题", Status: "active", GlowColor: "#fff;background:url(x)"}},
+		{name: "带透明度", req: CreateBannerAnnouncementRequest{Title: "标题", Status: "active", BgColor: "#00132880"}},
+		{name: "动效不在白名单", req: CreateBannerAnnouncementRequest{Title: "标题", Status: "active", BgEffect: "rainbow"}},
+	}
+	for _, testCase := range cases {
+		if _, err := svc.CreateBannerAnnouncement(admin, testCase.req); err == nil {
+			t.Fatalf("%s: expected rejection", testCase.name)
+		}
+	}
+	for value := range bannerEffects {
+		created, err := svc.CreateBannerAnnouncement(admin, CreateBannerAnnouncementRequest{Title: "动效 " + value, Status: "active", BgEffect: value})
+		if err != nil || created.BgEffect != value {
+			t.Fatalf("effect %q: %+v, %v", value, created, err)
+		}
+	}
+}
+
 // 公开接口带服务端时间与下一次变化时间：前台据此校准倒计时，并在预约通知开始时准时刷新。
 func TestBannerAnnouncementFeedReportsServerTimeAndNextChange(t *testing.T) {
 	svc, _ := newAnnouncementImageTestService(t)
