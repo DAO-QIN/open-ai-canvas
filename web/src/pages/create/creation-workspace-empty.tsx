@@ -1,12 +1,11 @@
-// 创作页空态：横幅、推荐提示词与精选作品。
+// 创作页空态：横幅、玩法条与精选作品。
 
 import { useAppearanceStore } from "@/stores/use-appearance-store";
 import type { CreationMode } from "./creation-assets";
-import { ArrowUp, ChevronDown, Clapperboard, FileText, Image as ImageIcon, Sparkles } from "lucide-react";
-import { LayoutGroup, motion, useReducedMotion } from "motion/react";
+import { ArrowUp, ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { aceternityMotion } from "@/lib/aceternity-motion";
 import { curatedInspirations, inspirationSourceOf, inspirationSources } from "@/lib/inspirations/catalog";
+import { CreationIcon } from "./creation-icons";
 import { modeLabels } from "./creation-types";
 import { Button } from "antd";
 
@@ -33,49 +32,29 @@ export function CreationEmptyBanner() {
     );
 }
 
-export const creationEmptySuggestions: Array<{ mode: CreationMode; icon: typeof Clapperboard; title: string; hint: string; prompt: string; openLibrary?: boolean }> = [
-    { mode: "video", icon: Clapperboard, title: "生成第一个镜头", hint: "描述画面、镜头运动与光线", prompt: "雨夜天台，镜头缓缓推近霓虹灯牌下的主角，她回眸看向镜头，强对比电影感布光" },
-    { mode: "image", icon: ImageIcon, title: "从参考图开始", hint: "上传风格图，生成同风格画面", prompt: "", openLibrary: true },
-    { mode: "text", icon: FileText, title: "续写故事", hint: "和 AI 讨论剧情、角色与对白", prompt: "帮我续写一个短剧故事，先聊聊剧情走向：" },
-    { mode: "text", icon: Sparkles, title: "规划分镜", hint: "拆解镜头、机位与画面节奏", prompt: "请帮我规划分镜，列出每个镜头的画面、景别、机位与运动方式。故事是：" },
+/**
+ * 玩法条：常用的六种玩法，点一下只预填创作类型和提示词开头，不改模型、不跳页、不自动生成。
+ * 封面是从仓库已有风格图裁出的 96px 小图（public/creation-plays），避免首屏加载大图。
+ */
+export const creationPlays: Array<{ id: string; label: string; cover: string; mode: CreationMode; prompt: string }> = [
+    { id: "avatar", label: "头像", cover: "/creation-plays/avatar.jpg", mode: "image", prompt: "做一张头像，干净的纯色背景，半身构图，人物是：" },
+    { id: "poster", label: "海报", cover: "/creation-plays/poster.jpg", mode: "image", prompt: "做一张电影感竖版海报，标题醒目，主题是：" },
+    { id: "product", label: "商品图", cover: "/creation-plays/product.jpg", mode: "image", prompt: "做一张电商商品主图，白底，突出材质和细节，商品是：" },
+    { id: "sticker", label: "表情包", cover: "/creation-plays/sticker.jpg", mode: "image", prompt: "做一组表情包，同一个角色，不同表情，角色是：" },
+    { id: "storyboard", label: "故事分镜", cover: "/creation-plays/storyboard.jpg", mode: "agent", prompt: "把这个故事拆成 6 个分镜，每个镜头出一张图，故事是：" },
+    { id: "short-video", label: "短视频", cover: "/creation-plays/short-video.jpg", mode: "video", prompt: "生成一段 5 秒短视频，镜头缓慢推近，画面是：" },
 ];
 
-export function CreationEmptySuggest({ onStartPrompt, onOpenLibrary }: { onStartPrompt: (mode: CreationMode, prompt: string) => void; onOpenLibrary: () => void }) {
-    const reducedMotion = useReducedMotion();
-    const [hovered, setHovered] = useState<string | null>(null);
+export function CreationPlayStrip({ onStartPrompt }: { onStartPrompt: (mode: CreationMode, prompt: string) => void }) {
     return (
-        <LayoutGroup id="creation-empty-suggest">
-            <div className="creation-empty-suggest" aria-label="快捷创作入口">
-                {creationEmptySuggestions.map((item) => {
-                    const Icon = item.icon;
-                    const start = () => {
-                        if (item.openLibrary) onOpenLibrary();
-                        else onStartPrompt(item.mode, item.prompt);
-                    };
-                    return (
-                        <motion.button
-                            key={item.title}
-                            type="button"
-                            className="suggest-card"
-                            onClick={start}
-                            onHoverStart={() => setHovered(item.title)}
-                            onHoverEnd={() => setHovered(null)}
-                            whileHover={reducedMotion ? undefined : { y: -2 }}
-                            transition={aceternityMotion.spring.surface}
-                        >
-                            {hovered === item.title ? <motion.span layoutId="creation-suggest-hover" className="suggest-card-hover" aria-hidden transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.surface} /> : null}
-                            <span className="library-icon-tile suggest-icon">
-                                <Icon size={18} strokeWidth={2} />
-                            </span>
-                            <span className="suggest-copy">
-                                <strong>{item.title}</strong>
-                                <span>{item.hint}</span>
-                            </span>
-                        </motion.button>
-                    );
-                })}
-            </div>
-        </LayoutGroup>
+        <div className="creation-play-strip" role="group" aria-label="玩法">
+            {creationPlays.map((play) => (
+                <button key={play.id} type="button" className="creation-play-chip" onClick={() => onStartPrompt(play.mode, play.prompt)}>
+                    <img src={play.cover} alt="" width={28} height={28} decoding="async" />
+                    <span>{play.label}</span>
+                </button>
+            ))}
+        </div>
     );
 }
 
@@ -125,7 +104,7 @@ export function CreationFeaturedWorks({ onStartPrompt }: { onStartPrompt: (mode:
                             <strong>{item.title}</strong>
                             <span>{item.description}</span>
                             <em>
-                                <Sparkles />
+                                <CreationIcon name="generate" size={14} />
                                 {inspirationSourceOf(item).label} · {modeLabels[item.mode]}
                             </em>
                         </span>

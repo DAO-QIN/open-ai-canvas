@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { App, Spin } from "antd";
 import { Tooltip } from "@/components/ui/base/tooltip";
-import { History, Sparkles, Maximize2 } from "lucide-react";
+import { History, Maximize2 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useLocation, useNavigate } from "react-router";
 import { useCreationHomeNavigation } from "./use-creation-home-navigation";
@@ -135,7 +135,11 @@ import {
     selectCreationConversationMode,
     type PersistedCreationTask,
 } from "./creation-conversations";
-import { CreationComposer, CreationEmptySuggest, CreationHistoryDrawer, CreationMessageView, CreationWorkspaceToolbar, creationAssetCategoryLabels } from "./creation-workspace";
+import { CreationComposer, CreationHistoryDrawer, CreationMessageView, CreationPlayStrip, CreationWorkspaceToolbar, creationAssetCategoryLabels } from "./creation-workspace";
+import { CreationAmbientBackdrop, CreationLaunchBackdrop, latestCreationResultImage } from "./creation-backdrops";
+import { CreationIcon } from "./creation-icons";
+import type { CreationResultImageHandler } from "./creation-workspace-messages";
+import { resolveResourceUrl } from "@/services/api/resources";
 import { declaredInspirationSources } from "@/lib/inspirations/catalog";
 import { fillablePrompt } from "@/lib/inspirations/resolve";
 import { CreationRecentCanvases } from "./creation-recent-canvases";
@@ -2555,6 +2559,32 @@ export default function CreatePage() {
         restoreMessageDraft(previous);
     };
 
+    // 结果图上的操作条：把这张图作为参考放进输入框，变体/转视频再补一句提示词开头。
+    // 只填输入框、不直接生成；用户已经写了提示词时不覆盖。数量超出模型上限由发送前的统一校验处理。
+    const reuseResultImage: CreationResultImageHandler = (image, intent) => {
+        if (busy || (!image.url && !image.storageKey)) return;
+        const url = resolveResourceUrl(image.storageKey, image.url);
+        const attachment: CreationAttachment = {
+            id: `result:${image.storageKey || image.url}`,
+            name: `生成结果 ${image.index + 1}`,
+            type: "image/png",
+            dataUrl: url,
+            url,
+            storageKey: image.storageKey,
+            previewUrl: image.url || url,
+        };
+        if (intent === "video") selectMode("video");
+        const next = [...attachmentsRef.current.filter((item) => item.id !== attachment.id), attachment];
+        attachmentsRef.current = next;
+        setAttachments(next);
+        const starter = intent === "variant" ? "保持主体和风格，换一种构图和光线，再出一版" : intent === "video" ? "让画面动起来：镜头缓慢推近，人物和场景保持不变" : "";
+        if (starter && !promptRef.current.trim()) {
+            promptRef.current = starter;
+            setPrompt(starter);
+        }
+        window.requestAnimationFrame(() => composerFocusRef.current?.focus());
+    };
+
     useCreationHomeNavigation(hydrated && composerPreferencesHydrated, startNewConversation);
 
     if (conversationRoute.loading)
@@ -2636,6 +2666,7 @@ export default function CreatePage() {
         },
         onOpenLibrary: () => setLibraryOpen(true),
         onModeChange: selectMode,
+        onOpenShortDrama: () => navigate("/projects"),
         model: selectedModel,
         modelRequirements,
         imageProfile,
@@ -2724,7 +2755,7 @@ export default function CreatePage() {
                 {pendingApproval ? (
                     <div className="creation-agent-pending-notice" role="status">
                         <span>
-                            {pendingApprovals.length} 份方案待审批 · {pendingApproval.title}
+                            有 {pendingApprovals.length} 个方案需要你确认 · {pendingApproval.title}
                         </span>
                         <button
                             type="button"
@@ -2733,7 +2764,7 @@ export default function CreatePage() {
                                 window.requestAnimationFrame(() => document.getElementById(`creation-shot-${pendingApproval.agentRunId}:assistant`)?.scrollIntoView({ block: "end", behavior: reducedMotion ? "auto" : "smooth" }));
                             }}
                         >
-                            查看待审批方案
+                            查看方案
                         </button>
                     </div>
                 ) : null}
@@ -2750,8 +2781,8 @@ export default function CreatePage() {
                                     exit={{ opacity: 0, y: -8, scale: 0.98 }}
                                     transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 360, damping: 32, mass: 0.8 }}
                                 >
-                                    <Sparkles aria-hidden="true" />
-                                    <input aria-label="快捷编辑提示词" placeholder="继续描述你的创作想法…" value={prompt} disabled={busy || referenceReplacementBusy} onChange={(event) => setPrompt(event.target.value)} />
+                                    <CreationIcon name="auto" />
+                                    <input aria-label="快捷编辑提示词" placeholder="接着描述你的想法…" value={prompt} disabled={busy || referenceReplacementBusy} onChange={(event) => setPrompt(event.target.value)} />
                                     <Tooltip title="展开完整创作区">
                                         <button
                                             type="button"
@@ -2768,6 +2799,7 @@ export default function CreatePage() {
                             ) : null}
                         </AnimatePresence>
                         <main ref={threadScrollRef} onScroll={handleThreadScroll} className="creation-home-scroll creation-scrollbar">
+                            <CreationLaunchBackdrop />
                             <section ref={launchpadRef} className="creation-launchpad" aria-label="开始创作">
                                 <header className="creation-start-heading">
                                     <div>
@@ -2785,13 +2817,7 @@ export default function CreatePage() {
                                         <CreationComposer {...composerProps} variant="empty" />
                                     </div>
                                 </div>
-                                <CreationEmptySuggest
-                                    onStartPrompt={startPrompt}
-                                    onOpenLibrary={() => {
-                                        selectMode("image");
-                                        setLibraryOpen(true);
-                                    }}
-                                />
+                                <CreationPlayStrip onStartPrompt={startPrompt} />
                             </section>
                             <CreationRecentCanvases onRequireLogin={() => setLoginDialogOpen(true)} />
                             <Suspense
@@ -2827,6 +2853,7 @@ export default function CreatePage() {
                     </>
                 ) : (
                     <div className="creation-thread-workbench">
+                        <CreationAmbientBackdrop url={latestCreationResultImage(activeConversation.messages)} />
                         <CreationWorkspaceToolbar onNewConversation={startNewConversation} onOpenHistory={openHistory} shots={videoShots} onJumpToShot={jumpToShot} onContinueCanvas={() => void continueOnCanvas()} openingCanvas={openingCanvas} />
                         <main ref={threadScrollRef} onScroll={handleThreadScroll} className="creation-thread-scroll creation-scrollbar">
                             <section className="creation-thread-stage">
@@ -2886,6 +2913,7 @@ export default function CreatePage() {
                                                     }
                                                     onContinueCanvas={(ids) => void continueOnCanvas(ids)}
                                                     openingCanvas={openingCanvas}
+                                                    onUseResultImage={reuseResultImage}
                                                     onEditUserMessage={(message) => {
                                                         restoreMessageDraft(message);
                                                         window.requestAnimationFrame(() => composerFocusRef.current?.focus());

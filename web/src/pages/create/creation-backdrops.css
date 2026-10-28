@@ -1,0 +1,143 @@
+/* 创作页背景层（creation-backdrops.tsx）。
+   空态：22px 点阵 + 顶部中性冷白月光，和加载动画（DotRippleField，RIPPLE_CYCLE_MS = 2.6s）同一套点距与节奏；
+   进页面只扩散一圈涟漪，之后静止。对话中：最新一组结果的缩略图重度模糊作底色。
+   颜色只从 --user-ink 推导，明暗主题各自成立；"减少动态效果"静止，"减少透明度"不画。 */
+
+@property --creation-launch-ripple-radius {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: 0px;
+}
+
+.creation-home-scroll {
+    position: relative;
+    isolation: isolate;
+}
+
+.creation-launch-backdrop {
+    --creation-launch-dot: color-mix(in srgb, var(--user-ink) 15%, transparent);
+    --creation-launch-dot-lit: color-mix(in srgb, var(--user-ink) 58%, transparent);
+    --creation-launch-glow: color-mix(in srgb, var(--user-ink) 10%, transparent);
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: -1;
+    height: min(720px, 92vh);
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.creation-home-scroll > .creation-launch-backdrop {
+    width: auto;
+    max-width: none;
+    margin: 0;
+}
+
+html:not(.dark) .creation-launch-backdrop {
+    --creation-launch-dot: color-mix(in srgb, var(--user-ink) 11%, transparent);
+    --creation-launch-dot-lit: color-mix(in srgb, var(--user-ink) 40%, transparent);
+    --creation-launch-glow: color-mix(in srgb, var(--user-ink) 5%, transparent);
+}
+
+.creation-launch-backdrop > span {
+    position: absolute;
+    inset: 0;
+}
+
+.creation-launch-moonlight {
+    left: 50% !important;
+    right: auto !important;
+    top: -340px !important;
+    width: min(1180px, 140vw);
+    height: 760px;
+    transform: translateX(-50%);
+    background: radial-gradient(closest-side, var(--creation-launch-glow), transparent);
+}
+
+.creation-launch-dots,
+.creation-launch-ripple {
+    background-position: center 11px;
+    background-size: 22px 22px;
+}
+
+.creation-launch-dots {
+    background-image: radial-gradient(circle, var(--creation-launch-dot) 1px, transparent 1.6px);
+    -webkit-mask-image: radial-gradient(ellipse 62% 64% at 50% 16%, #000 0%, rgb(0 0 0 / 0.5) 48%, transparent 82%);
+    mask-image: radial-gradient(ellipse 62% 64% at 50% 16%, #000 0%, rgb(0 0 0 / 0.5) 48%, transparent 82%);
+}
+
+/* 一圈涟漪：只亮起波前经过的点，跑完停在完全透明，不循环。 */
+.creation-launch-ripple {
+    opacity: 0;
+    background-image: radial-gradient(circle, var(--creation-launch-dot-lit) 1.1px, transparent 1.8px);
+    -webkit-mask-image: radial-gradient(circle at 50% 96px, transparent max(0px, calc(var(--creation-launch-ripple-radius) - 48px)), #000 var(--creation-launch-ripple-radius), transparent calc(var(--creation-launch-ripple-radius) + 48px));
+    mask-image: radial-gradient(circle at 50% 96px, transparent max(0px, calc(var(--creation-launch-ripple-radius) - 48px)), #000 var(--creation-launch-ripple-radius), transparent calc(var(--creation-launch-ripple-radius) + 48px));
+    animation: creation-launch-ripple 2.6s cubic-bezier(0.2, 0.6, 0.3, 1) 0.15s 1 both;
+}
+
+@keyframes creation-launch-ripple {
+    0% {
+        --creation-launch-ripple-radius: 0px;
+        opacity: 0;
+    }
+    15% {
+        opacity: 0.9;
+    }
+    100% {
+        --creation-launch-ripple-radius: 900px;
+        opacity: 0;
+    }
+}
+
+/* 对话中背景：放在工作区最底层，往下渐隐，不影响文字对比度。 */
+.creation-home .creation-thread-workbench {
+    position: relative;
+    isolation: isolate;
+}
+
+.creation-ambient {
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: -1;
+    height: 72%;
+    overflow: hidden;
+    pointer-events: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 30%, transparent 100%);
+}
+
+.creation-ambient img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.3;
+    filter: blur(90px) saturate(1.35);
+    transform: scale(1.25);
+    animation: creation-ambient-in 0.6s ease both;
+}
+
+html:not(.dark) .creation-ambient img {
+    opacity: 0.15;
+}
+
+@keyframes creation-ambient-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .creation-launch-ripple {
+        animation: none;
+        opacity: 0;
+    }
+    .creation-ambient img {
+        animation: none;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .creation-ambient {
+        display: none;
+    }
+}

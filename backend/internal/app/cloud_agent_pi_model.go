@@ -768,8 +768,18 @@ func (s *Service) finishCloudAgentPiModelStepWithInvalidCalls(userID, runID, tas
 	return repository.ErrCreationConflict
 }
 
+// 任务进入终态时由仓储的变化信号立即唤醒；兜底轮询只覆盖其他实例写入或通知丢失，
+// 从每 100ms 读一次库放宽到 250ms。
+const cloudAgentTaskWaitFallback = 250 * time.Millisecond
+
 func (s *Service) waitCloudAgentTask(ctx context.Context, taskID string) (*model.Task, error) {
-	ticker := time.NewTicker(100 * time.Millisecond)
+	changed, stop := s.repo.SubscribeTask(taskID)
+	defer stop()
+	interval := 100 * time.Millisecond
+	if s.repo.ChangeSignalsEnabled() {
+		interval = cloudAgentTaskWaitFallback
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		task, err := s.repo.Task(taskID)
@@ -787,6 +797,7 @@ func (s *Service) waitCloudAgentTask(ctx context.Context, taskID string) (*model
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
+		case <-changed:
 		case <-ticker.C:
 		}
 	}

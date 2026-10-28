@@ -2463,11 +2463,6 @@
     min-width: 0;
     flex: 1 1 auto;
 }
-.app-user-workspace .creation-composer-stage.is-agent-mode .creation-agent-entry {
-    min-width: 0;
-    flex: 1 1 auto;
-}
-
 .creation-model-picker-surface .creation-model-picker-menu.is-model-list .canvas-model-picker-two-pane {
     display: grid;
     grid-template-columns: 250px minmax(0, 1fr);

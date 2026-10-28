@@ -228,6 +228,8 @@ func (r *Repository) SaveTaskCompletion(task *model.Task, expected model.TaskSta
 // the task recoverable and never exposes a false success to the canvas.
 func (r *Repository) SaveTaskCompletionWithRegistration(task *model.Task, expected model.TaskStatus, results []model.Result, register func(*Repository) error) error {
 	return r.Transaction(func(repo *Repository) error {
+		// 记在事务里，提交成功后才唤醒等这个任务的一方。
+		repo.signalChanged(taskSignalKey(task.ID))
 		tx := repo.db
 		storedResultJSON := task.ResultJSON
 		updated := taskLeaseWriter(tx.Model(&model.Task{}), task.LeaseOwner).
@@ -271,6 +273,9 @@ func (r *Repository) UpdateTaskTerminalState(id string, owner string, expected m
 			"status": status, "stage": stage, "error": errorText, "completed_at": &completedAt,
 			"lease_owner": "", "lease_expires_at": nil, "updated_at": completedAt,
 		})
+	if result.Error == nil && result.RowsAffected == 1 {
+		r.signalChanged(taskSignalKey(id))
+	}
 	return result.RowsAffected == 1, result.Error
 }
 
@@ -284,6 +289,9 @@ func (r *Repository) UpdateTaskTerminalDiagnostic(task *model.Task, completedAt 
 			"cancellation_requested_at": task.CancellationRequestedAt,
 			"lease_owner":               "", "lease_expires_at": nil, "updated_at": completedAt,
 		})
+	if result.Error == nil && result.RowsAffected == 1 {
+		r.signalChanged(taskSignalKey(task.ID))
+	}
 	return result.RowsAffected == 1, result.Error
 }
 
@@ -317,6 +325,9 @@ func (r *Repository) CancelTaskIfStatus(userID string, id string, expected model
 	result := r.db.Model(&model.Task{}).
 		Where("id = ? AND user_id = ? AND status = ?", id, userID, expected).
 		Updates(updates)
+	if result.Error == nil && result.RowsAffected == 1 {
+		r.signalChanged(taskSignalKey(id))
+	}
 	return result.RowsAffected == 1, result.Error
 }
 
