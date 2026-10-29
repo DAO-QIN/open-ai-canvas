@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 79
+const CurrentSchemaVersion int64 = 80
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -291,6 +291,21 @@ var schemaMigrations = []migration{
 	}},
 	{version: 78, name: "banner_cta_countdown", checksum: "sha256:banner-cta-countdown-v78-20261028", apply: migrateBannerCtaCountdown},
 	{version: 79, name: "banner_theme", checksum: "sha256:banner-theme-v79-20261028", apply: migrateBannerTheme},
+	{version: 80, name: "banner_edge", checksum: "sha256:banner-edge-v80-20261029", apply: migrateBannerEdge},
+}
+
+// migrateBannerEdge 为常驻通知增加底边颗粒带的外形与波纹。
+// 旧通知按方格、平直（默认值）显示，与改版前的像素颗粒底边同一观感。
+func migrateBannerEdge(tx *gorm.DB) error {
+	for _, field := range []string{"EdgeShape", "EdgeWave"} {
+		if tx.Migrator().HasColumn(&model.BannerAnnouncement{}, field) {
+			continue
+		}
+		if err := tx.Migrator().AddColumn(&model.BannerAnnouncement{}, field); err != nil {
+			return fmt.Errorf("为常驻通知增加 %s：%w", field, err)
+		}
+	}
+	return nil
 }
 
 // migrateBannerTheme 为常驻通知增加自定义底色、光晕色与背景动效。

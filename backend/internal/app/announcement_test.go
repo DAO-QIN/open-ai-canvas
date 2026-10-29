@@ -787,6 +787,75 @@ func TestBannerAnnouncementThemePersistsAndValidates(t *testing.T) {
 	}
 }
 
+// 底边样式：外形与波纹走白名单、统一小写后落库，留空回到方格、平直；整包更新（如状态开关）带上字段时不会丢。
+func TestBannerAnnouncementEdgePersistsAndValidates(t *testing.T) {
+	svc, _ := newAnnouncementImageTestService(t)
+	admin := &model.User{ID: "admin", Role: model.UserRoleAdmin, Status: model.UserStatusActive}
+
+	banner, err := svc.CreateBannerAnnouncement(admin, CreateBannerAnnouncementRequest{Title: "底边样式", Status: "active"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := svc.repo.BannerAnnouncement(banner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.EdgeShape != bannerEdgeShapeDefault || stored.EdgeWave != bannerEdgeWaveDefault {
+		t.Fatalf("created = %+v", stored)
+	}
+
+	if _, err := svc.UpdateBannerAnnouncement(admin, banner.ID, UpdateBannerAnnouncementRequest{Title: "底边样式", Status: "disabled", BgEffect: "static", EdgeShape: " DOT ", EdgeWave: "Ripple"}); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := svc.repo.BannerAnnouncement(banner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.EdgeShape != "dot" || reloaded.EdgeWave != "ripple" || reloaded.BgEffect != "static" || reloaded.Status != "disabled" {
+		t.Fatalf("reloaded = %+v", reloaded)
+	}
+
+	if _, err := svc.UpdateBannerAnnouncement(admin, banner.ID, UpdateBannerAnnouncementRequest{Title: "底边样式", Status: "active", EdgeShape: "dot", EdgeWave: "ripple"}); err != nil {
+		t.Fatal(err)
+	}
+	toggled, err := svc.repo.BannerAnnouncement(banner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if toggled.EdgeShape != "dot" || toggled.EdgeWave != "ripple" || toggled.Status != "active" {
+		t.Fatalf("toggled = %+v", toggled)
+	}
+
+	if _, err := svc.UpdateBannerAnnouncement(admin, banner.ID, UpdateBannerAnnouncementRequest{Title: "底边样式", Status: "active"}); err != nil {
+		t.Fatal(err)
+	}
+	cleared, err := svc.repo.BannerAnnouncement(banner.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.EdgeShape != bannerEdgeShapeDefault || cleared.EdgeWave != bannerEdgeWaveDefault {
+		t.Fatalf("cleared = %+v", cleared)
+	}
+
+	for _, req := range []CreateBannerAnnouncementRequest{
+		{Title: "标题", Status: "active", EdgeShape: "star"},
+		{Title: "标题", Status: "active", EdgeWave: "zigzag"},
+		{Title: "标题", Status: "active", EdgeShape: "square;mask:url(x)"},
+	} {
+		if _, err := svc.CreateBannerAnnouncement(admin, req); err == nil {
+			t.Fatalf("expected rejection for %+v", req)
+		}
+	}
+	for shape := range bannerEdgeShapes {
+		for wave := range bannerEdgeWaves {
+			created, err := svc.CreateBannerAnnouncement(admin, CreateBannerAnnouncementRequest{Title: "底边 " + shape + " " + wave, Status: "active", EdgeShape: shape, EdgeWave: wave})
+			if err != nil || created.EdgeShape != shape || created.EdgeWave != wave {
+				t.Fatalf("edge %q/%q: %+v, %v", shape, wave, created, err)
+			}
+		}
+	}
+}
+
 // 公开接口带服务端时间与下一次变化时间：前台据此校准倒计时，并在预约通知开始时准时刷新。
 func TestBannerAnnouncementFeedReportsServerTimeAndNextChange(t *testing.T) {
 	svc, _ := newAnnouncementImageTestService(t)

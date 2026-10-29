@@ -118,7 +118,7 @@ describe("与后端白名单保持一致", () => {
         const goRepo = await readSource("../../backend/internal/repository/announcement.go");
         const start = goRepo.indexOf("func (r *Repository) UpdateBannerAnnouncement");
         const body = goRepo.slice(start, goRepo.indexOf("\n}", start));
-        for (const column of ["title", "title_runs", "notice_type", "bg_color", "glow_color", "bg_effect", "cta_text", "link", "status", "show_countdown", "sort_order", "starts_at", "ends_at"]) {
+        for (const column of ["title", "title_runs", "notice_type", "bg_color", "glow_color", "bg_effect", "edge_shape", "edge_wave", "cta_text", "link", "status", "show_countdown", "sort_order", "starts_at", "ends_at"]) {
             expect(body).toContain(`"${column}":`);
         }
     });
@@ -207,10 +207,10 @@ describe("通知条主题色", () => {
             expect(adminUi).toContain(`var(${type.baseVar})`);
             expect(adminUi).toContain(`var(${type.glowVar})`);
         }
-        // 深色主题底边只做透明度渐隐（渐变遮罩、最底部完全透明），不再用像素颗粒图案；浅色主题不加遮罩。
-        const fade = bannerCss.match(/\.dark \.notice-banner-backdrop \{([^}]*)\}/)?.[1] ?? "";
-        expect(fade).toMatch(/-webkit-mask: linear-gradient\([^;]*transparent\);/);
-        expect(fade).toMatch(/\bmask: linear-gradient\([^;]*transparent\);/);
+        // 深色主题底边是挂在通知条下方的颗粒带（遮罩由 banner-edge.ts 生成），不在通知条内部挖空，也不再渐隐到页面底色；
+        // 规则只在 .dark 下生效，浅色主题保持直边。详细断言见 banner-edge.test.ts。
+        expect(bannerCss).toMatch(/\.dark \.notice-banner\[data-edge-band\] \.notice-banner-backdrop \{/);
+        expect(bannerCss).not.toMatch(/\.notice-banner-backdrop \{[^}]*linear-gradient\(#000 \d+%/);
         expect(bannerCss).not.toContain("svg+xml");
         // 光效与按钮动画在减少动态效果时必须关闭。
         expect(bannerCss).toContain("@media (prefers-reduced-motion: reduce)");

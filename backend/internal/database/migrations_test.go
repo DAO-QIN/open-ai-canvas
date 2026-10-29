@@ -657,6 +657,49 @@ func TestMigrateSchemaV79AddsBannerTheme(t *testing.T) {
 	}
 }
 
+func TestMigrateSchemaV80AddsBannerEdge(t *testing.T) {
+	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-banner-edge-v80?mode=memory&cache=shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatal(err)
+	}
+	legacy := &model.BannerAnnouncement{ID: "legacy-banner-v79", Title: "旧库通知", NoticeType: "notice", BgColor: "#2F3472", GlowColor: "#7D87FF", BgEffect: "static", Link: "/projects", Status: "active", SortOrder: 1}
+	if err := db.Create(legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	columns := []string{"edge_shape", "edge_wave"}
+	for _, column := range columns {
+		if err := db.Migrator().DropColumn(&model.BannerAnnouncement{}, column); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Where("version = ?", 80).Delete(&schemaMigration{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateSchema(db); err != nil {
+		t.Fatalf("upgrade from v79: %v", err)
+	}
+	for _, column := range columns {
+		if !db.Migrator().HasColumn(&model.BannerAnnouncement{}, column) {
+			t.Fatalf("v80 upgrade did not add banner_announcements.%s", column)
+		}
+	}
+	var stored model.BannerAnnouncement
+	if err := db.First(&stored, "id = ?", "legacy-banner-v79").Error; err != nil {
+		t.Fatal(err)
+	}
+	// 旧通知升级后底边为方格、平直，配色、动效与其余字段原样保留。
+	if stored.EdgeShape != "square" || stored.EdgeWave != "flat" || stored.BgColor != "#2F3472" || stored.GlowColor != "#7D87FF" || stored.BgEffect != "static" || stored.Link != "/projects" || stored.SortOrder != 1 {
+		t.Fatalf("legacy banner changed during upgrade: %+v", stored)
+	}
+	status, err := ReadSchemaStatus(db)
+	if err != nil || !status.Ready || status.Current != CurrentSchemaVersion {
+		t.Fatalf("unexpected upgraded schema status: %+v, %v", status, err)
+	}
+}
+
 func TestMigrateSchemaV23BackfillsCanvasRevisions(t *testing.T) {
 	db, err := Open(Config{Driver: "sqlite", DSN: "file:migration-canvas-revisions-v23?mode=memory&cache=shared"})
 	if err != nil {

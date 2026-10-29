@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { BannerAnnouncementBody, BannerAnnouncementShell } from "../src/components/layout/banner-announcement-content";
+import { bannerEdgeMask } from "../src/lib/announcements/banner-edge";
 import { bannerInkColor } from "../src/lib/announcements/banner-theme";
 
 test("自定义配色与动效写到通知条外壳上，调用方的样式一并保留", () => {
@@ -19,7 +20,7 @@ test("自定义配色与动效写到通知条外壳上，调用方的样式一�
     expect(html).toMatch(/--nb-rotate-ms:\s*6000ms/);
 });
 
-test("跟随类型时不写颜色变量，动效默认流动", () => {
+test("跟随类型时不写颜色变量，动效默认流动，底边默认方格、平直颗粒带", () => {
     const html = renderToStaticMarkup(
         <BannerAnnouncementShell noticeType="notice" theme={{ bgColor: "", glowColor: "" }}>
             <span>通知内容</span>
@@ -28,6 +29,33 @@ test("跟随类型时不写颜色变量，动效默认流动", () => {
     expect(html).not.toContain("--nb-base");
     expect(html).not.toContain("--nb-glow");
     expect(html).toContain('data-effect="aurora"');
+    expect(html).toContain('data-edge-shape="square"');
+    expect(html).toContain('data-edge-wave="flat"');
+    expect(html).toContain('data-edge-band=""');
+    const mask = bannerEdgeMask("square", "flat");
+    expect(html).toMatch(new RegExp(`--nb-edge-rows:\\s*${mask.rows}`));
+    expect(html).toMatch(new RegExp(`--nb-edge-columns:\\s*${mask.columns}`));
+    expect(html).toContain("--nb-edge-mask:");
+});
+
+test("后台选的外形与波纹写到外壳上；平滑 + 平直是直边，不挂颗粒带", () => {
+    const wave = renderToStaticMarkup(
+        <BannerAnnouncementShell noticeType="notice" theme={{ edgeShape: "dot", edgeWave: "wave" }}>
+            <span>通知内容</span>
+        </BannerAnnouncementShell>,
+    );
+    expect(wave).toContain('data-edge-shape="dot"');
+    expect(wave).toContain('data-edge-wave="wave"');
+    expect(wave).toMatch(new RegExp(`--nb-edge-rows:\\s*${bannerEdgeMask("dot", "wave").rows}`));
+
+    const straight = renderToStaticMarkup(
+        <BannerAnnouncementShell noticeType="notice" theme={{ edgeShape: "smooth", edgeWave: "flat" }}>
+            <span>通知内容</span>
+        </BannerAnnouncementShell>,
+    );
+    expect(straight).toContain('data-edge-shape="smooth"');
+    expect(straight).not.toContain("data-edge-band");
+    expect(straight).not.toContain("--nb-edge-mask");
 });
 
 test("内容区渲染倒计时、标题与行动按钮", () => {

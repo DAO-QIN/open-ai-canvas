@@ -523,6 +523,9 @@ type CreateBannerAnnouncementRequest struct {
 	GlowColor string `json:"glowColor"`
 	// BgEffect 背景动效（aurora / static），空值按光晕流动处理。
 	BgEffect string `json:"bgEffect"`
+	// EdgeShape / EdgeWave 深色主题下底边颗粒带的外形与波纹，空值按方格、平直处理。
+	EdgeShape string `json:"edgeShape"`
+	EdgeWave  string `json:"edgeWave"`
 	// CtaText 行动按钮文案，空值由前端按通知类型取默认文案。
 	CtaText string `json:"ctaText"`
 	Link    string `json:"link"`
@@ -797,6 +800,40 @@ func normalizeBannerEffect(value string) (string, error) {
 	return normalized, nil
 }
 
+// 底边颗粒带的外形与波纹白名单，必须与前端 web/src/lib/announcements/banner-edge.ts 的 BANNER_EDGE_SHAPES /
+// BANNER_EDGE_WAVES 逐项一致（web/test/banner-edge.test.ts 会读本文件做双向校验）。
+var bannerEdgeShapes = map[string]struct{}{
+	"square": {}, "dot": {}, "diamond": {}, "smooth": {},
+}
+
+var bannerEdgeWaves = map[string]struct{}{
+	"flat": {}, "wave": {}, "ripple": {},
+}
+
+const (
+	bannerEdgeShapeDefault = "square"
+	bannerEdgeWaveDefault  = "flat"
+)
+
+// normalizeBannerEdge 统一大小写与空白，空值取默认（方格、平直），其余值必须在白名单内。
+func normalizeBannerEdge(shape string, wave string) (string, string, error) {
+	normalizedShape := strings.ToLower(strings.TrimSpace(shape))
+	if normalizedShape == "" {
+		normalizedShape = bannerEdgeShapeDefault
+	}
+	if _, ok := bannerEdgeShapes[normalizedShape]; !ok {
+		return "", "", BadAuthRequest("底边外形无效，仅支持方格、圆点、菱形或平滑")
+	}
+	normalizedWave := strings.ToLower(strings.TrimSpace(wave))
+	if normalizedWave == "" {
+		normalizedWave = bannerEdgeWaveDefault
+	}
+	if _, ok := bannerEdgeWaves[normalizedWave]; !ok {
+		return "", "", BadAuthRequest("底边波纹无效，仅支持平直、波浪或涟漪")
+	}
+	return normalizedShape, normalizedWave, nil
+}
+
 // normalizeBannerColor 只接受 #RRGGBB，统一大写；空值表示跟随通知类型的预设配色。
 func normalizeBannerColor(value string, label string) (string, error) {
 	color := strings.ToUpper(strings.TrimSpace(value))
@@ -848,6 +885,10 @@ func applyBannerRequest(banner *model.BannerAnnouncement, req CreateBannerAnnoun
 	if err != nil {
 		return err
 	}
+	edgeShape, edgeWave, err := normalizeBannerEdge(req.EdgeShape, req.EdgeWave)
+	if err != nil {
+		return err
+	}
 	status := strings.TrimSpace(req.Status)
 	if status != "active" && status != "disabled" {
 		return BadAuthRequest("通知状态无效，仅支持 active 或 disabled")
@@ -867,6 +908,8 @@ func applyBannerRequest(banner *model.BannerAnnouncement, req CreateBannerAnnoun
 	banner.BgColor = bgColor
 	banner.GlowColor = glowColor
 	banner.BgEffect = bgEffect
+	banner.EdgeShape = edgeShape
+	banner.EdgeWave = edgeWave
 	banner.CtaText = ctaText
 	banner.Link = link
 	banner.Status = status

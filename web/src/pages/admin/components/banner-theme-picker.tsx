@@ -1,11 +1,12 @@
 import { ColorPicker } from "antd";
 import type { CSSProperties } from "react";
 
+import { BANNER_EDGE_SHAPES, BANNER_EDGE_WAVES, type BannerEdgeShape, type BannerEdgeWave } from "@/lib/announcements/banner-edge";
 import { BANNER_EFFECTS, BANNER_THEME_PRESETS, bannerColorHex, readBannerPresetColors, type BannerEffect } from "@/lib/announcements/banner-theme";
 import { SegmentedControl } from "@/pages/admin/ui/controls";
 
-/** 编辑中的配色：颜色为空表示跟随通知类型；自定义时两种颜色都会填上。 */
-export type BannerThemeValue = { bgColor: string; glowColor: string; bgEffect: BannerEffect };
+/** 编辑中的外观：颜色为空表示跟随通知类型（自定义时两种颜色都会填上），另含背景动效与底边外形、波纹。 */
+export type BannerThemeValue = { bgColor: string; glowColor: string; bgEffect: BannerEffect; edgeShape: BannerEdgeShape; edgeWave: BannerEdgeWave };
 
 type ThemeMode = "preset" | "custom";
 
@@ -91,6 +92,25 @@ export function BannerThemePicker({ value, noticeType, onChange }: { value: Bann
                     </div>
                 </>
             ) : null}
+        </div>
+    );
+}
+
+/**
+ * 底边样式：外形决定颗粒形状（平滑为不加颗粒），波纹决定底边起伏。
+ * 只在深色主题下挂颗粒带，浅色主题保持直边；效果在下方「前台效果预览」里实时显示。
+ */
+export function BannerEdgePicker({ value, onChange }: { value: BannerThemeValue; onChange: (next: BannerThemeValue) => void }) {
+    return (
+        <div className="admin-banner-theme-row">
+            <div className="admin-banner-theme-field">
+                <span>外形</span>
+                <SegmentedControl<BannerEdgeShape> ariaLabel="底边外形" value={value.edgeShape} onChange={(edgeShape) => onChange({ ...value, edgeShape })} options={BANNER_EDGE_SHAPES.map((item) => ({ value: item.key, label: item.label }))} />
+            </div>
+            <div className="admin-banner-theme-field">
+                <span>波纹</span>
+                <SegmentedControl<BannerEdgeWave> ariaLabel="底边波纹" value={value.edgeWave} onChange={(edgeWave) => onChange({ ...value, edgeWave })} options={BANNER_EDGE_WAVES.map((item) => ({ value: item.key, label: item.label }))} />
+            </div>
         </div>
     );
 }

@@ -325,6 +325,12 @@ test("banner announcement editor keeps title styles through edit, save and statu
     expect(panel).toContain("bgColor: theme.bgColor, glowColor: theme.glowColor, bgEffect: theme.bgEffect");
     expect(panel).toContain("<BannerThemePicker value={theme} noticeType={noticeType}");
     expect(panel).toContain("theme={theme} />");
+    // 底边外形与波纹：随整包带回、编辑时还原、写入保存请求，并有独立的「底边样式」入口。
+    expect(panel).toContain("edgeShape: normalizeBannerEdgeShape(banner.edgeShape)");
+    expect(panel).toContain("edgeWave: normalizeBannerEdgeWave(banner.edgeWave)");
+    expect(panel).toContain("edgeShape: theme.edgeShape, edgeWave: theme.edgeWave");
+    expect(panel).toContain('<Form.Item label="底边样式"');
+    expect(panel).toContain("<BannerEdgePicker value={theme}");
     // 通知类型在后台要有独立入口；emoji 图标不设独立字段，经编辑器「图标」按钮插入。
     expect(panel).toContain("<BannerNoticeTypeSelector");
     expect(panel).not.toContain("BannerNoticeIconPicker");

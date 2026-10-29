@@ -11143,6 +11143,21 @@ html[data-magicui-theme-vt="active"] .admin-shell * {
     border-radius: 10px;
 }
 
+/* 背景层自己按圆角裁切：深色主题下外壳不再裁切（底边颗粒带挂在预览下方），圆角仍保留。 */
+.admin-banner-preview .notice-banner-backdrop {
+    border-radius: inherit;
+}
+
+/* 深色主题下颗粒带挂在预览下方：给它留出位置，与说明文字之间仍是原来的 4px；底部两角不再圆，颗粒带整条挂下来。 */
+.dark .admin-banner-preview.notice-banner[data-edge-band] {
+    margin-bottom: calc(var(--nb-edge-h) + var(--space-1));
+}
+
+.dark .admin-banner-preview.notice-banner[data-edge-band] .notice-banner-backdrop {
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
 /* 通知条配色：跟随类型 / 自定义、动效切换、推荐配色与取色器。 */
 .admin-banner-theme {
     display: flex;
@@ -11207,7 +11222,8 @@ html[data-magicui-theme-vt="active"] .admin-shell * {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 14%, transparent);
 }
 
-.admin-banner-theme-color {
+.admin-banner-theme-color,
+.admin-banner-theme-field {
     display: inline-flex;
     align-items: center;
     gap: 8px;
