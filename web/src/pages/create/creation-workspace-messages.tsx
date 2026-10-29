@@ -1,14 +1,9 @@
-import { usableResultUrl } from "./creation-result-urls";
+import { usableResultUrl, creationResultEntries } from "./creation-result-urls";
 import { CreationResultImage } from "./creation-result-image";
-import "./creation-results.css";
-// 创作页消息流：用户消息、媒体结果、生成中占位、引用素材与预览。
-
 import { conversationTimeFormatter, type CreationMessage } from "./creation-types";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, FileText, Film, Image as ImageIcon, Maximize2, Music2, Pencil, RefreshCw, UserRound, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, FileText, Film, Image as ImageIcon, Maximize2, Music2, Pencil, RefreshCw, UserRound, X, AlertCircle, AlertTriangle, CircleStop, CloudOff, ImageOff, RotateCcw, type LucideIcon, Blocks, Orbit } from "lucide-react";
 import { CreationIcon, type CreationIconName } from "./creation-icons";
-
-const SkillGlyph = () => <CreationIcon name="skill" />;
 import { GenerationToolCard, type GenerationToolStatus } from "@/components/ai/generation-tool-card";
 import { MessageReasoning } from "@/components/ai/message-reasoning";
 import { AIMessageMarkdown } from "@/components/ai/ai-message-markdown";
@@ -17,8 +12,8 @@ import { UserAvatar } from "@/components/layout/user-avatar";
 import { BrandLogoFrame } from "@/components/brand/brand-logo";
 import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { generationErrorMessage } from "@/lib/generation-error";
-import { useEffect, useId, useState, type ReactNode } from "react";
-import type { AgentOutputPreference } from "@/services/api/agent";
+import { useEffect, useId, useState, type ReactNode, type CSSProperties } from "react";
+import { AgentOutputPreference } from "@/services/api/agent";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { type CreationReference, displayCreationPrompt } from "./creation-references";
 import { useUserStore } from "@/stores/use-user-store";
@@ -26,7 +21,7 @@ import { type CreationAttachment, creationAttachmentKind, creationMediaAspectRat
 import { getResourceAccess, resolveResourceAccessURL, resolveResourceUrl, resourceIdFromStorageKey } from "@/services/api/resources";
 import { CachedResourceImage } from "@/components/cached-resource-image";
 import { Tooltip } from "@/components/ui/base/tooltip";
-import { useAssetStore } from "@/stores/use-asset-store";
+import { useAssetStore, type Asset, type ImageAsset, type VideoAsset } from "@/stores/use-asset-store";
 import { creationResultAssetIds, creationResultStorageKeys } from "@/lib/canvas/canvas-asset-handoff";
 import { resolveMediaUrl } from "@/services/file-storage";
 import { resolveImageUrl } from "@/services/image-storage";
@@ -36,10 +31,22 @@ import { AppModal } from "@/components/ui/product/app-modal";
 import { creationAgentLatestMediaTasks, projectCreationAgentMediaBatches } from "./creation-agent-conversation";
 import { saveAs } from "file-saver";
 import { createCreationImagesZip, creationImageDownloadBaseName, creationImagesZipName, downloadCreationImage } from "./creation-media-download";
+import { creationMessageNeedsResultSync } from "./creation-conversations";
+import { GenerationPhaseSteps } from "@/components/ai/generation-phase-steps";
+import { generationPhaseHint, generationPhaseLabel, generationPhaseStep, generationTaskPhase, generationTaskSavingState, generationTaskShowsProgress, type GenerationPhase } from "@/lib/generation-task-display";
+import { useTaskElapsed } from "@/hooks/use-task-elapsed";
+import "./creation-results.css";
+// 创作页消息流：用户消息、媒体结果、生成中占位、引用素材与预览。
+
+
+const SkillGlyph = () => <CreationIcon name="skill" />;
 
 export function CreationMessageView({
     item,
     shotNumber,
+    onRefreshResult = () => {},
+    onRecoverMedia = () => {},
+    refreshingResult = false,
     onRetryFailure,
     onCreateVariant,
     onEditUserMessage,
@@ -61,6 +68,9 @@ export function CreationMessageView({
     item: CreationMessage;
     shotNumber: number;
     onRetryFailure: () => void | Promise<void>;
+    onRefreshResult?: () => void;
+    onRecoverMedia?: () => void;
+    refreshingResult?: boolean;
     onCreateVariant: () => void;
     onEditUserMessage: (message: CreationMessage) => void;
     onContinueCanvas: (ids?: string[]) => void;
@@ -346,6 +356,9 @@ export function CreationMessageView({
                             item={item}
                             submitting={submitting}
                             onRetryFailure={nested ? undefined : onRetryFailure}
+                            onRefreshResult={onRefreshResult}
+                            onRecoverMedia={onRecoverMedia}
+                            refreshingResult={refreshingResult}
                             onCreateVariant={onCreateVariant}
                             onContinueCanvas={onContinueCanvas}
                             openingCanvas={openingCanvas}
@@ -561,6 +574,9 @@ function CreationImageActions({ image, onUse }: { image: CreationResultImageRef;
 export function MediaResult({
     item,
     submitting = false,
+    onRefreshResult = () => {},
+    onRecoverMedia = () => {},
+    refreshingResult = false,
     onRetryFailure,
     onCreateVariant,
     onContinueCanvas,
@@ -570,6 +586,9 @@ export function MediaResult({
     item: CreationMessage;
     submitting?: boolean;
     onRetryFailure?: () => void | Promise<void>;
+    onRefreshResult?: () => void;
+    onRecoverMedia?: () => void;
+    refreshingResult?: boolean;
     onCreateVariant: () => void;
     onContinueCanvas: (ids?: string[]) => void;
     openingCanvas: boolean;
@@ -678,25 +697,11 @@ export function MediaResult({
     if (submissionNotice && !expectedResultCount) return submissionNotice;
     if (item.status === "pending" && !displayResultUrls.length)
         return (
-            <CreationMediaPending
-                mode={item.mode || "image"}
-                ratio={item.settings?.ratio}
-                submitting={submitting && item.submissionPending}
-                verifying={item.taskStatePending}
-                progress={item.batchTotal ? `${item.batchCompletedCount || 0}/${item.batchTotal}${item.batchFailedCount ? `（${item.batchFailedCount} 项未成功）` : ""}` : undefined}
-            />
+            <CreationMediaPending item={item} refreshing={refreshingResult} onRefresh={onRefreshResult} onRetry={() => void onRetryFailure?.()} />
         );
     if ((item.status === "error" || item.status === "cancelled") && !expectedResultCount)
         return (
-            <div className="creation-media-error">
-                <span>{item.status === "cancelled" ? item.content || "已停止" : generationErrorMessage(item.error || "生成失败")}</span>
-                {onRetryFailure ? (
-                    <button type="button" disabled={recoveringSubmission} aria-busy={recoveringSubmission} onClick={() => void retryFailure()}>
-                        <RefreshCw size={16} />
-                        {recoveringSubmission ? "正在核对原任务…" : "重新生成"}
-                    </button>
-                ) : null}
-            </div>
+            <CreationMediaFailure item={item} refreshing={refreshingResult} onRefresh={onRefreshResult} onRecoverMedia={onRecoverMedia} onRetry={() => void onRetryFailure?.()} />
         );
     if (!expectedResultCount)
         return (
@@ -919,20 +924,185 @@ export function MediaResult({
     );
 }
 
-export function CreationMediaPending({ mode, ratio, progress, submitting = false, verifying = false }: { mode: CreationMode; ratio?: string; progress?: string; submitting?: boolean; verifying?: boolean }) {
-    const brandName = useAppearanceStore((state) => state.appearance.brandName);
-    const label = submitting ? "正在提交" : verifying ? "正在同步任务状态" : `${brandName}正在生成${creationMediaNoun(mode)}`;
+export function CreationMediaPending({ item, refreshing, onRefresh, onRetry }: { item: CreationMessage; refreshing: boolean; onRefresh: () => void; onRetry: () => void }) {
+    const mode: CreationMode = item.mode || "image";
+    const kind = mode === "video" ? "video" : "image";
+    const phase: GenerationPhase = item.taskIds?.length ? generationTaskPhase({ status: item.generationStatus || "running", stage: item.generationStage, mediaStage: item.generationMediaStage }) : "submitting";
+    const uncertain = phase === "uncertain";
+    const progress =
+        item.taskIds?.length &&
+        typeof item.generationProgress === "number" &&
+        generationTaskShowsProgress({ status: item.generationStatus || "running", stage: item.generationStage, mediaStage: item.generationMediaStage, progress: item.generationProgress })
+            ? item.generationProgress
+            : null;
+    const elapsed = useTaskElapsed(item.createdAt);
+    const hint = generationPhaseHint(phase, kind, item.generationStage);
+    const aspectRatio = creationMediaAspectRatio(item.settings?.ratio, mode);
+    const specs = creationPendingSpecs(item);
+    const Icon = mode === "video" ? Film : ImageIcon;
     return (
-        <div className={`creation-media-pending is-${mode}`} style={{ aspectRatio: creationMediaAspectRatio(ratio, mode) }} aria-live="polite">
-            <span className="creation-media-pending-icon">
-                <WorkingDots dotSize={7} gap={3} minOpacity={0.3} />
+        <div
+            className={`creation-media-pending is-${mode}`}
+            data-phase={phase}
+            data-saving={phase === "saving" ? generationTaskSavingState(item.generationStage) : undefined}
+            data-sync={item.syncInterrupted ? "interrupted" : undefined}
+            style={{ aspectRatio, "--creation-media-ratio": creationAspectRatioValue(aspectRatio) } as CSSProperties}
+        >
+            <span className="creation-media-pending-surface" aria-hidden="true" />
+            {specs ? (
+                <span className="creation-media-pending-spec">
+                    <Icon aria-hidden="true" />
+                    {specs}
+                </span>
+            ) : null}
+            <span className="creation-media-pending-body">
+                <span className="creation-media-pending-title" role="status">
+                    {generationPhaseLabel(phase, kind, item.generationStage)}
+                </span>
+                <span className="creation-media-pending-meta">{[item.batchTotal ? `${item.batchCompletedCount || 0}/${item.batchTotal}` : "", progress !== null ? `${progress}%` : "", item.createdAt ? `已用时 ${elapsed}` : ""].filter(Boolean).join(" · ")}</span>
+                {hint ? <span className="creation-media-pending-hint">{hint}</span> : null}
             </span>
-            <span>
-                {label}
-                {progress ? ` · ${progress}` : ""}
+            <span className="creation-media-pending-foot">
+                {item.syncInterrupted ? <CreationSyncNotice refreshing={refreshing} onRefresh={onRefresh} onRetry={onRetry} /> : uncertain ? null : <GenerationPhaseSteps step={generationPhaseStep(phase)} progress={progress} />}
             </span>
-            <span className="sr-only">{label}</span>
         </div>
+    );
+}
+
+function creationAspectRatioValue(aspectRatio: string) {
+    const [width, height] = aspectRatio.split("/").map((value) => Number(value.trim()));
+    return width > 0 && height > 0 ? width / height : 1;
+}
+
+export function creationResultAssetRatio(assets: Asset[], storageKey: string) {
+    const asset = assets.find((candidate): candidate is ImageAsset | VideoAsset => (candidate.kind === "image" || candidate.kind === "video") && candidate.data.storageKey === storageKey);
+    return asset && asset.data.width > 0 && asset.data.height > 0 ? asset.data.width / asset.data.height : undefined;
+}
+
+// 结果图块按真实比例预留宽高：已知素材尺寸优先，其次生成时选的画面比例；竖图按最大高度收窄宽度。
+function creationResultTileStyle(ratio: number): CSSProperties {
+    return { aspectRatio: String(ratio), "--creation-result-ratio": ratio } as CSSProperties;
+}
+
+function CreationResultMediaError({ label }: { label: string }) {
+    return (
+        <em className="creation-result-media-error">
+            <ImageOff aria-hidden="true" />
+            {label}
+        </em>
+    );
+}
+
+function creationPendingSpecs(item: CreationMessage) {
+    const settings = item.settings;
+    if (!settings) return "";
+    const ratio = settings.ratio && settings.ratio.toLowerCase() !== "auto" ? settings.ratio : "";
+    if (item.mode === "video") return [ratio, settings.seconds ? `${settings.seconds} 秒` : "", settings.videoQuality ? `${settings.videoQuality.replace(/p$/i, "")}P` : ""].filter(Boolean).join(" · ");
+    const count = Number(settings.count) || 1;
+    return [ratio, count > 1 ? `${count} 张` : ""].filter(Boolean).join(" · ");
+}
+
+/**
+ * 失败卡片按“下一步该做什么”分三类：
+ * 作品可能已生成（页面没拿到结果）→ 重新获取；作品已生成但保存失败 → 重新保存；后端确认失败 → 重新生成。
+ */
+function CreationMediaFailure({ item, refreshing, onRefresh, onRecoverMedia, onRetry }: { item: CreationMessage; refreshing: boolean; onRefresh: () => void; onRecoverMedia: () => void; onRetry: () => void }) {
+    const reason = generationErrorMessage(item.error || "生成失败");
+    if (item.status === "cancelled") {
+        return (
+            <CreationMediaNotice
+                tone="neutral"
+                icon={CircleStop}
+                title="已停止生成"
+                description={item.content && item.content !== "已停止" ? item.content : "可以调整后重新生成。"}
+                actions={
+                    <CreationNoticeButton icon={RotateCcw} onClick={onRetry}>
+                        重新生成
+                    </CreationNoticeButton>
+                }
+            />
+        );
+    }
+    if (creationMessageNeedsResultSync(item)) {
+        return (
+            <CreationMediaNotice
+                tone="warning"
+                icon={CloudOff}
+                title="结果暂未同步"
+                description="作品可能已在后台生成，只是页面没有及时拿到。重新获取不会重新生成，也不会重复扣费。"
+                detail={reason ? `原因：${reason}` : undefined}
+                actions={
+                    <>
+                        <CreationNoticeButton primary icon={RefreshCw} busy={refreshing} busyLabel="正在获取" onClick={onRefresh}>
+                            重新获取结果
+                        </CreationNoticeButton>
+                        <CreationNoticeButton icon={RotateCcw} onClick={onRetry}>
+                            重新生成
+                        </CreationNoticeButton>
+                    </>
+                }
+            />
+        );
+    }
+    if (item.mediaRecoverable) {
+        return (
+            <CreationMediaNotice
+                tone="warning"
+                icon={AlertTriangle}
+                title="作品已生成，保存未完成"
+                description="保存到素材库时出错。重新保存会接着上次的进度，不会重新生成，也不会重复扣费。"
+                detail={reason ? `原因：${reason}` : undefined}
+                actions={
+                    <>
+                        <CreationNoticeButton primary icon={RefreshCw} busy={refreshing} busyLabel="正在保存" onClick={onRecoverMedia}>
+                            重新保存
+                        </CreationNoticeButton>
+                        <CreationNoticeButton icon={RotateCcw} onClick={onRetry}>
+                            重新生成
+                        </CreationNoticeButton>
+                    </>
+                }
+            />
+        );
+    }
+    const started = Boolean(item.taskIds?.length);
+    return (
+        <CreationMediaNotice
+            tone="error"
+            icon={AlertCircle}
+            title={started ? "生成失败" : "未能开始生成"}
+            description={reason}
+            actions={
+                <CreationNoticeButton primary icon={RotateCcw} onClick={onRetry}>
+                    {started ? "重新生成" : "重新编辑"}
+                </CreationNoticeButton>
+            }
+        />
+    );
+}
+
+function CreationMediaNotice({ tone, icon: Icon, title, description, detail, actions }: { tone: "warning" | "error" | "neutral"; icon: LucideIcon; title: string; description: string; detail?: string; actions: ReactNode }) {
+    return (
+        <div className={`creation-media-notice is-${tone}`}>
+            <span className="creation-media-notice-icon" aria-hidden="true">
+                <Icon />
+            </span>
+            <div className="creation-media-notice-copy">
+                <strong>{title}</strong>
+                <p>{description}</p>
+                {detail ? <small>{detail}</small> : null}
+            </div>
+            <div className="creation-media-notice-actions">{actions}</div>
+        </div>
+    );
+}
+
+function CreationNoticeButton({ primary = false, icon: Icon, busy = false, busyLabel, onClick, children }: { primary?: boolean; icon: LucideIcon; busy?: boolean; busyLabel?: string; onClick: () => void; children: ReactNode }) {
+    return (
+        <button type="button" className={primary ? "is-primary" : undefined} onClick={onClick} disabled={busy} aria-busy={busy || undefined}>
+            <Icon aria-hidden="true" className={busy ? "animate-spin" : undefined} />
+            {busy && busyLabel ? busyLabel : children}
+        </button>
     );
 }
 
@@ -1039,4 +1209,36 @@ export function thinkingFor(mode: CreationMode, brandName: string): CreationThin
 export function formatMessageTime(value: string) {
     const timestamp = new Date(value).getTime();
     return Number.isFinite(timestamp) ? conversationTimeFormatter.format(timestamp) : "";
+}
+
+type CreationMessageStateTone = "pending" | "syncing" | "sync" | "error" | "cancelled";
+
+// 消息头部的状态标签：区分“生成中 / 重新连接中 / 结果待同步 / 生成失败 / 已停止”，不把页面没跟上说成生成失败。
+function creationMessageState(item: CreationMessage): { tone: CreationMessageStateTone; label: string } | null {
+    if (item.status === "pending" || item.status === "streaming") return item.syncInterrupted ? { tone: "syncing", label: "重新连接中" } : item.status === "pending" ? { tone: "pending", label: "生成中" } : null;
+    if (item.status === "cancelled") return { tone: "cancelled", label: "已停止" };
+    if (item.status === "error") {
+        if (creationMessageNeedsResultSync(item)) return { tone: "sync", label: "结果待同步" };
+        return item.mediaRecoverable ? { tone: "sync", label: "保存未完成" } : { tone: "error", label: "生成失败" };
+    }
+    return null;
+}
+
+function CreationSyncNotice({ refreshing, onRefresh, onRetry }: { refreshing: boolean; onRefresh: () => void; onRetry: () => void }) {
+    return (
+        <div className="creation-sync-notice" role="status">
+            <span>
+                <CloudOff aria-hidden="true" />
+                连接中断，正在自动重连
+            </span>
+            <button type="button" onClick={onRefresh} disabled={refreshing} aria-busy={refreshing || undefined}>
+                <RefreshCw aria-hidden="true" className={refreshing ? "animate-spin" : undefined} />
+                {refreshing ? "正在刷新" : "立即刷新"}
+            </button>
+            {/* 原任务一直拿不到（例如已在任务中心删除）时的出口；点击后会先确认再次扣费。 */}
+            <button type="button" className="is-quiet" onClick={onRetry}>
+                重新生成
+            </button>
+        </div>
+    );
 }

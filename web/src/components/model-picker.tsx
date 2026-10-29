@@ -73,6 +73,11 @@ export function ModelPicker({
     const [activeGroupKey, setActiveGroupKey] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
+    // 画布编辑器里的弹窗要和节点面板同色；其余入口跟随工作台浮层表面。
+    const [inSpatialWorkspace, setInSpatialWorkspace] = useState(false);
+    useLayoutEffect(() => {
+        setInSpatialWorkspace(Boolean(triggerRef.current?.closest(".app-spatial-workspace")));
+    }, []);
     const options = useMemo(() => Array.from(new Set(selectableModelsByCapability(config, capability).filter((model) => Boolean(model) && (!modelFilter || modelFilter(model))))), [capability, config, modelFilter]);
     const optionGroups = useMemo(() => groupModelsForPicker(config, options), [config, options]);
     const mobileGroups = useMemo(() => filterModelPickerGroups(optionGroups, query), [optionGroups, query]);
@@ -246,8 +251,11 @@ export function ModelPicker({
         <div
             ref={compact ? undefined : menuRef}
             data-canvas-no-zoom
-            className={cn("canvas-model-picker-menu creation-model-picker-menu max-w-[calc(100vw-24px)]", activeGroupKey === null ? "is-brand-list" : "is-model-list")}
-            style={{ background: theme.node.panel, color: theme.node.text, "--canvas-model-picker-available-height": `${availableHeight}px` } as CSSProperties}
+            className={cn(
+                "canvas-model-picker-menu creation-model-picker-menu max-w-[calc(100vw-24px)]",
+                activeGroupKey === null ? "is-brand-list" : "is-model-list",
+            )}
+            style={{ "--canvas-model-picker-available-height": `${availableHeight}px` } as CSSProperties}
             role="listbox"
             aria-label={placeholder}
             onKeyDown={handleMenuKeyDown}
@@ -355,6 +363,14 @@ export function ModelPicker({
                     container: cn("canvas-composer-popover-surface", "creation-model-picker-surface"),
                     content: "canvas-composer-popover-content",
                 }}
+                // 弹窗与发起它的输入框同一表面：画布入口取节点面板色，工作台入口回退到 --user-surface-raised（model-picker.css）。
+                styles={{
+                    container: (!inSpatialWorkspace ? {} : {
+                        "--model-picker-surface": theme.node.panel,
+                        "--model-picker-ink": theme.node.text,
+                        "--model-picker-edge": theme.toolbar.border,
+                    }) as CSSProperties,
+                }}
             >
                 <button
                     ref={triggerRef}
@@ -368,7 +384,7 @@ export function ModelPicker({
                     onClick={compact ? () => setPickerOpen(!open) : undefined}
                 >
                     <span className="canvas-model-picker-label flex min-w-0 items-center gap-2">
-                        <span className="canvas-model-picker-trigger-icon" style={{ background: theme.toolbar.itemHover }}>
+                        <span className="canvas-model-picker-trigger-icon">
                             <ModelIcon config={config} model={current} />
                         </span>
                         <span className="min-w-0 flex-1 truncate">{current ? (creationVariant ? pickerModelDisplayName(config, current, showConfiguredModelName) : pickerModelOptionLabel(config, current, showConfiguredModelName)) : placeholder}</span>
@@ -479,7 +495,7 @@ export function ModelLabel({
         (isDirectSystemModel(config, model) ? "" : logicalSpec ? logicalCapabilitySummary(logicalSpec) : videoProfile ? `${formatDurationSummary(videoProfile, videoResolution)} · ${videoResolutions.map((item) => item.toUpperCase()).join("/")}` : meta.description);
     return (
         <span className="flex w-full min-w-0 items-center gap-2 overflow-hidden py-0">
-            <span className="grid size-6 shrink-0 place-items-center rounded-md" style={{ background: theme.toolbar.itemHover }}>
+            <span className="canvas-model-picker-option-logo grid size-6 shrink-0 place-items-center">
                 <ModelIcon config={config} model={model} />
             </span>
             <span className="min-w-0 flex-1 overflow-hidden">

@@ -49,6 +49,7 @@ type CloudAgentRequest struct {
 	AttachmentMode        string                     `json:"attachmentMode,omitempty"`
 	OutputPreference      string                     `json:"outputPreference,omitempty"`
 	MediaSettings         *CloudAgentCreationMedia   `json:"mediaSettings,omitempty"`
+	PinnedSkillIDs        []string                   `json:"pinnedSkillIds,omitempty"`
 	Budget                struct {
 		MaxCredits         float64 `json:"maxCredits"`
 		MaxGenerationTasks int     `json:"maxGenerationTasks,omitempty"`
@@ -65,6 +66,13 @@ type CloudAgentRequest struct {
 	// 必须持久化：工具授权校验每步都从落库状态重建，丢掉这个标记会让模型看得见工具
 	// 却被判为"未获本轮权限授权"。
 	VisionEnabled bool `json:"visionEnabled,omitempty"`
+	// DramaLinked 决定是否暴露短剧工具：服务端在建 run 时按画布是否关联当前用户的短剧作品推导，
+	// 客户端传入值被覆盖；与 VisionEnabled 一样必须持久化，工具授权每步都从落库状态重建。
+	DramaLinked bool `json:"dramaLinked,omitempty"`
+	// SkillsEnabled / MemoryMode 同样由服务端建 run 时推导并持久化：前者表示本轮有可读的已安装技能，
+	// 后者是冻结的长期记忆模式（auto/review/off），决定是否暴露技能读取与记忆写入工具。
+	SkillsEnabled bool   `json:"skillsEnabled,omitempty"`
+	MemoryMode    string `json:"memoryMode,omitempty"`
 }
 
 type CloudAgentAttachment struct {
@@ -130,6 +138,9 @@ type cloudAgentState struct {
 	ConfirmationFingerprints       []string                  `json:"confirmationFingerprints,omitempty"`
 	PendingConfirmationFingerprint string                    `json:"pendingConfirmationFingerprint,omitempty"`
 	Skills                         []cloudAgentSkill         `json:"skills,omitempty"`
+	SkillVersions                  map[string]string         `json:"skillVersions,omitempty"`
+	SkillHints                     string                    `json:"skillHints,omitempty"`
+	Memory                         cloudAgentMemorySnapshot  `json:"memory,omitempty"`
 	Profile                        cloudAgentProfileSnapshot `json:"profile"`
 	Policy                         cloudAgentPolicySnapshot  `json:"policy"`
 }
@@ -283,14 +294,22 @@ func validateCloudAgentRequest(req *CloudAgentRequest) error {
 	if req.Budget.MaxGenerationTasks < 0 || req.Budget.MaxVideoSeconds < 0 || req.Budget.MaxSteps < 0 {
 		return BadAuthRequest("生成任务、视频秒数和模型调用步数预算不能为负数")
 	}
+	if len(req.PinnedSkillIDs) > cloudAgentSkillPinnedMax {
+		return BadAuthRequest(fmt.Sprintf("每轮最多固定 %d 个技能", cloudAgentSkillPinnedMax))
+	}
 	seen := map[string]bool{}
-	for i, id := range req.SkillIDs {
+	for i, id := range req.PinnedSkillIDs {
 		id = strings.TrimSpace(id)
 		if err := validateCloudAgentID(id, "技能 ID", 80); err != nil || seen[id] {
 			return BadAuthRequest("技能 ID 无效或重复")
 		}
-		req.SkillIDs[i] = id
+		req.PinnedSkillIDs[i] = id
 		seen[id] = true
+	}
+	switch req.MemoryMode {
+	case "", model.AgentMemoryDocumentModeAuto, model.AgentMemoryDocumentModeReview, model.AgentMemoryDocumentModeOff:
+	default:
+		return BadAuthRequest("长期记忆模式无效")
 	}
 	if req.PermissionMode == "read_only" && (req.Budget.MaxGenerationTasks != 0 || req.Budget.MaxVideoSeconds != 0) {
 		return BadAuthRequest("只读模式不能设置生成预算")
@@ -500,7 +519,7 @@ func (s *Service) cloudAgentTask(userID, id string) (*model.Task, cloudAgentStat
 	if task.ID != cloudAgentID(userID, state.Request.IdempotencyKey) || task.ProjectID != state.Request.CanvasID {
 		return nil, input.Agent, kernel.NotFound("Agent 运行不存在")
 	}
-	input.Agent = cloudAgentState{Version: 1, Request: state.Request, ParentID: state.ParentID, Fingerprint: state.Fingerprint, CreativeAnchor: state.CreativeAnchor, CommercePlan: state.CommercePlan, ConfirmationRounds: state.ConfirmationRounds, ConfirmationFingerprints: append([]string(nil), state.ConfirmationFingerprints...), PendingConfirmationFingerprint: state.PendingConfirmationFingerprint, Skills: state.Skills, Profile: state.Profile, Policy: state.Policy}
+	input.Agent = cloudAgentState{Version: 1, Request: state.Request, ParentID: state.ParentID, Fingerprint: state.Fingerprint, CreativeAnchor: state.CreativeAnchor, CommercePlan: state.CommercePlan, ConfirmationRounds: state.ConfirmationRounds, ConfirmationFingerprints: append([]string(nil), state.ConfirmationFingerprints...), PendingConfirmationFingerprint: state.PendingConfirmationFingerprint, Skills: state.Skills, SkillVersions: state.SkillVersions, SkillHints: state.SkillHints, Memory: state.Memory, Profile: state.Profile, Policy: state.Policy}
 	input.Agent.RetryReplay = append([]string(nil), state.RetryReplay...)
 	return task, input.Agent, nil
 }
@@ -638,6 +657,8 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 		return nil, creationConflict("Agent 偏好已变化，请重新读取后提交")
 	}
 	req.ProfileRevision = profile.Revision
+	// 下面这些字段由服务端推导，客户端传入值不参与幂等指纹。
+	req.VisionEnabled, req.DramaLinked, req.SkillsEnabled, req.MemoryMode = false, false, false, ""
 	id := cloudAgentID(userID, req.IdempotencyKey)
 	if existing, state, lookupErr := s.cloudAgentTask(userID, id); lookupErr == nil {
 		if state.Request.SessionID != "" {
@@ -833,18 +854,30 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 	} else {
 		creativeAnchor = cloudAgentCreativeAnchor{Version: 2, UserPrompt: req.Prompt}
 	}
-	skillSnapshots, err := s.cloudAgentSkills(userID, req.SkillIDs, req.Surface)
+	// 技能范围（已安装且允许自动使用 + 本轮固定）与记忆快照都在建 run 时冻结：目录进 system，
+	// 固定技能提示和记忆作为有来源的数据消息在每次模型请求前重新插入。
+	if len(req.PinnedSkillIDs) == 0 {
+		req.PinnedSkillIDs = append([]string(nil), req.SkillIDs...)
+	}
+	skillPool, err := s.cloudAgentBuildSkillPool(userID, req.Prompt, req.PinnedSkillIDs, s.cloudAgentContextBudgetForRequest(req))
+	if err != nil {
+		return nil, err
+	}
+	memory, err := s.cloudAgentMemorySnapshotForRun(userID, req.Prompt)
 	if err != nil {
 		return nil, err
 	}
 	if req.Surface == "creation" && len(req.SkillIDs) == 0 {
-		for _, skill := range skillSnapshots {
-			req.SkillIDs = append(req.SkillIDs, skill.ID)
+		for id := range skillPool.Versions {
+			req.SkillIDs = append(req.SkillIDs, id)
 		}
 	}
 	// 看图能力取决于本轮渠道模型自己的合同（text.references.maxImages），在建 run 时定格并
 	// 持久化：工具授权每步都从落库状态重建，运行期间不再变化，客户端传入值被忽略。
 	req.VisionEnabled = s.cloudAgentVisionEnabled(req)
+	req.DramaLinked = len(req.ContextScope) != 0 && dramaLinkedCanvas(s.repo, canvas)
+	req.SkillsEnabled = len(skillPool.Versions) > 0
+	req.MemoryMode = memory.Mode
 	canvasSummary := ""
 	if len(req.ContextScope) != 0 {
 		canvasSummary, err = cloudAgentCanvasSummaryWithOmitted(canvas, req.FocusNodeOmittedCount, req.FocusNodeIDs...)
@@ -858,11 +891,11 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 	if err != nil {
 		return nil, err
 	}
-	system, policy, err := compileCloudAgentPoliciesForIdentity(req, appearance.Canvas.AgentName, appearance.BrandName, skillSnapshots, "", profile, creativeAnchor)
+	system, policy, err := compileCloudAgentPoliciesForIdentity(req, appearance.Canvas.AgentName, appearance.BrandName, &skillPool.Catalog, "", profile, creativeAnchor)
 	if err != nil {
 		return nil, err
 	}
-	state := cloudAgentState{Version: 1, Request: req, ParentID: parentID, Fingerprint: fingerprint, CreativeAnchor: creativeAnchor, Plan: inheritedPlan, CommercePlan: inheritedCommercePlan, ConfirmationRounds: inheritedConfirmationRounds, ConfirmationFingerprints: inheritedConfirmationFingerprints, Skills: skillSnapshots, Profile: profile, Policy: policy}
+	state := cloudAgentState{Version: 1, Request: req, ParentID: parentID, Fingerprint: fingerprint, CreativeAnchor: creativeAnchor, Plan: inheritedPlan, CommercePlan: inheritedCommercePlan, ConfirmationRounds: inheritedConfirmationRounds, ConfirmationFingerprints: inheritedConfirmationFingerprints, Skills: skillPool.Pinned, SkillVersions: skillPool.Versions, SkillHints: skillPool.Hints, Memory: memory, Profile: profile, Policy: policy}
 	state.RetryReplay = retryReplay
 	canonical := cloudAgentCanonicalFor(system, history, req.Prompt, req, len(profile.Layers) > 0)
 	// Keep the catalog out of TextHistory (which defines conversation turns),

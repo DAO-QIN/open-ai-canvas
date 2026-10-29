@@ -23,6 +23,16 @@ type ManifestOperation struct {
 	Files               []ManifestFilePart `json:"files,omitempty"`
 }
 
+// ManifestUpload 声明“先上传素材、再按上游素材 ID 引用”的前置步骤。宿主在 create 之前
+// 对 Kinds 内的每个输入媒体执行一次该请求（模板里可用 media.* 引用当前媒体），
+// 用 ID 表达式从响应取出上游素材 ID，写入 media.uploadId 供 create 模板引用。
+// 恢复已有上游任务时不会重复上传。
+type ManifestUpload struct {
+	ManifestOperation
+	Kinds []string `json:"kinds"`
+	ID    any      `json:"id"`
+}
+
 type ManifestFilePart struct {
 	Name     string `json:"name"`
 	Source   any    `json:"source"`
@@ -48,6 +58,8 @@ type ManifestResponse struct {
 	// 每个对象可携带 data（Base64 音频片段）、code/message 和 usage。
 	StreamedJSONAudio bool                 `json:"streamedJsonAudio,omitempty"`
 	InlineAudio       *ManifestInlineAudio `json:"inlineAudio,omitempty"`
+	Stage             any                  `json:"stage,omitempty"`
+	QueueAhead        any                  `json:"queueAhead,omitempty"`
 	TaskID            any                  `json:"taskId,omitempty"`
 	Status            any                  `json:"status,omitempty"`
 	Message           any                  `json:"message,omitempty"`
@@ -362,6 +374,22 @@ func ValidateManifest(manifest Manifest) error {
 				return fmt.Errorf("provider %q poll operation: %w", provider.ID, err)
 			}
 		}
+		if provider.DetachedPolling && provider.Poll == nil {
+			return fmt.Errorf("provider %q detachedPolling requires a poll operation", provider.ID)
+		}
+		if provider.Upload != nil {
+			if err := validateManifestOperation(provider.Upload.ManifestOperation); err != nil {
+				return fmt.Errorf("provider %q upload operation: %w", provider.ID, err)
+			}
+			if provider.Upload.ID == nil || len(provider.Upload.Kinds) == 0 {
+				return fmt.Errorf("provider %q upload operation requires kinds and id mapping", provider.ID)
+			}
+			for _, kind := range provider.Upload.Kinds {
+				if kind != "image" && kind != "video" && kind != "audio" {
+					return fmt.Errorf("provider %q upload kind %q is unsupported", provider.ID, kind)
+				}
+			}
+		}
 		if provider.Cancel != nil {
 			if err := validateManifestOperation(*provider.Cancel); err != nil {
 				return fmt.Errorf("provider %q cancel operation: %w", provider.ID, err)
@@ -444,9 +472,12 @@ func normalizeManifestForProvider(manifest *Manifest, index int) error {
 	manifest.Metadata.Cancel = operationSummaryPtr(provider.Cancel)
 	manifest.Metadata.ContentType = provider.Create.ContentType
 	manifest.Metadata.RequiresPublicMediaURLs = provider.RequiresPublicMediaURLs
+	manifest.Metadata.DetachedPolling = provider.DetachedPolling
+	manifest.Metadata.IdempotentCreate = provider.IdempotentCreate
 	manifest.Metadata.Kind = provider.Kind
 	manifest.Metadata.Execution = manifest.Runtime.Backend
 	manifest.Create = provider.Create
+	manifest.Upload = provider.Upload
 	manifest.Agent = provider.Agent
 	manifest.Poll = provider.Poll
 	manifest.Cancel = provider.Cancel

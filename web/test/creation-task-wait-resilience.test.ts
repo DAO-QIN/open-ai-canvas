@@ -27,15 +27,15 @@ test("历史误报失败的视频只在原任务物化成功后恢复，并清�
     expect(next[0].messages[1].error).toBeUndefined();
     expect(next[0].messages[1].generationErrorCode).toBeUndefined();
     const raw = recovery.reconcileCreationTaskMessages(runtime, current, [task("succeeded", { resultJson: '{"video":{"url":"https://provider.invalid/raw.mp4"}}' })]);
-    expect(raw[0].messages[1].status).toBe("pending");
-    expect(raw[0].messages[1].resultUrls).toEqual([]);
+    expect(raw[0].messages[1]).toMatchObject({ status: "error", errorKind: "sync" });
+    expect(raw[0].messages[1].resultUrls || []).toEqual([]);
 });
 
 test("物化暂不可用不记生成失败，原任务恢复后仍补回结果", () => {
     const pending = conversation({ ...message, mode: "image", status: "pending", content: "", batchTotal: 1 });
     const interrupted = recovery.reconcileCreationTaskMessages(runtime, [pending], [task("succeeded", { type: "canvas_image", creationError: "资源暂不可用" })]);
-    expect(interrupted[0].messages[1].status).toBe("pending");
-    expect(interrupted[0].messages[1].batchFailedCount).toBe(0);
+    expect(interrupted[0].messages[1]).toMatchObject({ status: "error", errorKind: "sync" });
+    expect(interrupted[0].messages[1].batchFailedCount || 0).toBe(0);
     const completed = recovery.reconcileCreationTaskMessages(runtime, interrupted, [task("succeeded", { type: "canvas_image", creationResultStorageKeys: ["resource:image"] })]);
     expect(completed[0].messages[1]).toMatchObject({ status: "done", resultStorageKeys: ["resource:image"], batchFailedCount: 0 });
 });

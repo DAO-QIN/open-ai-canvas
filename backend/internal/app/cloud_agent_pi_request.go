@@ -98,7 +98,7 @@ func (s *Service) buildEnhancedPiRequest(_ context.Context, params EnhancedPiReq
 			request.BootstrapMessages = append(request.BootstrapMessages, message)
 		}
 	}
-	mediaModels, err := s.cloudAgentCreationMediaModels(params.RuntimeState.Request)
+	mediaModels, err := s.cloudAgentCreationMediaModels(params.UserID, params.RuntimeState.Request)
 	if err != nil {
 		return cloudAgentPiProcessRequest{}, err
 	}
@@ -125,11 +125,15 @@ func (s *Service) buildEnhancedPiRequest(_ context.Context, params EnhancedPiReq
 	return request, nil
 }
 
-func (s *Service) cloudAgentCreationMediaModels(req CloudAgentRequest) (map[string]any, error) {
+func (s *Service) cloudAgentCreationMediaModels(userID string, req CloudAgentRequest) (map[string]any, error) {
 	if req.Surface != "creation" || req.MediaSettings == nil {
 		return nil, nil
 	}
-	catalog, err := s.ModelCatalog(nil)
+	access, err := s.userGroupAccess(userID)
+	if err != nil {
+		return nil, err
+	}
+	catalog, err := s.ModelCatalog(access, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +147,7 @@ func (s *Service) cloudAgentCreationMediaModels(req CloudAgentRequest) (map[stri
 		}
 		selection := selected.choice.Selection
 		if selection.LogicalModelID != "" {
-			models, err := s.PublicLogicalModels(nil)
+			models, err := s.PublicLogicalModels(access, nil)
 			if err != nil {
 				return nil, err
 			}

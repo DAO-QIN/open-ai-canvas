@@ -80,7 +80,7 @@ describe("creation library button", () => {
         const source = readCreateWorkspaceSource();
         const styles = readFileSync(resolve(import.meta.dir, "../src/styles/globals.css"), "utf8");
 
-        expect(source).toContain('import { Reorder } from "motion/react"');
+        expect(source).toMatch(/import \{[^}]*\bReorder\b[^}]*\} from "motion\/react"/);
         expect(source).toContain("<Reorder.Group");
         expect(source).toContain('axis="x"');
         expect(source).toContain("values={visibleAttachments}");

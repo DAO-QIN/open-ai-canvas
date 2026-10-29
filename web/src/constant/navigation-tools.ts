@@ -1,4 +1,5 @@
-import { Blocks, House, CircleDollarSign, Clapperboard, Gift, History, Image, Images, LibraryBig, Lightbulb, PanelsTopLeft, Settings, Video, WandSparkles } from "lucide-react";
+import { Blocks, House, CircleDollarSign, Clapperboard, Gift, History, Image, Images, LibraryBig, Lightbulb, PanelsTopLeft, Settings, Video, WandSparkles, ListTodo, PenTool } from "lucide-react";
+
 
 export const navigationTools = [
     {
@@ -14,7 +15,7 @@ export const navigationTools = [
         label: "创作",
         fullLabel: "智能创作",
         keywords: ["Agent", "对话"],
-        icon: WandSparkles,
+        icon: PenTool,
         section: "创作空间",
     },
     {

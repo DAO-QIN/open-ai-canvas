@@ -9,6 +9,12 @@ import (
 	"yingce/backend/internal/model"
 )
 
+func rememberLessonCall(arguments string) cloudAgentCall {
+	var call cloudAgentCall
+	call.Function.Name, call.Function.Arguments = "remember_lesson", arguments
+	return call
+}
+
 func TestCreationMemoryAdmissionAndRecallIsolation(t *testing.T) {
 	s, db, _, _ := creationTestService(t)
 	now := time.Now()

@@ -102,7 +102,11 @@ func (s *Service) cloudAgentVisionReferences(req CloudAgentRequest) (TextReferen
 		return TextReferenceConfig{}, BadAuthRequest("看图渠道模型不可用")
 	}
 	if req.LogicalModelID != "" {
-		routed, err := s.ResolveLogicalModel(req.LogicalModelID, ModelRequestIntent{Capability: "text", Inputs: map[string]int{"image": 1}})
+		access, err := s.systemGroupAccess()
+		if err != nil {
+			return TextReferenceConfig{}, err
+		}
+		routed, err := s.ResolveLogicalModel(access, req.LogicalModelID, ModelRequestIntent{Capability: "text", Inputs: map[string]int{"image": 1}})
 		if err != nil {
 			return TextReferenceConfig{}, err
 		}

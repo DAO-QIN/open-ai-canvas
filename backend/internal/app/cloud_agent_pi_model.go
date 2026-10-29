@@ -321,7 +321,7 @@ func (s *Service) runCloudAgentModelStep(ctx context.Context, userID, runID stri
 			cloudAgentApplyReadLoopNudge(&canonical, &state)
 		}
 		if operation != cloudAgentContextCompactionOperation {
-			s.attachCloudAgentLessons(&canonical, userID, cloudAgentLessonTaskText(&state), state.Request.Surface)
+			cloudAgentAttachRunContext(&canonical, &state)
 			budget := s.cloudAgentContextBudgetForRequest(state.Request)
 			if err := fitCloudAgentModelContext(&canonical, budget.InputBudgetTokens); err != nil {
 				return nil, false, err

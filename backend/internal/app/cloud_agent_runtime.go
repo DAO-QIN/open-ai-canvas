@@ -143,6 +143,9 @@ type cloudAgentRuntime struct {
 	CreativeAnchor     cloudAgentCreativeAnchor              `json:"creativeAnchor,omitempty"`
 	TextHistory        []providerTextMessage                 `json:"textHistory,omitempty"`
 	Skills             []cloudAgentSkill                     `json:"skills"`
+	SkillVersions      map[string]string                     `json:"skillVersions,omitempty"`
+	SkillHints         string                                `json:"skillHints,omitempty"`
+	Memory             cloudAgentMemorySnapshot              `json:"memory,omitempty"`
 	Profile            cloudAgentProfileSnapshot             `json:"profile"`
 	ProfileReads       map[string]bool                       `json:"profileReads,omitempty"`
 	ToolReadResults    map[string]cloudAgentCachedToolResult `json:"toolReadResults,omitempty"`
@@ -190,13 +193,16 @@ type cloudAgentRuntime struct {
 	// PiAssistantResponses counts successful assistant message_end events from
 	// the Pi runtime. Completion must not be inferred from a clean Node exit:
 	// a provider/session error can otherwise be reported as a successful run.
-	PiAssistantResponses        int                     `json:"piAssistantResponses,omitempty"`
-	LessonEligibleToolSuccesses int                     `json:"lessonEligibleToolSuccesses,omitempty"`
-	RememberLessonSuccesses     int                     `json:"rememberLessonSuccesses,omitempty"`
-	PendingLessonDrafts         []agentmemory.Candidate `json:"pendingLessonDrafts,omitempty"`
-	IsGenerating                bool                    `json:"isGenerating,omitempty"`
-	LastError                   string                  `json:"lastError,omitempty"`
-	PiRecoveryAttempts          int                     `json:"piRecoveryAttempts,omitempty"`
+	PiAssistantResponses        int                          `json:"piAssistantResponses,omitempty"`
+	LessonEligibleToolSuccesses int                          `json:"lessonEligibleToolSuccesses,omitempty"`
+	RememberLessonSuccesses     int                          `json:"rememberLessonSuccesses,omitempty"`
+	PendingLessonDrafts         []agentmemory.Candidate      `json:"pendingLessonDrafts,omitempty"`
+	IsGenerating                bool                         `json:"isGenerating,omitempty"`
+	LastError                   string                       `json:"lastError,omitempty"`
+	PiRecoveryAttempts          int                          `json:"piRecoveryAttempts,omitempty"`
+	MemoryWriteCalls            int                          `json:"memoryWriteCalls,omitempty"`
+	SkillRecommendations        int                          `json:"skillRecommendations,omitempty"`
+	MarketSuggestions           []cloudAgentMarketSuggestion `json:"marketSuggestions,omitempty"`
 	// EmptyOutputEscalated 记录"空输出已经升级重试过几次"（关思考 + 放大输出预算）。
 	EmptyOutputEscalated int `json:"emptyOutputEscalated,omitempty"`
 	// StepTimeoutEscalated 记录"单步墙钟到点后已经关思考重试过几次"。
@@ -297,7 +303,7 @@ func (s *Service) ensureCloudAgentExecution(task *model.Task, initial cloudAgent
 	// not an active model task; validation and recovery use TaskIDs as the run's
 	// immutable task-history anchor. Leaving this nil makes every new Pi run
 	// fail its first checkpoint with "Agent runtime task history is invalid".
-	state := cloudAgentRuntime{Request: initial.Request, Policy: initial.Policy, ParentID: initial.ParentID, Fingerprint: initial.Fingerprint, CreativeAnchor: initial.CreativeAnchor, TextHistory: input.TextHistory, Skills: initial.Skills, Profile: initial.Profile, Canonical: canonical, ActiveTaskID: "", TaskIDs: []string{task.ID}, Step: 0, Decisions: map[string]string{}, Plan: initial.Plan, CommercePlan: initial.CommercePlan, ConfirmationRounds: initial.ConfirmationRounds, ConfirmationFingerprints: append([]string(nil), initial.ConfirmationFingerprints...), PendingConfirmationFingerprint: "", Events: []CloudAgentEvent{}, StepLimits: limits}
+	state := cloudAgentRuntime{Request: initial.Request, Policy: initial.Policy, ParentID: initial.ParentID, Fingerprint: initial.Fingerprint, CreativeAnchor: initial.CreativeAnchor, TextHistory: input.TextHistory, Skills: initial.Skills, SkillVersions: initial.SkillVersions, SkillHints: initial.SkillHints, Memory: initial.Memory, Profile: initial.Profile, Canonical: canonical, ActiveTaskID: "", TaskIDs: []string{task.ID}, Step: 0, Decisions: map[string]string{}, Plan: initial.Plan, CommercePlan: initial.CommercePlan, ConfirmationRounds: initial.ConfirmationRounds, ConfirmationFingerprints: append([]string(nil), initial.ConfirmationFingerprints...), PendingConfirmationFingerprint: "", Events: []CloudAgentEvent{}, StepLimits: limits}
 	state.RetryReplay = append([]string(nil), initial.RetryReplay...)
 	if len(state.RetryReplay) > 0 {
 		call := cloudAgentCall{ID: "retry-media"}
@@ -308,14 +314,17 @@ func (s *Service) ensureCloudAgentExecution(task *model.Task, initial cloudAgent
 		state.ActiveTaskID = task.ID
 		state.Step = 1
 	}
-	if len(initial.Skills) > 0 {
-		// skillIds makes the enablement auditable: usage telemetry can attribute a
-		// run to the skills it actually loaded instead of only counting the total.
+	if len(initial.SkillVersions) > 0 {
+		// skillIds 只列用户固定的技能，便于使用统计归因；availableCount 是本轮可自动发现的技能总数。
 		skillIDs := make([]string, 0, len(initial.Skills))
 		for _, skill := range initial.Skills {
 			skillIDs = append(skillIDs, skill.ID)
 		}
-		state.event(task.ID, "tool_completed", map[string]any{"toolName": "skills_load", "skillIds": skillIDs, "text": fmt.Sprintf("已启用 %d 个技能，正文将按需读取", len(initial.Skills))})
+		text := fmt.Sprintf("可自动发现 %d 个已安装技能，正文按需读取", len(initial.SkillVersions))
+		if len(skillIDs) > 0 {
+			text = fmt.Sprintf("可自动发现 %d 个已安装技能（固定 %d 个），正文按需读取", len(initial.SkillVersions), len(skillIDs))
+		}
+		state.event(task.ID, "tool_completed", map[string]any{"toolName": "skills_load", "skillIds": skillIDs, "availableCount": len(initial.SkillVersions), "text": text})
 	}
 	if state.Request.Surface != "creation" && len(state.Plan) > 0 {
 		// 继承的待办清单必须挂到本轮：前端按 plan-<runId> 展示清单，不发这条事件时

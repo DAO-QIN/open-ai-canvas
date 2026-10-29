@@ -227,13 +227,52 @@ export async function refreshCreationMessageTasks(runtime: CreationRuntime, conv
         && (!task.billing || task.billing.status === "settled" || task.billing.status === "refunded");
     const retryableTaskIds = latest.filter((task) => task.status === "failed" && safeToRetry(task)).map((task) => task.id);
     return {
-        conversation: reconcileCreationTaskMessages(runtime, [conversation], persisted)[0],
+        conversation: reconcileCreationTaskMessages(runtime, [conversation], persisted, { reviveMessageIds: new Set([message.id]) })[0],
         canRetry: retryableTaskIds.length > 0 || latest.length > 0 && latest.every((task) => task.status === "cancelled" && safeToRetry(task)),
         retryableTaskIds,
     };
 }
 
-export function reconcileCreationTaskMessages(runtime: CreationRuntime, conversations: CreationConversation[], tasks: PersistedCreationTask[]) {
+/** 失败但后端没有确认任务失败（含旧版本未分类的失败）：作品可能已生成，应提供“重新获取结果”。 */
+export function creationMessageNeedsResultSync(message: Pick<CreationMessage, "status" | "errorKind" | "taskIds">) {
+    return message.status === "error" && message.errorKind !== "task" && Boolean(message.taskIds?.length);
+}
+
+// 仍需用任务终态来收敛的媒体消息：生成中，或失败但后端没有确认失败。
+function creationMediaMessageAwaitsTask(message: CreationMessage, revive: boolean) {
+    if (message.role !== "assistant") return false;
+    return revive || message.status === "pending" || creationMessageNeedsResultSync(message);
+}
+
+const clearedCreationSyncState = { syncInterrupted: undefined, errorKind: undefined, mediaRecoverable: undefined, generationErrorCode: undefined, taskStatePending: undefined } satisfies Partial<CreationMessage>;
+
+/** 任务仍在进行：消息回到生成中，并刷新阶段与真实进度；没有变化时返回原对象，避免无谓重渲染与持久化。 */
+function creationMessageWithObservedTask(message: CreationMessage, task: GenerationTask): CreationMessage {
+    const progress = typeof task.progress === "number" && Number.isFinite(task.progress) ? Math.round(task.progress) : undefined;
+    const unchanged =
+        message.status === "pending" &&
+        !message.syncInterrupted &&
+        !message.error &&
+        !message.errorKind &&
+        message.generationStatus === task.status &&
+        message.generationStage === task.stage &&
+        message.generationMediaStage === task.mediaStage &&
+        message.generationProgress === progress;
+    if (unchanged) return message;
+    return {
+        ...message,
+        ...clearedCreationSyncState,
+        status: "pending",
+        content: message.status === "pending" || isCreationAgentMediaTask(message) ? message.content : "",
+        error: undefined,
+        generationStatus: task.status,
+        generationStage: task.stage,
+        generationMediaStage: task.mediaStage,
+        generationProgress: progress,
+    };
+}
+
+export function reconcileCreationTaskMessages(runtime: CreationRuntime, conversations: CreationConversation[], tasks: PersistedCreationTask[], options: { reviveMessageIds?: ReadonlySet<string> } = {}) {
     let changed = false;
     const next = conversations.map((conversation) => {
         let conversationChanged = false;
@@ -243,17 +282,32 @@ export function reconcileCreationTaskMessages(runtime: CreationRuntime, conversa
             const matched = tasks.filter((task) => taskIds.has(task.id) || Boolean(task.retryOf && taskIds.has(task.retryOf)) || Boolean(task.attemptGroupId && taskIds.has(task.attemptGroupId)) || (task.clientContext?.conversationId === conversation.id && task.clientContext.messageId === message.id));
             const matches = latestCreationTaskAttempts(matched)
                 .sort((left, right) => (left.clientContext?.batchIndex || 0) - (right.clientContext?.batchIndex || 0));
+            const active = matches.filter((task) => task.status === "queued" || task.status === "running");
             if (message.role === "assistant" && message.mode === "text") {
                 const recovery = runtime.recoverCreationTextTask(message, matches);
-                if (!recovery) return message;
+                if (!recovery) {
+                    // 恢复监听已重新拿到任务状态，连接中断提示可以收起；正文仍等任务终态一次性回填。
+                    if (!message.syncInterrupted || !active.length) return message;
+                    conversationChanged = true;
+                    changed = true;
+                    return { ...message, syncInterrupted: undefined };
+                }
                 completedAt = matches.reduce((latest, task) => conversationTimestamp(task.updatedAt) > conversationTimestamp(latest) ? task.updatedAt : latest, completedAt);
                 conversationChanged = true;
                 changed = true;
-                return { ...message, ...recovery };
+                return { ...message, ...recovery, syncInterrupted: undefined };
             }
-            if (message.role !== "assistant" || (message.status !== "pending" && !(message.status === "error" && (message.mode === "image" || creationSingleResultMode(message.mode))))) return message;
-            const expectedTaskCount = Math.max(0, ...matches.map((task) => task.clientContext?.batchCount || 0)) || (creationSingleResultMode(message.mode) ? 1 : Number(message.settings?.count) || 0);
+            if (!creationMediaMessageAwaitsTask(message, Boolean(options.reviveMessageIds?.has(message.id)))) return message;
+            const expectedTaskCount = isCreationAgentMediaTask(message) ? 1 : Math.max(0, ...matches.map((task) => task.clientContext?.batchCount || 0)) || (creationSingleResultMode(message.mode) ? 1 : Number(message.settings?.count) || 0);
             if (!matches.length) return message;
+            if (expectedTaskCount > 0 && matches.length < expectedTaskCount && !message.submissionPending) return message;
+            if (active.length && !matches.some((task) => task.status === "succeeded" && (creationTaskResultUrls(task).length || creationTaskResultStorageKeys(task).length))) {
+                const observed = creationMessageWithObservedTask(message, active[0]);
+                if (observed === message) return message;
+                conversationChanged = true;
+                changed = true;
+                return observed;
+            }
 
             const succeeded = matches.filter((task) => task.status === "succeeded");
             const resultUrls = Array.from(new Set([...(message.resultUrls || []), ...succeeded.flatMap(creationTaskResultUrls)]));
@@ -264,7 +318,7 @@ export function reconcileCreationTaskMessages(runtime: CreationRuntime, conversa
             const nextTaskIds = Array.from(new Set([...(message.taskIds || []), ...matches.map((task) => task.id)]));
             const taskStatuses = { ...message.taskStatuses, ...Object.fromEntries(matches.map((task) => [task.id, task.status])) };
             const submissionPending = message.submissionPending && !(expectedTaskCount > 0 && matches.length >= (message.batchTotal || expectedTaskCount));
-            const nextMessage = { ...message, taskIds: nextTaskIds, taskStatuses, submissionPending: submissionPending || undefined };
+            const nextMessage = { ...message, ...clearedCreationSyncState, taskIds: nextTaskIds, taskStatuses, submissionPending: submissionPending || undefined };
             completedAt = matches.reduce((latest, task) => conversationTimestamp(task.updatedAt) > conversationTimestamp(latest) ? task.updatedAt : latest, completedAt);
             conversationChanged = true;
             changed = true;
@@ -278,6 +332,12 @@ export function reconcileCreationTaskMessages(runtime: CreationRuntime, conversa
                 const failed = matches.find((task) => task.status === "failed" || task.creationError);
                 const error = failed?.creationError || failed?.error || "任务已结束，但生成结果暂时无法读取";
                 return { ...nextMessage, status: "error" as const, error: generationErrorMessage(error), generationErrorCode: generationErrorCode(error) };
+            }
+            if (!resultUrls.length && !resultStorageKeys.length && !submissionPending) {
+                const unavailable = succeeded.find((task) => task.creationError) || succeeded[0];
+                if (unavailable) return { ...nextMessage, status: "error" as const, content: "结果待同步", errorKind: "sync" as const, error: generationErrorMessage(unavailable.creationError || "任务已完成，但生成结果暂时无法读取"), generationStatus: "succeeded" as const };
+                const failed = matches.find((task) => task.status === "failed");
+                if (failed) return { ...nextMessage, status: "error" as const, content: "生成失败", errorKind: "task" as const, mediaRecoverable: matches.some((task) => task.canRecoverMedia) || undefined, error: generationErrorMessage(failed.error || "任务已结束，但没有返回结果"), generationStatus: "failed" as const, generationMediaStage: failed.mediaStage };
             }
             if (submissionPending) return { ...nextMessage, status: "pending" as const, resultUrls, resultStorageKeys, batchFailedCount: observedFailedCount, error: undefined, generationErrorCode: undefined };
             if (creationSingleResultMode(message.mode)) {

@@ -8,8 +8,9 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { Button, Dropdown, Popover } from "antd";
 import { useWorkspaceTopBarMount } from "@/components/layout/workspace-top-bar-extension";
 import { Tooltip } from "@/components/ui/base/tooltip";
-import { Reorder } from "motion/react";
-import { Brain, ChevronDown, ChevronLeft, ChevronRight, Clapperboard, Clock3, History, LoaderCircle, Maximize2, Minimize2, Plus, SlidersHorizontal, Square, Trash2, Waves, X } from "lucide-react";
+import { Reorder, LayoutGroup, motion, useReducedMotion } from "motion/react";
+import { Brain, ChevronDown, ChevronLeft, ChevronRight, Clapperboard, Clock3, History, LoaderCircle, Maximize2, Minimize2, Plus, SlidersHorizontal, Square, Trash2, Waves, X, ArrowUp, Film, Image as ImageIcon, MessageSquareText, Lightbulb, Orbit, PenLine } from "lucide-react";
+
 
 import { formatVideoResolutionLabel as videoResolutionLabel } from "@/lib/video-generation-options";
 import { CanvasResourceMentionTextarea } from "@/components/canvas/canvas-resource-mention-textarea";
@@ -34,6 +35,8 @@ import type { PromptOptimizerProvider } from "@/lib/plugins/plugin-types";
 import { type CreationReference } from "./creation-references";
 import { creationAttachmentKind, type CreationAttachment, type CreationMode } from "./creation-assets";
 import { countOptions, creationComposerModeOptions, creationHasInput, creationModelCapability, modeLabels, qualityOptions, resolutionOptions, type CreationShotRailEntry } from "./creation-types";
+import { creationMessageNeedsResultSync } from "./creation-conversations";
+
 import "./creation-product.css";
 import "./creation-scrollbars.css";
 import "@/components/canvas/canvas-cloud-agent.css";
@@ -80,71 +83,29 @@ export function CreationWorkspaceToolbar({
         return () => window.removeEventListener("mousedown", onPointerDown);
     }, [railOpen]);
     const mount = useWorkspaceTopBarMount();
-    const toolbar = (
-        <header className="creation-thread-toolbar">
-            <div className="creation-toolbar-shots" ref={railRef}>
-                <button type="button" className="creation-rail-trigger" aria-expanded={railOpen} aria-haspopup="listbox" onClick={() => setRailOpen((open) => !open)}>
-                    <Clapperboard />
-                    镜头时间线{shots.length > 0 ? <em className="creation-rail-count">{shots.length}</em> : null}
-                </button>
-                {railOpen ? (
-                    <div className="creation-rail-pop" role="listbox" aria-label="镜头时间线">
-                        <div className="creation-rail-pop-head">
-                            <span className="creation-rail-pop-title">
-                                镜头时间线<small>{shots.length ? `共 ${shots.length} 镜` : "空轨道"}</small>
-                            </span>
-                            <button type="button" className="creation-rail-pop-close" aria-label="关闭镜头列表" onClick={() => setRailOpen(false)}>
-                                <X />
-                            </button>
-                        </div>
-                        {shots.length ? (
-                            <ol className="creation-rail-list">
-                                {shots.map((shot) => {
-                                    const resultStatus = shot.result?.status;
-                                    const statusLabel = resultStatus === "done" ? "完成" : resultStatus === "error" ? "生成失败" : resultStatus === "pending" ? "生成中" : resultStatus === "cancelled" ? "已停止" : "待生成";
-                                    return (
-                                        <li key={shot.key}>
-                                            <button
-                                                type="button"
-                                                role="option"
-                                                aria-selected="false"
-                                                className="creation-rail-row"
-                                                onClick={() => {
-                                                    setRailOpen(false);
-                                                    onJumpToShot(shot);
-                                                }}
-                                            >
-                                                <span className="creation-rail-row-shot">{formatShotOrdinal(shot.ordinal - 1)}</span>
-                                                <span className="creation-rail-row-prompt">{shot.user.content || "视频镜头"}</span>
-                                                <span className={`creation-rail-row-state is-${resultStatus || "idle"}`}>{statusLabel}</span>
-                                            </button>
-                                        </li>
-                                    );
-                                })}
-                            </ol>
-                        ) : (
-                            <p className="creation-rail-empty">在下方发送一条视频消息，就会自动成为第 1 镜。</p>
-                        )}
-                    </div>
-                ) : null}
-            </div>
-            <div className="creation-toolbar-actions">
-                <Button size="small" loading={openingCanvas} onClick={onContinueCanvas}>
-                    画布中继续
-                </Button>
-                <Tooltip title="新建创作">
-                    <button type="button" aria-label="新建创作" className="creation-toolbar-action" onClick={onNewConversation}>
-                        <Plus />
-                    </button>
-                </Tooltip>
-                <Tooltip title="历史对话">
-                    <button type="button" aria-label="查看历史对话" className="creation-toolbar-action" onClick={onOpenHistory}>
-                        <History />
-                    </button>
-                </Tooltip>
-            </div>
-        </header>
-    );
+    const toolbar = <header className="creation-thread-toolbar">
+        <div className="creation-toolbar-shots" ref={railRef}>
+            <button type="button" className="creation-rail-trigger" aria-expanded={railOpen} aria-haspopup="listbox" onClick={() => setRailOpen((open) => !open)}><Clapperboard />镜头时间线{shots.length > 0 ? <em className="creation-rail-count">{shots.length}</em> : null}</button>
+            {railOpen ? <div className="creation-rail-pop" role="listbox" aria-label="镜头时间线">
+                <div className="creation-rail-pop-head"><span className="creation-rail-pop-title">镜头时间线<small>{shots.length ? `共 ${shots.length} 镜` : "空轨道"}</small></span><button type="button" className="creation-rail-pop-close" aria-label="关闭镜头列表" onClick={() => setRailOpen(false)}><X /></button></div>
+                {shots.length ? <ol className="creation-rail-list">{shots.map((shot) => {
+                    const resultStatus = shot.result?.status;
+                    const resultNeedsSync = Boolean(shot.result && creationMessageNeedsResultSync(shot.result));
+                    const statusLabel = resultStatus === "done" ? "完成" : resultNeedsSync ? "待同步" : resultStatus === "error" ? "生成失败" : resultStatus === "pending" ? "生成中" : resultStatus === "cancelled" ? "已停止" : "待生成";
+                    return <li key={shot.key}><button type="button" role="option" aria-selected="false" className="creation-rail-row" onClick={() => { setRailOpen(false); onJumpToShot(shot); }}>
+                        <span className="creation-rail-row-shot">{formatShotOrdinal(shot.ordinal - 1)}</span>
+                        <span className="creation-rail-row-prompt">{shot.user.content || "视频镜头"}</span>
+                        <span className={`creation-rail-row-state is-${resultNeedsSync ? "sync" : resultStatus || "idle"}`}>{statusLabel}</span>
+                    </button></li>;
+                })}</ol> : <p className="creation-rail-empty">在下方发送一条视频消息，就会自动成为第 1 镜。</p>}
+            </div> : null}
+        </div>
+        <div className="creation-toolbar-actions">
+            <Button size="small" loading={openingCanvas} onClick={onContinueCanvas}>画布中继续</Button>
+            <Tooltip title="新建创作"><button type="button" aria-label="新建创作" className="creation-toolbar-action" onClick={onNewConversation}><Plus /></button></Tooltip>
+            <Tooltip title="历史对话"><button type="button" aria-label="查看历史对话" className="creation-toolbar-action" onClick={onOpenHistory}><History /></button></Tooltip>
+        </div>
+    </header>;
     if (mount) return createPortal(toolbar, mount);
     if (mount === null) return null;
     return toolbar;

@@ -26,7 +26,7 @@ export function AgentAvatarVideo({
         const video = videoRef.current;
         const canvas = canvasRef.current;
         const context = canvas?.getContext("2d", { willReadFrequently: true });
-        if (!video || !canvas || !context) return;
+        if (paused || !video || !canvas || !context) return;
         let animationFrame = 0;
         let videoFrame = 0;
         let disposed = false;
@@ -58,7 +58,7 @@ export function AgentAvatarVideo({
             context.putImageData(image, 0, 0);
         };
         const scheduleFrame = () => {
-            if (disposed) return;
+            if (disposed || document.visibilityState === "hidden") return;
             if (typeof video.requestVideoFrameCallback === "function") {
                 videoFrame = video.requestVideoFrameCallback(() => {
                     drawFrame();
@@ -71,6 +71,19 @@ export function AgentAvatarVideo({
                 });
             }
         };
+        const cancelFrame = () => {
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            if (videoFrame && typeof video.cancelVideoFrameCallback === "function") video.cancelVideoFrameCallback(videoFrame);
+            animationFrame = 0;
+            videoFrame = 0;
+        };
+        // 回到前台时重新排帧；隐藏时 scheduleFrame 不再续排。
+        const resumeWhenVisible = () => {
+            if (document.visibilityState === "hidden") return;
+            cancelFrame();
+            scheduleFrame();
+        };
+        document.addEventListener("visibilitychange", resumeWhenVisible);
         drawFrame();
         video.addEventListener("loadeddata", drawFrame);
         if (!paused && !reducedMotion) scheduleFrame();

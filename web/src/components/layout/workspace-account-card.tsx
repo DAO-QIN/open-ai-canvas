@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useThemeStore, type ThemeName } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { UserAvatar } from "./user-avatar";
+import { UserGroupAvatarRing, UserGroupBadge } from "./user-group-badge";
 import "./workspace-account-card.css";
 
 // 打开菜单时，超过该时长的余额会在后台静默刷新；不做常驻轮询。
@@ -59,9 +60,9 @@ export function WorkspaceAccountCard({ onWallet, onNavigate, active }: { onWalle
     return (
         <section className="workspace-account-card" aria-label="我的账户">
             <Link to="/settings?section=profile" onClick={onNavigate} className="workspace-account-card-identity" title="查看个人信息">
-                <UserAvatar user={user} className="workspace-account-card-avatar" />
+                <UserGroupAvatarRing><UserAvatar user={user} className="workspace-account-card-avatar" /></UserGroupAvatarRing>
                 <span className="workspace-account-card-identity-copy">
-                    <strong>{displayName}</strong>
+                    <strong className="workspace-account-card-name">{displayName}<UserGroupBadge /></strong>
                     <span>@{user.username}</span>
                 </span>
                 <em data-role={user.role}>{user.role === "admin" ? "管理员" : "创作者"}</em>

@@ -71,6 +71,10 @@ func (s *Service) switchTaskToNextImageChannel(task *model.Task, attempts []mode
 	if err != nil {
 		return nil, err
 	}
+	access, err := s.userGroupAccess(task.UserID)
+	if err != nil {
+		return nil, err
+	}
 	for _, candidate := range candidates {
 		matched, matchErr := s.channelModelMatchesIntent(&candidate, &intent)
 		if matchErr != nil || !matched || s.logicalRouteBlocked(cachedLogicalRoute{ChannelModel: candidate}) {
@@ -82,7 +86,7 @@ func (s *Service) switchTaskToNextImageChannel(task *model.Task, attempts []mode
 		}
 		nextConfig := nextInput["config"].(map[string]any)
 		nextConfig["channelId"], nextConfig["model"], nextConfig["channelModelKey"] = candidate.ChannelID, candidate.ModelKey, candidate.ModelKey
-		nextInput, err = s.resolveSystemChannelModelSelection(nextInput, task.Type, task.Operation)
+		nextInput, err = s.resolveSystemChannelModelSelection(access, nextInput, task.Type, task.Operation)
 		if err != nil || s.ValidateTaskCapability(nextInput) != nil || validateCloudAgentResolvedMediaOptions(config, nextInput) != nil {
 			continue
 		}

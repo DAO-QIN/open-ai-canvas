@@ -51,6 +51,8 @@ const (
 	ReasonIdempotencyConflict   ErrorReason = "idempotency_conflict"
 	ReasonPromotionInsufficient ErrorReason = "insufficient_promotion_balance"
 	ReasonCreditBalanceOverflow ErrorReason = "credit_balance_overflow"
+	ReasonDramaBudgetExhausted  ErrorReason = "drama_budget_exhausted"
+	ReasonDramaSegmentChanged   ErrorReason = "drama_segment_changed"
 )
 
 func ReasonForStatus(status int) ErrorReason {

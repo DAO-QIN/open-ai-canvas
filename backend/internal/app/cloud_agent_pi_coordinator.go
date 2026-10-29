@@ -616,9 +616,6 @@ func (s *Service) completeCloudAgentPiRun(userID, runID string, priorAssistantRe
 				return cloudAgentSave(current, &state)
 			}
 
-			if err := cloudAgentCommitLessonDrafts(txRepo, userID, runID, &state); err != nil {
-				return err
-			}
 			current.Status = "completed"
 			state.event(runID, "run_completed", map[string]any{
 				"text":      "Agent 已完成",
