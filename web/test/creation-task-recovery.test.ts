@@ -65,7 +65,10 @@ describe("首页创作：页面没跟上 ≠ 生成失败", () => {
     test("多图任务要等全部任务快照到齐才下结论", () => {
         const source = conversations(assistant({ mode: "image", status: "pending", taskIds: ["task-a", "task-b"] }));
         const first = task({ id: "task-a", type: "canvas_image", status: "succeeded", creationResultStorageKeys: ["resource:a"], clientContext: { conversationId: "conversation-1", messageId: "assistant-1", batchIndex: 0, batchCount: 2 } });
-        expect(reconcileCreationTaskMessages(runtime, source, [first])).toBe(source);
+        const partial = reconcileCreationTaskMessages(runtime, source, [first])[0].messages[0];
+        expect(partial.status).toBe("pending");
+        expect(partial.resultStorageKeys).toEqual(["resource:a"]);
+        expect(partial.batchCompletedCount).toBe(1);
         const second = task({ id: "task-b", type: "canvas_image", status: "failed", error: "上游拒绝", clientContext: { conversationId: "conversation-1", messageId: "assistant-1", batchIndex: 1, batchCount: 2 } });
         expect(messageOf(reconcileCreationTaskMessages(runtime, source, [first, second]))).toMatchObject({ status: "done", resultStorageKeys: ["resource:a"], content: "1 张图片已生成，1 张失败" });
     });
