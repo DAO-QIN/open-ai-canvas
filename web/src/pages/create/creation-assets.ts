@@ -18,7 +18,7 @@ export type CreationDocumentAttachment = {
 };
 export type CreationAttachmentRole = "product" | "reference" | "competitor" | "style" | "source" | "person";
 export type CreationAttachment = (((Omit<ReferenceImage, "role"> | Omit<ReferenceVideo, "role"> | Omit<ReferenceAudio, "role">) & { previewUrl: string }) | CreationDocumentAttachment) & { role?: CreationAttachmentRole };
-export type CreationMode = "agent" | "text" | "image" | "video";
+export type CreationMode = "agent" | "text" | "image" | "video" | "audio";
 export type CreationAttachmentKind = "image" | "video" | "audio" | "file";
 
 const textDocumentExtensions = [".pdf", ".txt", ".md", ".csv", ".json", ".html", ".xml", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"];
@@ -29,6 +29,11 @@ export type CreationAssetIdentity = {
     resultIndex?: number;
 };
 
+/** 视频和音频每次只出一个结果；图片按张数成批。 */
+export function creationSingleResultMode(mode: CreationMode | undefined): mode is "video" | "audio" {
+    return mode === "video" || mode === "audio";
+}
+
 export function creationUploadAccept(mode: CreationMode) {
     if (mode === "video") return "image/*,video/*,audio/*";
     if (mode === "text" || mode === "agent") return `image/*,video/*,audio/*,${textDocumentExtensions.join(",")}`;
@@ -36,6 +41,8 @@ export function creationUploadAccept(mode: CreationMode) {
 }
 
 export function creationFileAccepted(mode: CreationMode, file: Pick<File, "type" | "name">) {
+    // 音频生成只收文字，不接参考素材。
+    if (mode === "audio") return false;
     if (file.type.startsWith("image/")) return true;
     if (mode === "video") return file.type.startsWith("video/") || file.type.startsWith("audio/");
     if (mode !== "text" && mode !== "agent") return false;
@@ -66,6 +73,8 @@ export function creationAttachmentPreview(attachment: CreationAttachment): { kin
 }
 
 export function creationMediaAspectRatio(value: string | undefined, mode: CreationMode) {
+    // 音频没有画幅，占位条固定扁长。
+    if (mode === "audio") return "4 / 1";
     const fallback = mode === "video" ? "16 / 9" : "1 / 1";
     const match = value?.trim().match(/^(\d+(?:\.\d+)?)\s*[:x/]\s*(\d+(?:\.\d+)?)$/i);
     if (!match) return fallback;

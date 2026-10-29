@@ -282,7 +282,7 @@ func validateCreationHistoryMessage(repo *repository.Repository, userID, session
 	if err := validateCloudAgentID(message.ID, "消息 ID", 120); err != nil {
 		return err
 	}
-	if message.Role != "user" && message.Role != "assistant" || message.Mode != "image" && message.Mode != "video" && message.Mode != "text" || message.CreatedAt.IsZero() {
+	if message.Role != "user" && message.Role != "assistant" || message.Mode != "image" && message.Mode != "video" && message.Mode != "audio" && message.Mode != "text" || message.CreatedAt.IsZero() {
 		return BadAuthRequest("普通创作消息无效")
 	}
 	if message.Role == "assistant" && (message.Content != "" || len(message.Attachments) != 0 || len(message.References) != 0) {

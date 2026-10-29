@@ -317,6 +317,13 @@ function BudgetInput({ label, hint, value, onChange, theme }: { label: string; h
 function sectionTitle(section: SettingsSection) { return section === "profile" ? "长期偏好" : section === "memories" ? "个人记忆" : section === "skills" ? "Skills" : section === "mcp" ? "MCP 与工具" : section === "context" ? "上下文" : "预算"; }
 function sectionSubtitle(section: SettingsSection) { return section === "profile" ? "用户、项目和画布的长期行为偏好" : section === "memories" ? "只属于你，批准后才会注入会话" : section === "skills" ? "搜索、安装并选择本轮技能" : section === "mcp" ? "云端工具与连接状态" : section === "context" ? "控制 Agent 能读取的范围" : "控制本轮积分与生成消耗"; }
 
-export function agentPermissionLabel(mode: AgentPermissionMode) { return permissionOptions.find((option) => option.value === mode)?.label || "请求审批"; }
+export type AgentPermissionSurface = "canvas" | "creation";
+// 创作页面向 C 端用户：不出现"审批""执行权限"，按"点发送即同意预估 × 1.2"的实际行为描述。
+const creationPermissionCopy: Record<AgentPermissionMode, { label: string; description: string }> = {
+    read_only: { label: "只聊不生成", description: "只分析和建议，不出图" },
+    request_approval: { label: "超出预估再确认", description: "发送时显示预估，超出 1.2 倍才确认" },
+    auto: { label: "预算内直接生成", description: "不再确认，按本轮积分上限执行" },
+};
+export function agentPermissionLabel(mode: AgentPermissionMode, surface: AgentPermissionSurface = "canvas") { if (surface === "creation") return creationPermissionCopy[mode]?.label || creationPermissionCopy.request_approval.label; return permissionOptions.find((option) => option.value === mode)?.label || "请求审批"; }
 export function agentPermissionVisual(mode: AgentPermissionMode) { const option = permissionOptions.find((item) => item.value === mode) || permissionOptions[0]; return { color: option.color, soft: `${option.color}1f`, icon: option.icon }; }
-export function agentPermissionMenuItems(mode: AgentPermissionMode, onChange: (mode: AgentPermissionMode) => void) { return permissionOptions.map((option) => ({ key: option.value, label: <span>{option.label}</span>, icon: mode === option.value ? <Check className="size-3.5" style={{ color: option.color }} /> : <option.icon className="size-3.5" style={{ color: option.color }} />, onClick: () => onChange(option.value) })); }
+export function agentPermissionMenuItems(mode: AgentPermissionMode, onChange: (mode: AgentPermissionMode) => void, surface: AgentPermissionSurface = "canvas") { return permissionOptions.map((option) => ({ key: option.value, label: surface === "creation" ? <span title={creationPermissionCopy[option.value].description}>{creationPermissionCopy[option.value].label}</span> : <span>{option.label}</span>, icon: mode === option.value ? <Check className="size-3.5" style={{ color: option.color }} /> : <option.icon className="size-3.5" style={{ color: option.color }} />, onClick: () => onChange(option.value) })); }

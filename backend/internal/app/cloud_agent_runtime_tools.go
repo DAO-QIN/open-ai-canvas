@@ -566,7 +566,20 @@ func (s *Service) advanceCloudAgentApprovalTool(run *model.CloudAgentExecution, 
 				return err
 			}
 		}
-		if plan != nil && state.Request.Surface == "creation" && call.Function.Name == "generate_media" && (state.Request.PermissionMode == "auto" && plan.CommerceRetryFailedTaskID == "" || autoRepair) {
+		// 按预估授权：需要确认的模式下，报价加上本轮已提交的占用不超过发送时同意的额度就直接执行。
+		withinPreauthorized := false
+		if plan != nil && state.Request.Surface == "creation" && call.Function.Name == "generate_media" && state.Request.PermissionMode == "request_approval" && plan.CommerceRetryFailedTaskID == "" {
+			quote := int64(-1)
+			if plan.Prepared != nil {
+				quote = plan.Prepared.Quote.AmountMicrocredits
+			} else if mediaPreparation != nil && mediaPreparation.Order != nil {
+				quote = mediaPreparation.Order.AmountMicrocredits
+			}
+			if withinPreauthorized, err = s.cloudAgentCreationAutoApproves(run.UserID, state, quote); err != nil {
+				return err
+			}
+		}
+		if plan != nil && state.Request.Surface == "creation" && call.Function.Name == "generate_media" && (state.Request.PermissionMode == "auto" && plan.CommerceRetryFailedTaskID == "" || autoRepair || withinPreauthorized) {
 			if plan.Prepared != nil {
 				// The draft and quote were already checkpointed. Reuse them after a
 				// worker restart instead of dry-admitting and mutating the canvas again.

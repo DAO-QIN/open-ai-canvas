@@ -24,7 +24,7 @@ export function CreationLaunchBackdrop() {
 export function latestCreationResultImage(messages: readonly CreationMessage[]): string {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
         const message = messages[index];
-        if (message.role !== "assistant" || message.mode === "video" || message.status === "error" || message.status === "cancelled") continue;
+        if (message.role !== "assistant" || message.mode === "video" || message.mode === "audio" || message.status === "error" || message.status === "cancelled") continue;
         const keys = message.resultStorageKeys || [];
         for (const key of keys) {
             const id = resourceIdFromStorageKey(key);

@@ -4,7 +4,7 @@ import type { CanvasResourceKind } from "@/lib/canvas/canvas-resource-references
 export type CreationHistoryMessage = {
     id: string;
     role: "user" | "assistant";
-    mode: "text" | "image" | "video";
+    mode: "text" | "image" | "video" | "audio";
     content: string;
     createdAt: string;
     model?: string;

@@ -4,7 +4,7 @@ import { isGenerationTaskSubmissionUncertain } from "@/lib/generation-task-displ
 import type { BackendGenerationResult } from "@/services/api/generation-task";
 import type { GenerationTask } from "@/services/api/task-center";
 import { ApiError } from "@/services/api/request";
-import { creationAttachmentKind, type CreationAttachment } from "./creation-assets";
+import { creationAttachmentKind, creationSingleResultMode, type CreationAttachment } from "./creation-assets";
 import type { CreationConversation, CreationMessage, CreationMode, CreationShotRailEntry } from "./creation-types";
 import { projectSmartCreationBatch } from "./smart-creation-runtime";
 
@@ -17,7 +17,12 @@ export function newConversation(): CreationConversation {
 
 export function creationConversationMode(conversation: CreationConversation): CreationMode {
     const selected = conversation.composerMode || (conversation.agentSessionId ? "agent" : conversation.messages.findLast((message) => message.role === "user")?.mode || conversation.messages.at(-1)?.mode);
-    return selected === "image" || selected === "video" ? selected : "agent";
+    return selected === "image" || selected === "video" || selected === "audio" ? selected : "agent";
+}
+
+/** 单结果模式（视频、音频）完成后的结果卡文案。 */
+export function creationSingleResultDoneLabel(mode: CreationMode | undefined) {
+    return mode === "audio" ? "音频已生成" : "视频已生成";
 }
 
 export function selectCreationConversationMode(conversation: CreationConversation, mode: CreationMode): CreationConversation {
@@ -51,7 +56,7 @@ export function creationVideoShotOrdinal(shots: CreationShotRailEntry[], item: C
     return own?.ordinal || 0;
 }
 
-export function completedCreationGenerationTask(runtime: CreationRuntime, input: { taskId: string; task?: GenerationTask; mode: "image" | "video"; prompt: string; result: BackendGenerationResult; conversationId: string; messageId: string; batchIndex?: number; batchCount?: number }): GenerationTask {
+export function completedCreationGenerationTask(runtime: CreationRuntime, input: { taskId: string; task?: GenerationTask; mode: "image" | "video" | "audio"; prompt: string; result: BackendGenerationResult; conversationId: string; messageId: string; batchIndex?: number; batchCount?: number }): GenerationTask {
     const now = new Date().toISOString();
     const task = input.task ?? { id: input.taskId, type: input.mode, status: "succeeded" as const, prompt: input.prompt, attempts: 1, createdAt: now, updatedAt: now };
     return runtime.projectGenerationTaskResult({ ...task, status: "succeeded", prompt: input.prompt, clientContext: { conversationId: input.conversationId, messageId: input.messageId, ...(typeof input.batchIndex === "number" ? { batchIndex: input.batchIndex } : {}), ...(typeof input.batchCount === "number" ? { batchCount: input.batchCount } : {}) } }, input.result);
@@ -122,7 +127,7 @@ export function applyRecoveredCreationResult(message: CreationMessage, resultUrl
     const nextResultUrls = Array.from(new Set([...(message.resultUrls || []), ...resultUrls]));
     const nextStorageKeys = Array.from(new Set([...(message.resultStorageKeys || []), ...resultStorageKeys]));
     if (isCreationAgentMediaTask(message)) return { ...message, status: "done" as const, taskStatePending: undefined, error: undefined, generationErrorCode: undefined, resultUrls: nextResultUrls, resultStorageKeys: nextStorageKeys };
-    if (message.mode === "video") return { ...message, status: "done" as const, content: "视频已生成", error: undefined, generationErrorCode: undefined, resultUrls: nextResultUrls, resultStorageKeys: nextStorageKeys };
+    if (creationSingleResultMode(message.mode)) return { ...message, status: "done" as const, content: creationSingleResultDoneLabel(message.mode), error: undefined, generationErrorCode: undefined, resultUrls: nextResultUrls, resultStorageKeys: nextStorageKeys };
     const projection = projectSmartCreationBatch({ total: message.batchTotal || batchCount, resultUrls: nextResultUrls, resultStorageKeys: nextStorageKeys, failedCount: message.batchFailedCount || 0 });
     return { ...message, ...projection, ...(message.submissionPending ? { status: "pending" as const } : {}), error: undefined, generationErrorCode: undefined };
 }
@@ -164,7 +169,7 @@ export async function recoverCreationGenerationSubmission(runtime: CreationRunti
     let updates = Promise.resolve<unknown>(undefined);
     let recoveryError: unknown;
     let recoveredFromStore = false;
-    const expected = message.mode === "video" ? 1 : message.batchTotal || Number(message.settings?.count) || 0;
+    const expected = creationSingleResultMode(message.mode) ? 1 : message.batchTotal || Number(message.settings?.count) || 0;
     const onTaskUpdate = (task: GenerationTask) => {
         tasks.set(task.id, task);
         updates = updates.then(() => updateMessage((current) => bindCreationSubmissionTask(current, task)));
@@ -183,7 +188,7 @@ export async function recoverCreationGenerationSubmission(runtime: CreationRunti
         }
         if (!expected || latestCreationTaskAttempts([...tasks.values()]).length < expected) {
             recoveredFromStore = true;
-            const keys = message.mode === "video" ? [message.clientOperationId]
+            const keys = creationSingleResultMode(message.mode) ? [message.clientOperationId]
                 : Number.isInteger(expected) && expected > 0 && expected <= 15 ? Array.from({ length: expected }, (_, index) => `${message.clientOperationId}:batch:${index}`) : undefined;
             await runtime.recoverGenerationSubmission(message.clientOperationId, { signal, keys, onTaskUpdate });
         }
@@ -246,8 +251,8 @@ export function reconcileCreationTaskMessages(runtime: CreationRuntime, conversa
                 changed = true;
                 return { ...message, ...recovery };
             }
-            if (message.role !== "assistant" || (message.status !== "pending" && !(message.status === "error" && (message.mode === "image" || message.mode === "video")))) return message;
-            const expectedTaskCount = Math.max(0, ...matches.map((task) => task.clientContext?.batchCount || 0)) || (message.mode === "video" ? 1 : Number(message.settings?.count) || 0);
+            if (message.role !== "assistant" || (message.status !== "pending" && !(message.status === "error" && (message.mode === "image" || creationSingleResultMode(message.mode))))) return message;
+            const expectedTaskCount = Math.max(0, ...matches.map((task) => task.clientContext?.batchCount || 0)) || (creationSingleResultMode(message.mode) ? 1 : Number(message.settings?.count) || 0);
             if (!matches.length) return message;
 
             const succeeded = matches.filter((task) => task.status === "succeeded");
@@ -275,8 +280,8 @@ export function reconcileCreationTaskMessages(runtime: CreationRuntime, conversa
                 return { ...nextMessage, status: "error" as const, error: generationErrorMessage(error), generationErrorCode: generationErrorCode(error) };
             }
             if (submissionPending) return { ...nextMessage, status: "pending" as const, resultUrls, resultStorageKeys, batchFailedCount: observedFailedCount, error: undefined, generationErrorCode: undefined };
-            if (message.mode === "video") {
-                if (resultUrls.length || resultStorageKeys.length) return { ...nextMessage, status: "done" as const, content: "视频已生成", resultUrls, resultStorageKeys, error: undefined, generationErrorCode: undefined };
+            if (creationSingleResultMode(message.mode)) {
+                if (resultUrls.length || resultStorageKeys.length) return { ...nextMessage, status: "done" as const, content: creationSingleResultDoneLabel(message.mode), resultUrls, resultStorageKeys, error: undefined, generationErrorCode: undefined };
                 if (matches.some((task) => task.status === "queued" || task.status === "running")) return { ...nextMessage, status: "pending" as const, error: undefined, generationErrorCode: undefined };
             }
             if (matches.length >= total && matches.every((task) => task.status === "cancelled")) {

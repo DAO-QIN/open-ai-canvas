@@ -45,6 +45,29 @@ export const creationPlays: Array<{ id: string; label: string; cover: string; mo
     { id: "short-video", label: "短视频", cover: "/creation-plays/short-video.jpg", mode: "video", prompt: "生成一段 5 秒短视频，镜头缓慢推近，画面是：" },
 ];
 
+export type CreationSurface = "generate" | "canvas";
+
+/**
+ * 标题下方的"生成 | 画布"：生成就是这里的对话；画布模式下输入框不变，点发送会新建画布，
+ * 把这句话和参考图交给画布里的阿Q 接着做。
+ */
+export function CreationSurfaceSwitch({ value, onChange, disabled }: { value: CreationSurface; onChange: (value: CreationSurface) => void; disabled?: boolean }) {
+    const options: Array<{ value: CreationSurface; label: string; title: string }> = [
+        { value: "generate", label: "生成", title: "在这里对话生成" },
+        { value: "canvas", label: "画布", title: "发送后新建画布，交给画布里的阿Q" },
+    ];
+    return (
+        <div className="creation-surface-switch" role="group" aria-label="创作方式">
+            {options.map((option) => (
+                <button key={option.value} type="button" className={value === option.value ? "is-active" : undefined} aria-pressed={value === option.value} title={option.title} disabled={disabled} onClick={() => onChange(option.value)}>
+                    <CreationIcon name={option.value === "canvas" ? "canvas" : "generate"} size={16} />
+                    <span>{option.label}</span>
+                </button>
+            ))}
+        </div>
+    );
+}
+
 export function CreationPlayStrip({ onStartPrompt }: { onStartPrompt: (mode: CreationMode, prompt: string) => void }) {
     return (
         <div className="creation-play-strip" role="group" aria-label="玩法">

@@ -693,3 +693,15 @@ html:not(.dark) .app-product-overlays .creation-control-popover-surface {
 @media (prefers-reduced-motion: reduce) {
     .creation-play-chip { transition: none; }
 }
+
+/* 标题下方的"生成 | 画布"（CreationSurfaceSwitch）：居中、320 宽、单独一行；白底胶囊表示选中。 */
+.creation-surface-switch { display: grid; grid-template-columns: 1fr 1fr; width: min(320px, 100%); margin: calc(var(--space-2) * -1) auto var(--space-4); padding: 3px; border: 1px solid var(--user-border); border-radius: 999px; background: color-mix(in srgb, var(--user-surface) 72%, transparent); }
+.creation-surface-switch button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; border: 0; border-radius: 999px; background: transparent; color: var(--user-ink-muted); font-size: 13px; font-weight: 500; cursor: pointer; transition: background var(--user-motion), color var(--user-motion), box-shadow var(--user-motion); }
+.creation-surface-switch button:hover:not(:disabled) { color: var(--user-ink); }
+.creation-surface-switch button.is-active { background: var(--user-ink); color: var(--user-surface); box-shadow: 0 1px 2px rgb(0 0 0 / 12%); }
+.creation-surface-switch button:focus-visible { outline: 2px solid var(--user-accent); outline-offset: 2px; }
+.creation-surface-switch button:disabled { cursor: default; opacity: .55; }
+.creation-surface-hint { margin: calc(var(--space-2) * -1) 0 var(--space-3); color: var(--user-ink-muted); font-size: 12px; text-align: center; }
+@media (prefers-reduced-motion: reduce) {
+    .creation-surface-switch button { transition: none; }
+}

@@ -39,7 +39,7 @@ func validateCreationPreferenceFields(value map[string]any, prefix string) error
 			}
 			continue
 		case "mode":
-			options = "text,image,video,agent"
+			options = "text,image,video,audio,agent"
 		case "outputPreference":
 			options = "concise,detailed"
 		case "agent.permissionMode":
@@ -50,7 +50,7 @@ func validateCreationPreferenceFields(value map[string]any, prefix string) error
 			options = "preferred,fixed"
 		case "image.transparentBackground":
 			options = "true,false"
-		case "image.model", "image.ratio", "image.quality", "image.imageResolution", "image.count", "video.ratio", "video.seconds", "video.videoQuality", "models.textModel", "models.imageModel", "models.videoModel", "agent.image.size", "agent.image.quality", "agent.video.size", "agent.video.quality":
+		case "image.model", "image.ratio", "image.quality", "image.imageResolution", "image.count", "video.ratio", "video.seconds", "video.videoQuality", "models.textModel", "models.imageModel", "models.videoModel", "models.audioModel", "agent.image.size", "agent.image.quality", "agent.video.size", "agent.video.quality":
 			allowedString = true
 		case "agent.budget.maxCredits", "agent.budget.maxGenerationTasks", "agent.budget.maxVideoSeconds", "agent.image.count", "agent.video.durationSeconds":
 			allowedNumber = true

@@ -23,7 +23,7 @@ import type { AgentMediaSettings, AgentPermissionMode } from "@/services/api/age
 import { buildAgentFeedSegments } from "@/lib/canvas/agent-operation-feed";
 import { AgentWelcome } from "./canvas-agent-welcome";
 import { useEffectiveConfig } from "@/stores/use-config-store";
-import { agentPermissionLabel, agentPermissionMenuItems, agentPermissionVisual } from "./canvas-cloud-agent-settings";
+import { agentPermissionLabel, agentPermissionMenuItems, agentPermissionVisual, type AgentPermissionSurface } from "./canvas-cloud-agent-settings";
 import { ModelPicker } from "@/components/model-picker";
 import { agentImageApproval, agentVideoApproval } from "@/lib/canvas/agent-media-approval";
 import { agentApprovalPresentation } from "@/lib/canvas/agent-approval-presentation";
@@ -513,17 +513,18 @@ export function ComposerControls({
     );
 }
 
-export function AgentPermissionControl({ mode, onChange, mutedColor }: { mode: AgentPermissionMode; onChange: (mode: AgentPermissionMode) => void; mutedColor?: string }) {
+export function AgentPermissionControl({ mode, onChange, mutedColor, surface = "canvas" }: { mode: AgentPermissionMode; onChange: (mode: AgentPermissionMode) => void; mutedColor?: string; surface?: AgentPermissionSurface }) {
     const visual = agentPermissionVisual(mode);
     const Icon = visual.icon;
+    const title = surface === "creation" ? `生成方式：${agentPermissionLabel(mode, surface)}，点击切换` : `执行权限：${agentPermissionLabel(mode)}，点击切换`;
     return (
-        <Dropdown trigger={["click"]} placement="topLeft" menu={{ items: agentPermissionMenuItems(mode, onChange) }}>
+        <Dropdown trigger={["click"]} placement="topLeft" menu={{ items: agentPermissionMenuItems(mode, onChange, surface) }}>
             <button
                 type="button"
                 className="grid size-8 shrink-0 place-items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/25"
                 style={{ color: mutedColor || "var(--user-ink-muted)", background: "transparent" }}
-                aria-label={`执行权限：${agentPermissionLabel(mode)}，点击切换`}
-                title={`执行权限：${agentPermissionLabel(mode)}，点击切换`}
+                aria-label={title}
+                title={title}
             >
                 <Icon className="size-3.5" style={{ color: visual.color }} aria-hidden="true" />
             </button>

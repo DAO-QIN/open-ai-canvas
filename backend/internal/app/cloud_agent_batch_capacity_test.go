@@ -129,7 +129,9 @@ func TestCloudAgentBatchCapacityRefillsWithoutRepeatingTool(t *testing.T) {
 				if err := s.settleCloudAgentMedia("user", runID); err != nil {
 					t.Fatal(err)
 				}
-				assertCapacityBatch(t, s, db, runID, 7, true)
+				// 普通多图批次在名额补齐、最后一项受理后即交还回执（提交即返回）；整套商品计划仍等全部结束。
+				acceptedOnSubmit := kind == "images"
+				assertCapacityBatch(t, s, db, runID, 7, !acceptedOnSubmit)
 				if err := db.Model(&model.Task{}).Where("id = ?", batch.Items[6].TaskID).Update("status", model.TaskStatusSucceeded).Error; err != nil {
 					t.Fatal(err)
 				}
@@ -143,6 +145,9 @@ func TestCloudAgentBatchCapacityRefillsWithoutRepeatingTool(t *testing.T) {
 				receipt, err := s.repo.CloudAgentReceipt("user", runID, "tool", call.ID)
 				if err != nil || receipt.Status != "committed" || receipt.IsError {
 					t.Fatalf("invalid final receipt: %+v %v", receipt, err)
+				}
+				if acceptedOnSubmit != strings.Contains(receipt.Content, `"phase":"accepted"`) {
+					t.Fatalf("batch receipt does not match its delivery contract: %s", receipt.Content)
 				}
 				if _, err := s.executeCloudAgentRuntimeTool(context.Background(), "user", runID, call); err != nil {
 					t.Fatal(err)

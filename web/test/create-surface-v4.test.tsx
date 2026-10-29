@@ -75,7 +75,7 @@ test("空态背景是纯装饰；对话背景取最新一张完成的结果图�
     expect(ambient).toContain('alt=""');
 });
 
-test("结果图上的操作条：变体、转视频、作为参考只填输入框；不传回调时不显示", () => {
+test("结果图上的操作条：变体、高清、局部修改、扩图、转视频、作为参考；不传回调时不显示", () => {
     const item: CreationMessage = { id: "result", role: "assistant", content: "", createdAt: "2026-10-29T00:00:00Z", mode: "image", status: "done", resultUrls: ["https://cdn.example/one.png"] };
     const base = { item, onCreateVariant: () => {}, onContinueCanvas: () => {}, openingCanvas: false };
     expect(renderToStaticMarkup(<MediaResult {...base} />)).not.toContain("creation-image-actions");
@@ -84,12 +84,30 @@ test("结果图上的操作条：变体、转视频、作为参考只填输入�
         dom.document.body.innerHTML = renderToStaticMarkup(<MediaResult {...base} onUseResultImage={() => {}} />);
         const group = dom.document.querySelector(".creation-image-result .creation-image-actions");
         expect(group?.getAttribute("role")).toBe("group");
-        const labels = Array.from(group?.querySelectorAll("button") || []).map((button) => button.getAttribute("aria-label"));
-        expect(labels).toEqual(["用这张图做变体", "用这张图做视频", "把这张图作为参考"]);
+        const buttons = Array.from(group?.querySelectorAll("button") || []);
+        expect(buttons.map((button) => button.getAttribute("title"))).toEqual(["变体", "高清", "局部修改", "扩图", "转视频", "作为参考"]);
+        expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual(["用这张图做变体", "把这张图重绘成高清版", "框选这张图的局部来修改", "把这张图向四周扩展", "用这张图做视频", "把这张图作为参考"]);
+        expect(buttons.map((button) => button.querySelector("svg")?.getAttribute("data-icon"))).toEqual(["variant", "hd", "inpaint", "expand", "toVideo", "reference"]);
         // 旧消息样式会隐藏结果卡里的每个 span，操作条里不能出现 span。
         expect(group?.querySelector("span")).toBeNull();
         // 下载仍是单独的按钮，不并进操作条。
         expect(dom.document.querySelector('button[aria-label="下载生成图片 1"]')).not.toBeNull();
+    } finally {
+        dom.close();
+    }
+});
+
+test("音频结果：一条播放器加下载，不显示图片操作条和添加到画布", () => {
+    const item: CreationMessage = { id: "audio", role: "assistant", content: "音频已生成", createdAt: "2026-10-29T00:00:00Z", mode: "audio", status: "done", resultUrls: ["https://cdn.example/voice.mp3"] };
+    const dom = new Window();
+    try {
+        dom.document.body.innerHTML = renderToStaticMarkup(<MediaResult item={item} onCreateVariant={() => {}} onContinueCanvas={() => {}} openingCanvas={false} onUseResultImage={() => {}} />);
+        const audio = dom.document.querySelector(".creation-audio-result audio");
+        expect(audio?.getAttribute("src")).toBe("https://cdn.example/voice.mp3");
+        expect(audio?.hasAttribute("controls")).toBe(true);
+        expect(dom.document.querySelector(".creation-image-actions")).toBeNull();
+        expect(dom.document.body.textContent).not.toContain("添加到画布");
+        expect(dom.document.querySelector("a[download]")?.getAttribute("href")).toBe("https://cdn.example/voice.mp3");
     } finally {
         dom.close();
     }

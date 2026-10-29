@@ -5,7 +5,9 @@ import { scopedLocalStorage } from "@/lib/user-scope";
 import type { AgentOutputPreference } from "@/services/api/agent";
 import type { AiConfig } from "./use-config-store";
 
-export type CreationModePreference = "text" | "image" | "video" | "agent";
+export type CreationModePreference = "text" | "image" | "video" | "audio" | "agent";
+type CreationModelKey = "textModel" | "imageModel" | "videoModel" | "audioModel";
+const creationModelKeys = new Set<string>(["textModel", "imageModel", "videoModel", "audioModel"]);
 
 export type CreationAgentPreferences = {
     permissionMode: "read_only" | "request_approval" | "auto";
@@ -51,7 +53,7 @@ export type CreationComposerPreferences = {
     outputPreference?: AgentOutputPreference;
     image?: CreationImagePreferences;
     video?: CreationVideoPreferences;
-    models?: Partial<Pick<AiConfig, "textModel" | "imageModel" | "videoModel">>;
+    models?: Partial<Pick<AiConfig, CreationModelKey>>;
     activeConversationId?: string;
 };
 
@@ -65,7 +67,7 @@ type CreationPreferencesStore = {
     rememberOutputPreference: (preference: AgentOutputPreference) => void;
     rememberImageSettings: (settings: CreationImagePreferences) => void;
     rememberVideoSettings: (settings: CreationVideoPreferences) => void;
-    rememberModel: (key: "textModel" | "imageModel" | "videoModel", value: string) => void;
+    rememberModel: (key: CreationModelKey, value: string) => void;
     rememberActiveConversation: (id: string) => void;
 };
 
@@ -108,10 +110,10 @@ export function normalizeCreationComposerPreferences(value: unknown): CreationCo
     const image = normalizeImagePreferences(raw.image);
     const video = normalizeVideoPreferences(raw.video);
     const models =
-        raw.models && typeof raw.models === "object" && !Array.isArray(raw.models) ? Object.fromEntries(Object.entries(raw.models).filter(([key, value]) => ["textModel", "imageModel", "videoModel"].includes(key) && nonEmptyString(value))) : undefined;
+        raw.models && typeof raw.models === "object" && !Array.isArray(raw.models) ? Object.fromEntries(Object.entries(raw.models).filter(([key, value]) => creationModelKeys.has(key) && nonEmptyString(value))) : undefined;
     return {
         ...(agent ? { agent } : {}),
-        ...(raw.mode === "text" || raw.mode === "image" || raw.mode === "video" || raw.mode === "agent" ? { mode: raw.mode } : {}),
+        ...(raw.mode === "text" || raw.mode === "image" || raw.mode === "video" || raw.mode === "audio" || raw.mode === "agent" ? { mode: raw.mode } : {}),
         ...(raw.outputPreference === "concise" || raw.outputPreference === "detailed" ? { outputPreference: raw.outputPreference } : {}),
         ...(image ? { image } : {}),
         ...(video ? { video } : {}),

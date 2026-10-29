@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { generationErrorMessage } from "../src/lib/generation-error";
 import { createGenerationBatchRetryContexts, createGenerationRetryContext } from "../src/lib/canvas/canvas-project-generation";
 import { refreshCreationMessageTasks } from "../src/pages/create/creation-conversations";
-import { creationHasInput, type CreationConversation, type CreationMessage, type CreationRetryContext } from "../src/pages/create/creation-types";
+import { creationHasInput, creationModelKey, type CreationConversation, type CreationMessage, type CreationRetryContext } from "../src/pages/create/creation-types";
 import type { GenerationTask } from "../src/services/api/task-center";
 import * as agentConversation from "../src/pages/create/creation-agent-conversation";
 import type { AgentRun } from "../src/services/api/agent";
@@ -85,6 +85,7 @@ function harness(
     };
     const scope = {
         creationHasInput,
+        creationModelKey,
         activeConversation: conversation,
         busy: false,
         activeIdRef: { current: conversation.id },

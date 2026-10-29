@@ -27,7 +27,7 @@ import { mergedImageCapabilityConfig, type ModelRequirements } from "@/lib/model
 import { imageQualityLabel } from "@/lib/image-quality";
 import { modelQuoteDescription, modelQuoteRequest } from "@/lib/model-pricing";
 import { quoteModel, type LogicalModelQuote } from "@/services/api/logical-models";
-import { modelOptionName, resolveModelChannel, type AiConfig } from "@/stores/use-config-store";
+import { modelOptionName, resolveModelChannel, selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useGlobalAgentStore } from "@/stores/use-global-agent-store";
 import type { PromptOptimizerProvider } from "@/lib/plugins/plugin-types";
@@ -39,12 +39,18 @@ import "./creation-scrollbars.css";
 import "@/components/canvas/canvas-cloud-agent.css";
 import { CreationAttachmentThumbnail, CreationMediaPreviewModal } from "./creation-workspace-messages";
 import { CreationIcon } from "./creation-icons";
+import type { CanvasAudioSettingKey } from "@/components/canvas/canvas-audio-settings-popover";
+import { audioFormatLabelForConfig, audioVoiceLabelForConfig, isMusicAudioConfig, musicInstrumentalForConfig } from "@/lib/audio-generation";
+import { canvasThemes } from "@/lib/canvas-theme";
+import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 
 export { CreationHistoryDrawer } from "./creation-workspace-history";
 export { CreationMessageView } from "./creation-workspace-messages";
 export { CreationEmptyBanner, CreationFeaturedWorks, CreationPlayStrip } from "./creation-workspace-empty";
 
 const CanvasPromptOptimizerDrawer = lazy(() => import("@/components/canvas/canvas-prompt-optimizer-drawer").then((module) => ({ default: module.CanvasPromptOptimizerDrawer })));
+// 和画布音频节点同一块设置面板；打开设置时才加载。
+const AudioSettingsPanel = lazy(() => import("@/components/audio-settings-panel").then((module) => ({ default: module.AudioSettingsPanel })));
 
 export const creationAssetCategoryLabels: Record<string, string> = { all: "全部素材", ...ASSET_CATEGORY_LABELS };
 
@@ -191,6 +197,9 @@ type ComposerProps = {
     setVideoQuality: (value: string) => void;
     count: string;
     setCount: (value: string) => void;
+    /** 音频模式的音色、格式、语速等；只在本页生效，不写进偏好。 */
+    audioConfig?: AiConfig;
+    onAudioSettingChange?: (key: CanvasAudioSettingKey, value: string) => void;
     textStreaming: boolean;
     setTextStreaming: (value: boolean) => void;
     textThinking: boolean;
@@ -212,6 +221,8 @@ type ComposerProps = {
     agentContextView: AgentContextUsageView;
     agentInputError?: string;
     agentImageModel: string;
+    /** 自动模式发送前预估（1 张当前图片模型的积分），拿不到报价时为 null。 */
+    agentEstimateCredits?: number | null;
     agentVideoModel: string;
     agentImageSelectionMode: "preferred" | "fixed";
     agentVideoSelectionMode: "preferred" | "fixed";
@@ -304,9 +315,12 @@ export function CreationComposer(props: ComposerProps) {
             });
         return () => controller.abort();
     }, [creditsEnabled, quoteRequest]);
-    const generationCredits = routeQuote ? routeQuote.amountMicrocredits / 1_000_000 : credits;
+    // 自动模式按 1 张当前图片模型预估（阿Q 实际规划超出 1.2 倍时才会在对话里请你确认）。
+    const agentEstimate = props.mode === "agent" && props.agentPermissionMode !== "read_only" ? (props.agentEstimateCredits ?? null) : null;
+    const generationCredits = props.mode === "agent" ? agentEstimate : routeQuote ? routeQuote.amountMicrocredits / 1_000_000 : credits;
     const showCost = creditsEnabled && !props.smartCreationActive && !interjecting && generationCredits !== null && generationCredits !== undefined;
     const formattedCredits = generationCredits?.toLocaleString("zh-CN", { maximumFractionDigits: 6 });
+    const costTitle = props.mode === "agent" ? "按出 1 张图预估；阿Q 规划超出 1.2 倍时会先请你确认" : routeQuote ? modelQuoteDescription(routeQuote) : undefined;
     const actionLabel = stopping
         ? "正在停止"
         : props.referencePasteBusy
@@ -324,17 +338,20 @@ export function CreationComposer(props: ComposerProps) {
                 : interjecting
                   ? "发送补充说明"
                   : showCost
-                    ? `${routeQuote?.estimated ? "预估" : "消耗"} ${formattedCredits} 积分，发送`
+                    ? props.mode === "agent"
+                        ? `约 ${formattedCredits} 积分，发送`
+                        : `${routeQuote?.estimated ? "预估" : "消耗"} ${formattedCredits} 积分，发送`
                     : "发送";
     // Once the backend task has been accepted, the task row keeps showing its
     // own progress while this composer is immediately available for another
     // prompt. Only work that still blocks submission owns the spinner.
     const showWorkingSpinner = stopping || (interactionBusy && !canStop);
     // 占位文字不超过 14 个字，细节交给示例和玩法，不在输入框里写说明书。
-    const placeholder = props.mode === "video" ? "接着改，或描述下一个镜头" : "接着改，或 @ 某一张";
-    const emptyPlaceholder = props.mode === "video" ? "描述镜头，或拖入一张首帧" : "描述画面，或拖入一张图";
+    const placeholder = props.mode === "video" ? "接着改，或描述下一个镜头" : props.mode === "audio" ? "接着改，或写下一段配音" : "接着改，或 @ 某一张";
+    const emptyPlaceholder = props.mode === "video" ? "描述镜头，或拖入一张首帧" : props.mode === "audio" ? "写下配音文案，或描述声音" : "描述画面，或拖入一张图";
+    const audioAvailable = useMemo(() => selectableModelsByCapability(props.config, "audio").length > 0, [props.config]);
     const imageReferencesSupported = props.imageProfile.references.maxImages > 0;
-    const referencesSupported = props.mode === "image" ? imageReferencesSupported : props.mode !== "video" || props.maxReferences > 0;
+    const referencesSupported = props.mode === "audio" ? false : props.mode === "image" ? imageReferencesSupported : props.mode !== "video" || props.maxReferences > 0;
     const canAddMoreReferences = referencesSupported && props.attachments.length < props.maxReferences;
     const addReferenceLabel = interactionBusy
         ? props.referenceReplacementBusy
@@ -606,7 +623,7 @@ export function CreationComposer(props: ComposerProps) {
                 </div>
                 <footer className="creation-chat-dock">
                     <div className="creation-chat-controls">
-                        <ModePicker mode={props.mode} variant={props.variant} onModeChange={props.onModeChange} onOpenShortDrama={props.onOpenShortDrama} />
+                        <ModePicker mode={props.mode} variant={props.variant} audioAvailable={audioAvailable} onModeChange={props.onModeChange} onOpenShortDrama={props.onOpenShortDrama} />
                         {canOptimizePrompt ? (
                             <Tooltip title="用 AI 优化提示词">
                                 <button
@@ -638,10 +655,12 @@ export function CreationComposer(props: ComposerProps) {
                         {props.mode === "agent" ? (
                             <>
                                 <AgentExecutionSettings {...props} />
-                                <AgentPermissionControl mode={props.agentPermissionMode} onChange={props.onAgentPermissionChange} />
+                                <AgentPermissionControl mode={props.agentPermissionMode} onChange={props.onAgentPermissionChange} surface="creation" />
                             </>
                         ) : null}
-                        {!props.smartCreationActive && (props.mode === "video" || (props.mode === "image" && imageSettingsSupported)) ? (
+                        {props.mode === "audio" && props.audioConfig && props.onAudioSettingChange ? (
+                            <AudioSettingsMenu config={props.audioConfig} onChange={props.onAudioSettingChange} />
+                        ) : !props.smartCreationActive && (props.mode === "video" || (props.mode === "image" && imageSettingsSupported)) ? (
                             <GenerationSettingsMenu {...props} />
                         ) : props.smartCreationActive ? (
                             <span className="creation-chat-control creation-chat-control-agent-lock" aria-label="智能创作已接管生成参数">
@@ -676,9 +695,9 @@ export function CreationComposer(props: ComposerProps) {
                     </div>
                     <div className="creation-submit-wrap">
                         {showCost ? (
-                            <span className="creation-submit-cost" title={routeQuote ? modelQuoteDescription(routeQuote) : undefined}>
+                            <span className="creation-submit-cost" title={costTitle}>
                                 <CreditSymbol />
-                                <span>{routeQuote?.estimated ? `预估:${formattedCredits}` : formattedCredits}</span>
+                                <span>{props.mode === "agent" ? `约 ${formattedCredits}` : routeQuote?.estimated ? `预估:${formattedCredits}` : formattedCredits}</span>
                             </span>
                         ) : null}
                         {props.mode === "agent" ? <AgentContextRing view={props.agentContextView} surface="creation" iconOnly /> : null}
@@ -738,30 +757,32 @@ export function CreationComposer(props: ComposerProps) {
     );
 }
 
-const creationModeIcons = { agent: "auto", image: "image", video: "video" } as const;
+const creationModeIcons = { agent: "auto", image: "image", video: "video", audio: "audio" } as const;
 
 /**
  * 输入框左下角的"创作类型"菜单（参考即梦 Agent 页）：按钮显示当前类型，点开是一张带说明的菜单，
  * 选中项打勾。分隔线下的"短剧制作"只是去短剧工作台的入口，不是生成类型；后台关闭短剧时不显示。
  */
-function ModePicker({ mode, variant, onModeChange, onOpenShortDrama }: { mode: CreationMode; variant: "empty" | "thread"; onModeChange: (mode: CreationMode) => void; onOpenShortDrama?: () => void }) {
+function ModePicker({ mode, variant, audioAvailable, onModeChange, onOpenShortDrama }: { mode: CreationMode; variant: "empty" | "thread"; audioAvailable: boolean; onModeChange: (mode: CreationMode) => void; onOpenShortDrama?: () => void }) {
     const [open, setOpen] = useState(false);
     const shortDramaEnabled = useUserStore((state) => state.features.shortDramaEnabled) && Boolean(onOpenShortDrama);
-    const activeItem = creationComposerModeOptions.find((item) => item.key === mode) || creationComposerModeOptions[0];
+    // 没有可用的音频模型时不显示"音频生成"，免得选了也发不出去。
+    const modeOptions = creationComposerModeOptions.filter((item) => item.key !== "audio" || audioAvailable || mode === "audio");
+    const activeItem = modeOptions.find((item) => item.key === mode) || modeOptions[0];
     const selectMode = (key: string) => {
         setOpen(false);
         if (key === "short-drama") {
             onOpenShortDrama?.();
             return;
         }
-        if ((key === "agent" || key === "image" || key === "video") && key !== mode) onModeChange(key);
+        if ((key === "agent" || key === "image" || key === "video" || key === "audio") && key !== mode) onModeChange(key);
     };
     const menuItems = [
         {
             type: "group" as const,
             key: "types",
             label: "创作类型",
-            children: creationComposerModeOptions.map((item) => ({
+            children: modeOptions.map((item) => ({
                 key: item.key,
                 icon: <CreationIcon name={creationModeIcons[item.key]} size={20} />,
                 label: (
@@ -1136,6 +1157,35 @@ function GenerationSettingsMenu(props: ComposerProps) {
             content={panel}
         >
             <button type="button" className="creation-chat-control" aria-label={`生成设置：${summary}`}>
+                <SlidersHorizontal />
+                <span>{summary}</span>
+                <ChevronDown className={open ? "is-open" : ""} />
+            </button>
+        </Popover>
+    );
+}
+
+function AudioSettingsMenu({ config, onChange }: { config: AiConfig; onChange: (key: CanvasAudioSettingKey, value: string) => void }) {
+    const [open, setOpen] = useState(false);
+    const theme = canvasThemes[useActiveTheme()];
+    const summary = isMusicAudioConfig(config) ? (musicInstrumentalForConfig(config) ? "纯音乐" : "歌曲") : [audioVoiceLabelForConfig(config, config.audioVoice) || "默认音色", audioFormatLabelForConfig(config, config.audioFormat)].filter(Boolean).join(" · ");
+    return (
+        <Popover
+            open={open}
+            onOpenChange={setOpen}
+            trigger="click"
+            placement="bottom"
+            arrow={false}
+            classNames={{ root: "creation-control-popover", container: "creation-control-popover-surface", content: "creation-control-popover-content" }}
+            content={
+                <div className="creation-parameter-menu creation-audio-settings max-h-[65vh] overflow-y-auto">
+                    <Suspense fallback={<LoaderCircle className="animate-spin" aria-label="正在加载音频设置" />}>
+                        <AudioSettingsPanel config={config} onConfigChange={onChange} theme={theme} showTitle={false} className="space-y-4" />
+                    </Suspense>
+                </div>
+            }
+        >
+            <button type="button" className="creation-chat-control" aria-label={`音频设置：${summary}`}>
                 <SlidersHorizontal />
                 <span>{summary}</span>
                 <ChevronDown className={open ? "is-open" : ""} />

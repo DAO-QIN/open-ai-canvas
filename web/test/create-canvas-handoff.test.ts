@@ -14,7 +14,8 @@ test("Create exposes one accessible copy action beside each displayed user promp
 
 test("Create submit button does not forward the browser click event as retry context", async () => {
     const source = await Bun.file(new URL("../src/pages/create/index.tsx", import.meta.url)).text();
-    expect(source).toContain("onSubmit: () => void submit()");
+    // 空态选"画布"时改走新建画布；两条路都不带参数调用，点击事件不会被当成重试上下文。
+    expect(source).toContain('onSubmit: () => void (isEmpty && creationSurface === "canvas" ? submitToCanvas() : submit())');
     expect(source).not.toContain("onSubmit: submit,");
 });
 

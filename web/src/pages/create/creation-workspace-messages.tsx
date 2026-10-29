@@ -173,7 +173,7 @@ export function CreationMessageView({
             <>
                 {shotNumber > 0 ? <span className="creation-shot-badge">镜 {shotNumber}</span> : null}
                 <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<CreationIcon name="auto" />} />
-                <strong>{mode === "image" ? "图像生成" : "视频生成"}</strong>
+                <strong>{mode === "image" ? "图像生成" : mode === "audio" ? "音频生成" : "视频生成"}</strong>
                 {item.status === "pending" ? (
                     <span className="creation-message-progress-copy">
                         {item.submissionPending ? (
@@ -186,12 +186,12 @@ export function CreationMessageView({
                             "正在同步任务状态…"
                         ) : (
                             <>
-                                {brandName}正在生成{mode === "video" ? "视频" : "图像"}……
+                                {brandName}正在生成{creationMediaNoun(mode)}……
                             </>
                         )}
                     </span>
                 ) : item.status === "done" ? (
-                    <span className="creation-message-progress-copy">{mode === "video" ? "视频" : "图片"}已生成</span>
+                    <span className="creation-message-progress-copy">{mode === "image" ? "图片" : creationMediaNoun(mode)}已生成</span>
                 ) : null}
                 {item.status === "done" && !item.agentRunId ? (
                     <button type="button" className="creation-message-variant-action" onClick={onCreateVariant}>
@@ -520,19 +520,28 @@ function usableResultUrls(urls: string[]) {
     });
 }
 
-export type CreationResultImageIntent = "variant" | "video" | "reference";
+/** 生成中、结果卡里对媒体的叫法。 */
+function creationMediaNoun(mode: CreationMode | undefined) {
+    return mode === "video" ? "视频" : mode === "audio" ? "音频" : "图像";
+}
+
+export type CreationResultImageIntent = "variant" | "upscale" | "inpaint" | "expand" | "video" | "reference";
 export type CreationResultImageRef = { url: string; storageKey?: string; index: number };
 export type CreationResultImageHandler = (image: CreationResultImageRef, intent: CreationResultImageIntent) => void;
 
-const creationImageActionItems: Array<{ intent: CreationResultImageIntent; icon: CreationIconName; label: string; title: string }> = [
+export const creationImageActionItems: Array<{ intent: CreationResultImageIntent; icon: CreationIconName; label: string; title: string }> = [
     { intent: "variant", icon: "variant", label: "用这张图做变体", title: "变体" },
+    { intent: "upscale", icon: "hd", label: "把这张图重绘成高清版", title: "高清" },
+    { intent: "inpaint", icon: "inpaint", label: "框选这张图的局部来修改", title: "局部修改" },
+    { intent: "expand", icon: "expand", label: "把这张图向四周扩展", title: "扩图" },
     { intent: "video", icon: "toVideo", label: "用这张图做视频", title: "转视频" },
     { intent: "reference", icon: "reference", label: "把这张图作为参考", title: "作为参考" },
 ];
 
 /**
  * 结果图上的操作条：只放和这一张图有关的操作，整组的操作（添加到画布、批量下载）留在图下面。
- * 桌面端悬停或键盘聚焦时浮出；触屏设备常驻显示。操作只把图片和提示词填进输入框，不会直接生成。
+ * 桌面端悬停或键盘聚焦时浮出；触屏设备常驻显示。局部修改先打开框选弹窗，在弹窗里确认后才生成；
+ * 其余操作只把图片、参数和提示词填进输入框，不会直接生成。
  */
 function CreationImageActions({ image, onUse }: { image: CreationResultImageRef; onUse?: CreationResultImageHandler }) {
     if (!onUse) return null;
@@ -611,7 +620,7 @@ export function MediaResult({
             };
         }
         // 历史记录只把 URL 当作短期 hint；真正恢复依赖稳定 storageKey，展示 URL 由访问缓存按需续签。
-        const resolver = item.mode === "video" ? resolveMediaUrl : resolveImageUrl;
+        const resolver = item.mode === "video" || item.mode === "audio" ? resolveMediaUrl : resolveImageUrl;
         void Promise.all(
             resultStorageKeys.map(async (storageKey, index) => {
                 if (resourceIdFromStorageKey(storageKey)) {
@@ -630,7 +639,8 @@ export function MediaResult({
         };
     }, [item.id, item.mode, resultStorageKeys.join("|"), storedResultUrls.join("|")]);
 
-    const alignedResultUrls = resultStorageKeys.length ? resultStorageKeys.map((key, index) => resolvedByKey[key] || (item.mode !== "video" || failedByKey[key] || !resourceIdFromStorageKey(key) ? usableResultUrl(storedResultUrls[index]) : "")) : storedResultUrls;
+    const mediaFileResult = item.mode === "video" || item.mode === "audio";
+    const alignedResultUrls = resultStorageKeys.length ? resultStorageKeys.map((key, index) => resolvedByKey[key] || (!mediaFileResult || failedByKey[key] || !resourceIdFromStorageKey(key) ? usableResultUrl(storedResultUrls[index]) : "")) : storedResultUrls;
     const downloadImages = Array.from({ length: Math.max(alignedResultUrls.length, resultStorageKeys.length) }, (_, index) => ({
         url: alignedResultUrls[index] || "",
         storageKey: resultStorageKeys[index],
@@ -700,12 +710,27 @@ export function MediaResult({
             </div>
         );
     const isVideo = item.mode === "video";
+    const isAudio = item.mode === "audio";
     const activeBatchUrl = displayResultUrls[batchPreviewIndex] || "";
     const loadingResult = (
         <span className="creation-media-result-placeholder" role="status">
-            {isVideo ? "视频加载中" : "图片加载中"}
+            {isVideo ? "视频加载中" : isAudio ? "音频加载中" : "图片加载中"}
         </span>
     );
+    if (isAudio)
+        return (
+            <div className="creation-media-result">
+                <div className="creation-audio-result">{displayResultUrls[0] ? <audio controls preload="metadata" src={displayResultUrls[0]} aria-label="生成的音频" /> : loadingResult}</div>
+                <div className="creation-media-actions">
+                    <span>音频结果</span>
+                    <a href={displayResultUrls[0] || undefined} aria-disabled={!displayResultUrls[0]} download>
+                        <Download />
+                        下载
+                    </a>
+                </div>
+                {submissionNotice}
+            </div>
+        );
     const stackedUrls = displayResultUrls.length > 1 ? Array.from({ length: Math.min(2, displayResultUrls.length - 1) }, (_, offset) => displayResultUrls[(batchPreviewIndex + offset + 1) % displayResultUrls.length]) : [];
     const moveBatchPreview = (direction: -1 | 1) => setBatchPreviewIndex((current) => (current + direction + displayResultUrls.length) % displayResultUrls.length);
     const downloadImage = async (index: number) => {
@@ -896,7 +921,7 @@ export function MediaResult({
 
 export function CreationMediaPending({ mode, ratio, progress, submitting = false, verifying = false }: { mode: CreationMode; ratio?: string; progress?: string; submitting?: boolean; verifying?: boolean }) {
     const brandName = useAppearanceStore((state) => state.appearance.brandName);
-    const label = submitting ? "正在提交" : verifying ? "正在同步任务状态" : `${brandName}正在生成${mode === "video" ? "视频" : "图像"}`;
+    const label = submitting ? "正在提交" : verifying ? "正在同步任务状态" : `${brandName}正在生成${creationMediaNoun(mode)}`;
     return (
         <div className={`creation-media-pending is-${mode}`} style={{ aspectRatio: creationMediaAspectRatio(ratio, mode) }} aria-live="polite">
             <span className="creation-media-pending-icon">

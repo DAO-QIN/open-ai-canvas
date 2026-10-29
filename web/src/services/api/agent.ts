@@ -188,7 +188,8 @@ export type CreateAgentRunInput = {
     permissionMode?: AgentPermissionMode;
     contextScope?: string[];
     contextSelection?: AgentContextSelection;
-    budget?: { maxCredits?: number; maxGenerationTasks?: number; maxVideoSeconds?: number; maxSteps?: number };
+    /** autoApproveCredits：创作页点发送即同意的额度（发送前预估 × 1.2），只在需要确认的模式下传。 */
+    budget?: { maxCredits?: number; maxGenerationTasks?: number; maxVideoSeconds?: number; maxSteps?: number; autoApproveCredits?: number };
     idempotencyKey: string;
     attachments?: AgentCreationAttachment[];
     attachmentMode?: "replace" | "inherit" | "append";

@@ -163,11 +163,13 @@ type cloudAgentRuntime struct {
 	// AutoPreparedMedia is the durable admission checkpoint for permissionMode=auto.
 	// It prevents a worker restart between dry admission and billed submission from
 	// re-running admission or creating the draft node a second time.
-	AutoPreparedMedia              *cloudAgentPreparedMedia                `json:"autoPreparedMedia,omitempty"`
-	AutoPreparedCallHash           string                                  `json:"autoPreparedCallHash,omitempty"`
-	Decisions                      map[string]string                       `json:"decisions"`
-	DecisionSettings               map[string]string                       `json:"decisionSettings,omitempty"`
-	DecisionPreparedHashes         map[string]string                       `json:"decisionPreparedHashes,omitempty"`
+	AutoPreparedMedia      *cloudAgentPreparedMedia `json:"autoPreparedMedia,omitempty"`
+	AutoPreparedCallHash   string                   `json:"autoPreparedCallHash,omitempty"`
+	Decisions              map[string]string        `json:"decisions"`
+	DecisionSettings       map[string]string        `json:"decisionSettings,omitempty"`
+	DecisionPreparedHashes map[string]string        `json:"decisionPreparedHashes,omitempty"`
+	// ApprovedMicrocredits 是本轮用户在确认卡上批准过的报价合计，扩大"按预估授权"的额度。
+	ApprovedMicrocredits           int64                                   `json:"approvedMicrocredits,omitempty"`
 	ActionNudged                   bool                                    `json:"actionNudged,omitempty"`
 	EmptyOutputNudged              int                                     `json:"emptyOutputNudged,omitempty"`
 	InvalidArgumentSteps           int                                     `json:"invalidArgumentSteps,omitempty"`

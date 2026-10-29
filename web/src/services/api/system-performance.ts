@@ -118,6 +118,8 @@ export type SystemPerformanceAgent = {
     active: number;
     limit: number;
     queued: number;
+    warm: number;
+    prewarm: number;
     configuredLimit: number;
     statusMessage?: string;
 };

@@ -295,7 +295,11 @@ func (s *Service) enqueueCloudAgentTask(run *model.CloudAgentExecution, state *c
 				payload["imageBatchId"], payload["imageBatchTotal"], payload["imageBatchItemId"] = batch.PlanID, len(batch.Items), metadata["imageBatchItemId"]
 			}
 			state.event(run.ID, "generation_task_created", payload)
-			if _, deferWait := cloudAgentCreationImageCallGroup(state, media.CallID); media.Args.Mode == "image" && deferWait {
+			if cloudAgentCreationReturnsOnSubmit(state, media) {
+				// 提交即返回：回执随任务一起落库，桥接层读到工具结果立即交还模型，本轮不等待出图。
+				state.MediaTaskID = ""
+				cloudAgentToolResult(run.ID, state, state.Calls[state.CallIndex], cloudAgentCreationAcceptedResult(task, prepare.Order, media.Args.Mode), nil)
+			} else if _, deferWait := cloudAgentCreationImageCallGroup(state, media.CallID); media.Args.Mode == "image" && deferWait {
 				state.CreationPendingImages = append(state.CreationPendingImages, task.ID)
 				state.MediaTaskID = ""
 				cloudAgentToolResult(run.ID, state, state.Calls[state.CallIndex], map[string]any{"phase": "admission", "taskId": task.ID, "status": task.Status, "taskSubmitted": true, "instruction": "图片已受理，尚未完成；继续提交本批其他独立图片，最后一项统一等待真实结果，不要重复提交。"}, nil)
@@ -613,10 +617,23 @@ func (s *Service) DecideCloudAgentApproval(userID, id, approvalID, decision, rea
 		return creationConflict("审批不存在或已过期")
 	}
 	if decision == "refresh" || decision == "approve" && state.Request.Surface == "creation" && cloudAgentCommerceQuoteNeedsRefresh(state.Approval.Batch) {
+		shownQuote := cloudAgentApprovalQuoteMicrocredits(state.Approval)
+		// 只有普通多图批次可以在确认时直接续期执行；整套商品计划和失败重放必须让用户看到续期后的报价。
+		renewInPlace := decision == "approve" && state.Approval.Batch != nil && state.Approval.Batch.Kind == "images" && state.CommercePlan == nil && len(state.RetryReplay) == 0
 		if err := s.refreshCloudAgentCommerceApproval(userID, id, approvalID); err != nil {
 			return err
 		}
 		if decision == "approve" {
+			// 确认时报价已过期：新报价不高于用户看到的价格，就按新报价直接批准执行，不再让用户再点一次；
+			// 涨价时保留新报价，让用户核对后再批准。
+			if renewInPlace && shownQuote > 0 {
+				if renewed, readErr := s.repo.CloudAgent(userID, id); readErr == nil {
+					fresh, decodeErr := cloudAgentDecodeForExecution(renewed)
+					if decodeErr == nil && fresh.Approval != nil && fresh.Approval.ID != approvalID && cloudAgentApprovalQuoteMicrocredits(fresh.Approval) <= shownQuote {
+						return s.DecideCloudAgentApproval(userID, id, fresh.Approval.ID, decision, reason)
+					}
+				}
+			}
 			return creationConflict("报价已过期并已更新，方案仍保留；请核对新报价后批准")
 		}
 		return nil
@@ -672,6 +689,10 @@ func (s *Service) DecideCloudAgentApproval(userID, id, approvalID, decision, rea
 					state.DecisionSettings = map[string]string{}
 				}
 				state.DecisionSettings[approvalID] = creationHash(settings)
+			}
+			if decision == "approve" && state.Request.Surface == "creation" {
+				// 用户批准的报价计入本轮已同意的额度：同一轮后续小额生成不必再为已批准的部分确认。
+				state.ApprovedMicrocredits += max(cloudAgentApprovalQuoteMicrocredits(state.Approval), 0)
 			}
 			if decision == "approve" && state.Approval.Prepared != nil {
 				if state.DecisionPreparedHashes == nil {

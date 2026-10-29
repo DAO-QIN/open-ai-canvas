@@ -11,6 +11,7 @@ import (
 
 	"yingce/backend/internal/model"
 	"yingce/backend/internal/platform"
+	"yingce/backend/internal/repository"
 )
 
 const newAPIChannel2TaskSyncMaxAge = 5 * time.Minute
@@ -64,6 +65,8 @@ func (w *taskWorkerCoordinator) start(ctx context.Context) {
 				return
 			}
 			workerConcurrency := setting.WorkerConcurrency
+			// 单个用户最多同时占用约一半 worker（向上取整，至少 1）；其他用户没有可领取任务时照常领取。
+			claimOptions := repository.TaskClaimOptions{UserRunningCap: max(1, (workerConcurrency+1)/2)}
 			for len(slots) < workerConcurrency {
 				globalSlot, acquired, err := s.coordinator.AcquireLease(ctx, "workers", workerConcurrency, workerSlotLeaseDuration)
 				if err != nil || !acquired {
@@ -74,7 +77,7 @@ func (w *taskWorkerCoordinator) start(ctx context.Context) {
 				}
 				claimCtx, cancelClaim := context.WithTimeout(ctx, 5*time.Second)
 				// 每次领取使用独立 owner，防止同一进程内旧执行者恢复后覆盖新执行者。
-				task, err := s.repo.WithContext(claimCtx).ClaimNextTask(globalSlot.Token(), 45*time.Second)
+				task, err := s.repo.WithContext(claimCtx).ClaimNextTask(globalSlot.Token(), 45*time.Second, claimOptions)
 				cancelClaim()
 				if err != nil || task == nil {
 					globalSlot.Release()

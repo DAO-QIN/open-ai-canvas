@@ -233,6 +233,7 @@ export default function SystemPerformancePage() {
                             <Fact label="地址" value={agent.endpoint} mono />
                             <Fact label="进行中 / 上限" value={`${formatNumber(agent.active)} / ${formatNumber(agent.limit)}`} />
                             <Fact label="排队" value={formatNumber(agent.queued)} />
+                            {agent.mode === "remote" ? <Fact label="预热" value={agent.prewarm ? `${formatNumber(agent.warm)} / ${formatNumber(agent.prewarm)}` : "未开启"} /> : null}
                             <Fact label="已保存上限" value={formatNumber(agent.configuredLimit)} />
                             <Fact label="说明" value={agent.statusMessage || "同一台机器提高上限即可，不需要再启动容器。"} />
                         </FactGrid>

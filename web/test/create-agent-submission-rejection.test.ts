@@ -4,6 +4,7 @@ import * as agentApi from "../src/services/api/agent";
 import * as interjectionHelpers from "../src/pages/create/creation-agent-interjection";
 import { creationConversationMode } from "../src/pages/create/creation-conversations";
 import { buildCreationAgentRunInput } from "../src/pages/create/creation-agent-request";
+import { creationAgentPreauthorizedCredits } from "../src/pages/create/creation-agent-estimate";
 import { createCreationSubmitGate } from "../src/pages/create/creation-submit-gate";
 import { ApiError } from "../src/services/api/request";
 import { creationHasInput, type CreationConversation } from "../src/pages/create/creation-types";
@@ -140,6 +141,9 @@ function fixture(followup = false) {
             agentVideoParameterMode: "auto",
             agentVideoSettings: {},
             agentBudget: { maxCredits: budget, maxGenerationTasks: 0, maxVideoSeconds: 30 },
+            // 没有报价时不预授权：请求体与改动前一致，下面按原 key/body 核对恢复的用例不受影响。
+            agentEstimateCredits: null,
+            creationAgentPreauthorizedCredits,
             attachments: draftAttachments,
             draftReferences: [],
             agentAttachmentSelection: { attachmentMode: "inherit" },
