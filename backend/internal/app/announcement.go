@@ -807,7 +807,7 @@ var bannerEdgeShapes = map[string]struct{}{
 }
 
 var bannerEdgeWaves = map[string]struct{}{
-	"flat": {}, "wave": {}, "ripple": {},
+	"flat": {}, "zigzag": {}, "ripple": {},
 }
 
 const (
@@ -829,7 +829,7 @@ func normalizeBannerEdge(shape string, wave string) (string, string, error) {
 		normalizedWave = bannerEdgeWaveDefault
 	}
 	if _, ok := bannerEdgeWaves[normalizedWave]; !ok {
-		return "", "", BadAuthRequest("底边波纹无效，仅支持平直、波浪或涟漪")
+		return "", "", BadAuthRequest("底边波纹无效，仅支持平直、锯齿或涟漪")
 	}
 	return normalizedShape, normalizedWave, nil
 }

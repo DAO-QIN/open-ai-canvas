@@ -84,6 +84,8 @@
 /* 深色主题底边：背景层向下多画 --nb-edge-h，这一段按后台选的外形与波纹遮成颗粒，挂在通知条下方、叠在侧栏与内容区上，
  * 颗粒之间露出的就是下层界面本身的颜色。不能在通知条内部挖空：那里背后是页面最底层的近黑色，会变成一排黑色方格。
  * 遮罩图案、平铺宽度与行数由 lib/announcements/banner-edge.ts 生成，以 --nb-edge-mask / --nb-edge-columns / --nb-edge-rows 写在外壳上；
+ * 图案比颗粒带上下各多一格：从颗粒带上方一格铺到下方一格，最上面一格叠在实心层上，最下面一格落在背景层以外，
+ * 非整数倍屏幕缩放下交界处不会透出暗线，最后一行也不会被染色。
  * 平滑 + 平直（直边）时外壳不带 data-edge-band，不挂颗粒带。颗粒带不接收指针，下方的侧栏与顶栏照常可点。
  * 浅色主题保持干净的直边——深色颗粒散在浅色页面上像噪点。 */
 .dark .notice-banner[data-edge-band] {
@@ -96,10 +98,10 @@
     bottom: calc(var(--nb-edge-h) * -1);
     -webkit-mask:
         linear-gradient(#000, #000) top / 100% calc(100% - var(--nb-edge-h)) no-repeat,
-        var(--nb-edge-mask) left bottom / calc(var(--nb-pixel) * var(--nb-edge-columns)) var(--nb-edge-h) repeat-x;
+        var(--nb-edge-mask) left 0 bottom calc(var(--nb-pixel) * -1) / calc(var(--nb-pixel) * var(--nb-edge-columns)) calc(var(--nb-edge-h) + var(--nb-pixel) * 2) repeat-x;
     mask:
         linear-gradient(#000, #000) top / 100% calc(100% - var(--nb-edge-h)) no-repeat,
-        var(--nb-edge-mask) left bottom / calc(var(--nb-pixel) * var(--nb-edge-columns)) var(--nb-edge-h) repeat-x;
+        var(--nb-edge-mask) left 0 bottom calc(var(--nb-pixel) * -1) / calc(var(--nb-pixel) * var(--nb-edge-columns)) calc(var(--nb-edge-h) + var(--nb-pixel) * 2) repeat-x;
 }
 
 /* 文字区压光层（盖在光环之上）：两侧留出 --nb-side 以外的区域，亮带经过文字时减到 80%，两端照常鲜亮。

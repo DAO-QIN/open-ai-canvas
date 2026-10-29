@@ -5,15 +5,19 @@
  * 通知条背后只有页面最底层的近黑色，挖空处会变成一排黑色方格，和下方更亮的侧栏、内容区形成色差。
  *
  * 外形决定颗粒形状：方格是随机像素溶解，圆点 / 菱形是由大到小的网点，平滑不加颗粒；
- * 波纹决定颗粒带上沿的起伏：平直、波浪（长波）或涟漪（短波）。平滑 + 平直即直边，不挂颗粒带。
+ * 波纹决定颗粒带上沿的起伏：平直、锯齿（齿尖朝下的三角齿）或涟漪（短波）。平滑 + 平直即直边，不挂颗粒带。
  * 图案是确定性生成的 SVG 遮罩（同一组合每次输出一致），以一个像素格 --nb-pixel 为单位横向平铺，
  * 用法见 components/layout/banner-announcement.css。取值白名单与后端 announcement.go 的 bannerEdgeShapes / bannerEdgeWaves 一致。
+ *
+ * 遮罩比颗粒带上下各多一行（viewBox 从 y = −1 开始）：最上面一行整行实心，叠在通知条的实心层上；最下面一行留空，挂在背景层以外。
+ * 在 110%、125%、150% 这类非整数倍的屏幕缩放下，实心层与遮罩的交界落在物理像素中间，两层各自抗锯齿后叠加盖不满，透出背后的近黑色，
+ * 成了一条暗线；遮罩下沿与背景层下沿重合时，颗粒带最后一行又会被染成通知条的颜色。多出的两行把这两条边都移出了颗粒带。
  */
 
 import type { CSSProperties } from "react";
 
 export type BannerEdgeShape = "square" | "dot" | "diamond" | "smooth";
-export type BannerEdgeWave = "flat" | "wave" | "ripple";
+export type BannerEdgeWave = "flat" | "zigzag" | "ripple";
 
 export const BANNER_EDGE_SHAPE_DEFAULT: BannerEdgeShape = "square";
 export const BANNER_EDGE_WAVE_DEFAULT: BannerEdgeWave = "flat";
@@ -29,7 +33,7 @@ export const BANNER_EDGE_SHAPES: { key: BannerEdgeShape; label: string }[] = [
 /** 底边波纹，取值与后端 bannerEdgeWaves 白名单一致。 */
 export const BANNER_EDGE_WAVES: { key: BannerEdgeWave; label: string }[] = [
     { key: "flat", label: "平直" },
-    { key: "wave", label: "波浪" },
+    { key: "zigzag", label: "锯齿" },
     { key: "ripple", label: "涟漪" },
 ];
 
@@ -62,14 +66,20 @@ export function normalizeBannerEdgeWave(value?: string | null): BannerEdgeWave {
     return WAVE_KEYS.has(raw) ? (raw as BannerEdgeWave) : BANNER_EDGE_WAVE_DEFAULT;
 }
 
-/** 一个平铺单元宽 72 格（桌面约 240px）：波浪一个周期，涟漪四个周期，随机颗粒不易看出重复。 */
+/** 一个平铺单元宽 72 格（桌面约 240px）：锯齿六个齿，涟漪四个周期，随机颗粒不易看出重复。 */
 export const BANNER_EDGE_COLUMNS = 72;
 
-/** 颗粒带上沿的起伏：振幅与周期（像素格），上沿深度 = 振幅 × (1 − cos(2πx / 周期)) / 2。 */
-const WAVE_PROFILES: Record<BannerEdgeWave, { amplitude: number; period: number }> = {
-    flat: { amplitude: 0, period: BANNER_EDGE_COLUMNS },
-    wave: { amplitude: 3, period: BANNER_EDGE_COLUMNS },
-    ripple: { amplitude: 1.5, period: BANNER_EDGE_COLUMNS / 4 },
+type Surface = (x: number) => number;
+type Drawing = { path: string; bottom: number; crisp: boolean };
+
+/**
+ * 颗粒带上沿的起伏：surface(x) 是第 x 格处上沿压下来的深度（像素格），x = 0 处为 0，最深为 amplitude。
+ * 锯齿是三角波，每 12 格（桌面 40px）一个齿尖朝下的齿，深 2 格；涟漪是周期 18 格、深 1.5 格的余弦波。周期都能整除 72 格，平铺没有接缝。
+ */
+const WAVE_PROFILES: Record<BannerEdgeWave, { amplitude: number; surface: Surface }> = {
+    flat: { amplitude: 0, surface: () => 0 },
+    zigzag: { amplitude: 2, surface: (x) => 2 * (1 - Math.abs(((x / 12) % 1) * 2 - 1)) },
+    ripple: { amplitude: 1.5, surface: (x) => 0.75 * (1 - Math.cos((2 * Math.PI * x) / 18)) },
 };
 
 /** 方格颗粒在上沿以下溶解的行数：逐行变疏（约 83% / 50% / 17%）。 */
@@ -82,9 +92,6 @@ const HALFTONE = {
 } as const;
 
 const SEED = 11;
-
-type Surface = (x: number) => number;
-type Drawing = { path: string; bottom: number; crisp: boolean };
 
 function seededRandom(seed: number) {
     let state = seed >>> 0;
@@ -107,14 +114,15 @@ function num(value: number) {
     return Object.is(rounded, -0) ? "0" : String(rounded);
 }
 
-/** 上沿以上整片实心（通知条的延伸），波浪 / 涟漪时才有。 */
-function solidPath(surface: Surface) {
+/** 遮罩最上面一行（y = −1..0）整行实心，叠在通知条的实心层上；给出上沿时一直实心到上沿（通知条的延伸）。 */
+function solidPath(surface?: Surface) {
+    if (!surface) return `M0 -1h${BANNER_EDGE_COLUMNS}v1H0z`;
     const points: string[] = [];
     for (let step = 0; step <= BANNER_EDGE_COLUMNS * 2; step += 1) {
         const x = step / 2;
         points.push(`${num(x)} ${num(surface(x))}`);
     }
-    return `M0 0L${points.join("L")}L${BANNER_EDGE_COLUMNS} 0z`;
+    return `M0 -1L${points.join("L")}L${BANNER_EDGE_COLUMNS} -1z`;
 }
 
 /** 方格：每格按到上沿的深度决定出现概率，同一行相邻的格合并成一段矩形。 */
@@ -150,7 +158,7 @@ function halftone(surface: Surface, amplitude: number, kind: keyof typeof HALFTO
     const { cell, pitch, rows } = HALFTONE[kind];
     const fade = rows * pitch;
     const half = cell / 2;
-    const parts: string[] = amplitude > 0 ? [solidPath(surface)] : [];
+    const parts: string[] = [];
     let bottom = amplitude;
     for (let row = -1; row < rows; row += 1) {
         const depth = (row + 0.5) * pitch;
@@ -171,12 +179,13 @@ function halftone(surface: Surface, amplitude: number, kind: keyof typeof HALFTO
 }
 
 function buildMask(shape: BannerEdgeShape, wave: BannerEdgeWave): BannerEdgeMask {
-    const { amplitude, period } = WAVE_PROFILES[wave];
-    const surface: Surface = (x) => (amplitude * (1 - Math.cos((2 * Math.PI * x) / period))) / 2;
-    const drawing: Drawing = shape === "square" ? squareGrain(surface, amplitude) : shape === "smooth" ? { path: amplitude > 0 ? solidPath(surface) : "", bottom: amplitude, crisp: false } : halftone(surface, amplitude, shape);
+    const { amplitude, surface } = WAVE_PROFILES[wave];
+    const drawing: Drawing = shape === "square" ? squareGrain(surface, amplitude) : shape === "smooth" ? { path: "", bottom: amplitude, crisp: false } : halftone(surface, amplitude, shape);
     const rows = Math.ceil(drawing.bottom - 1e-6);
-    if (!drawing.path || rows <= 0) return { image: "none", columns: BANNER_EDGE_COLUMNS, rows: 0 };
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${BANNER_EDGE_COLUMNS} ${rows}' preserveAspectRatio='none'${drawing.crisp ? " shape-rendering='crispEdges'" : ""}><path d='${drawing.path}'/></svg>`;
+    if (rows <= 0) return { image: "none", columns: BANNER_EDGE_COLUMNS, rows: 0 };
+    // 方格的实心部分本身就是整格，上面只补一整行；网点与平滑由同一块多边形从最上面一行一直实心到上沿。
+    const solid = shape === "square" || amplitude <= 0 ? solidPath() : solidPath(surface);
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -1 ${BANNER_EDGE_COLUMNS} ${rows + 2}' preserveAspectRatio='none'${drawing.crisp ? " shape-rendering='crispEdges'" : ""}><path d='${solid}${drawing.path}'/></svg>`;
     const encoded = svg.replace(/%/g, "%25").replace(/#/g, "%23").replace(/</g, "%3C").replace(/>/g, "%3E");
     return { image: `url("data:image/svg+xml,${encoded}")`, columns: BANNER_EDGE_COLUMNS, rows };
 }

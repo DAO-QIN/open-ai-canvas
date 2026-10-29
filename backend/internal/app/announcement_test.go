@@ -839,7 +839,7 @@ func TestBannerAnnouncementEdgePersistsAndValidates(t *testing.T) {
 
 	for _, req := range []CreateBannerAnnouncementRequest{
 		{Title: "标题", Status: "active", EdgeShape: "star"},
-		{Title: "标题", Status: "active", EdgeWave: "zigzag"},
+		{Title: "标题", Status: "active", EdgeWave: "wave"},
 		{Title: "标题", Status: "active", EdgeShape: "square;mask:url(x)"},
 	} {
 		if _, err := svc.CreateBannerAnnouncement(admin, req); err == nil {
