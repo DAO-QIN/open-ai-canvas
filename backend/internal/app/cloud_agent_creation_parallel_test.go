@@ -32,6 +32,13 @@ func installCreationParallelImageModel(t *testing.T, db *gorm.DB) {
 
 func creationParallelImageFixture(t *testing.T, permission string) (*Service, *gorm.DB, string, []cloudAgentCall) {
 	t.Helper()
+	return creationParallelImageFixtureWait(t, permission, false)
+}
+
+// creationParallelImageFixtureWait 在 waitForResult 为 true 时让三张图走"等待真实结果"的交付路径：
+// 前两张受理即继续，最后一张统一等全组结果。默认（false）是创作页的提交即返回。
+func creationParallelImageFixtureWait(t *testing.T, permission string, waitForResult bool) (*Service, *gorm.DB, string, []cloudAgentCall) {
+	t.Helper()
 	s, db, _ := agentMediaFixture(t)
 	installCreationParallelImageModel(t, db)
 	req := creationAgentRequest()
@@ -44,7 +51,7 @@ func creationParallelImageFixture(t *testing.T, permission string) (*Service, *g
 	}
 	calls := make([]cloudAgentCall, 3)
 	for i := range calls {
-		calls[i] = agentMediaCall(cloudAgentMediaArgs{Mode: "image", Prompt: fmt.Sprintf("Independent landscape %d", i+1), Title: fmt.Sprintf("Image %d", i+1)})
+		calls[i] = agentMediaCall(cloudAgentMediaArgs{Mode: "image", Prompt: fmt.Sprintf("Independent landscape %d", i+1), Title: fmt.Sprintf("Image %d", i+1), WaitForResult: waitForResult})
 		calls[i].ID = fmt.Sprintf("parallel-image-%d", i+1)
 	}
 	run, state := agentInterjectionState(t, s, root.ID)
@@ -246,7 +253,8 @@ func testCreationNativePiImageCallsReachUpstreamTogether(t *testing.T, batch boo
 }
 
 func TestCreationImageGroupSubmitsBeforeAnyImageCompletes(t *testing.T) {
-	s, db, runID, calls := creationParallelImageFixture(t, "auto")
+	// 模型要等这组新图再继续时（waitForResult=true），整组先全部受理，最后一张统一等真实结果。
+	s, db, runID, calls := creationParallelImageFixtureWait(t, "auto", true)
 	for _, call := range calls[:2] {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		result, err := s.executeCloudAgentRuntimeTool(ctx, "user", runID, call)

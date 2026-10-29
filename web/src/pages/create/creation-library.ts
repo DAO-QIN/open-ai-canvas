@@ -5,6 +5,7 @@ import { creationAttachmentFromAsset, creationAttachmentFromAudioAsset, creation
 
 export function creationLibraryDisabledReason(mode: CreationMode, kind: string | undefined, videoLimits?: CreationReferenceLimits) {
     if (kind !== "image" && kind !== "video" && kind !== "audio") return "此类型素材暂不支持作为创作参考";
+    if (mode === "audio") return "音频生成只需要文字描述，不使用参考素材";
     if (mode === "image") return kind === "image" ? undefined : "图片创作仅支持参考图";
     if (mode !== "video") return undefined;
 

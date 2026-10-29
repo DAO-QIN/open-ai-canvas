@@ -104,35 +104,38 @@ func (s *Service) cloudAgentModelIntent(userID, canvasID, arguments string) (*Mo
 }
 
 type cloudAgentMediaArgs struct {
-	ConfigurationChange        *cloudAgentMediaConfigurationChange `json:"configurationChange,omitempty"`
-	Prepared                   *cloudAgentPreparedMedia            `json:"-"`
-	DraftRunID                 string                              `json:"-"`
-	CharacterVersions          map[string]string                   `json:"-"`
-	CharacterLabels            []string                            `json:"-"`
-	Mode                       string                              `json:"mode"`
-	Prompt                     string                              `json:"prompt"`
-	LogicalModelID             string                              `json:"logicalModelId"`
-	ChannelID                  string                              `json:"channelId"`
-	ChannelModelKey            string                              `json:"channelModelKey"`
-	RequirePreferredModel      bool                                `json:"requirePreferredModel,omitempty"`
-	Duration                   int                                 `json:"durationSeconds"`
-	Size                       string                              `json:"size"`
-	ImageResolution            string                              `json:"imageResolution"`
-	ImageParameters            string                              `json:"imageParameters,omitempty"`
-	Quality                    string                              `json:"quality"`
-	VideoGenerateAudio         *bool                               `json:"videoGenerateAudio"`
-	VideoWatermark             *bool                               `json:"videoWatermark"`
-	VideoArkPrivateAssetUpload *bool                               `json:"videoArkPrivateAssetUpload"`
-	VideoStartFrameNodeID      string                              `json:"videoStartFrameNodeId"`
-	VideoEndFrameNodeID        string                              `json:"videoEndFrameNodeId"`
-	SnapshotHash               string                              `json:"snapshotHash"`
-	NodeID                     string                              `json:"nodeId"`
-	Title                      string                              `json:"title"`
-	SourceNodeID               string                              `json:"sourceNodeId"`
-	ReferenceNodeIDs           []string                            `json:"referenceNodeIds"`
-	ReferenceTransientIDs      []string                            `json:"referenceTransientIds"`
-	AttachmentResourceIDs      []string                            `json:"attachmentResourceIds"`
-	References                 []cloudAgentCreationReference       `json:"references,omitempty"`
+	ConfigurationChange   *cloudAgentMediaConfigurationChange `json:"configurationChange,omitempty"`
+	Prepared              *cloudAgentPreparedMedia            `json:"-"`
+	DraftRunID            string                              `json:"-"`
+	CharacterVersions     map[string]string                   `json:"-"`
+	CharacterLabels       []string                            `json:"-"`
+	Mode                  string                              `json:"mode"`
+	Prompt                string                              `json:"prompt"`
+	LogicalModelID        string                              `json:"logicalModelId"`
+	ChannelID             string                              `json:"channelId"`
+	ChannelModelKey       string                              `json:"channelModelKey"`
+	RequirePreferredModel bool                                `json:"requirePreferredModel,omitempty"`
+	// WaitForResult 只用于创作页：本轮下一步要用这次的新成品时由模型传 true，工具等真实结果再返回；
+	// 默认受理即返回，结果完成后直接出现在对话里。
+	WaitForResult              bool                          `json:"waitForResult,omitempty"`
+	Duration                   int                           `json:"durationSeconds"`
+	Size                       string                        `json:"size"`
+	ImageResolution            string                        `json:"imageResolution"`
+	ImageParameters            string                        `json:"imageParameters,omitempty"`
+	Quality                    string                        `json:"quality"`
+	VideoGenerateAudio         *bool                         `json:"videoGenerateAudio"`
+	VideoWatermark             *bool                         `json:"videoWatermark"`
+	VideoArkPrivateAssetUpload *bool                         `json:"videoArkPrivateAssetUpload"`
+	VideoStartFrameNodeID      string                        `json:"videoStartFrameNodeId"`
+	VideoEndFrameNodeID        string                        `json:"videoEndFrameNodeId"`
+	SnapshotHash               string                        `json:"snapshotHash"`
+	NodeID                     string                        `json:"nodeId"`
+	Title                      string                        `json:"title"`
+	SourceNodeID               string                        `json:"sourceNodeId"`
+	ReferenceNodeIDs           []string                      `json:"referenceNodeIds"`
+	ReferenceTransientIDs      []string                      `json:"referenceTransientIds"`
+	AttachmentResourceIDs      []string                      `json:"attachmentResourceIds"`
+	References                 []cloudAgentCreationReference `json:"references,omitempty"`
 }
 
 type cloudAgentMediaPlan struct {

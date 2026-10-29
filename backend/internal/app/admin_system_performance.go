@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"runtime"
 	"strconv"
@@ -45,6 +48,8 @@ type SystemPerformanceAgent struct {
 	Active          int    `json:"active"`
 	Limit           int    `json:"limit"`
 	Queued          int    `json:"queued"`
+	Warm            int    `json:"warm"`
+	Prewarm         int    `json:"prewarm"`
 	ConfiguredLimit int    `json:"configuredLimit"`
 	StatusMessage   string `json:"statusMessage,omitempty"`
 }
@@ -235,7 +240,7 @@ func (s *Service) collectAgentServices(ctx context.Context) []SystemPerformanceA
 		ID: "yingce-agent", Name: "画布 Agent", Mode: "remote", Endpoint: endpoint,
 		ConfiguredLimit: configured,
 	}
-	status, err := yingceagent.Inspect(ctx, endpoint)
+	status, err := inspectAgentHealth(ctx, endpoint)
 	if err != nil {
 		service.StatusMessage = "独立 Agent 服务不可达。正在进行的对话会失败，不会自动改回本进程执行。"
 		return []SystemPerformanceAgent{service}
@@ -244,10 +249,38 @@ func (s *Service) collectAgentServices(ctx context.Context) []SystemPerformanceA
 	service.Active = status.Active
 	service.Limit = status.Limit
 	service.Queued = status.Queued
+	service.Warm = status.Warm
+	service.Prewarm = status.Prewarm
 	if status.Limit != configured {
 		service.StatusMessage = "运行中的上限与已保存配置不一致，重新保存一次即可应用。"
 	}
 	return []SystemPerformanceAgent{service}
+}
+
+// agentHealth 在 yingceagent.Status 之外读取 /healthz 的预热字段：warm 是空闲预热进程数，
+// prewarm 是目标数。旧镜像不返回这两个字段时为 0。
+type agentHealth struct {
+	yingceagent.Status
+	Warm    int `json:"warm"`
+	Prewarm int `json:"prewarm"`
+}
+
+func inspectAgentHealth(ctx context.Context, endpoint string) (agentHealth, error) {
+	var health agentHealth
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(endpoint, "/")+"/healthz", nil)
+	if err != nil {
+		return health, err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return health, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return health, fmt.Errorf("yingce-agent health returned HTTP %d", response.StatusCode)
+	}
+	err = json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&health)
+	return health, err
 }
 
 func agentServicesDegraded(agents []SystemPerformanceAgent) bool {

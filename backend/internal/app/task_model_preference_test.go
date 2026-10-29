@@ -98,7 +98,8 @@ func TestPreferredImageFallbackPreservesReferenceRequirements(t *testing.T) {
 func TestPreferredVideoFallbackPreservesApprovedInputAndDoesNotRepeatUnknownSubmission(t *testing.T) {
 	s, db, _ := agentMediaFixture(t)
 	s.routeHealthBlocked = map[string]time.Time{}
-	args := cloudAgentMediaArgs{Mode: "video", Prompt: "商品演示", AttachmentResourceIDs: []string{"ref-one"}, Duration: 12, Size: "9:16"}
+	// 走等待交付路径，保留 MediaTaskID 作为这条视频任务的句柄。
+	args := cloudAgentMediaArgs{Mode: "video", Prompt: "商品演示", AttachmentResourceIDs: []string{"ref-one"}, Duration: 12, Size: "9:16", WaitForResult: true}
 	choice := CloudAgentCreationMediaChoice{Selection: CloudAgentMediaModelSelection{ChannelID: "channel", ChannelModelKey: "seedance-test"}, SelectionMode: "preferred", ParameterMode: "manual", Size: "9:16", DurationSeconds: 12}
 	run, state := creationMediaRun(t, s, "preferred-video", args, choice, "auto")
 	if err := s.advanceCloudAgentTool(run, &state); err != nil {

@@ -52,7 +52,8 @@ func TestCreationMediaApprovalBillsOnceWithoutCanvasMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 	original := canvas.PayloadJSON
-	args := cloudAgentMediaArgs{Mode: "video", Prompt: "拍摄一段商品演示视频", AttachmentResourceIDs: []string{"ref-one"}, Duration: 6, Size: "16:9", Title: "商品演示"}
+	// 这里验证"同一轮要用结果"的等待路径；提交即返回见 cloud_agent_creation_accept_test.go。
+	args := cloudAgentMediaArgs{Mode: "video", Prompt: "拍摄一段商品演示视频", AttachmentResourceIDs: []string{"ref-one"}, Duration: 6, Size: "16:9", Title: "商品演示", WaitForResult: true}
 	choice := CloudAgentCreationMediaChoice{Selection: CloudAgentMediaModelSelection{ChannelID: "channel", ChannelModelKey: "seedance-test"}, ParameterMode: "manual", Size: "9:16", DurationSeconds: 12}
 	run, state := creationMediaRun(t, s, "creation-video-approval", args, choice)
 	if err := s.advanceCloudAgentTool(run, &state); err != nil {
@@ -131,7 +132,7 @@ func TestCreationMediaRejectsUnlistedAttachment(t *testing.T) {
 func TestCreationMediaAutoModeHonorsGenerationBudget(t *testing.T) {
 	s, db, _ := agentMediaFixture(t)
 	choice := CloudAgentCreationMediaChoice{Selection: CloudAgentMediaModelSelection{ChannelID: "channel", ChannelModelKey: "seedance-test"}, ParameterMode: "auto"}
-	args := cloudAgentMediaArgs{Mode: "video", Prompt: "商品演示", Duration: 12, AttachmentResourceIDs: []string{"ref-one"}}
+	args := cloudAgentMediaArgs{Mode: "video", Prompt: "商品演示", Duration: 12, AttachmentResourceIDs: []string{"ref-one"}, WaitForResult: true}
 	run, state := creationMediaRun(t, s, "creation-auto-budget", args, choice, "auto")
 	state.Request.Budget.MaxGenerationTasks = 1
 	if err := s.repo.MutateCloudAgent("user", run.ID, run.Revision, func(current *model.CloudAgentExecution, _ *repository.Repository) error {

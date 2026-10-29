@@ -12,7 +12,7 @@ import (
 const (
 	cloudAgentCompilerVersion              = "cloud-agent-policy-compiler/v6"
 	cloudAgentDefaultReasoning             = "off"
-	cloudAgentCreationCapabilitySetVersion = "creation-agent-capabilities/v7"
+	cloudAgentCreationCapabilitySetVersion = "creation-agent-capabilities/v8"
 )
 
 const cloudAgentCreationCapabilityGuide = "首页创作能力：当前会话对话与规划、按本轮所选图片/视频执行模型生成、独立图片整批提交及上下文多图修改、已授权附件引用、电商计划审核、本会话任务查询、当前账号的智能创作个人记忆。系统只附已批准记忆索引，相关时用 recall_lessons 按需取全文；经验是参考数据，不代替用户当前要求、能力核验或授权。本轮媒体真实成功交付后可用 remember_lesson 记录通用做法，分类固定 smart_creation，待用户在设置中批准后才供后续会话使用。能否读取图片内容取决于当前对话模型声明的图片输入能力和本次实际附图。当前入口没有画布数据、画布工具或画布长期偏好。"

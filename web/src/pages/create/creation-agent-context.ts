@@ -24,7 +24,8 @@ function latestVisibleMediaResult(messages: CreationMessage[]) {
 export function creationAgentDirectContext(conversation?: Pick<CreationConversation, "messages" | "agentRuns" | "agentRunId">) {
     const latestRun = conversation?.agentRuns?.find((run) => run.id === conversation.agentRunId) || conversation?.agentRuns?.at(-1);
     const imported = new Set(latestRun?.creationContextMessageIds || []);
-    const messages = (conversation?.messages || []).filter((item) => !item.agentRunId && item.mode && item.mode !== "agent" && !imported.has(item.id));
+    // 阿Q 只读图片、视频和文本的普通创作记录；音频任务不在后端允许的上下文类型里，带上会整轮被拒。
+    const messages = (conversation?.messages || []).filter((item) => !item.agentRunId && item.mode && item.mode !== "agent" && item.mode !== "audio" && !imported.has(item.id));
     const entries: AgentCreationContextEntry[] = [];
     const latestVisibleResult = latestVisibleMediaResult(conversation?.messages || []);
     for (const item of messages) {

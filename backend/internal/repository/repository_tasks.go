@@ -64,28 +64,65 @@ func (r *Repository) ActiveTaskCountForProjectIDs(userID string, projectIDs []st
 	return count, err
 }
 
+// TaskClaimOptions 是调度器给一次领取的偏好；零值只按优先级排序，不限制单用户并发。
+type TaskClaimOptions struct {
+	// UserRunningCap 是单个用户持有有效租约的执行中任务上限，<= 0 表示不限制。
+	// 达到上限的用户的任务先让其他用户领取；没有其他可领取任务时仍照常领取，worker 不空等。
+	// Agent 模型调用不受上限约束，但计入该用户的执行中数量。
+	UserRunningCap int
+}
+
+// taskClaimAgingStep 是非交互任务的排队老化步长：每等满一个步长，优先级提升一级。
+// 目前只有交互（0）和普通（1）两级，普通任务等满一个步长即与交互任务同级，按创建时间先后领取。
+const taskClaimAgingStep = time.Minute
+
+// taskClaimAgentModelOperations 与 app 层 cloudAgentModelOperation 同一口径：Agent 根任务（第一步）、
+// 后续每一步和上下文压缩调用。repository 不能引用 app 常量；操作名是已落库数据，改名时必须同步这里。
+var taskClaimAgentModelOperations = []string{"cloud_agent", "cloud_agent_step", "cloud_agent_context_compaction"}
+
+// taskClaimBackgroundOperations 是没有项目归属、但没有用户在等的后台任务（Agent 记忆整理），不算交互级。
+var taskClaimBackgroundOperations = []string{"agent_memory_compact"}
+
+const (
+	// 可领取：排队中，或执行中但租约缺失/已过期；且不在等待下一次上游回查。
+	taskClaimableCondition = "(status = ? OR (status = ? AND (lease_expires_at IS NULL OR lease_expires_at <= ?))) AND (next_poll_at IS NULL OR next_poll_at <= ?)"
+	// 单用户上限只统计持有有效租约的执行中任务；转入上游回查的任务已释放租约，不计数。Agent 模型调用豁免。
+	taskClaimUserCapCondition = "(operation IN ? OR user_id NOT IN (SELECT user_id FROM tasks WHERE status = ? AND lease_expires_at > ? AND user_id IS NOT NULL GROUP BY user_id HAVING COUNT(*) >= ?))"
+	// 有效优先级：Agent 模型调用、创作运行提交（creation_submission_id）、Agent 对话内的媒体（agent_run_id），
+	// 以及不属于画布/项目也不属于工作台的任务（创作页直接生成走 POST /tasks，来源只记在 input_json 里）为 0；
+	// 其余为 1，排队满一个老化步长后为 0。同级按创建时间先后。老化截止时间是绑定参数，两种数据库共用同一表达式。
+	taskClaimPriorityOrder = "CASE WHEN operation IN ? OR COALESCE(creation_submission_id, '') <> '' OR COALESCE(agent_run_id, '') <> '' OR (COALESCE(project_id, '') = '' AND COALESCE(workbench_kind, '') = '' AND operation NOT IN ?) THEN 0 WHEN created_at <= ? THEN 0 ELSE 1 END ASC, created_at ASC"
+)
+
 // 任务领取以数据库租约为真相；PostgreSQL 锁行跳过竞争任务，SQLite 继续依赖条件更新保证单实例原子性。
-func (r *Repository) ClaimNextTask(owner string, leaseDuration time.Duration) (*model.Task, error) {
+// 设置单用户上限时，先排除已达上限用户的任务挑选；挑不到再不带上限挑一次，有可领取任务就一定领取。
+func (r *Repository) ClaimNextTask(owner string, leaseDuration time.Duration, options ...TaskClaimOptions) (*model.Task, error) {
+	var option TaskClaimOptions
+	if len(options) > 0 {
+		option = options[0]
+	}
 	var task model.Task
 	now := time.Now()
 	leaseExpiresAt := now.Add(leaseDuration)
+	isPostgres := r.Dialect() == "postgres"
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		query := tx.Where("(status = ? OR (status = ? AND (lease_expires_at IS NULL OR lease_expires_at <= ?))) AND (next_poll_at IS NULL OR next_poll_at <= ?)", model.TaskStatusQueued, model.TaskStatusRunning, now, now).
-			Order("created_at asc").Limit(1)
-		if r.Dialect() == "postgres" {
-			query = query.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"})
+		found := false
+		for _, userCap := range taskClaimUserCapPasses(option.UserRunningCap) {
+			result := taskClaimCandidate(tx, isPostgres, now, userCap).Find(&task)
+			if result.Error != nil {
+				return result.Error
+			}
+			if found = result.RowsAffected > 0; found {
+				break
+			}
 		}
-		result := query.Find(&task)
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
+		if !found {
 			task = model.Task{}
 			return nil
 		}
 		claim := tx.Model(&model.Task{}).Where("id = ?", task.ID)
-		if r.Dialect() != "postgres" {
-			claim = claim.Where("(status = ? OR (status = ? AND (lease_expires_at IS NULL OR lease_expires_at <= ?))) AND (next_poll_at IS NULL OR next_poll_at <= ?)", model.TaskStatusQueued, model.TaskStatusRunning, now, now)
+		if !isPostgres {
+			claim = claim.Where(taskClaimableCondition, model.TaskStatusQueued, model.TaskStatusRunning, now, now)
 		}
 		updated := claim.
 			Updates(map[string]any{
@@ -112,6 +149,30 @@ func (r *Repository) ClaimNextTask(owner string, leaseDuration time.Duration) (*
 		return nil, err
 	}
 	return &task, nil
+}
+
+// taskClaimUserCapPasses 返回依次尝试的单用户上限：先带上限挑选，再以 0（不限制）兜底。
+func taskClaimUserCapPasses(userCap int) []int {
+	if userCap <= 0 {
+		return []int{0}
+	}
+	return []int{userCap, 0}
+}
+
+// taskClaimCandidate 构造一次候选查询：可领取条件与可选的单用户上限，按有效优先级、创建时间取第一条。
+func taskClaimCandidate(tx *gorm.DB, isPostgres bool, now time.Time, userCap int) *gorm.DB {
+	query := tx.Where(taskClaimableCondition, model.TaskStatusQueued, model.TaskStatusRunning, now, now)
+	if userCap > 0 {
+		query = query.Where(taskClaimUserCapCondition, taskClaimAgentModelOperations, model.TaskStatusRunning, now, userCap)
+	}
+	query = query.Order(clause.OrderBy{Expression: clause.Expr{
+		SQL:  taskClaimPriorityOrder,
+		Vars: []any{taskClaimAgentModelOperations, taskClaimBackgroundOperations, now.Add(-taskClaimAgingStep)},
+	}}).Limit(1)
+	if isPostgres {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"})
+	}
+	return query
 }
 
 func (r *Repository) RenewTaskLease(id string, owner string, leaseDuration time.Duration) error {

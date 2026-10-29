@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { creationModelKey } from "../src/pages/create/creation-types";
 
 const page = readFileSync(resolve(import.meta.dir, "../src/pages/create/index.tsx"), "utf8").replace(/\s+/g, " ");
 const workspace = readFileSync(resolve(import.meta.dir, "../src/pages/create/creation-workspace.tsx"), "utf8").replace(/\s+/g, " ");
@@ -14,7 +15,9 @@ test("首页复用原模型选择器，Agent 主栏是对话模型，图片视�
     expect(workspace).not.toContain("CreationAgentModelPicker");
     expect(styles).not.toContain("creation-agent-model-panel");
     expect(page).toContain("model: selectedModel");
-    expect(page).toContain('onModelChange: (value: string) => updateConfig(mode === "text" || mode === "agent" ? "textModel" : mode === "image" ? "imageModel" : "videoModel", value)');
+    // 各类型（含音频）记到各自的默认模型键：自动和文本共用文本模型。
+    expect(page).toContain("updateConfig(creationModelKey(mode), value);");
+    expect((["agent", "text", "image", "video", "audio"] as const).map((mode) => creationModelKey(mode))).toEqual(["textModel", "textModel", "imageModel", "videoModel", "audioModel"]);
 });
 
 test("首页 Agent 权限与自动参数接入实际服务端执行流程", () => {
@@ -47,5 +50,5 @@ test("首页移除虚构上下文进度，发送继续走实际提交入口", ()
     expect(styles).not.toContain("creation-context-estimate");
     expect(page).not.toContain("本地估算");
     expect(page).not.toContain("未测量");
-    expect(page).toContain("onSubmit: () => void submit()");
+    expect(page).toContain('onSubmit: () => void (isEmpty && creationSurface === "canvas" ? submitToCanvas() : submit())');
 });

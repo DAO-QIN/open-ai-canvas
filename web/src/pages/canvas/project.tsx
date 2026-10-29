@@ -653,6 +653,31 @@ function CanvasViewportPage() {
         setSearchParams(next, { replace: true });
     }, [projectLoaded, searchParams, setSearchParams, openAgent]);
 
+    // 首页"画布"模式带入的第一句话（agentPrompt）：等转入的参考图放上画布后，交给阿Q 作为首条消息自动发出。
+    // 每个画布只发一次；转入失败或 15 秒内没完成也照常发出，不把用户的话丢掉。
+    const handedAgentPromptRef = useRef("");
+    useEffect(() => {
+        const agentPrompt = searchParams.get("agentPrompt")?.trim();
+        if (!projectLoaded || !agentPrompt) return;
+        const deliver = () => {
+            const key = `${projectId}:${agentPrompt}`;
+            if (handedAgentPromptRef.current !== key) {
+                handedAgentPromptRef.current = key;
+                setAgentPrefillRequest((current) => ({ id: (current?.id ?? 0) + 1, text: agentPrompt, autoSubmit: true }));
+                openAgent();
+            }
+            const next = new URLSearchParams(searchParams);
+            next.delete("agentPrompt");
+            setSearchParams(next, { replace: true });
+        };
+        if (searchParams.get("mode") !== "handoff") {
+            deliver();
+            return;
+        }
+        const timer = window.setTimeout(deliver, 15_000);
+        return () => window.clearTimeout(timer);
+    }, [projectLoaded, projectId, searchParams, setSearchParams, openAgent]);
+
     // 沉浸专注进入时收起智能体与小地图、重置 Dock 唤出态；仅响应「进入」瞬间，避免关闭专注内主动唤出的面板。
     const prevFocusModeRef = useRef(focusMode);
     useEffect(() => {

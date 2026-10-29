@@ -59,7 +59,8 @@ func creationContextImageBatchFixture(t *testing.T, permission string) (*Service
 	run, state := agentInterjectionState(t, s, root.ID)
 	state.ActiveTaskID = ""
 	call := cloudAgentCall{ID: "translate-five-originals"}
-	call.Function.Name, call.Function.Arguments = "generate_image_batch", mustMarshal(map[string]any{"items": items})
+	// 这些用例验证批量的等待与续跑；提交即返回见 cloud_agent_creation_accept_test.go。
+	call.Function.Name, call.Function.Arguments = "generate_image_batch", mustMarshal(map[string]any{"items": items, "waitForResult": true})
 	state.PiModelCalls = []cloudAgentCall{call}
 	if err := s.repo.MutateCloudAgentRun(run, func(current *model.CloudAgentExecution, _ *repository.Repository) error {
 		return cloudAgentSave(current, &state)
@@ -201,24 +202,49 @@ func TestCreationContextImageBatchApprovalAndFailureKeepExactTasks(t *testing.T)
 		t.Fatal("batch charged before its one approval")
 	}
 	approval := state.Approval.ID
+	// 报价过期、刷新后的报价高于用户看到的价格：不能静默批准，原地刷新让用户核对新报价。
 	state.Approval.Batch.Items[0].Prepared.Quote.ExpiresAt = time.Now().Add(-time.Minute)
+	state.Approval.Batch.QuoteMicrocredits = 1
 	if err := s.repo.MutateCloudAgentRun(run, func(current *model.CloudAgentExecution, _ *repository.Repository) error {
 		return cloudAgentSave(current, &state)
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DecideCloudAgentApproval("user", runID, approval, "approve", ""); err == nil {
-		t.Fatal("expired quote was silently approved")
+		t.Fatal("expired quote above the shown price was silently approved")
 	}
-	_, state = agentInterjectionState(t, s, runID)
+	run, state = agentInterjectionState(t, s, runID)
 	if state.Approval == nil || state.Approval.ID == approval || state.Approval.Batch.Kind != "images" {
 		t.Fatal("generic batch quote did not refresh in place")
 	}
+	db.Model(&model.Task{}).Where("agent_run_id = ? AND type = ?", runID, "canvas_image").Count(&count)
+	if count != 0 {
+		t.Fatal("batch charged before the refreshed quote was approved")
+	}
+	// 再次过期、刷新后的报价不高于看到的价格：点一次批准就按新报价执行。
 	approval = state.Approval.ID
-	for i := 0; i < 2; i++ {
-		if err := s.DecideCloudAgentApproval("user", runID, approval, "approve", ""); err != nil {
-			t.Fatal(err)
+	state.Approval.Batch.Items[0].Prepared.Quote.ExpiresAt = time.Now().Add(-time.Minute)
+	if err := s.repo.MutateCloudAgentRun(run, func(current *model.CloudAgentExecution, _ *repository.Repository) error {
+		return cloudAgentSave(current, &state)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DecideCloudAgentApproval("user", runID, approval, "approve", ""); err != nil {
+		t.Fatalf("expired quote not above the shown price was not approved: %v", err)
+	}
+	_, state = agentInterjectionState(t, s, runID)
+	renewed := ""
+	for id, decision := range state.Decisions {
+		if id != approval && decision == "approve" {
+			renewed = id
 		}
+	}
+	if renewed == "" {
+		t.Fatalf("the refreshed quote was not approved: %+v", state.Decisions)
+	}
+	// 重放同一个批准不重复提交。
+	if err := s.DecideCloudAgentApproval("user", runID, renewed, "approve", ""); err != nil {
+		t.Fatal(err)
 	}
 	var tasks []model.Task
 	if err := db.Where("agent_run_id = ? AND type = ?", runID, "canvas_image").Order("created_at").Find(&tasks).Error; err != nil {

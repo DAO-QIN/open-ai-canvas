@@ -36,7 +36,8 @@ import {
     savePendingCreationAgentSubmission,
     updateCreationConversationSnapshot,
 } from "@/services/creation-conversation-store";
-import { resolveModelChannel, resolveModelRequestConfig, selectableModelsByCapability, useEffectiveConfig } from "@/stores/use-config-store";
+import { resolveModelChannel, resolveModelRequestConfig, selectableModelsByCapability, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import type { CanvasAudioSettingKey } from "@/components/canvas/canvas-audio-settings-popover";
 import {
     createAgentRun,
     decideAgentApproval,
@@ -53,7 +54,8 @@ import {
 import { subscribeGenerationTasks } from "@/services/api/task-center";
 import { creationConfigWithPreferences, useCreationAgentPreferences, useCreationPreferencesStore } from "@/stores/use-creation-preferences-store";
 import { useAssetStore, type Asset } from "@/stores/use-asset-store";
-import { loadAssetsForUse, saveRemoteUserDataNow } from "@/services/user-data-sync";
+import { createCanvasProjectWithRemoteSync, loadAssetsForUse, saveRemoteUserDataNow } from "@/services/user-data-sync";
+import { flushCanvasStorePersistence } from "@/stores/canvas/use-canvas-store";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
 import { resolveCreationCopy } from "@/lib/creation-copy";
 import { cn } from "@/lib/utils";
@@ -103,6 +105,7 @@ import {
     creationModelCapability,
     defaultCreationMode,
     modeLabels,
+    creationModelKey,
     type CreationConversation,
     type CreationHistoryEntry,
     type CreationMessage,
@@ -137,8 +140,16 @@ import {
 } from "./creation-conversations";
 import { CreationComposer, CreationHistoryDrawer, CreationMessageView, CreationPlayStrip, CreationWorkspaceToolbar, creationAssetCategoryLabels } from "./creation-workspace";
 import { CreationAmbientBackdrop, CreationLaunchBackdrop, latestCreationResultImage } from "./creation-backdrops";
+import { creationAgentPreauthorizedCredits, useCreationAgentEstimate } from "./creation-agent-estimate";
+import { CreationSurfaceSwitch, type CreationSurface } from "./creation-workspace-empty";
+import { creationHistoryFingerprint, forgetSyncedCreationHistory, rememberSyncedCreationHistory, syncedCreationHistoryFingerprint } from "./creation-history-sync-cache";
 import { CreationIcon } from "./creation-icons";
-import type { CreationResultImageHandler } from "./creation-workspace-messages";
+import type { CreationResultImageHandler, CreationResultImageRef } from "./creation-workspace-messages";
+import { creationImageSettingsForSource, loadCreationResultImage, regionEditDisplayPrompt, renderExpandedImage, type CreationImageSettingsPatch, type CreationPixelSize } from "./creation-image-tools";
+import type { CanvasImageRegionEditPayload } from "@/components/canvas/canvas-node-region-edit-dialog";
+import { buildRegionEditPrompt } from "@/lib/canvas/image-region-edit";
+import { dataUrlToFile } from "@/lib/image-utils";
+import type { ReferenceImage } from "@/types/image";
 import { resolveResourceUrl } from "@/services/api/resources";
 import { declaredInspirationSources } from "@/lib/inspirations/catalog";
 import { fillablePrompt } from "@/lib/inspirations/resolve";
@@ -175,6 +186,11 @@ import type { AgentPermissionMode } from "@/services/api/agent";
 import { creationAgentInterjectionRun, pendingCreationAgentInterjection, submitCreationAgentInterjection, upsertCreationAgentInterjection } from "./creation-agent-interjection";
 
 const AssetLibraryPickerModal = lazy(() => import("@/components/assets/asset-library-picker-modal").then((module) => ({ default: module.AssetLibraryPickerModal })));
+const CanvasNodeRegionEditDialog = lazy(() => import("@/components/canvas/canvas-node-region-edit-dialog").then((module) => ({ default: module.CanvasNodeRegionEditDialog })));
+
+// 高清、扩图只填输入框；用户已经写了提示词时不覆盖。
+const UPSCALE_STARTER_PROMPT = "高清重绘：保持画面内容、构图、人物和颜色不变，提升清晰度和细节，去掉噪点、模糊和压缩痕迹";
+const EXPAND_STARTER_PROMPT = "扩图：中间是原图，保持不变；把四周模糊的部分补全成与原图自然衔接的完整画面，不要留下模糊、边框或拼接痕迹";
 const InspirationHall = lazy(() => import("@/pages/inspirations"));
 const loadCreationRuntime = () => import("./creation-runtime");
 type CreationRuntime = Awaited<ReturnType<typeof loadCreationRuntime>>;
@@ -276,6 +292,8 @@ export default function CreatePage() {
     const navigate = useNavigate();
     const location = useLocation();
     const [openingCanvas, setOpeningCanvas] = useState(false);
+    // 标题下方的"生成 | 画布"；只在空态出现，不记到偏好里。
+    const [creationSurface, setCreationSurface] = useState<CreationSurface>("generate");
     const setLoginDialogOpen = (open: boolean) => { if (open) openLoginModal({ description: "登录后即可继续创作，你的输入会保留" }); };
     const openingCanvasRef = useRef(false);
     const appearance = useAppearanceStore((state) => state.appearance);
@@ -371,6 +389,9 @@ export default function CreatePage() {
         agentVideoSettings,
         setAgentVideoSettings,
     } = useCreationAgentPreferences();
+    const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
+    // 自动模式发送前显示"约 N 积分"（1 张当前图片模型）；需要确认的模式下点发送即同意 N × 1.2 以内的消耗。
+    const agentEstimateCredits = useCreationAgentEstimate(config, config.imageModel, creditsEnabled && mode === "agent" && agentPermissionMode !== "read_only");
     const [agentConnectionError, setAgentConnectionError] = useState("");
     const [agentConnectionEpoch, setAgentConnectionEpoch] = useState(0);
     const [agentTaskSyncFailures, setAgentTaskSyncFailures] = useState<Set<string>>(new Set());
@@ -391,6 +412,7 @@ export default function CreatePage() {
     const [imageParameters, setImageParameters] = useState("{}");
     const [videoQuality, setVideoQuality] = useState(config.vquality || "720");
     const [count, setCount] = useState(String(Math.max(1, Math.min(4, Number(config.count) || 1))));
+    const [audioSettings, setAudioSettings] = useState<Partial<Pick<AiConfig, CanvasAudioSettingKey>>>({});
     const [textStreaming, setTextStreaming] = useState(() => readComposerPref(TEXT_STREAMING_PREF_KEY, true));
     const [textThinking, setTextThinking] = useState(() => readComposerPref(TEXT_THINKING_PREF_KEY, false));
     const [busy, setBusy] = useState(false);
@@ -424,6 +446,12 @@ export default function CreatePage() {
     const smartPlanningGateRef = useRef(createCreationSubmitGate());
     const pendingRetryRef = useRef<{ context?: CreationRetryContext; lockKey: string } | null>(null);
     const [retrySequence, setRetrySequence] = useState(0);
+    // 局部修改：弹窗确认后先切到图片模式和弹窗选的模型，等下一次渲染拿到新状态再提交。
+    const pendingGenerationOverrideRef = useRef<HomepageGenerationOverride | null>(null);
+    const [generationOverrideSequence, setGenerationOverrideSequence] = useState(0);
+    const [regionEditTarget, setRegionEditTarget] = useState<{ image: CreationResultImageRef; url: string; size?: string; quality?: string } | null>(null);
+    // 高清/扩图/局部修改在读图、上传期间不接受第二次点击。
+    const resultImagePreparingRef = useRef(false);
     const [composerPreferencesInitialized, setComposerPreferencesInitialized] = useState(false);
     promptRef.current = prompt;
     attachmentsRef.current = attachments;
@@ -460,7 +488,7 @@ export default function CreatePage() {
     }, [activeId, conversations, historyPending]);
     const pendingApprovals = historyConversations.filter((conversation) => conversation.agentApproval);
     const pendingApproval = pendingApprovals.find((conversation) => conversation.id === activeId) || pendingApprovals[0];
-    const preferredModel = mode === "text" || mode === "agent" ? config.textModel : mode === "image" ? config.imageModel : config.videoModel;
+    const preferredModel = mode === "text" || mode === "agent" ? config.textModel : mode === "image" ? config.imageModel : mode === "video" ? config.videoModel : config.audioModel;
     const hasPrompt = Boolean(prompt.trim());
     const modelRequirements = useMemo<ModelRequirements>(
         () => ({
@@ -490,18 +518,22 @@ export default function CreatePage() {
         [attachments, config, preferredModel, count, hasPrompt, imageResolution, imageParameters, mode, quality, ratio, seconds, smartCreationActive, videoQuality],
     );
     const selectedModel = mode === "agent" ? preferredModel : resolveCompatibleModel(config, preferredModel, modelRequirements) || preferredModel;
-    const generationConfig = useMemo(() => (mode === "video" ? creationVideoConfig(config, selectedModel, { ratio, seconds, videoQuality }) : config), [config, mode, ratio, seconds, selectedModel, videoQuality]);
+    // 音频设置（音色、格式、语速…）只在本页生效：从账号默认值开始，切换音频模型后清空重来。
+    const audioConfig = useMemo<AiConfig>(() => ({ ...config, ...audioSettings, model: mode === "audio" ? selectedModel : config.audioModel, audioModel: mode === "audio" ? selectedModel : config.audioModel }), [audioSettings, config, mode, selectedModel]);
+    const generationConfig = useMemo(() => (mode === "video" ? creationVideoConfig(config, selectedModel, { ratio, seconds, videoQuality }) : mode === "audio" ? audioConfig : config), [audioConfig, config, mode, ratio, seconds, selectedModel, videoQuality]);
     const imageProfile = useMemo(() => modelCapabilityConfigFor(config, selectedModel).image!, [config, selectedModel]);
     const videoProfile = useMemo(() => modelCapabilityConfigFor(config, selectedModel).video!, [config, selectedModel]);
     // 同名逻辑模型可能把文生视频、图生视频和全模态参考拆到不同路由。
     // 入口需要展示整个模型组的引用能力，添加素材后再由兼容路由选择具体模型。
     const videoReferenceLimits = useMemo(() => (mode === "video" ? modelGroupReferenceLimits(config, preferredModel || selectedModel, "video") || { maxImages: 0, maxVideos: 0, maxAudios: 0 } : undefined), [config, mode, preferredModel, selectedModel]);
     const maxReferences =
-        mode === "video"
-            ? (videoReferenceLimits?.maxImages || 0) + (videoReferenceLimits?.maxVideos || 0) + (videoReferenceLimits?.maxAudios || 0)
-            : mode === "image"
-              ? imageProfile.references.maxImages
-              : creationAgentImageReferenceLimit(config, config.textModel);
+        mode === "audio"
+            ? 0
+            : mode === "video"
+              ? (videoReferenceLimits?.maxImages || 0) + (videoReferenceLimits?.maxVideos || 0) + (videoReferenceLimits?.maxAudios || 0)
+              : mode === "image"
+                ? imageProfile.references.maxImages
+                : creationAgentImageReferenceLimit(config, config.textModel);
     const referenceImageSize = useMemo(() => {
         const imageAttachments = attachments.filter(isImageAttachment);
         if (imageAttachments.length !== 1) return undefined;
@@ -808,7 +840,9 @@ export default function CreatePage() {
                 conversationSaveChainRef.current = save;
                 await save;
             }
-            cloudHistoryFingerprintsRef.current.set(conversation.id, JSON.stringify(creationHistoryInput(conversation)));
+            const fingerprint = creationHistoryFingerprint(creationHistoryInput(conversation));
+            cloudHistoryFingerprintsRef.current.set(conversation.id, fingerprint);
+            rememberSyncedCreationHistory(conversation.id, fingerprint);
             setCloudHistoryError("");
             return id;
         },
@@ -823,7 +857,9 @@ export default function CreatePage() {
                 for (const conversation of conversationsRef.current) {
                     if (cancelled) break;
                     if (!conversation.messages.length || historyRecoveryDeletedRef.current.has(conversation.agentSessionId || conversation.id)) continue;
-                    if (cloudHistoryFingerprintsRef.current.get(conversation.id) === JSON.stringify(creationHistoryInput(conversation))) continue;
+                    // 内容和上次成功写入的一样就跳过；摘要按账号存在本机，重新打开页面也不整份重传。
+                    const fingerprint = creationHistoryFingerprint(creationHistoryInput(conversation));
+                    if (cloudHistoryFingerprintsRef.current.get(conversation.id) === fingerprint || syncedCreationHistoryFingerprint(conversation.id) === fingerprint) continue;
                     try {
                         await syncConversationHistory(conversation);
                     } catch (error) {
@@ -946,12 +982,9 @@ export default function CreatePage() {
         setMode(next);
         updateActive((conversation) => selectCreationConversationMode(conversation, next));
         if (next !== "agent") rememberMode(next);
-        const capability = next === "agent" ? "text" : next;
-        const nextModels = selectableModelsByCapability(config, capability);
-        const current = capability === "text" ? config.textModel : capability === "image" ? config.imageModel : config.videoModel;
-        if (!nextModels.includes(current) && nextModels[0]) {
-            updateConfig(capability === "text" ? "textModel" : capability === "image" ? "imageModel" : "videoModel", nextModels[0]);
-        }
+        const key = creationModelKey(next);
+        const nextModels = selectableModelsByCapability(config, creationModelCapability(next));
+        if (!nextModels.includes(config[key]) && nextModels[0]) updateConfig(key, nextModels[0]);
     };
 
     const executeSmartCreationPlan = async (plan: SmartCreationAgentPlan, requestAttachments: CreationAttachment[], displayPrompt = plan.intent, parentUserMessageId?: string) => {
@@ -1268,7 +1301,10 @@ export default function CreatePage() {
         styleFingerprint?: string;
         attachments?: CreationAttachment[];
         displayPrompt?: string;
-        source?: "homepage-agent" | "smart-creation-agent";
+        /** create-page：本页自己的操作（局部修改）；失败已写进结果卡，不再向调用方抛出。 */
+        source?: "homepage-agent" | "smart-creation-agent" | "create-page";
+        /** 透明像素为可编辑区域；只在模型支持蒙版时传。 */
+        mask?: ReferenceImage;
         batchId?: string;
         batchMessageId?: string;
         batchTotal?: number;
@@ -1575,6 +1611,8 @@ export default function CreatePage() {
                               durationSeconds: agentVideoSettings.durationSeconds,
                           },
                           budget: agentBudget,
+                          // 待确认的旧请求按原额度核对指纹，避免报价刷新后被误判为另一次提交。
+                          preauthorizedCredits: pending ? pending.request.budget?.autoApproveCredits : creationAgentPreauthorizedCredits(agentEstimateCredits, agentBudget.maxCredits),
                           attachments: action ? [] : attachments,
                           attachmentMode: action ? "inherit" : agentAttachmentSelection.attachmentMode,
                           outputPreference: pending ? pending.request.outputPreference : agentOutputPreference,
@@ -1807,7 +1845,7 @@ export default function CreatePage() {
         followLatestMessageRef.current = true;
         const batchSubmission = Boolean(generationOverride?.batchMessageId);
         const clientOperationId = retryContext?.clientOperationId || createClientId();
-        const trackSubmission = !batchSubmission && (mode === "image" || mode === "video");
+        const trackSubmission = !batchSubmission && (mode === "image" || mode === "video" || mode === "audio");
         const userMessage = newMessage("user", generationOverride?.displayPrompt || text, { mode, model: requestModel, attachments: requestAttachments, references, settings });
         const assistantMessage = batchSubmission
             ? ({ id: generationOverride!.batchMessageId!, createdAt: new Date().toISOString() } as CreationMessage)
@@ -1875,6 +1913,7 @@ export default function CreatePage() {
             imageParameters: normalizedImage?.imageParameters || imageParameters,
             videoModel: requestModel,
             textModel: requestModel,
+            audioModel: requestModel,
             ...(mode === "image" ? { size: normalizedImage?.size || requestRatio, quality: normalizedImage?.quality || requestQuality, count: normalizedImage?.count || requestCount, videoSeconds: config.videoSeconds } : {}),
         };
         try {
@@ -1930,6 +1969,7 @@ export default function CreatePage() {
                         prompt: expandedPrompt,
                         config: { ...requestConfig, count: "1" },
                         referenceImages,
+                        ...(generationOverride?.mask ? { mask: generationOverride.mask } : {}),
                         signal: requestLifecycle.signal,
                         metadata: {
                             source: generationOverride?.source || (generationOverride ? "homepage-agent" : "create-page"),
@@ -1990,6 +2030,36 @@ export default function CreatePage() {
                 }
                 if (failedCount) toast.warning(`${completedCount} 张图片已生成，${failedCount} 张生成失败`);
                 if (!batchSubmission) updateOriginAssistant((item) => ({ ...item, content: failedCount ? `${completedCount} 张图片已生成，${failedCount} 张失败` : "图片已生成" }));
+            } else if (mode === "audio") {
+                // 和视频同一条路：一个后端任务、一个结果，物化成音频素材后写回结果卡。
+                const result = await runtime.runGenerationOperationOnce(clientOperationId, () =>
+                    runtime.runBackendGenerationTask({
+                        mode: "audio",
+                        prompt: expandedPrompt,
+                        config: requestConfig,
+                        signal: requestLifecycle.signal,
+                        metadata: { source: "create-page", conversationId: activeConversation.id, messageId: assistantMessage.id, ...referenceMetadata },
+                        onTaskUpdate: bindTask,
+                        onSubmissionUnconfirmed: finishSubmitting,
+                        ...retryContext,
+                        clientOperationId,
+                    }),
+                );
+                if (!result.audio?.dataUrl && !result.audios?.some((audio) => audio.dataUrl)) throw new Error("后端任务没有返回音频");
+                const taskId = Array.from(boundTaskIds)[0];
+                if (!taskId) throw new Error("生成任务缺少稳定任务标识");
+                const task = completedCreationGenerationTask(runtime, { taskId, task: boundTasks.get(taskId), mode: "audio", prompt: expandedPrompt, result, conversationId: activeConversation.id, messageId: assistantMessage.id });
+                const materialized = await runtime.consumeGenerationTaskMessage(
+                    task,
+                    assistantMessage.id,
+                    async ({ resultUrls, resultStorageKeys, effectKey }) => {
+                        await updateOriginAssistant(
+                            (item) => runtime.applyGenerationConsumerEffect(item, effectKey, (current) => ({ ...current, status: "done" as const, content: "音频已生成", resultUrls, ...(resultStorageKeys.length ? { resultStorageKeys } : {}) })).value,
+                        );
+                    },
+                    { signal: requestLifecycle.signal },
+                );
+                if (!runtime.generationTaskMaterializedUrls(materialized)[0]) throw new Error("音频结果资源不可用");
             } else {
                 const result = await runtime.runGenerationOperationOnce(clientOperationId, () =>
                     runtime.runBackendGenerationTask({
@@ -2046,7 +2116,7 @@ export default function CreatePage() {
                 }),
             );
             if ((!batchSubmission && cancelled) || (unmountedRef.current && boundTaskIds.size > 0)) return;
-            if (generationOverride) throw error;
+            if (generationOverride && generationOverride.source !== "create-page") throw error;
         } finally {
             if (trackSubmission) finishSubmitting();
             for (const taskId of boundTaskIds) activeGenerationTaskIdsRef.current.delete(taskId);
@@ -2067,6 +2137,15 @@ export default function CreatePage() {
         pendingRetryRef.current = null;
         void submit(pending.context, pending.lockKey, undefined, true);
     }, [retrySequence]);
+
+    useEffect(() => {
+        if (!generationOverrideSequence) return;
+        const pending = pendingGenerationOverrideRef.current;
+        if (!pending) return;
+        pendingGenerationOverrideRef.current = null;
+        // 结果卡出现之前的拒绝（模型未配置、参考图超限、已有任务在提交）只会抛出，这里提示。
+        void submit(undefined, undefined, pending).catch((error: unknown) => toast.error(generationErrorMessage(error)));
+    }, [generationOverrideSequence]);
 
     const startNewConversation = () => {
         cancelHistorySelection();
@@ -2124,6 +2203,46 @@ export default function CreatePage() {
             navigate(`/canvas/${result.id}?${params.toString()}`);
         } catch (cause) {
             if (scope === getActiveUserScope()) toast.error(cause instanceof Error ? cause.message : "转入画布失败，原会话已保留");
+        } finally {
+            openingCanvasRef.current = false;
+            setOpeningCanvas(false);
+        }
+    };
+
+    // "画布"模式的发送：新建画布，把参考图作为素材带过去，再把这句话交给画布里的阿Q 自动发出。
+    const submitToCanvas = async () => {
+        const text = prompt.trim();
+        if ((!text && !attachments.length) || openingCanvasRef.current || busy) return;
+        if (!smartCreationUserId) {
+            setLoginDialogOpen(true);
+            return;
+        }
+        openingCanvasRef.current = true;
+        setOpeningCanvas(true);
+        const scope = getActiveUserScope();
+        try {
+            const assets = useAssetStore.getState().assets;
+            const keys = new Set(attachments.map((attachment) => attachment.storageKey).filter(Boolean));
+            const assetIds = [...new Set(assets.filter((asset) => (asset.kind === "image" || asset.kind === "video") && asset.data.storageKey && keys.has(asset.data.storageKey)).map((asset) => asset.id))];
+            if (assetIds.length < keys.size || attachments.some((attachment) => !attachment.storageKey)) toast.warning("部分参考内容还没保存到素材库，没有带进画布");
+            if (assetIds.length) await saveRemoteUserDataNow([]);
+            const { id, syncError } = await createCanvasProjectWithRemoteSync(text.slice(0, 24) || "未命名画布");
+            await flushCanvasStorePersistence();
+            if (scope !== getActiveUserScope()) return;
+            if (syncError) toast.warning("画布已保存在本机，云端同步尚未完成，将自动重试。");
+            const params = new URLSearchParams();
+            if (text) params.set("agentPrompt", text);
+            else params.set("agent", "1");
+            if (assetIds.length) {
+                params.set("mode", "handoff");
+                assetIds.forEach((assetId) => params.append("asset", assetId));
+            }
+            setPrompt("");
+            setAttachments([]);
+            setDraftReferences([]);
+            navigate(`/canvas/${id}?${params.toString()}`);
+        } catch (cause) {
+            if (scope === getActiveUserScope()) toast.error(cause instanceof Error ? cause.message : "新建画布失败，输入已保留");
         } finally {
             openingCanvasRef.current = false;
             setOpeningCanvas(false);
@@ -2334,7 +2453,7 @@ export default function CreatePage() {
         setAttachments(nextAttachments);
         attachmentsRef.current = nextAttachments;
         setDraftReferences(item.references ? [...item.references] : []);
-        if (item.model) updateConfig(nextMode === "text" || nextMode === "agent" ? "textModel" : nextMode === "image" ? "imageModel" : "videoModel", item.model);
+        if (item.model) updateConfig(creationModelKey(nextMode), item.model);
         if (!nextSettings) return;
         setRatio(nextSettings.ratio);
         setSeconds(nextSettings.seconds);
@@ -2559,30 +2678,136 @@ export default function CreatePage() {
         restoreMessageDraft(previous);
     };
 
-    // 结果图上的操作条：把这张图作为参考放进输入框，变体/转视频再补一句提示词开头。
-    // 只填输入框、不直接生成；用户已经写了提示词时不覆盖。数量超出模型上限由发送前的统一校验处理。
-    const reuseResultImage: CreationResultImageHandler = (image, intent) => {
-        if (busy || (!image.url && !image.storageKey)) return;
+    const resultImageAttachment = (image: CreationResultImageRef, size?: CreationPixelSize): CreationAttachment => {
         const url = resolveResourceUrl(image.storageKey, image.url);
-        const attachment: CreationAttachment = {
-            id: `result:${image.storageKey || image.url}`,
-            name: `生成结果 ${image.index + 1}`,
-            type: "image/png",
-            dataUrl: url,
-            url,
-            storageKey: image.storageKey,
-            previewUrl: image.url || url,
-        };
-        if (intent === "video") selectMode("video");
+        return { id: `result:${image.storageKey || image.url}`, name: `生成结果 ${image.index + 1}`, type: "image/png", dataUrl: url, url, storageKey: image.storageKey, previewUrl: image.url || url, ...size };
+    };
+    const fillComposerWithImage = (attachment: CreationAttachment, starter: string) => {
         const next = [...attachmentsRef.current.filter((item) => item.id !== attachment.id), attachment];
         attachmentsRef.current = next;
         setAttachments(next);
-        const starter = intent === "variant" ? "保持主体和风格，换一种构图和光线，再出一版" : intent === "video" ? "让画面动起来：镜头缓慢推近，人物和场景保持不变" : "";
         if (starter && !promptRef.current.trim()) {
             promptRef.current = starter;
             setPrompt(starter);
         }
         window.requestAnimationFrame(() => composerFocusRef.current?.focus());
+    };
+    const savedImageSettings = (): CreationImageSettingsPatch => {
+        const saved = useCreationPreferencesStore.getState().preferences.image;
+        return { ratio: saved?.ratio, quality: saved?.quality, imageResolution: saved?.imageResolution };
+    };
+    // 和在参数面板里手动选一样写进偏好：切到图片模式时，参数按偏好恢复，不会被冲掉。
+    const applyImageSettingsPatch = (patch: CreationImageSettingsPatch) => {
+        const remembered: CreationImageSettingsPatch = {};
+        if (patch.ratio) {
+            setRatio(patch.ratio);
+            remembered.ratio = patch.ratio;
+        }
+        if (patch.quality) {
+            setQuality(patch.quality);
+            remembered.quality = patch.quality;
+        }
+        if (patch.imageResolution) {
+            setImageResolution(patch.imageResolution);
+            remembered.imageResolution = patch.imageResolution;
+        }
+        if (Object.keys(remembered).length) rememberImageSettings(remembered);
+    };
+    // 高清：原图作为参考，按原图比例取模型最高档重绘。扩图：上传四周铺了模糊边的 1.5 倍底图，沿用当前档位。
+    const prepareResultImage = async (image: CreationResultImageRef, intent: "upscale" | "expand") => {
+        const loaded = await loadCreationResultImage({ url: resolveResourceUrl(image.storageKey, image.url), storageKey: image.storageKey });
+        const profile = mergedImageCapabilityConfig(config, config.imageModel);
+        let attachment: CreationAttachment;
+        let patch: CreationImageSettingsPatch;
+        if (intent === "expand") {
+            const hide = toast.loading("正在生成扩图底图…", 0);
+            try {
+                const expanded = await renderExpandedImage(loaded.element);
+                const { attachment: uploaded } = await uploadCreationAsset(expanded.file);
+                attachment = { ...uploaded, name: "扩图底图", width: expanded.width, height: expanded.height };
+                patch = creationImageSettingsForSource(profile, expanded, "current", savedImageSettings());
+            } finally {
+                hide();
+            }
+        } else {
+            attachment = resultImageAttachment(image, loaded.size);
+            patch = creationImageSettingsForSource(profile, loaded.size, "highest");
+        }
+        selectMode("image");
+        applyImageSettingsPatch(patch);
+        fillComposerWithImage(attachment, intent === "expand" ? EXPAND_STARTER_PROMPT : UPSCALE_STARTER_PROMPT);
+    };
+    const openRegionEdit = async (image: CreationResultImageRef) => {
+        const url = resolveResourceUrl(image.storageKey, image.url);
+        const saved = savedImageSettings();
+        let size: string | undefined;
+        try {
+            const loaded = await loadCreationResultImage({ url, storageKey: image.storageKey });
+            size = creationImageSettingsForSource(mergedImageCapabilityConfig(config, config.imageModel), loaded.size, "current", saved).ratio;
+        } catch {
+            // 读图失败由弹窗自己提示；尺寸沿用上次的图片设置。
+        }
+        setRegionEditTarget({ image, url, size: size || saved.ratio, quality: saved.quality });
+    };
+    // 局部修改：和画布的区域编辑同一套提示词。能收两张参考图时附带编号标注图，支持蒙版时再用蒙版锁住框外像素。
+    const confirmRegionEdit = async (target: { image: CreationResultImageRef }, payload: CanvasImageRegionEditPayload) => {
+        const model = payload.generationConfig?.imageModel || payload.generationConfig?.model || config.imageModel;
+        const profile = modelCapabilityConfigFor(config, model).image;
+        const maxReferenceImages = profile?.references.maxImages ?? 0;
+        if (!payload.regions.length) return void toast.warning("请先框选需要修改的区域");
+        if (maxReferenceImages < 1) return void toast.error("当前图片模型不支持参考图编辑，请换一个支持图片编辑的模型");
+        if (busy || resultImagePreparingRef.current) return void toast.info("上一条还在提交，请稍候再试");
+        const useAnnotatedReference = maxReferenceImages >= 2;
+        const useMask = Boolean(profile?.references.maskSupported);
+        setRegionEditTarget(null);
+        resultImagePreparingRef.current = true;
+        const hide = useAnnotatedReference ? toast.loading("正在上传标注图…", 0) : undefined;
+        try {
+            const source = resultImageAttachment(target.image, payload.size);
+            const annotated = useAnnotatedReference ? (await uploadCreationAsset(dataUrlToFile({ id: "region-annotated", name: "局部修改标注.jpg", type: "image/jpeg", dataUrl: payload.annotatedDataUrl }))).attachment : undefined;
+            const size = payload.generationConfig?.size || savedImageSettings().ratio || ratio;
+            const requestQuality = payload.generationConfig?.quality || savedImageSettings().quality || quality;
+            const imageCount = Math.max(1, Math.floor(Number(payload.generationConfig?.count) || 1));
+            if (model !== config.imageModel) updateConfig("imageModel", model);
+            selectMode("image");
+            pendingGenerationOverrideRef.current = {
+                itemId: "",
+                queuePosition: 0,
+                queueSize: 0,
+                source: "create-page",
+                prompt: buildRegionEditPrompt({ prompt: payload.prompt, regions: payload.regions, size: payload.size, annotatedReference: useAnnotatedReference, mask: useMask }),
+                displayPrompt: regionEditDisplayPrompt(payload.prompt),
+                attachments: annotated ? [source, { ...annotated, name: "局部修改标注" }] : [source],
+                ...(useMask ? { mask: { id: "region-mask", name: "mask.png", type: "image/png", dataUrl: payload.maskDataUrl } } : {}),
+                imageCount,
+                settings: { model, size, aspectRatio: size, quality: requestQuality, count: imageCount },
+            };
+            setGenerationOverrideSequence((current) => current + 1);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "局部修改提交失败，请重试");
+        } finally {
+            hide?.();
+            resultImagePreparingRef.current = false;
+        }
+    };
+
+    // 结果图上的操作条。变体/转视频/作为参考：把这张图作为参考放进输入框，变体/转视频再补一句提示词开头。
+    // 高清/扩图：切到图片生成，填好参考图、尺寸和提示词，由用户点发送。局部修改：在框选弹窗里确认后直接生成。
+    // 都不覆盖用户已经写好的提示词；数量超出模型上限由发送前的统一校验处理。
+    const reuseResultImage: CreationResultImageHandler = (image, intent) => {
+        if (busy || resultImagePreparingRef.current || (!image.url && !image.storageKey)) return;
+        if (intent === "inpaint" || intent === "upscale" || intent === "expand") {
+            resultImagePreparingRef.current = true;
+            void (intent === "inpaint" ? openRegionEdit(image) : prepareResultImage(image, intent))
+                .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "图片处理失败，请重试"))
+                .finally(() => {
+                    resultImagePreparingRef.current = false;
+                });
+            return;
+        }
+        if (intent === "video") selectMode("video");
+        const starter = intent === "variant" ? "保持主体和风格，换一种构图和光线，再出一版" : intent === "video" ? "让画面动起来：镜头缓慢推近，人物和场景保持不变" : "";
+        fillComposerWithImage(resultImageAttachment(image), starter);
     };
 
     useCreationHomeNavigation(hydrated && composerPreferencesHydrated, startNewConversation);
@@ -2672,7 +2897,12 @@ export default function CreatePage() {
         imageProfile,
         videoProfile,
         config: generationConfig,
-        onModelChange: (value: string) => updateConfig(mode === "text" || mode === "agent" ? "textModel" : mode === "image" ? "imageModel" : "videoModel", value),
+        onModelChange: (value: string) => {
+            if (mode === "audio" && value !== selectedModel) setAudioSettings({});
+            updateConfig(creationModelKey(mode), value);
+        },
+        audioConfig,
+        onAudioSettingChange: (key: CanvasAudioSettingKey, value: string) => setAudioSettings((current) => ({ ...current, [key]: value })),
         ratio,
         setRatio: setComposerRatio,
         seconds,
@@ -2702,7 +2932,8 @@ export default function CreatePage() {
         onToggleSmartCreation: () => setSmartCreationActive((active) => !active),
         composerFocusRef,
         onPromptFocus: loadAddedSkills,
-        onSubmit: () => void submit(),
+        // 空态选了"画布"时，发送 = 新建画布并把这句话和参考图交给画布里的阿Q；对话中始终在这里生成。
+        onSubmit: () => void (isEmpty && creationSurface === "canvas" ? submitToCanvas() : submit()),
         agentPermissionMode,
         onAgentPermissionChange: setAgentPermissionMode,
         agentOutputPreference,
@@ -2710,6 +2941,7 @@ export default function CreatePage() {
         agentContextView,
         agentInputError,
         agentImageModel: config.imageModel,
+        agentEstimateCredits,
         agentImageSelectionMode,
         agentVideoSelectionMode,
         onAgentImageSelectionModeChange: setAgentImageSelectionMode,
@@ -2745,6 +2977,7 @@ export default function CreatePage() {
                             type="button"
                             onClick={() => {
                                 cloudHistoryFingerprintsRef.current.clear();
+                                forgetSyncedCreationHistory();
                                 setConversations([...conversationsRef.current]);
                             }}
                         >
@@ -2812,6 +3045,8 @@ export default function CreatePage() {
                                         <span>历史对话</span>
                                     </button>
                                 </header>
+                                <CreationSurfaceSwitch value={creationSurface} onChange={setCreationSurface} disabled={openingCanvas} />
+                                {creationSurface === "canvas" ? <p className="creation-surface-hint">发送后新建画布，交给画布里的阿Q 接着做</p> : null}
                                 <div className="creation-composer-stage is-home-mode">
                                     <div className="creation-empty-composer">
                                         <CreationComposer {...composerProps} variant="empty" />
@@ -2977,6 +3212,24 @@ export default function CreatePage() {
                         }}
                         onClose={() => setLibraryOpen(false)}
                         onConfirm={handleLibrarySelect}
+                    />
+                </Suspense>
+            ) : null}
+            {regionEditTarget ? (
+                <Suspense fallback={null}>
+                    <CanvasNodeRegionEditDialog
+                        open
+                        image={{ url: regionEditTarget.url, storageKey: regionEditTarget.image.storageKey }}
+                        config={{
+                            ...config,
+                            model: config.imageModel,
+                            imageModel: config.imageModel,
+                            ...(regionEditTarget.size ? { size: regionEditTarget.size } : {}),
+                            ...(regionEditTarget.quality ? { quality: regionEditTarget.quality } : {}),
+                            count: "1",
+                        }}
+                        onClose={() => setRegionEditTarget(null)}
+                        onConfirm={(payload) => void confirmRegionEdit(regionEditTarget, payload)}
                     />
                 </Suspense>
             ) : null}

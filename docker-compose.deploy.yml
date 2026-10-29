@@ -44,6 +44,7 @@ services:
     environment:
       YINGCE_AGENT_TOKEN: ${YINGCE_AGENT_TOKEN:?请先配置 YINGCE_AGENT_TOKEN}
       MAX_CONCURRENT_SESSIONS: ${YINGCE_AGENT_MAX_SESSIONS:-30}
+      YINGCE_AGENT_PREWARM: ${YINGCE_AGENT_PREWARM:-2}
       NODE_MAX_OLD_SPACE_SIZE: ${YINGCE_AGENT_NODE_MEMORY_MB:-512}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]

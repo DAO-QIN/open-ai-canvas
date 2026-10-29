@@ -8,6 +8,7 @@ import { readAnnouncementPendingReview } from "./components/admin-announcement-s
 import { BillingAutoRefundToggle } from "./components/billing-auto-refund-toggle";
 
 const AnalyticsPanel = lazy(() => import("./components/analytics-panel"));
+const CreationMetricsPanel = lazy(() => import("./components/creation-metrics-panel"));
 const AdminAnnouncementsPanel = lazy(() => import("./components/admin-announcements-panel"));
 const AdminBannerAnnouncementsPanel = lazy(() => import("./components/admin-banner-announcements-panel"));
 const CreditOperationsPanel = lazy(() => import("./components/credit-operations-panel"));
@@ -21,6 +22,7 @@ export function AnalyticsPage() {
     const { references } = useAdminContext();
     return (
         <AdminPageFrame title="运行总览" description="请求质量、任务队列与成本 · 趋势按自然日统计" scroll>
+            <CreationMetricsPanel />
             <AnalyticsPanel users={references.users} channels={references.channels} />
         </AdminPageFrame>
     );

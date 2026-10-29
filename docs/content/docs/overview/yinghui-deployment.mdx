@@ -32,6 +32,8 @@ curl -fsSL https://raw.githubusercontent.com/DAO-QIN/open-ai-canvas/main/scripts
 
 backend 与独立 Agent 使用同一个 `YINGCE_AGENT_TOKEN`。两种安装脚本均为新环境生成该令牌；已有环境需显式配置至少 32 字符的随机值，不再借用更新器令牌。源码部署不需要 `CANVAS_UPDATER_TOKEN`，缺少 Agent 令牌时应停止，不能以空令牌启动。
 
+独立 Agent 默认预先启动 2 个空闲的 Pi 运行时进程，新会话取得名额后直接使用，省去加载依赖的时间；数量由 `.env` 中的 `YINGCE_AGENT_PREWARM` 设置（0–4，0 关闭）。预热进程不占同时对话名额，但每个都常驻一份 Node 内存，后台“系统性能”页显示当前预热数与目标数。
+
 ## 手工构建时的版本信息
 
 已有经过确认的环境配置时，在仓库根目录导出实际源码元数据后构建：

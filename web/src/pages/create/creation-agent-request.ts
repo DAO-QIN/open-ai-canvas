@@ -54,6 +54,8 @@ export type CreationAgentRequestOptions = {
     attachments?: InputAttachment[];
     attachmentMode?: "replace" | "inherit" | "append";
     budget?: { maxCredits: number; maxGenerationTasks: number; maxVideoSeconds: number };
+    /** 点发送即同意的额度（发送前预估 × 1.2）。只在需要确认的模式下随请求发送。 */
+    preauthorizedCredits?: number;
     skillIds?: string[];
 };
 
@@ -94,7 +96,12 @@ export function buildCreationAgentRunInput(input: CreationAgentRequestOptions): 
         ...(input.outputPreference ? { outputPreference: input.outputPreference } : {}),
         contextScope: [],
         contextSelection: { surface: "creation", scopes: [] },
-        budget: { maxCredits: budget.maxCredits, maxGenerationTasks: input.permissionMode === "read_only" ? 0 : budget.maxGenerationTasks, maxVideoSeconds: input.permissionMode === "read_only" ? 0 : budget.maxVideoSeconds },
+        budget: {
+            maxCredits: budget.maxCredits,
+            maxGenerationTasks: input.permissionMode === "read_only" ? 0 : budget.maxGenerationTasks,
+            maxVideoSeconds: input.permissionMode === "read_only" ? 0 : budget.maxVideoSeconds,
+            ...(input.permissionMode === "request_approval" && input.preauthorizedCredits && input.preauthorizedCredits > 0 ? { autoApproveCredits: Math.min(input.preauthorizedCredits, budget.maxCredits) } : {}),
+        },
         ...(attachmentMode ? { attachmentMode } : {}),
         ...(selectedAttachments.length || attachmentMode === "replace" ? { attachments: selectedAttachments.map(managedAttachment) } : {}),
         mediaSettings: {

@@ -27,7 +27,7 @@ func cloudAgentImageBatchProperties() map[string]any {
 	str := func(description string) map[string]any {
 		return map[string]any{"type": "string", "description": description}
 	}
-	return map[string]any{"items": map[string]any{"type": "array", "minItems": 2, "maxItems": 20, "items": map[string]any{
+	return map[string]any{"waitForResult": map[string]any{"type": "boolean", "description": "仅当本轮下一步要用这批新成品（例如再拿它们做视频）时设为 true，等真实结果再返回；默认整批受理即返回，结果完成后直接出现在对话里"}, "items": map[string]any{"type": "array", "minItems": 2, "maxItems": 20, "items": map[string]any{
 		"type": "object", "additionalProperties": false, "required": []string{"id", "title", "prompt"},
 		"properties": map[string]any{
 			"id": str("本批唯一图片交付项 ID，与阶段计划 ID 分开"), "title": str("这张图的标题"), "prompt": str("该图完整提示词；编辑时明确只改什么、保留什么"),
@@ -40,7 +40,8 @@ func cloudAgentImageBatchProperties() map[string]any {
 
 func (s *Service) prepareCloudAgentImageBatch(run *model.CloudAgentExecution, state *cloudAgentRuntime, call cloudAgentCall) (*cloudAgentCommerceBatch, error) {
 	var args struct {
-		Items []cloudAgentImageBatchItem `json:"items"`
+		Items         []cloudAgentImageBatchItem `json:"items"`
+		WaitForResult bool                       `json:"waitForResult,omitempty"`
 	}
 	if err := decodeCloudAgentJSONObject(call.Function.Arguments, &args); err != nil {
 		return nil, cloudAgentJSONArgumentError(err)
@@ -139,10 +140,17 @@ func (s *Service) advanceCloudAgentImageBatch(run *model.CloudAgentExecution, st
 		if err != nil {
 			return s.cloudAgentMediaError(run, state, "admission", false, false, err)
 		}
+		// 按预估授权：整批报价加上本轮已提交的占用不超过发送时同意的额度，就和自动模式一样直接执行。
+		executeDirectly := state.Request.PermissionMode == "auto"
+		if !executeDirectly {
+			if executeDirectly, err = s.cloudAgentCreationAutoApproves(run.UserID, state, batch.QuoteMicrocredits); err != nil {
+				return err
+			}
+		}
 		s.storageMu.Lock()
 		err = s.mutateCloudAgentTool(run, state, func(current *model.CloudAgentExecution, repo *repository.Repository) error {
 			cloudAgentImageBatchPlanEvent(state, run.ID, batch)
-			if state.Request.PermissionMode == "auto" {
+			if executeDirectly {
 				state.CommerceBatch = batch
 			} else {
 				preview := cloudAgentImageBatchPreview(batch)
@@ -156,7 +164,7 @@ func (s *Service) advanceCloudAgentImageBatch(run *model.CloudAgentExecution, st
 			return cloudAgentSave(current, state)
 		})
 		s.storageMu.Unlock()
-		if err != nil || state.Request.PermissionMode != "auto" {
+		if err != nil || !executeDirectly {
 			return err
 		}
 		latest, err := s.reloadCloudAgent(run)
@@ -248,11 +256,26 @@ func (s *Service) advanceCloudAgentImageBatch(run *model.CloudAgentExecution, st
 		}
 		results = append(results, result)
 	}
+	accepted := waiting != "" && !capacityBlocked && len(results) == len(batch.Items) && cloudAgentCreationBatchReturnsOnSubmit(state, call, batch)
 	return s.mutateCloudAgentTool(run, state, func(current *model.CloudAgentExecution, repo *repository.Repository) error {
 		cloudAgentBatchRecordCompleted(state, run.ID, batch, results)
 		batch.WaitingForCapacity = capacityBlocked
 		state.CommerceBatch = batch
 		state.MediaTaskID = waiting
+		if accepted {
+			// 提交即返回：整批都已受理就交还回执、结束这一轮；各张图完成后直接出现在对话里。
+			// 名额不够时仍留在这里补交，补齐后再返回。
+			cloudAgentBatchFinishStages(state, run.ID, batch, true)
+			state.CommerceBatch = nil
+			state.MediaTaskID = ""
+			if state.Approval != nil {
+				if err := repo.ReleaseCloudAgentResourceLeases(run.UserID, state.Approval.ID); err != nil {
+					return err
+				}
+			}
+			cloudAgentToolResult(run.ID, state, call, map[string]any{"phase": "accepted", "batchId": batch.PlanID, "total": len(batch.Items), "complete": false, "taskSubmitted": true, "delivery": "conversation", "batchResults": results, "estimatedCredits": math.Round(float64(batch.QuoteMicrocredits)/float64(CreditScale)*10000) / 10000, "instruction": cloudAgentCreationAcceptedInstruction}, nil)
+			return cloudAgentSave(current, state)
+		}
 		if waiting == "" && !capacityBlocked {
 			allSucceeded := true
 			for _, result := range results {

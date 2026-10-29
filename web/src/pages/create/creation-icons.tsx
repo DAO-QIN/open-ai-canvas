@@ -3,7 +3,26 @@
 
 import type { ReactNode, SVGProps } from "react";
 
-export type CreationIconName = "auto" | "image" | "video" | "film" | "check" | "chevronDown" | "send" | "reference" | "toVideo" | "canvas" | "download" | "edit" | "generate" | "variant" | "skill";
+export type CreationIconName =
+    | "auto"
+    | "image"
+    | "video"
+    | "audio"
+    | "film"
+    | "check"
+    | "chevronDown"
+    | "send"
+    | "reference"
+    | "toVideo"
+    | "canvas"
+    | "download"
+    | "edit"
+    | "generate"
+    | "variant"
+    | "hd"
+    | "inpaint"
+    | "expand"
+    | "skill";
 
 const paths: Record<CreationIconName, ReactNode> = {
     auto: (
@@ -83,6 +102,29 @@ const paths: Record<CreationIconName, ReactNode> = {
         <>
             <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
             <path d="M14.25 7.5l-4.5 9" />
+        </>
+    ),
+    // 音频：五根高低不同的声波竖线。
+    audio: <path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10.5v3" />,
+    // 高清：圆角框里的 HD 两个字母。
+    hd: (
+        <>
+            <rect x="2.5" y="5" width="19" height="14" rx="3.5" />
+            <path d="M7 9.25v5.5M7 12h3.25M10.25 9.25v5.5M13.75 9.25v5.5h1.5a2.75 2.75 0 0 0 0-5.5z" />
+        </>
+    ),
+    // 局部修改：四角取景框 + 中间一支笔。
+    inpaint: (
+        <>
+            <path d="M3.5 8V6a2.5 2.5 0 0 1 2.5-2.5h2M16 3.5h2A2.5 2.5 0 0 1 20.5 6v2M20.5 16v2a2.5 2.5 0 0 1-2.5 2.5h-2M8 20.5H6A2.5 2.5 0 0 1 3.5 18v-2" />
+            <path d="M9 15.5l5.75-5.75 1.5 1.5L10.5 17H9z" />
+        </>
+    ),
+    // 扩图：中间原图，四角向外展开。
+    expand: (
+        <>
+            <rect x="8.25" y="8.25" width="7.5" height="7.5" rx="1.75" />
+            <path d="M3.5 8V3.5H8M16 3.5h4.5V8M20.5 16v4.5H16M8 20.5H3.5V16" />
         </>
     ),
 };

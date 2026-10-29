@@ -195,10 +195,17 @@ func (s *Service) advanceCloudAgentCommercePlan(run *model.CloudAgentExecution, 
 		cloudAgentCommerceBatchPlanEvent(state, run.ID, plan, batch, references)
 		return s.cloudAgentMediaError(run, state, "admission", false, false, err)
 	}
+	// 按预估授权：整套报价加上本轮已提交的占用不超过发送时同意的额度，就和自动模式一样直接执行。
+	executeDirectly := state.Request.PermissionMode == "auto"
+	if !executeDirectly {
+		if executeDirectly, err = s.cloudAgentCreationAutoApproves(run.UserID, state, batch.QuoteMicrocredits); err != nil {
+			return err
+		}
+	}
 	s.storageMu.Lock()
 	err = s.mutateCloudAgentTool(run, state, func(current *model.CloudAgentExecution, repo *repository.Repository) error {
 		cloudAgentCommerceBatchPlanEvent(state, run.ID, plan, batch, references)
-		if state.Request.PermissionMode == "auto" {
+		if executeDirectly {
 			state.CommerceBatch = batch
 		} else {
 			preview := cloudAgentCommerceBatchPreview(plan, batch, state.Request.Budget.MaxCredits)
@@ -212,7 +219,7 @@ func (s *Service) advanceCloudAgentCommercePlan(run *model.CloudAgentExecution, 
 		return cloudAgentSave(current, state)
 	})
 	s.storageMu.Unlock()
-	if err != nil || state.Request.PermissionMode != "auto" {
+	if err != nil || !executeDirectly {
 		return err
 	}
 	latest, err := s.reloadCloudAgent(run)

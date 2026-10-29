@@ -55,6 +55,9 @@ type CloudAgentRequest struct {
 		MaxVideoSeconds    int     `json:"maxVideoSeconds,omitempty"`
 		// 0 = 不限制模型调用步数（与官方取消固定截断一致）。正数时夹到上限。
 		MaxSteps int `json:"maxSteps,omitempty"`
+		// AutoApproveCredits 是创作页"按预估授权"的预授权额度：点发送即同意本轮这个额度以内的媒体消耗
+		// （前端按发送前预估 × 1.2 计算）。只在 request_approval 下生效，超过 MaxCredits 的部分无效；0 表示每次都确认。
+		AutoApproveCredits float64 `json:"autoApproveCredits,omitempty"`
 	} `json:"budget"`
 	IdempotencyKey string `json:"idempotencyKey"`
 	// VisionEnabled 决定是否给模型暴露看图工具，由服务端在创建 run 时按渠道模型合同
@@ -338,6 +341,12 @@ func validateCloudAgentRequest(req *CloudAgentRequest) error {
 	}
 	if math.IsNaN(req.Budget.MaxCredits) || math.IsInf(req.Budget.MaxCredits, 0) || req.Budget.MaxCredits <= 0 || req.Budget.MaxCredits > 1000000 {
 		return BadAuthRequest("本轮积分上限必须大于 0 且不超过 1000000")
+	}
+	if math.IsNaN(req.Budget.AutoApproveCredits) || math.IsInf(req.Budget.AutoApproveCredits, 0) || req.Budget.AutoApproveCredits < 0 || req.Budget.AutoApproveCredits > 1000000 {
+		return BadAuthRequest("预授权积分必须在 0 到 1000000 之间")
+	}
+	if req.Budget.AutoApproveCredits > 0 && (req.Surface != "creation" || req.PermissionMode != "request_approval") {
+		return BadAuthRequest("预授权积分只用于创作页需要确认的模式")
 	}
 	return nil
 }
