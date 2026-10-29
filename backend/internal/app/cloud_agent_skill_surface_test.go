@@ -37,6 +37,8 @@ func TestCreationBuiltinDesignSkillIsDiscoveredWithoutInliningAndReadsCompletePa
 		t.Fatal("ordinary creation received the full design skill eagerly")
 	}
 	state := cloudAgentRuntime{Request: creationAgentRequest(), Skills: snapshots}
+	state.Request.SkillsEnabled = true
+	state.SkillVersions = map[string]string{snapshots[0].ID: snapshots[0].Version}
 	result, err := cloudAgentReadTool(s.repo, "user", &state, skillFeedbackCall("commerce-visual-design", cloudAgentSkillEntryPath), s)
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +82,7 @@ func TestCreationSkillDeclarationDoesNotAuthorizeCanvasReads(t *testing.T) {
 	if err != nil || len(admitted.Skills) != 1 {
 		t.Fatalf("explicit homepage skill was not admitted: %+v, %v", admitted.Skills, err)
 	}
-	state := &cloudAgentRuntime{Request: admitted.Request, Skills: admitted.Skills}
+	state := &cloudAgentRuntime{Request: admitted.Request, Skills: admitted.Skills, SkillVersions: admitted.SkillVersions}
 	if _, err := cloudAgentReadTool(s.repo, "user", state, skillFeedbackCall(req.SkillIDs[0], "SKILL.md"), s); err != nil {
 		t.Fatalf("homepage cannot read its own skill: %v", err)
 	}
@@ -111,7 +113,7 @@ func TestCreationSkillRequiresExplicitSharedDeclaration(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, surface := range []string{"creation", "canvas"} {
-		state := &cloudAgentRuntime{Request: admitted.Request, Skills: admitted.Skills}
+		state := &cloudAgentRuntime{Request: admitted.Request, Skills: admitted.Skills, SkillVersions: admitted.SkillVersions}
 		state.Request.Surface = surface
 		result, err := cloudAgentReadTool(s.repo, "user", state, skillFeedbackCall(req.SkillIDs[0], "SKILL.md"), s)
 		if err != nil || !strings.Contains(result.(map[string]any)["content"].(string), "SURFACE_SKILL_PRIVATE_BODY") {
@@ -177,7 +179,7 @@ func TestCreationAcceptsUnmodifiedLegacyCommerceBuiltinWithoutRewritingPackage(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := &cloudAgentRuntime{Request: admitted.Request, Skills: admitted.Skills}
+	state := &cloudAgentRuntime{Request: admitted.Request, Skills: admitted.Skills, SkillVersions: admitted.SkillVersions}
 	result, err := cloudAgentReadTool(s.repo, "user", state, skillFeedbackCall(skill.ID, "SKILL.md"), s)
 	if err != nil || result.(map[string]any)["content"] != string(content) {
 		t.Fatalf("legacy skill content was changed or is unreadable: %#v, %v", result, err)

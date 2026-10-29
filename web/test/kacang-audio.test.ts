@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
 import { defaultAudioCapabilityConfig, defaultModelCapabilityConfig } from "@/lib/model-capabilities";
 import { musicInstrumentalForConfig } from "@/lib/audio-generation";
 import { modelPromptLengthError } from "@/lib/model-selection";
@@ -15,7 +15,9 @@ import { useAssetStore, withAssetStorePersistenceSuppressed, type AudioAsset } f
 const initialAssets = useAssetStore.getState().assets;
 afterEach(() => withAssetStorePersistenceSuppressed(() => useAssetStore.setState({ assets: initialAssets })));
 
+const originalGetResourceAccess = resources.getResourceAccess;
 mock.module("@/services/api/resources", () => ({ ...resources, getResourceAccess: async (key: string) => ({ url: `https://media.example/${key.slice("resource:".length)}.mp3` }) }));
+afterAll(() => mock.module("@/services/api/resources", () => ({ ...resources, getResourceAccess: originalGetResourceAccess })));
 const { applyGenerationTaskResultToNodes, generationTaskOutputsApplied } = await import("@/lib/canvas/canvas-generation-task-sync");
 const { resetGenerationTaskMetadata } = await import("@/lib/canvas/canvas-task-state");
 

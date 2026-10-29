@@ -357,7 +357,7 @@ func cloudAgentLessonEligibleSuccesses(state *cloudAgentRuntime) int {
 }
 
 // 只有真实改变画布或生成结果的写类工具成功才算可沉淀经验的依据；只读和会话控制工具不算。
-func cloudAgentLessonToolEligible(name string) bool { return agenttool.Of(name).LessonEligible() }
+func cloudAgentLessonToolEligible(name string) bool { return agenttool.Of(name).Write() }
 
 func cloudAgentRememberLessonCount(state *cloudAgentRuntime) int {
 	if state == nil {

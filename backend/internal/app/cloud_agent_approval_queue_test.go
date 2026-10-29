@@ -20,6 +20,7 @@ func TestCloudAgentApprovalQueueContinuesSameStep(t *testing.T) {
 	if err := db.AutoMigrate(database.Models()...); err != nil {
 		t.Fatal(err)
 	}
+	ensureTestUsers(t, db, "user")
 	s := &Service{repo: repository.New(db), dataDir: t.TempDir(), disablePiRuntime: true}
 	if err := os.WriteFile(filepath.Join(s.dataDir, ".settings-key"), make([]byte, 32), 0o600); err != nil {
 		t.Fatal(err)

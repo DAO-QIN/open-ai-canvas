@@ -338,3 +338,5 @@
         transition: none !important;
     }
 }
+
+.workspace-account-card-name { display:flex; align-items:center; gap:6px; }

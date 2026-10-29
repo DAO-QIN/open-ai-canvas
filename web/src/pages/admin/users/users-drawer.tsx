@@ -3,10 +3,15 @@ import { Select } from "@/pages/admin/ui/controls";
 import { useEffect, useState } from "react";
 
 import { createAdminUser, updateAdminUser, type AdminUser, type LocalUser } from "@/services/api/auth";
+import { DEFAULT_USER_GROUP_CODE, formatRatioBasisPoints, userGroupCode, type UserGroup } from "@/services/api/user-groups";
 
-type UserFormValues = Pick<LocalUser, "displayName" | "email" | "role" | "status"> & { password?: string };
+type UserFormValues = Pick<LocalUser, "displayName" | "email" | "role" | "status"> & { password?: string; userGroup: string };
 
-export function AdminUserEditDrawer({ user, actorId, onClose, onSaved }: { user: AdminUser | null; actorId?: string; onClose: () => void; onSaved: (user: LocalUser) => void }) {
+function userGroupOptions(groups: UserGroup[]) {
+    return groups.map((group) => ({ value: group.code, label: `${group.name}（倍率 ${formatRatioBasisPoints(group.ratioBasisPoints)}）` }));
+}
+
+export function AdminUserEditDrawer({ user, actorId, groups, onClose, onSaved }: { user: AdminUser | null; actorId?: string; groups: UserGroup[]; onClose: () => void; onSaved: (user: LocalUser) => void }) {
     const { message, modal } = App.useApp();
     const [saving, setSaving] = useState(false);
     const [form] = Form.useForm<UserFormValues>();
@@ -20,6 +25,7 @@ export function AdminUserEditDrawer({ user, actorId, onClose, onSaved }: { user:
             email: user.email || "",
             role: user.role,
             status: user.status,
+            userGroup: userGroupCode(user.userGroup),
         });
     }, [form, user]);
 
@@ -49,6 +55,7 @@ export function AdminUserEditDrawer({ user, actorId, onClose, onSaved }: { user:
                 email: values.email?.trim() || "",
                 role: values.role,
                 status: values.status,
+                userGroup: values.userGroup,
                 ...(values.password?.trim() ? { password: values.password } : {}),
             });
             onSaved(result.user);
@@ -107,6 +114,9 @@ export function AdminUserEditDrawer({ user, actorId, onClose, onSaved }: { user:
                         ]}
                     />
                 </Form.Item>
+                <Form.Item name="userGroup" label="用户分组" extra="分组决定可见的系统渠道与模型、统一折扣和货币兑换比例；用户下次刷新工作台后生效。">
+                    <Select options={userGroupOptions(groups)} />
+                </Form.Item>
             </Form>
         </Drawer>
     );
@@ -119,9 +129,10 @@ type CreateUserFormValues = {
     password: string;
     role: LocalUser["role"];
     status: LocalUser["status"];
+    userGroup: string;
 };
 
-export function AdminUserCreateDrawer({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (user: AdminUser) => void }) {
+export function AdminUserCreateDrawer({ open, groups, onClose, onCreated }: { open: boolean; groups: UserGroup[]; onClose: () => void; onCreated: (user: AdminUser) => void }) {
     const { message, modal } = App.useApp();
     const [saving, setSaving] = useState(false);
     const [form] = Form.useForm<CreateUserFormValues>();
@@ -129,7 +140,7 @@ export function AdminUserCreateDrawer({ open, onClose, onCreated }: { open: bool
     useEffect(() => {
         if (!open) return;
         form.resetFields();
-        form.setFieldsValue({ role: "user", status: "active" });
+        form.setFieldsValue({ role: "user", status: "active", userGroup: DEFAULT_USER_GROUP_CODE });
     }, [form, open]);
 
     const close = () => {
@@ -159,6 +170,7 @@ export function AdminUserCreateDrawer({ open, onClose, onCreated }: { open: bool
                 password: values.password,
                 role: values.role,
                 status: values.status,
+                userGroup: values.userGroup,
             });
             onCreated(result.user);
             form.resetFields();
@@ -213,6 +225,9 @@ export function AdminUserCreateDrawer({ open, onClose, onCreated }: { open: bool
                             { label: "\u5df2\u505c\u7528", value: "disabled" },
                         ]}
                     />
+                </Form.Item>
+                <Form.Item name="userGroup" label="用户分组">
+                    <Select options={userGroupOptions(groups)} />
                 </Form.Item>
             </Form>
         </Drawer>

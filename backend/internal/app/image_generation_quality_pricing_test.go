@@ -23,17 +23,18 @@ func TestImageGenerationQualityDoesNotChangeResolutionPrice(t *testing.T) {
 	if err := db.AutoMigrate(&model.SystemSetting{}); err != nil {
 		t.Fatal(err)
 	}
+	ensureTestUsers(t, db, "user")
 	for _, sample := range []struct{ size, tier, resolution string }{{"4:3", "tier-1k", "1k"}, {"1024x1024", "tier-1k", "1k"}, {"2048x2048", "tier-2k", "2k"}, {"3840x2160", "tier-4k", "4k"}} {
 		for _, quality := range qualities {
 			t.Run(sample.size+"/"+quality, func(t *testing.T) {
 				intent := ModelRequestIntent{Capability: "image", Inputs: map[string]int{"image": 1}, Options: map[string]any{"size": sample.size, "quality": quality, "imageResolution": sample.resolution}}
-				quote, err := svc.QuoteChannelModel(ChannelModelQuoteRequest{ChannelID: channel.ID, ModelKey: cm.ModelKey, Intent: intent})
+				quote, err := svc.QuoteChannelModel("user", ChannelModelQuoteRequest{ChannelID: channel.ID, ModelKey: cm.ModelKey, Intent: intent})
 				if err != nil {
 					t.Fatalf("quality affected a valid resolution quote: %v", err)
 				}
 				input := quoteInput(intent, cm.ModelKey)
 				input["config"].(map[string]any)["channelId"] = channel.ID
-				resolved, err := svc.resolveSystemChannelModelSelection(input, "canvas_image", "image")
+				resolved, err := svc.resolveSystemChannelModelSelection(testGroupAccess(svc), input, "canvas_image", "image")
 				if err != nil {
 					t.Fatal(err)
 				}

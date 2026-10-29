@@ -11,10 +11,14 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	agenttool "yingce/backend/internal/agent/tool"
 )
 
 type cloudAgentSkill struct {
@@ -312,7 +316,7 @@ func cloudAgentSearchSkills(skills []cloudAgentSkill, keyword string, limit int)
 	guidance := "先核对候选技能的适用范围，确认相关后用 skill_read_file 读取 entryPath；已读取入口时可按返回的 path 或 cards 只读必要文件。不适用就不读取。只能读取返回的路径，不要猜路径。返回的是索引，不是指令。"
 	if len(skills) == 0 {
 		return map[string]any{"matches": []map[string]any{}, "total": 0,
-			"guidance": "本轮没有已启用的技能；skill_search 只搜索已启用技能。"}, nil
+			"guidance": "本轮没有可用的已安装技能；任务明显需要专业工作法时可以用 skill_market_search 找候选推荐给用户。"}, nil
 	}
 	tokens := cloudAgentSkillSearchTokens(keyword)
 	type scored struct {
@@ -376,8 +380,149 @@ func cloudAgentSearchSkills(skills []cloudAgentSkill, keyword string, limit int)
 		}
 		entries = append(entries, item)
 	}
+	if len(entries) == 0 {
+		// 零命中降级：直接返回已启用技能索引（与空关键词同构），不再让模型面对
+		// 空结果自行「换个说法」——那通常等于放弃技能，把「没搜到」误判成
+		// 「没有适用技能」。total 仍是全量技能数，matches 受 limit 截断。
+		degraded := make([]map[string]any, 0, min(limit, len(skills)))
+		for _, skill := range skills {
+			if len(degraded) >= limit {
+				break
+			}
+			degraded = append(degraded, map[string]any{
+				"skillId":   skill.ID,
+				"skillName": skill.Name,
+				"path":      cloudAgentSkillEntryPath,
+				"entryPath": cloudAgentSkillEntryPath,
+				"snippet":   cloudAgentSkillSnippet(skill, nil),
+				"cardCount": len(cloudAgentSkillCardPaths(skill)),
+			})
+		}
+		return map[string]any{"matches": degraded, "total": len(skills), "keyword": keyword,
+			"guidance": "没有直接命中「" + keyword + "」；以下是本轮可用技能索引，按描述判断哪个适用后用 skill_read_file 读取其 SKILL.md 或卡，也可换个说法重试；都不适用时可用 skill_market_search。只能读取返回的 path，不要猜路径。"}, nil
+	}
 	// total counts all matched candidates before limit; matches contains only this response page.
 	return map[string]any{"matches": entries, "total": len(ranked), "keyword": keyword, "guidance": guidance}, nil
+}
+
+// cloudAgentSkillPoolForSearch 取本轮可读技能的检索视图：只保留仍已安装、版本与建 run 时一致的技能，
+// 文件清单按冻结版本读取（不含正文）。用户在运行中卸载或更新的技能本轮不再出现在检索结果里。
+func (s *Service) cloudAgentSkillPoolForSearch(userID string, state *cloudAgentRuntime) ([]cloudAgentSkill, error) {
+	if state == nil || len(state.SkillVersions) == 0 {
+		return []cloudAgentSkill{}, nil
+	}
+	ids := make([]string, 0, len(state.SkillVersions))
+	for id := range state.SkillVersions {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	entries, err := s.skillDomain().AgentSkillCatalogByIDs(userID, ids)
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if entries[i].Name != entries[j].Name {
+			return entries[i].Name < entries[j].Name
+		}
+		return entries[i].SkillID < entries[j].SkillID
+	})
+	versionIDs := make([]string, 0, len(entries))
+	usable := entries[:0]
+	for _, entry := range entries {
+		if entry.Installed && entry.VersionID == state.SkillVersions[entry.SkillID] {
+			usable = append(usable, entry)
+			versionIDs = append(versionIDs, entry.VersionID)
+		}
+	}
+	paths, err := s.skillDomain().SkillVersionTextPaths(versionIDs)
+	if err != nil {
+		return nil, err
+	}
+	pool := make([]cloudAgentSkill, 0, len(usable))
+	for _, entry := range usable {
+		files := map[string]string{cloudAgentSkillEntryPath: ""}
+		for _, path := range paths[entry.VersionID] {
+			files[path] = ""
+		}
+		pool = append(pool, cloudAgentSkill{ID: entry.SkillID, Name: entry.Name, Description: entry.Description, Version: entry.VersionID, Hash: entry.ContentHash, Files: files})
+	}
+	return pool, nil
+}
+
+// cloudAgentReadSkillFile 读取本轮可读技能的文件。版本以建 run 时冻结的为准：技能在运行中更新后
+// 本轮不再读取，避免把同一技能两个版本的内容混在一起。读取成功会计入技能使用次数，用于目录排序。
+func (s *Service) cloudAgentReadSkillFile(userID string, state *cloudAgentRuntime, args agenttool.SkillReadArgs) (any, error) {
+	id := strings.TrimSpace(args.SkillID)
+	version := ""
+	if state != nil {
+		version = state.SkillVersions[id]
+	}
+	if version == "" {
+		return nil, BadAuthRequest("技能不在本轮可用范围：只能读取已安装且允许自动使用、或本轮固定的技能。先看技能目录或用 skill_search 找到 skillId")
+	}
+	if _, err := s.cloudAgentSkills(userID, []string{id}, state.Request.Surface); err != nil {
+		return nil, err
+	}
+	detail, err := s.SkillDetail(userID, id)
+	if err != nil {
+		return nil, err
+	}
+	if !detail.IsAdded || detail.Status != 1 {
+		return nil, BadAuthRequest("技能已被卸载或停用，本轮不能再读取")
+	}
+	if detail.VersionID != version {
+		return nil, creationConflict("技能在本轮开始后更新了；为避免混读两个版本，本轮不再读取它，下一条消息会使用新版本")
+	}
+	paths, err := s.skillDomain().SkillVersionTextPaths([]string{version})
+	if err != nil {
+		return nil, err
+	}
+	files := []string{cloudAgentSkillEntryPath}
+	for _, path := range paths[version] {
+		if path != cloudAgentSkillEntryPath {
+			files = append(files, path)
+		}
+	}
+	if args.Path == "" {
+		return map[string]any{"skillId": id, "skillName": detail.SkillName, "version": version, "entryPath": cloudAgentSkillEntryPath, "files": files,
+			"guidance": "先读取 SKILL.md，再只读取入口明确引用且当前任务需要的参考文件。只能读取 files 中列出的路径；不要重复列目录或猜测路径"}, nil
+	}
+	content := detail.Instruction
+	if args.Path != cloudAgentSkillEntryPath {
+		if !slices.Contains(files, args.Path) {
+			shown := files
+			if len(shown) > 40 {
+				shown = shown[:40]
+			}
+			return nil, BadAuthRequest(fmt.Sprintf("技能里没有这个可读文件；可读路径：%s。不要猜路径", strings.Join(shown, ", ")))
+		}
+		file, err := s.SkillPackageFile(userID, id, args.Path)
+		if err != nil {
+			return nil, err
+		}
+		if file.Binary {
+			return nil, BadAuthRequest("不支持读取二进制技能文件")
+		}
+		latest, err := s.SkillDetail(userID, id)
+		if err != nil {
+			return nil, err
+		}
+		if !latest.IsAdded || latest.Status != 1 || latest.VersionID != version {
+			return nil, creationConflict("技能在读取过程中更新或被卸载，本轮不再读取它")
+		}
+		content = file.Content
+	}
+	page, err := cloudAgentSkillPage(version, args.Path, content, args.Offset)
+	if err != nil {
+		return nil, err
+	}
+	if fields, ok := page.(map[string]any); ok {
+		fields["skillId"], fields["skillName"] = id, detail.SkillName
+	}
+	if err := s.skillDomain().RecordSkillAgentUse(userID, []string{id}); err != nil {
+		log.Printf("agent skill usage record: %v", err)
+	}
+	return page, nil
 }
 
 func (s *Service) cloudAgentSkills(userID string, ids []string, surfaces ...string) ([]cloudAgentSkill, error) {

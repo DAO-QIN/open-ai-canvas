@@ -30,7 +30,7 @@ func (s *Service) AdminUsers(actor *model.User, query AdminListQuery) (*AdminUse
 		return nil, err
 	}
 	page, limit := normalizeAdminPage(query.Page, query.Limit)
-	users, total, err := s.repo.AdminUsers(query.Keyword, model.UserRole(query.Type), model.UserStatus(query.Status), limit, (page-1)*limit)
+	users, total, err := s.repo.AdminUsers(query.Keyword, model.UserRole(query.Type), model.UserStatus(query.Status), strings.ToLower(strings.TrimSpace(query.Group)), limit, (page-1)*limit)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +136,10 @@ func (s *Service) CreateAdminUser(actor *model.User, req CreateAdminUserRequest)
 			return nil, err
 		}
 	}
+	groupCode, err := s.requireExistingUserGroup(req.UserGroup)
+	if err != nil {
+		return nil, err
+	}
 	passwordHash, err := hashPassword(req.Password)
 	if err != nil {
 		return nil, err
@@ -148,6 +152,7 @@ func (s *Service) CreateAdminUser(actor *model.User, req CreateAdminUserRequest)
 		DisplayName:  displayName,
 		Role:         req.Role,
 		Status:       req.Status,
+		UserGroup:    groupCode,
 		PasswordHash: passwordHash,
 		CreatedAt:    now,
 		UpdatedAt:    now,
@@ -249,11 +254,18 @@ func (s *Service) UpdateUser(actor *model.User, userID string, req UpdateUserReq
 	}
 	user.Role = nextRole
 	user.Status = nextStatus
+	if req.UserGroup != nil {
+		groupCode, groupErr := s.requireExistingUserGroup(*req.UserGroup)
+		if groupErr != nil {
+			return nil, groupErr
+		}
+		user.UserGroup = groupCode
+	}
 	user.UpdatedAt = time.Now()
 	if err := s.repo.Save(user); err != nil {
 		return nil, err
 	}
-	if err := s.appendAdminAudit(actor, "user.update", "user", user.ID, "更新用户账号状态或资料", map[string]any{"role": user.Role, "status": user.Status}); err != nil {
+	if err := s.appendAdminAudit(actor, "user.update", "user", user.ID, "更新用户账号状态或资料", map[string]any{"role": user.Role, "status": user.Status, "userGroup": normalizeUserGroupCode(user.UserGroup)}); err != nil {
 		return nil, err
 	}
 	return user, nil

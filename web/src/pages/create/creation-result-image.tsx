@@ -35,8 +35,10 @@ export function CreationResultImage({ url, alt, square = false, ratio = "1", pre
         }
     };
     const image = source ? <img key={`${source}:${attempt}`} src={source} alt={alt} decoding="async" onLoad={() => setStatus("ready")} onError={() => setStatus("error")} /> : null;
+    const [ratioWidth, ratioHeight = "1"] = ratio.split("/");
+    const aspectRatio = Number(ratioWidth) / Number(ratioHeight);
     return (
-        <span className={`creation-result-image${square ? " is-square" : ""} is-${status}`} style={{ aspectRatio: square ? "1" : status === "ready" ? undefined : ratio }}>
+        <span className={`creation-result-image${square ? " is-square" : ""} is-${status}`} data-media-state={status === "ready" ? "loaded" : status} aria-busy={status === "loading"} style={{ aspectRatio: square ? "1" : status === "ready" ? undefined : Number.isFinite(aspectRatio) && aspectRatio > 0 ? String(aspectRatio) : "1" }}>
             {onPreview ? (
                 <button type="button" className="creation-result-image-open" disabled={status !== "ready"} aria-label={previewLabel || (alt === "生成结果 1" ? "预览生成图片" : `预览${alt}`)} onClick={() => onPreview(source)}>{image}</button>
             ) : image}

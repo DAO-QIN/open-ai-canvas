@@ -81,7 +81,7 @@ func TestCreationNativePiRuntimeUsesHomepageContractAndImages(t *testing.T) {
 					t.Fatalf("native upstream contract leaked canvas capability %s", forbidden)
 				}
 			}
-			for _, required := range []string{"recall_lessons", "remember_lesson", "smart_creation"} {
+			for _, required := range []string{"memory_update", "skill_market_search", "skill_recommend"} {
 				if !strings.Contains(string(encoded), required) {
 					t.Fatalf("native upstream missed homepage memory contract %s", required)
 				}

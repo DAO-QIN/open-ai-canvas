@@ -150,33 +150,11 @@
 .app-user-workspace .creation-launchpad .creation-mode-select, .app-user-workspace .creation-launchpad .creation-mode-permission-select { height: 36px; padding-inline: 11px 9px; border-radius: 12px; font-size: 13px; }
 .app-user-workspace .creation-launchpad .creation-mode-select > svg, .app-user-workspace .creation-launchpad .creation-mode-permission-select > svg { width: 14px; height: 14px; }
 .creation-mode-spark {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
-    background: #6366f1;
-    box-shadow: 0 0 8px rgba(99, 102, 241, 0.65);
-    animation: creation-mode-spark-pulse 2s ease-in-out infinite;
-}
-
-.dark .creation-mode-spark {
-    background: #818cf8;
-    box-shadow: 0 0 10px rgba(129, 140, 248, 0.85);
-}
-
-@keyframes creation-mode-spark-pulse {
-    0%,
-    100% {
-        transform: scale(0.85);
-        opacity: 0.45;
-        box-shadow: 0 0 4px rgba(99, 102, 241, 0.4);
-    }
-    50% {
-        transform: scale(1.3);
-        opacity: 1;
-        box-shadow:
-            0 0 10px rgba(99, 102, 241, 0.9),
-            0 0 16px rgba(99, 102, 241, 0.45);
-    }
+    background: currentColor;
+    opacity: .55;
 }
 .creation-agent-error { grid-column: 1 / -1; color: var(--status-error); font-size: 12px; margin: 0; }
 .creation-home .creation-empty-composer[hidden] { display: none; }
@@ -337,22 +315,12 @@
 }
 .app-user-workspace .creation-voice-trigger.ant-btn:hover,
 .app-user-workspace .creation-voice-trigger.ant-btn:focus-visible {
-    background: var(--user-surface-hover) !important;
-    color: var(--user-ink) !important;
+    background: var(--button-tonal-hover-bg) !important;
+    color: var(--button-ghost-hover-fg) !important;
 }
-.app-user-workspace .creation-chat-control > svg:first-child {
-    transition:
-        transform var(--user-motion),
-        color var(--user-motion);
-    color: currentColor;
-}
-.app-user-workspace .creation-model-picker .canvas-model-picker-trigger-icon {
-    color: currentColor;
-}
-.app-user-workspace .creation-chat-control.is-clear:hover {
-    background: color-mix(in srgb, var(--status-error, #c45b5b) 12%, var(--user-surface)) !important;
-    color: var(--status-error, #c45b5b) !important;
-}
+.app-user-workspace .creation-chat-control > svg:first-child { transition: color var(--button-motion); color: currentColor; }
+.app-user-workspace .creation-model-picker .canvas-model-picker-trigger-icon { color: currentColor; }
+.app-user-workspace .creation-chat-control.is-clear:hover { background: color-mix(in srgb, var(--status-error, #c45b5b) 12%, var(--user-surface)) !important; color: var(--status-error, #c45b5b) !important; }
 
 /* 思考、流式等持久开关：开启态用主色浅底 + 主色文字表达"已开启"，不发光、不放大图标。
    颜色跟随皮肤主色，明暗主题共用一套规则。 */
@@ -376,10 +344,8 @@
     border-color: color-mix(in srgb, var(--workspace-accent) 56%, transparent) !important;
 }
 .app-user-workspace .creation-launchpad .creation-reference-add-button:hover:not(:disabled) {
-    border-style: solid;
-    border-color: var(--user-border-strong);
-    background: var(--user-surface-hover);
-    color: var(--user-ink);
+    background: var(--button-tonal-hover-bg);
+    color: var(--button-ghost-hover-fg);
 }
 .app-user-workspace .creation-chat-control[aria-pressed="true"],
 .app-user-workspace .creation-chat-control[aria-pressed="true"]:hover {

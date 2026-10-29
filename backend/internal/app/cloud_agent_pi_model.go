@@ -321,7 +321,7 @@ func (s *Service) runCloudAgentModelStep(ctx context.Context, userID, runID stri
 			cloudAgentApplyReadLoopNudge(&canonical, &state)
 		}
 		if operation != cloudAgentContextCompactionOperation {
-			s.attachCloudAgentLessons(&canonical, userID, cloudAgentLessonTaskText(&state), state.Request.Surface)
+			cloudAgentAttachRunContext(&canonical, &state)
 			budget := s.cloudAgentContextBudgetForRequest(state.Request)
 			if err := fitCloudAgentModelContext(&canonical, budget.InputBudgetTokens); err != nil {
 				return nil, false, err
@@ -507,6 +507,16 @@ func cloudAgentPiCanonicalForModelRequest(messages []map[string]any, existing ca
 		return existing, nil
 	}
 	// The native branch is authoritative even when server-side recovery history is longer.
+	// Pi tool receipts contain text. Retain the server's image payload for the
+	// same just-completed batch without restoring an older conversation branch.
+	if n, m := len(existing.Messages), len(canonical.Messages); n >= 2 && m > 0 && !cloudAgentPiHasCompactionSummary(messages) {
+		image, previous, last := existing.Messages[n-1], existing.Messages[n-2], canonical.Messages[m-1]
+		if stringField(image, "role") == "user" && cloudAgentIsInspectedImageMessage(image) &&
+			stringField(previous, "role") == "tool" && stringField(last, "role") == "tool" &&
+			stringField(previous, "tool_call_id") != "" && stringField(previous, "tool_call_id") == stringField(last, "tool_call_id") {
+			canonical.Messages = append(canonical.Messages, image)
+		}
+	}
 	canonical.PromptCacheKey = existing.PromptCacheKey
 	return canonical, nil
 }

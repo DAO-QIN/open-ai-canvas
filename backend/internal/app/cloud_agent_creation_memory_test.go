@@ -9,6 +9,12 @@ import (
 	"yingce/backend/internal/model"
 )
 
+func rememberLessonCall(arguments string) cloudAgentCall {
+	var call cloudAgentCall
+	call.Function.Name, call.Function.Arguments = "remember_lesson", arguments
+	return call
+}
+
 func TestCreationMemoryAdmissionAndRecallIsolation(t *testing.T) {
 	s, db, _, _ := creationTestService(t)
 	now := time.Now()
@@ -27,39 +33,38 @@ func TestCreationMemoryAdmissionAndRecallIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	task, _, err := s.cloudAgentTask("user", run.ID)
+	task, admitted, err := s.cloudAgentTask("user", run.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	canonical := canonicalAgentRequest{}
-	s.attachCloudAgentLessons(&canonical, "user", "creation style", "creation")
+	execution, err := s.repo.CloudAgent("user", run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := cloudAgentDecode(execution)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical := runtime.Canonical
+	state := cloudAgentRuntime{Request: admitted.Request, Memory: admitted.Memory, SkillHints: admitted.SkillHints}
+	cloudAgentAttachRunContext(&canonical, &state)
 	encoded, _ := json.Marshal(canonical)
-	if !strings.Contains(string(encoded), "SMART_CREATION_ONLY") {
-		t.Fatal("首页未接入按步注入的智能创作记忆索引")
+	for _, expected := range []string{"SMART_CREATION_ONLY", "CANVAS_ONLY"} {
+		if !strings.Contains(string(encoded), expected) {
+			t.Fatalf("共享记忆文件未导入本人已批准的经验 %s", expected)
+		}
+		if strings.Contains(canonical.SystemPrompt, expected) {
+			t.Fatal("个人记忆进入稳定 system 前缀")
+		}
 	}
-	for _, forbidden := range []string{"CANVAS_ONLY", "PENDING_ONLY", "FOREIGN_ONLY"} {
+	for _, forbidden := range []string{"PENDING_ONLY", "FOREIGN_ONLY"} {
 		if strings.Contains(task.InputJSON, forbidden) || strings.Contains(string(encoded), forbidden) {
-			t.Fatalf("索引泄漏 %s", forbidden)
+			t.Fatalf("记忆文件泄漏 %s", forbidden)
 		}
 	}
-	for _, args := range []map[string]any{{}, {"keyword": "style", "limit": 1}, {"category": "smart_creation"}, {"topic": "creation.style"}} {
-		call := cloudAgentStoryboardCall(t, "recall_lessons", "memory", args)
-		result, err := cloudAgentReadTool(s.repo, "user", &cloudAgentRuntime{Request: creationAgentRequest()}, call, s)
-		if err != nil {
-			t.Fatal(err)
-		}
-		raw, _ := json.Marshal(result)
-		if !strings.Contains(string(raw), "creation.style") || strings.Contains(string(raw), "canvas.style") {
-			t.Fatalf("首页召回越界或丢失: %s", raw)
-		}
-	}
-	call := cloudAgentStoryboardCall(t, "recall_lessons", "cross", map[string]any{"topic": "canvas.style"})
-	if _, err := cloudAgentReadTool(s.repo, "user", &cloudAgentRuntime{Request: creationAgentRequest()}, call, s); err == nil {
-		t.Fatal("首页按 topic 读到了画布记忆")
-	}
-	call = cloudAgentStoryboardCall(t, "recall_lessons", "cross", map[string]any{"topic": "creation.style"})
-	if _, err := cloudAgentReadTool(s.repo, "user", &cloudAgentRuntime{Request: agentTestRequest()}, call, s); err == nil {
-		t.Fatal("画布读到了智能创作记忆")
+	canvasMemory, err := s.cloudAgentMemorySnapshotForRun("user", "canvas style")
+	if err != nil || canvasMemory.Text != admitted.Memory.Text {
+		t.Fatalf("创作与画布没有使用同一份个人记忆文件: %v", err)
 	}
 }
 

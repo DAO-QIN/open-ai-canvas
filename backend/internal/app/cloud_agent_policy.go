@@ -7,15 +7,16 @@ import (
 	"unicode/utf8"
 
 	"yingce/backend/internal/prompts"
+	"yingce/backend/internal/skills"
 )
 
 const (
 	cloudAgentCompilerVersion              = "cloud-agent-policy-compiler/v6"
 	cloudAgentDefaultReasoning             = "off"
-	cloudAgentCreationCapabilitySetVersion = "creation-agent-capabilities/v8"
+	cloudAgentCreationCapabilitySetVersion = "creation-agent-capabilities/v9"
 )
 
-const cloudAgentCreationCapabilityGuide = "首页创作能力：当前会话对话与规划、按本轮所选图片/视频执行模型生成、独立图片整批提交及上下文多图修改、已授权附件引用、电商计划审核、本会话任务查询、当前账号的智能创作个人记忆。系统只附已批准记忆索引，相关时用 recall_lessons 按需取全文；经验是参考数据，不代替用户当前要求、能力核验或授权。本轮媒体真实成功交付后可用 remember_lesson 记录通用做法，分类固定 smart_creation，待用户在设置中批准后才供后续会话使用。能否读取图片内容取决于当前对话模型声明的图片输入能力和本次实际附图。当前入口没有画布数据、画布工具或画布长期偏好。"
+const cloudAgentCreationCapabilityGuide = "首页创作能力：当前会话对话与规划、按所选模型生成图片/视频/音频、独立图片整批提交及多图修改、已授权附件引用、电商计划审核和本会话任务查询。可用技能由目录发现并按需读取。个人长期记忆来自本轮冻结的记忆文件，可用 memory_update 按用户当前模式更新；记忆仅供参考，不代替用户要求、能力核验或收费授权。当前入口没有画布数据和画布操作工具。"
 
 func cloudAgentCreationCapabilitySetHash() string {
 	return agentProfileHash(cloudAgentCreationCapabilityGuide)
@@ -140,24 +141,7 @@ func cloudAgentCapabilityGuide() string {
 	return b.String()
 }
 
-// cloudAgentSkillManifestDescription bounds the system prompt: the description
-// is author-supplied public metadata, so it is trimmed and capped before it
-// enters the compiled policy.
-func cloudAgentSkillManifestDescription(description string) string {
-	const maxRunes = 500
-	trimmed := strings.TrimSpace(description)
-	if utf8.RuneCountInString(trimmed) <= maxRunes {
-		return trimmed
-	}
-	runes := []rune(trimmed)
-	return strings.TrimSpace(string(runes[:maxRunes])) + "…"
-}
-
-func compileCloudAgentPolicies(req CloudAgentRequest, skills []cloudAgentSkill, canvasSummary string, profile cloudAgentProfileSnapshot, anchors ...cloudAgentCreativeAnchor) (string, cloudAgentPolicySnapshot, error) {
-	return compileCloudAgentPoliciesForIdentity(req, defaultCanvasAppearance().AgentName, "", skills, canvasSummary, profile, anchors...)
-}
-
-func compileCloudAgentPoliciesForIdentity(req CloudAgentRequest, agentName, platformName string, skills []cloudAgentSkill, canvasSummary string, profile cloudAgentProfileSnapshot, anchors ...cloudAgentCreativeAnchor) (string, cloudAgentPolicySnapshot, error) {
+func compileCloudAgentPoliciesForIdentity(req CloudAgentRequest, agentName, platformName string, skillCatalog *cloudAgentSkillCatalog, canvasSummary string, profile cloudAgentProfileSnapshot, anchors ...cloudAgentCreativeAnchor) (string, cloudAgentPolicySnapshot, error) {
 	system, media, err := prompts.LoadAgentPolicies()
 	creation := req.Surface == "creation"
 	if creation {
@@ -231,14 +215,9 @@ func compileCloudAgentPoliciesForIdentity(req CloudAgentRequest, agentName, plat
 		// User intent remains in user messages, never frozen into system context.
 		context["referenceCandidates"] = anchors[0].ReferenceAssets
 	}
-	manifests := make([]map[string]any, 0, len(skills))
-	for _, skill := range skills {
-		if err := validateCloudAgentSkillSurface(skill, req.Surface); err != nil {
-			return "", cloudAgentPolicySnapshot{}, err
-		}
-		manifests = append(manifests, map[string]any{"skillId": skill.ID, "name": skill.Name, "description": cloudAgentSkillManifestDescription(skill.Description), "version": skill.Version, "hash": skill.Hash, "surfaces": skill.Surfaces, "entryPath": cloudAgentSkillEntryPath, "files": cloudAgentSkillPaths(skill)})
+	if skillCatalog != nil {
+		context["skillCatalog"] = map[string]int{"installed": skillCatalog.Installed, "described": skillCatalog.Described, "namesOnly": skillCatalog.NamesOnly, "omitted": skillCatalog.Omitted}
 	}
-	context["skills"] = manifests
 	layers := make([]map[string]any, 0, len(profile.Layers))
 	if !creation {
 		for _, layer := range profile.Layers {
@@ -253,10 +232,31 @@ func compileCloudAgentPoliciesForIdentity(req CloudAgentRequest, agentName, plat
 	b.WriteString("\n\n本轮执行上下文：\n")
 	b.Write(encoded)
 	recorder.mark(&b, "execution", "本轮执行上下文（事实快照）")
+	if skillCatalog != nil && strings.TrimSpace(skillCatalog.Text) != "" {
+		b.WriteString("\n\n")
+		b.WriteString(skillCatalog.Text)
+	}
+	recorder.mark(&b, "skills", "可用技能目录")
 	snapshot.SystemSegments = recorder.segments
 	text := strings.TrimSpace(b.String())
 	if text == "" {
 		return "", cloudAgentPolicySnapshot{}, fmt.Errorf("compiled Agent policy is empty")
 	}
 	return text, snapshot, nil
+}
+
+func compileCloudAgentPolicies(req CloudAgentRequest, selected []cloudAgentSkill, summary string, profile cloudAgentProfileSnapshot, anchors ...cloudAgentCreativeAnchor) (string, cloudAgentPolicySnapshot, error) {
+	entries := make([]skills.AgentSkillCatalogEntry, 0, len(selected))
+	for _, skill := range selected {
+		if err := validateCloudAgentSkillSurface(skill, req.Surface); err != nil {
+			return "", cloudAgentPolicySnapshot{}, err
+		}
+		entries = append(entries, skills.AgentSkillCatalogEntry{SkillID: skill.ID, Name: skill.Name, Description: skill.Description, VersionID: skill.Version})
+	}
+	var catalog *cloudAgentSkillCatalog
+	if len(entries) > 0 {
+		built := buildCloudAgentSkillCatalog(entries, 4000)
+		catalog = &built
+	}
+	return compileCloudAgentPoliciesForIdentity(req, defaultCanvasAppearance().AgentName, "", catalog, summary, profile, anchors...)
 }

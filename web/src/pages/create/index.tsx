@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { App, Spin } from "antd";
 import { Tooltip } from "@/components/ui/base/tooltip";
-import { History, Maximize2 } from "lucide-react";
+import { History, Maximize2, PenLine } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useLocation, useNavigate } from "react-router";
 import { useCreationHomeNavigation } from "./use-creation-home-navigation";
@@ -123,6 +123,7 @@ import {
     consumeCreationImageResults,
     conversationTimestamp,
     creationConversationMode,
+    creationMessageNeedsResultSync,
     creationShotRail,
     creationVideoShotOrdinal,
     isImageAttachment,
@@ -452,6 +453,11 @@ export default function CreatePage() {
     const [regionEditTarget, setRegionEditTarget] = useState<{ image: CreationResultImageRef; url: string; size?: string; quality?: string } | null>(null);
     // 高清/扩图/局部修改在读图、上传期间不接受第二次点击。
     const resultImagePreparingRef = useRef(false);
+    // 递增即重建恢复监听：订阅服务会缓存已结束的任务快照，任务被重新拉起或交接时需要重新订阅。
+    const [recoveryEpoch, setRecoveryEpoch] = useState(0);
+    const resultRefreshIdsRef = useRef(new Set<string>());
+    const [resultRefreshIds, setResultRefreshIds] = useState<ReadonlySet<string>>(() => new Set());
+    const resultRefreshControllersRef = useRef(new Set<AbortController>());
     const [composerPreferencesInitialized, setComposerPreferencesInitialized] = useState(false);
     promptRef.current = prompt;
     attachmentsRef.current = attachments;
@@ -552,8 +558,11 @@ export default function CreatePage() {
         });
         return () => window.cancelAnimationFrame(frame);
     }, [activeId, hydrated, isEmpty]);
-    const pendingTaskIds = useMemo(() => pendingCreationTaskIds(activeConversation ? [activeConversation] : []), [activeConversation]);
-    const recoveryTaskKey = useMemo(() => pendingTaskIds.filter((id) => !activeGenerationTaskIdsRef.current.has(id)).join("|"), [pendingTaskIds]);
+    const pendingTaskIds = useMemo(() => pendingCreationTaskIds(conversations), [conversations]);
+    const recoveryTaskKey = useMemo(() => {
+        const ids = pendingTaskIds.filter((id) => !activeGenerationTaskIdsRef.current.has(id));
+        return ids.length ? `${recoveryEpoch}:${ids.join("|")}` : "";
+    }, [pendingTaskIds, recoveryEpoch]);
     const videoShots = useMemo(() => creationShotRail(activeConversation?.messages || []), [activeConversation]);
     const jumpToShot = (shot: CreationShotRailEntry) => {
         const id = shot.result?.id;
@@ -737,71 +746,13 @@ export default function CreatePage() {
         }
     }, [conversations, hydrated]);
 
-    useEffect(() => {
-        if (recoveryTaskSnapshotRef.current.userId !== smartCreationUserId) {
-            recoveryTaskSnapshotRef.current = { userId: smartCreationUserId, tasks: new Map() };
-        }
-        mergeCreationTaskObservations(recoveryTaskSnapshotRef.current.tasks, [], pendingTaskIds);
-        if (!hydrated || !recoveryTaskKey || !pendingTaskIds.length) return;
-        // 当前页面主动提交的任务由 submit 自己等待并收尾；恢复监听只接管刷新前遗留的任务，避免同一任务被双重轮询。
-        const recoverableTaskIds = pendingTaskIds.filter((id) => !activeGenerationTaskIdsRef.current.has(id));
-        if (!recoverableTaskIds.length) return;
-        let cancelled = false;
-        const observationController = new AbortController();
-        const applyTasks = async (tasks: GenerationTask[]) => {
-            const runtime = await loadCreationRuntime();
-            const contextual = attachCreationTaskContexts(tasks, conversationsRef.current);
-            const persistedTasks = await materializeCreationTaskResults(runtime, contextual, observationController.signal);
-            if (cancelled) return;
-            const observedTasks = mergeCreationTaskObservations(recoveryTaskSnapshotRef.current.tasks, persistedTasks, recoverableTaskIds);
-            taskSyncWarningRef.current = false;
-            const attachable = persistedTasks.filter((task) => task.status === "succeeded" && Boolean(task.clientContext?.messageId) && Boolean(task.creationResultUrls?.length || task.creationResultStorageKeys?.length));
-            for (const task of attachable) {
-                try {
-                    await runtime.consumeGenerationTaskMessage(
-                        task,
-                        task.clientContext!.messageId!,
-                        async ({ effectKey, resultUrls, resultStorageKeys }) => {
-                            if (cancelled) return;
-                            await updateConversationMessage(
-                                task.clientContext!.conversationId!,
-                                task.clientContext!.messageId!,
-                                (item) => runtime.applyGenerationConsumerEffect(item, effectKey, (current) => applyRecoveredCreationResult(current, resultUrls, resultStorageKeys, task.clientContext?.batchCount || current.taskIds?.length || 1)).value,
-                            );
-                        },
-                        { signal: observationController.signal, materialize: async () => task, materializedUrls: runtime.generationTaskMaterializedUrls, materializedStorageKeys: runtime.generationTaskMaterializedStorageKeys },
-                    );
-                } catch (error) {
-                    if (cancelled || observationController.signal.aborted) return;
-                    console.warn("创作任务结果挂载失败，将使用已物化结果收敛消息状态", error);
-                }
-            }
-            if (!cancelled) setConversations((current) => reconcileCreationTaskMessages(runtime, current, observedTasks));
-        };
-        const warnSync = (error: unknown) => {
-            if (cancelled || observationController.signal.aborted) return;
-            console.warn("创作任务状态同步失败", error);
-            if (!taskSyncWarningRef.current) {
-                taskSyncWarningRef.current = true;
-                toast.warning("任务状态暂时无法同步，请稍后刷新");
-            }
-        };
-        let applyChain = Promise.resolve();
-        let unsubscribe: () => void = () => {};
-        void loadCreationRuntime()
-            .then((runtime) => {
-                if (cancelled) return;
-                unsubscribe = runtime.subscribeGenerationTasks(recoverableTaskIds, (task) => {
-                    applyChain = applyChain.then(() => applyTasks([task])).catch(warnSync);
-                });
-            })
-            .catch(warnSync);
-        return () => {
-            cancelled = true;
-            observationController.abort();
-            unsubscribe();
-        };
-    }, [hydrated, recoveryTaskKey, smartCreationUserId, toast]);
+    useEffect(
+        () => () => {
+            for (const controller of resultRefreshControllersRef.current) controller.abort();
+            resultRefreshControllersRef.current.clear();
+        },
+        [],
+    );
 
     const loadAddedSkills = useCallback(() => {
         if (addedSkillsRequestedRef.current) return;
@@ -975,6 +926,161 @@ export default function CreatePage() {
         conversationSaveChainRef.current = save;
         await save;
     }, []);
+
+    /**
+     * 把后端任务快照接回创作消息：成功的任务先资源化再挂到对应消息上。
+     * 刷新恢复、断线重连和“重新获取结果”共用这一条链路，只读取原任务，从不创建新任务。
+     */
+    const applyCreationTaskSnapshots = useCallback(
+        async (runtime: CreationRuntime, tasks: GenerationTask[], signal: AbortSignal): Promise<PersistedCreationTask[]> => {
+            const contextual = attachCreationTaskContexts(tasks, conversationsRef.current);
+            const persistedTasks = await materializeCreationTaskResults(runtime, contextual, signal);
+            if (signal.aborted) return persistedTasks;
+            const attachable = persistedTasks.filter((task) => task.status === "succeeded" && Boolean(task.clientContext?.conversationId && task.clientContext.messageId) && Boolean(task.creationResultUrls?.length || task.creationResultStorageKeys?.length));
+            for (const task of attachable) {
+                const conversationId = task.clientContext!.conversationId!;
+                const messageId = task.clientContext!.messageId!;
+                try {
+                    await runtime.consumeGenerationTaskMessage(task, messageId, async ({ effectKey, resultUrls, resultStorageKeys }) => {
+                        if (signal.aborted) return;
+                        await updateConversationMessage(conversationId, messageId, (item) =>
+                            runtime.applyGenerationConsumerEffect(item, effectKey, (current) => ({
+                                ...current,
+                                status: "done" as const,
+                                content: current.mode === "video" ? "视频已生成" : "图片已生成",
+                                error: undefined,
+                                errorKind: undefined,
+                                syncInterrupted: undefined,
+                                mediaRecoverable: undefined,
+                                generationStatus: "succeeded" as const,
+                                ...(resultUrls.length ? { resultUrls: Array.from(new Set([...(current.resultUrls || []), ...resultUrls])) } : {}),
+                                ...(resultStorageKeys.length ? { resultStorageKeys: Array.from(new Set([...(current.resultStorageKeys || []), ...resultStorageKeys])) } : {}),
+                            })).value,
+                        );
+                    }, { signal, materialize: async () => task, materializedUrls: runtime.generationTaskMaterializedUrls, materializedStorageKeys: runtime.generationTaskMaterializedStorageKeys });
+                } catch (error) {
+                    if (signal.aborted) return persistedTasks;
+                    console.warn("创作任务结果挂载失败，将使用已物化结果收敛消息状态", error);
+                }
+            }
+            return persistedTasks;
+        },
+        [updateConversationMessage],
+    );
+
+    useEffect(() => {
+        if (!hydrated || !recoveryTaskKey || !pendingTaskIds.length) return;
+        // 当前页面主动提交的任务由 submit 自己等待并收尾；恢复监听只接管刷新前遗留、或 submit 交接过来的任务，避免同一任务被双重轮询。
+        const recoverableTaskIds = pendingTaskIds.filter((id) => !activeGenerationTaskIdsRef.current.has(id));
+        if (!recoverableTaskIds.length) return;
+        let cancelled = false;
+        const observationController = new AbortController();
+        // 一条消息可能对应多张图的多个任务：保留每个任务的最新快照一起收敛，不会只看到其中一个就提前定论。
+        const knownTasks = new Map<string, PersistedCreationTask>();
+        const applyTasks = async (tasks: GenerationTask[]) => {
+            const runtime = await loadCreationRuntime();
+            const persistedTasks = await applyCreationTaskSnapshots(runtime, tasks, observationController.signal);
+            if (cancelled) return;
+            taskSyncWarningRef.current = false;
+            for (const task of persistedTasks) knownTasks.set(task.id, task);
+            setConversations((current) => reconcileCreationTaskMessages(runtime, current, [...knownTasks.values()]));
+        };
+        const warnSync = (error: unknown) => {
+            if (cancelled || observationController.signal.aborted) return;
+            console.warn("创作任务状态同步失败", error);
+            if (!taskSyncWarningRef.current) {
+                taskSyncWarningRef.current = true;
+                toast.warning("任务状态暂时无法同步，请稍后刷新");
+            }
+        };
+        let applyChain = Promise.resolve();
+        let unsubscribe: () => void = () => {};
+        void loadCreationRuntime()
+            .then((runtime) => {
+                if (cancelled) return;
+                unsubscribe = runtime.subscribeGenerationTasks(recoverableTaskIds, (task) => {
+                    applyChain = applyChain.then(() => applyTasks([task])).catch(warnSync);
+                });
+            })
+            .catch(warnSync);
+        return () => {
+            cancelled = true;
+            observationController.abort();
+            unsubscribe();
+        };
+    }, [applyCreationTaskSnapshots, hydrated, recoveryTaskKey, toast]);
+
+    const beginResultRefresh = (messageId: string) => {
+        if (resultRefreshIdsRef.current.has(messageId)) return null;
+        resultRefreshIdsRef.current.add(messageId);
+        setResultRefreshIds(new Set(resultRefreshIdsRef.current));
+        const controller = new AbortController();
+        resultRefreshControllersRef.current.add(controller);
+        return {
+            signal: controller.signal,
+            finish() {
+                resultRefreshControllersRef.current.delete(controller);
+                resultRefreshIdsRef.current.delete(messageId);
+                setResultRefreshIds(new Set(resultRefreshIdsRef.current));
+            },
+        };
+    };
+
+    // 重新查询原任务并接回结果：任务仍在进行就回到生成中继续跟进，已成功就补回作品；不会提交新任务。
+    const refreshMessageResult = async (item: CreationMessage) => {
+        const taskIds = item.taskIds || [];
+        if (!taskIds.length) return;
+        const refresh = beginResultRefresh(item.id);
+        if (!refresh) return;
+        const scope = getActiveUserScope();
+        try {
+            const runtime = await loadCreationRuntime();
+            const tasks = await Promise.all(taskIds.map((id) => runtime.queryGenerationTask(id, { signal: refresh.signal })));
+            if (refresh.signal.aborted || scope !== getActiveUserScope()) return;
+            const persistedTasks = await applyCreationTaskSnapshots(runtime, tasks, refresh.signal);
+            if (refresh.signal.aborted || scope !== getActiveUserScope()) return;
+            setConversations((current) => reconcileCreationTaskMessages(runtime, current, persistedTasks, { reviveMessageIds: new Set([item.id]) }));
+            if (tasks.some((task) => task.status === "queued" || task.status === "running")) {
+                setRecoveryEpoch((value) => value + 1);
+                toast.info("任务仍在生成，完成后会自动显示");
+            } else if (persistedTasks.some((task) => task.status === "succeeded" && !task.creationResultUrls?.length && !task.creationResultStorageKeys?.length)) {
+                toast.warning("作品已生成，但暂时无法载入，请稍后再试");
+            }
+        } catch (error) {
+            if (refresh.signal.aborted || scope !== getActiveUserScope()) return;
+            toast.error(`暂时无法获取结果：${generationErrorMessage(error)}`);
+        } finally {
+            refresh.finish();
+        }
+    };
+
+    // 作品已生成但后端保存失败：重放保存检查点，不重新生成、不重复扣费，随后回到生成中跟进保存结果。
+    const recoverMessageMedia = async (item: CreationMessage) => {
+        const taskIds = item.taskIds || [];
+        if (!taskIds.length) return;
+        const refresh = beginResultRefresh(item.id);
+        if (!refresh) return;
+        const scope = getActiveUserScope();
+        try {
+            const runtime = await loadCreationRuntime();
+            const recovered = await Promise.allSettled(taskIds.map((id) => runtime.recoverGenerationTaskMedia(id)));
+            if (!recovered.some((entry) => entry.status === "fulfilled")) {
+                const rejected = recovered.find((entry): entry is PromiseRejectedResult => entry.status === "rejected");
+                throw rejected?.reason instanceof Error ? rejected.reason : new Error("作品暂时无法重新保存");
+            }
+            const tasks = await Promise.all(taskIds.map((id) => runtime.queryGenerationTask(id, { signal: refresh.signal })));
+            if (refresh.signal.aborted || scope !== getActiveUserScope()) return;
+            const persistedTasks = await applyCreationTaskSnapshots(runtime, tasks, refresh.signal);
+            if (refresh.signal.aborted || scope !== getActiveUserScope()) return;
+            setConversations((current) => reconcileCreationTaskMessages(runtime, current, persistedTasks, { reviveMessageIds: new Set([item.id]) }));
+            setRecoveryEpoch((value) => value + 1);
+        } catch (error) {
+            if (refresh.signal.aborted || scope !== getActiveUserScope()) return;
+            toast.error(`重新保存失败：${generationErrorMessage(error)}`);
+        } finally {
+            refresh.finish();
+        }
+    };
 
     const selectMode = (requested: CreationMode) => {
         const next = requested === "text" ? "agent" : requested;
@@ -1916,6 +2022,7 @@ export default function CreatePage() {
             audioModel: requestModel,
             ...(mode === "image" ? { size: normalizedImage?.size || requestRatio, quality: normalizedImage?.quality || requestQuality, count: normalizedImage?.count || requestCount, videoSeconds: config.videoSeconds } : {}),
         };
+        let handedOverToRecovery = false;
         try {
             // 先保存本次操作标识。创建回执丢失或刷新后仍能沿原请求恢复。
             if (trackSubmission) await updateOriginAssistant((item) => item);
@@ -2120,6 +2227,7 @@ export default function CreatePage() {
         } finally {
             if (trackSubmission) finishSubmitting();
             for (const taskId of boundTaskIds) activeGenerationTaskIdsRef.current.delete(taskId);
+            if (handedOverToRecovery) setRecoveryEpoch((value) => value + 1);
             requestLifecycle.release();
             releaseRetryLock();
             releaseSubmitGate();
@@ -2660,6 +2768,22 @@ export default function CreatePage() {
         }
     };
 
+    // 作品可能已经生成（页面只是没拿到结果，或仍在重连）时，重新生成会提交新任务并再次扣费，先确认。
+    const regenerateMessage = (item: CreationMessage, index: number) => {
+        if (!creationMessageNeedsResultSync(item) && !(item.syncInterrupted && (item.status === "pending" || item.status === "streaming"))) {
+            void retryFailedMessage(item, index);
+            return;
+        }
+        modal.confirm({
+            className: "workspace-modal workspace-modal-compact",
+            title: "作品可能已经生成",
+            content: "页面只是没有及时拿到结果，建议先点「重新获取结果」。重新生成会提交新任务并再次扣费。",
+            okText: "仍要重新生成",
+            cancelText: "先不",
+            onOk: () => retryFailedMessage(item, index),
+        });
+    };
+
     const createVariant = (item: CreationMessage, index: number) => {
         const previous =
             item.role === "assistant"
@@ -3105,7 +3229,10 @@ export default function CreatePage() {
                                                     item={item}
                                                     submitting={submittingMessageIds.has(item.id)}
                                                     shotNumber={creationVideoShotOrdinal(videoShots, item)}
-                                                    onRetryFailure={() => retryFailedMessage(item, index)}
+                                                    onRetryFailure={() => regenerateMessage(item, index)}
+                                                    onRefreshResult={() => void refreshMessageResult(item)}
+                                                    onRecoverMedia={() => void recoverMessageMedia(item)}
+                                                    refreshingResult={resultRefreshIds.has(item.id)}
                                                     onQueryInterjection={async (message) => {
                                                         const current = conversationsRef.current.find((conversation) => conversation.id === activeConversation.id);
                                                         if (current) await interjectCreationAgent(current, message.content, message.id);
