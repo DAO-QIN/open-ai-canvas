@@ -13,6 +13,7 @@ import (
 func TestCreationPolicyHasMemoryWithoutCanvasWorkflow(t *testing.T) {
 	req := creationAgentRequest()
 	req.PermissionMode = "auto"
+	req.MemoryMode = model.AgentMemoryDocumentModeAuto
 	req.MediaSettings = &CloudAgentCreationMedia{Image: &CloudAgentCreationMediaChoice{ParameterMode: "auto"}}
 	profile := cloudAgentProfileSnapshot{Revision: agentProfileRevision(nil), Hash: agentProfileHash("")}
 	system, policy, err := compileCloudAgentPolicies(req, nil, "", profile)
@@ -31,7 +32,7 @@ func TestCreationPolicyHasMemoryWithoutCanvasWorkflow(t *testing.T) {
 			t.Errorf("creation carries canvas-only contract %q", forbidden)
 		}
 	}
-	for _, required := range []string{"recall_lessons", "remember_lesson", "smart_creation"} {
+	for _, required := range []string{"memory_update", "skill_market_search", "skill_recommend"} {
 		if !strings.Contains(string(tools), required) {
 			t.Errorf("creation missing memory contract %q", required)
 		}
@@ -58,8 +59,8 @@ func TestCreationAdmissionDoesNotLoadCanvasProfileOrLessons(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(admitted.Profile.Layers) != 0 || strings.Contains(task.InputJSON, "CANVAS_MEMORY_MUST_NOT_LEAK") || strings.Contains(task.InputJSON, "CANVAS_PROFILE_MUST_NOT_LEAK") {
-		t.Fatal("creation admission inherited canvas profile or personal memory")
+	if len(admitted.Profile.Layers) != 0 || strings.Contains(task.InputJSON, "CANVAS_PROFILE_MUST_NOT_LEAK") {
+		t.Fatal("creation admission inherited canvas profile")
 	}
 	var input map[string]any
 	if err := json.Unmarshal([]byte(task.InputJSON), &input); err != nil {

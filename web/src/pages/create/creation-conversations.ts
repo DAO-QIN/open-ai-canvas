@@ -300,7 +300,6 @@ export function reconcileCreationTaskMessages(runtime: CreationRuntime, conversa
             if (!creationMediaMessageAwaitsTask(message, Boolean(options.reviveMessageIds?.has(message.id)))) return message;
             const expectedTaskCount = isCreationAgentMediaTask(message) ? 1 : Math.max(0, ...matches.map((task) => task.clientContext?.batchCount || 0)) || (creationSingleResultMode(message.mode) ? 1 : Number(message.settings?.count) || 0);
             if (!matches.length) return message;
-            if (expectedTaskCount > 0 && matches.length < expectedTaskCount && !message.submissionPending) return message;
             if (active.length && !matches.some((task) => task.status === "succeeded" && (creationTaskResultUrls(task).length || creationTaskResultStorageKeys(task).length))) {
                 const observed = creationMessageWithObservedTask(message, active[0]);
                 if (observed === message) return message;
@@ -333,7 +332,7 @@ export function reconcileCreationTaskMessages(runtime: CreationRuntime, conversa
                 const error = failed?.creationError || failed?.error || "任务已结束，但生成结果暂时无法读取";
                 return { ...nextMessage, status: "error" as const, error: generationErrorMessage(error), generationErrorCode: generationErrorCode(error) };
             }
-            if (!resultUrls.length && !resultStorageKeys.length && !submissionPending) {
+            if (!resultUrls.length && !resultStorageKeys.length && !submissionPending && total <= 1) {
                 const unavailable = succeeded.find((task) => task.creationError) || succeeded[0];
                 if (unavailable) return { ...nextMessage, status: "error" as const, content: "结果待同步", errorKind: "sync" as const, error: generationErrorMessage(unavailable.creationError || "任务已完成，但生成结果暂时无法读取"), generationStatus: "succeeded" as const };
                 const failed = matches.find((task) => task.status === "failed");

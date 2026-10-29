@@ -859,9 +859,15 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 	if len(req.PinnedSkillIDs) == 0 {
 		req.PinnedSkillIDs = append([]string(nil), req.SkillIDs...)
 	}
-	skillPool, err := s.cloudAgentBuildSkillPool(userID, req.Prompt, req.PinnedSkillIDs, s.cloudAgentContextBudgetForRequest(req))
+	skillPool, err := s.cloudAgentBuildSkillPool(userID, req.Prompt, req.PinnedSkillIDs, s.cloudAgentContextBudgetForRequest(req), req.Surface)
 	if err != nil {
 		return nil, err
+	}
+	if len(req.PinnedSkillIDs) > 0 {
+		skillPool.Pinned, err = s.cloudAgentSkills(userID, req.PinnedSkillIDs, req.Surface)
+		if err != nil {
+			return nil, err
+		}
 	}
 	memory, err := s.cloudAgentMemorySnapshotForRun(userID, req.Prompt)
 	if err != nil {

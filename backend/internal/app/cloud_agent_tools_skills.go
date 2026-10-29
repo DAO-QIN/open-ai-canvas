@@ -460,6 +460,9 @@ func (s *Service) cloudAgentReadSkillFile(userID string, state *cloudAgentRuntim
 	if version == "" {
 		return nil, BadAuthRequest("技能不在本轮可用范围：只能读取已安装且允许自动使用、或本轮固定的技能。先看技能目录或用 skill_search 找到 skillId")
 	}
+	if _, err := s.cloudAgentSkills(userID, []string{id}, state.Request.Surface); err != nil {
+		return nil, err
+	}
 	detail, err := s.SkillDetail(userID, id)
 	if err != nil {
 		return nil, err

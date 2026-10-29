@@ -327,6 +327,11 @@ func cloudAgentHandleSkillSearch(repo *repository.Repository, userID string, sta
 	if err := decodeCloudAgentJSONObject(call.Function.Arguments, &args); err != nil {
 		return nil, cloudAgentJSONArgumentError(err)
 	}
+	for _, skill := range state.Skills {
+		if err := validateCloudAgentSkillSurface(skill, state.Request.Surface); err != nil {
+			return nil, err
+		}
+	}
 	service := cloudAgentToolService(services)
 	if service == nil {
 		return nil, BadAuthRequest("技能服务不可用")
@@ -353,7 +358,11 @@ func cloudAgentHandleSkillReadFile(repo *repository.Repository, userID string, s
 	if service == nil {
 		return nil, BadAuthRequest("技能服务不可用")
 	}
-	return service.cloudAgentReadSkillFile(userID, state, args)
+	result, err := service.cloudAgentReadSkillFile(userID, state, args)
+	if err == nil && args.Path == cloudAgentSkillEntryPath {
+		cloudAgentCreationSkillRead(state, call)
+	}
+	return result, err
 }
 
 func cloudAgentHandleTaskGet(repo *repository.Repository, userID string, state *cloudAgentRuntime, call cloudAgentCall, services ...*Service) (any, error) {

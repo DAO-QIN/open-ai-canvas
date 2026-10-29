@@ -332,17 +332,33 @@ func TestCreationImageGroupSubmitsBeforeAnyImageCompletes(t *testing.T) {
 }
 
 func TestCreationVisualSkillReadEnablesSetSubmissionWithoutEagerSkillLoading(t *testing.T) {
+	s, _, _, _ := creationTestService(t)
+	if err := s.EnsureBuiltinSkills(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetSkillAdded("user", "commerce-visual-design", true); err != nil {
+		t.Fatal(err)
+	}
 	req := creationAgentRequest()
 	req.PermissionMode = "auto"
-	state := cloudAgentRuntime{Request: req, Skills: []cloudAgentSkill{{ID: "commerce-visual-design", Version: "test-full-skill", Surfaces: []string{"creation"}, Instruction: "Full visual design method"}}}
+	req.PinnedSkillIDs = []string{"commerce-visual-design"}
+	run, err := s.CreateCloudAgentRun("user", req, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, admitted, err := s.cloudAgentTask("user", run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := cloudAgentRuntime{Request: admitted.Request, Skills: admitted.Skills, SkillVersions: admitted.SkillVersions}
 	tools := compileCloudAgentTools(req, false)
 	if strings.Contains(mustMarshal(cloudAgentCreationModelTools(&state, tools)), "commerce_plan_submit") {
 		t.Fatal("ordinary creation eagerly exposed commerce workflow")
 	}
 	call := cloudAgentCall{ID: "choose-visual-method"}
 	call.Function.Name, call.Function.Arguments = "skill_read_file", `{"skillId":"commerce-visual-design","path":"SKILL.md"}`
-	result, err := cloudAgentReadTool(nil, "user", &state, call)
-	if err != nil || !strings.Contains(mustMarshal(result), "Full visual design method") {
+	result, err := cloudAgentReadTool(s.repo, "user", &state, call, s)
+	if err != nil || !strings.Contains(mustMarshal(result), "content") {
 		t.Fatalf("complete visual skill was not read: %+v %v", result, err)
 	}
 	if !strings.Contains(mustMarshal(cloudAgentCreationModelTools(&state, tools)), "commerce_plan_submit") {

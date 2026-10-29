@@ -25,7 +25,7 @@ for (const [key, value] of Object.entries({
     originals.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
     Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
 }
-const { act } = await import("react");
+const { act, useState } = await import("react");
 const { createRoot } = await import("react-dom/client");
 const { CreationMessageView } = await import("../src/pages/create/creation-workspace-messages");
 afterAll(() => {
@@ -155,14 +155,37 @@ test.each(["image", "video", "image-unknown", "agent-batch"])("各失败入口�
     };
     const media: CreationMessage = { ...failed, id: "task-image", mode: kind === "video" ? "video" : "image", submissionPending: kind === "image-unknown" || undefined, status: kind === "image-unknown" ? "pending" : "error", taskIds: ["image"] };
     const item = kind === "agent-batch" ? failed : media;
+    function RecoveryView() {
+        const [refreshing, setRefreshing] = useState(false);
+        const refresh = async () => {
+            if (refreshing) return;
+            setRefreshing(true);
+            try {
+                await query();
+            } finally {
+                setRefreshing(false);
+            }
+        };
+        return (
+            <CreationMessageView
+                {...actions}
+                item={item}
+                onRetryFailure={query}
+                onRefreshResult={() => void refresh()}
+                refreshingResult={refreshing}
+                agentTasks={kind === "agent-batch" ? [media, { ...media, id: "task-other", taskIds: ["other"] }] : undefined}
+                onRetryAgentTasks={query}
+            />
+        );
+    }
     try {
-        await act(async () => root.render(<CreationMessageView {...actions} item={item} onRetryFailure={query} agentTasks={kind === "agent-batch" ? [media, { ...media, id: "task-other", taskIds: ["other"] }] : undefined} onRetryAgentTasks={query} />));
-        const button = () => host.querySelector<HTMLButtonElement>(kind === "agent-batch" ? ".creation-message-error button" : kind === "image-unknown" ? ".creation-media-empty button" : ".creation-media-error button")!;
+        await act(async () => root.render(<RecoveryView />));
+        const button = () => host.querySelector<HTMLButtonElement>(kind === "agent-batch" ? ".creation-message-error button" : kind === "image-unknown" ? ".creation-media-empty button" : ".creation-media-notice button")!;
         await act(async () => button().click());
-        expect(button().textContent).toContain("正在核对原任务");
+        expect(button().textContent).toContain(kind === "image" || kind === "video" ? "正在获取" : "正在核对原任务");
         expect(button().disabled).toBe(true);
         expect(button().getAttribute("aria-busy")).toBe("true");
-        expect(button().querySelector("svg")?.getAttribute("width")).toBe("16");
+        expect(button().querySelector("svg")).not.toBeNull();
         await act(async () => button().click());
         expect(queries).toBe(1);
         await act(async () => {

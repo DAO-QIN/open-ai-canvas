@@ -530,8 +530,11 @@ func (s *Service) executeCloudAgentRuntimeTool(ctx context.Context, userID, runI
 			return nil, err
 		}
 		if !cloudAgentWrite(call.Function.Name) {
-			state.Calls = []cloudAgentCall{call}
-			state.CallIndex = 0
+			// Preserve a recorded parallel batch so image data follows every tool receipt.
+			if state.CallIndex >= len(state.Calls) || state.Calls[state.CallIndex].ID != call.ID {
+				state.Calls = []cloudAgentCall{call}
+				state.CallIndex = 0
+			}
 			state.Approval = nil
 		} else if state.CallIndex >= len(state.Calls) || state.Calls[state.CallIndex].ID != call.ID {
 			return nil, NewAppError(409, "工具恢复记录不一致，未自动重发")

@@ -300,13 +300,34 @@ func buildCloudAgentSkillHints(prompt string, pinned []skills.AgentSkillCatalogE
 
 // cloudAgentBuildSkillPool 冻结本轮可用的技能范围，并生成目录与动态提示。
 // 范围 = 允许自动使用的已安装技能 ∪ 本轮固定的技能；固定的技能必须已安装且启用。
-func (s *Service) cloudAgentBuildSkillPool(userID, prompt string, pinnedIDs []string, budget cloudAgentContextBudget) (cloudAgentSkillPool, error) {
+func (s *Service) cloudAgentBuildSkillPool(userID, prompt string, pinnedIDs []string, budget cloudAgentContextBudget, surfaces ...string) (cloudAgentSkillPool, error) {
 	if len(pinnedIDs) > cloudAgentSkillPinnedMax {
 		return cloudAgentSkillPool{}, BadAuthRequest(fmt.Sprintf("每轮最多固定 %d 个技能", cloudAgentSkillPinnedMax))
 	}
 	entries, err := s.skillDomain().AgentSkillCatalog(userID)
 	if err != nil {
 		return cloudAgentSkillPool{}, err
+	}
+	if len(surfaces) > 0 && surfaces[0] == "creation" {
+		automatic, err := s.cloudAgentSkills(userID, nil, "creation")
+		if err != nil {
+			return cloudAgentSkillPool{}, err
+		}
+		pinned, err := s.cloudAgentSkills(userID, pinnedIDs, "creation")
+		if err != nil {
+			return cloudAgentSkillPool{}, err
+		}
+		allowed := map[string]bool{}
+		for _, item := range append(automatic, pinned...) {
+			allowed[item.ID] = true
+		}
+		filtered := entries[:0]
+		for _, entry := range entries {
+			if allowed[entry.SkillID] {
+				filtered = append(filtered, entry)
+			}
+		}
+		entries = filtered
 	}
 	byID := make(map[string]skills.AgentSkillCatalogEntry, len(entries))
 	for _, entry := range entries {

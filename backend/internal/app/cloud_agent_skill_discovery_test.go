@@ -18,10 +18,10 @@ func TestCreationDiscoversOnlyInstalledCompatibleSkillsWithoutExplicitSelection(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(admitted.Skills) != 1 || admitted.Skills[0].ID != available {
-		t.Fatalf("creation candidates = %+v; canvas-only %s must be excluded", admitted.Skills, canvasOnly)
+	if len(admitted.SkillVersions) != 1 || admitted.SkillVersions[available] == "" || admitted.SkillVersions[canvasOnly] != "" {
+		t.Fatalf("creation candidates = %+v; canvas-only %s must be excluded", admitted.SkillVersions, canvasOnly)
 	}
-	state := &cloudAgentRuntime{Request: admitted.Request, Skills: admitted.Skills}
+	state := &cloudAgentRuntime{Request: admitted.Request, Skills: admitted.Skills, SkillVersions: admitted.SkillVersions}
 	search := cloudAgentCall{ID: "discover"}
 	search.Function.Name, search.Function.Arguments = "skill_search", `{}`
 	if _, err := cloudAgentReadTool(s.repo, "user", state, search, s); err != nil {
