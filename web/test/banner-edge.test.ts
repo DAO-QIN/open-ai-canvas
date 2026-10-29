@@ -51,7 +51,8 @@ describe("底边外形与波纹的取值", () => {
         expect(normalizeBannerEdgeShape("star")).toBe("square");
         expect(normalizeBannerEdgeWave(null)).toBe(BANNER_EDGE_WAVE_DEFAULT);
         expect(normalizeBannerEdgeWave("Ripple")).toBe("ripple");
-        expect(normalizeBannerEdgeWave("zigzag")).toBe("flat");
+        expect(normalizeBannerEdgeWave(" ZigZag ")).toBe("zigzag");
+        expect(normalizeBannerEdgeWave("wave")).toBe("flat");
     });
 
     test("前后端白名单与默认值一致", async () => {
@@ -87,7 +88,9 @@ describe("底边遮罩", () => {
             expect(mask.rows).toBeGreaterThan(0);
             expect(mask.rows).toBeLessThanOrEqual(8);
             const svg = svgOf(mask.image);
-            expect(svg).toContain(`viewBox='0 0 ${BANNER_EDGE_COLUMNS} ${mask.rows}'`);
+            // 图案比颗粒带上下各多一行：最上面一行（y = −1..0）整行实心，叠在实心层上；最下面一行留空，挂在背景层以外。
+            expect(svg).toContain(`viewBox='0 -1 ${BANNER_EDGE_COLUMNS} ${mask.rows + 2}'`);
+            expect(svg).toMatch(new RegExp(`<path d='M0 -1(h${BANNER_EDGE_COLUMNS}v1H0z|L0 0L)`));
             expect(svg).toContain("preserveAspectRatio='none'");
             expect(svg).not.toContain('"');
             // 遮罩长度受控：内联在外壳 style 上。
@@ -112,16 +115,16 @@ describe("底边遮罩", () => {
         expect(svgOf(mask.image)).toContain("shape-rendering='crispEdges'");
     });
 
-    test("波浪、涟漪让颗粒带上沿起伏：比平直更深，最上面一行在波峰处是实心的", () => {
+    test("锯齿、涟漪让颗粒带上沿起伏：比平直更深，最上面一行在起伏最深处是实心的", () => {
         const flat = bannerEdgeMask("square", "flat");
-        for (const wave of ["wave", "ripple"] as const) {
+        for (const wave of ["zigzag", "ripple"] as const) {
             const mask = bannerEdgeMask("square", wave);
             expect(mask.rows).toBeGreaterThan(flat.rows);
             const coverage = squareCoverage(mask.image, mask.rows);
             expect(coverage[0]).toBeGreaterThan(coverage.at(-1) ?? 1);
         }
         for (const shape of ["dot", "diamond", "smooth"] as const) {
-            expect(bannerEdgeMask(shape, "wave").rows).toBeGreaterThanOrEqual(bannerEdgeMask(shape, "flat").rows);
+            expect(bannerEdgeMask(shape, "zigzag").rows).toBeGreaterThanOrEqual(bannerEdgeMask(shape, "flat").rows);
         }
     });
 
@@ -133,7 +136,7 @@ describe("底边遮罩", () => {
         const diamond = svgOf(bannerEdgeMask("diamond", "flat").image);
         expect(diamond).not.toContain(" a");
         expect(Array.from(diamond.matchAll(/z/g)).length).toBeGreaterThan(BANNER_EDGE_COLUMNS);
-        const smooth = svgOf(bannerEdgeMask("smooth", "wave").image);
+        const smooth = svgOf(bannerEdgeMask("smooth", "zigzag").image);
         expect(Array.from(smooth.matchAll(/M/g)).length).toBe(1);
     });
 });
@@ -158,7 +161,8 @@ describe("通知条样式", () => {
         for (const property of ["-webkit-mask:", "\n    mask:"]) {
             const value = backdrop.slice(backdrop.indexOf(property), backdrop.indexOf(";", backdrop.indexOf(property)));
             expect(value).toContain("linear-gradient(#000, #000) top / 100% calc(100% - var(--nb-edge-h)) no-repeat");
-            expect(value).toContain("var(--nb-edge-mask) left bottom / calc(var(--nb-pixel) * var(--nb-edge-columns)) var(--nb-edge-h) repeat-x");
+            // 图案高度是颗粒带加两格，下沿压到背景层以下一格：最上面一格与实心层重叠，最下面一格落在背景层以外。
+            expect(value).toContain("var(--nb-edge-mask) left 0 bottom calc(var(--nb-pixel) * -1) / calc(var(--nb-pixel) * var(--nb-edge-columns)) calc(var(--nb-edge-h) + var(--nb-pixel) * 2) repeat-x");
         }
         // 浅色主题没有颗粒带规则。
         expect(css).not.toMatch(/^\.notice-banner\[data-edge-band\]/m);

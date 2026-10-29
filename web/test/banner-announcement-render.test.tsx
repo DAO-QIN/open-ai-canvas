@@ -40,13 +40,13 @@ test("跟随类型时不写颜色变量，动效默认流动，底边默认方�
 
 test("后台选的外形与波纹写到外壳上；平滑 + 平直是直边，不挂颗粒带", () => {
     const wave = renderToStaticMarkup(
-        <BannerAnnouncementShell noticeType="notice" theme={{ edgeShape: "dot", edgeWave: "wave" }}>
+        <BannerAnnouncementShell noticeType="notice" theme={{ edgeShape: "dot", edgeWave: "zigzag" }}>
             <span>通知内容</span>
         </BannerAnnouncementShell>,
     );
     expect(wave).toContain('data-edge-shape="dot"');
-    expect(wave).toContain('data-edge-wave="wave"');
-    expect(wave).toMatch(new RegExp(`--nb-edge-rows:\\s*${bannerEdgeMask("dot", "wave").rows}`));
+    expect(wave).toContain('data-edge-wave="zigzag"');
+    expect(wave).toMatch(new RegExp(`--nb-edge-rows:\\s*${bannerEdgeMask("dot", "zigzag").rows}`));
 
     const straight = renderToStaticMarkup(
         <BannerAnnouncementShell noticeType="notice" theme={{ edgeShape: "smooth", edgeWave: "flat" }}>

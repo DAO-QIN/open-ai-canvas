@@ -499,7 +499,7 @@ type BannerAnnouncement struct {
 	// BgEffect 是通知条背景动效："aurora" 光晕流动，"static" 光晕静止。
 	BgEffect string `json:"bgEffect" gorm:"size:16;not null;default:'aurora'"`
 	// EdgeShape / EdgeWave 是深色主题下通知条底边颗粒带的外形（"square" | "dot" | "diamond" | "smooth"）
-	// 与波纹（"flat" | "wave" | "ripple"），取值白名单见 app 层；平滑 + 平直即直边。
+	// 与波纹（"flat" | "zigzag" | "ripple"），取值白名单见 app 层；平滑 + 平直即直边。
 	EdgeShape string `json:"edgeShape" gorm:"size:16;not null;default:'square'"`
 	EdgeWave  string `json:"edgeWave" gorm:"size:16;not null;default:'flat'"`
 	// CtaText 是通知条行动按钮的文案；空串由前端按通知类型取默认文案，只在有跳转链接时展示。
