@@ -53,7 +53,9 @@
 例如，参考图片尺寸不符合要求时，上游返回 `task.error.code: "2013"` 和 `task.error.message: "content[1].image_url: media dimensions must be between 256 and 5760 pixels"`。任务应展示这条具体消息；只有上游未提供可读取的错误原因时，才使用通用失败提示。
 
 <!-- YINGCE_MANIFEST_CONTRACT_START -->
-## 插件清单
+## Manifest 完整接口定义
+
+以下 JSON 与插件包内实际 `manifest.json` 逐字段一致，覆盖插件身份、权限、配置、鉴权、参数、校验、创建、Agent、查询、取消、结果下载、响应和 Agent 响应映射。`documentation` 字段的值就是当前完整文档；为避免文档在自身内部无限递归，JSON 中仅用等义占位文本表示正文。
 
 ```json
 {
@@ -63,6 +65,7 @@
   "version": "2.0.3",
   "author": "MiniMax / 影策",
   "description": "MiniMax / Hailuo V2 视频生成协议，保留首帧、尾帧、参考图、视频和音频角色语义。",
+  "documentation": "<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>",
   "permissions": [
     "generation.run",
     "media.read"
@@ -615,8 +618,7 @@
         }
       }
     ]
-  },
-  "documentation": "<当前插件的完整 documentation，由 README.md 与 docs/interface.md 拼接而成；为避免 JSON 递归，此处不重复展开正文。>"
+  }
 }
 ```
 <!-- YINGCE_MANIFEST_CONTRACT_END -->
