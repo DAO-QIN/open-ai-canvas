@@ -36,6 +36,7 @@ import { validateVideoSegmentBatch } from "@/lib/canvas/canvas-video-regeneratio
 import { listVideoEnhanceModels, VIDEO_ENHANCE_OPERATION, videoEnhanceSourceReference, videoEnhanceTaskInput, type VideoEnhanceParams } from "@/lib/canvas/canvas-video-enhance";
 import { resolveCanvasStyleExecution } from "@/lib/canvas/canvas-style-execution";
 import { buildGenerationConfig, buildImageGenerationMetadata, nodeReferenceImage, isGenerationCanceled, runBackendCanvasGenerationTask, runCanvasGenerationTaskToConsumer } from "@/lib/canvas/canvas-project-generation";
+import { canvasImageNodeDimensions } from "@/lib/canvas/canvas-reference-image-size";
 import { fitImageNodeSize, fitNodeSize, preserveImageNodeSize, VIDEO_NODE_MAX_SIZE } from "@/lib/canvas/canvas-node-size";
 import { compositeEmotionImage, emotionGenerationSize, emotionProviderMask, normalizeEmotionPromptForProvider, resolveEmotionEditPlan } from "@/lib/canvas/canvas-emotion";
 import { DEFAULT_PORTRAIT_TEXTURE_SETTINGS } from "@/lib/canvas/canvas-portrait-texture";
@@ -857,7 +858,7 @@ export function useCanvasMediaTools({
 
     const editImageNode = useCallback(async (node: CanvasNodeData, payload: CanvasImageEditPayload) => {
         if (!node.metadata?.content || !payload.prompt.trim()) return;
-        const baseGenerationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1" };
+        const baseGenerationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image", undefined, false, canvasImageNodeDimensions(node)), count: "1" };
         const selectedModel = payload.generationConfig?.model || payload.generationConfig?.imageModel || baseGenerationConfig.model;
         const generationConfig = { ...baseGenerationConfig, ...payload.generationConfig, model: selectedModel, imageModel: payload.generationConfig?.imageModel || selectedModel, count: "1" };
         if (!isAiConfigReady(generationConfig, generationConfig.model)) {
@@ -962,7 +963,7 @@ export function useCanvasMediaTools({
     const editAnnotatedImageNode = useCallback(async (node: CanvasNodeData, payload: CanvasImageAnnotationPayload) => {
         const source = nodeReferenceImage(node);
         if (!source) return;
-        const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1" };
+        const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image", undefined, false, canvasImageNodeDimensions(node)), count: "1" };
         if (!isAiConfigReady(generationConfig, generationConfig.model)) {
             navigateToSettings({ continueCreation: true });
             return;
@@ -1543,7 +1544,7 @@ export function useCanvasMediaTools({
 
     const generateAngleNode = useCallback(async (node: CanvasNodeData, params: CanvasImageAngleParams) => {
         if (!node.metadata?.content) return;
-        const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1" };
+        const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image", undefined, false, canvasImageNodeDimensions(node)), count: "1" };
         if (!isAiConfigReady(generationConfig, generationConfig.model)) {
             navigateToSettings({ continueCreation: true });
             return;
@@ -1603,7 +1604,7 @@ export function useCanvasMediaTools({
 
     const generateLightingNode = useCallback((node: CanvasNodeData, options: CanvasImageLightingOptions, prompt: string) => {
         if (!node.metadata?.content) return;
-        const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image"), count: "1" };
+        const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "image", undefined, false, canvasImageNodeDimensions(node)), count: "1" };
         const childId = nanoid();
         const imageSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
         const title = buildLightingLabel(options);

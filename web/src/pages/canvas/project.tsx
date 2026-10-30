@@ -123,6 +123,7 @@ import { batchSourceRestriction } from "@/lib/canvas/canvas-batch-connection";
 import { deriveStoryboardPipelineProgress } from "@/lib/canvas/canvas-storyboard-progress";
 import { CanvasOperationChangeToast, CanvasMergeStatusToast, CanvasUploadStatusToast } from "./canvas-project-feedback";
 import { getGenerationCount } from "@/lib/canvas/canvas-project-generation";
+import { canvasReferenceImageDimensions } from "@/lib/canvas/canvas-reference-image-size";
 import { cancelGenerationTask } from "@/services/api/task-center";
 import { CanvasTopBar, type CanvasProjectView } from "./canvas-project-top-bar";
 import { CanvasAssetView } from "@/components/canvas/canvas-asset-view";
@@ -2274,6 +2275,7 @@ function CanvasViewportPage() {
                     onClose={() => setDialogNodeId(null)}
                     onNodeMouseDown={handleNodeMouseDown}
                     workspaceMode={workspaceMode}
+                    referenceImageSize={canvasReferenceImageDimensions(panelNode.id, nodesRef.current, connectionsRef.current)}
                     onImageSettingsOpenChange={(open) => {
                         setNodeImageSettingsOpen(open);
                         if (open) setToolbarNodeId(null);

@@ -123,7 +123,7 @@ Pi SDK 执行前的参数校验失败由 `agent-runtime/pi/agent-runtime.mjs` �
 | 职责 | 代码位置 |
 | --- | --- |
 | 页面装配和跨域动作协调 | `web/src/pages/canvas/project.tsx` |
-| 画布领域规则和生成协议 | `web/src/lib/canvas/canvas-project-domain.ts`、`canvas-project-generation.ts`、`produced-model.ts` |
+| 画布领域规则和生成协议 | `web/src/lib/canvas/canvas-project-domain.ts`、`canvas-project-generation.ts`、`produced-model.ts`；图生图默认跟随参考图比例：`canvas-reference-image-size.ts`（提示词面板 `buildNodeConfig` 与生成 `buildGenerationConfig` 共用） |
 | 项目恢复、持久化和项目级动作 | `web/src/pages/canvas/use-canvas-project-lifecycle.ts` |
 | 画布 operations 同步与本地 journal | `web/src/services/user-data-sync.ts` 协调快照和确认；`web/src/services/canvas-mutation-batches.ts` 按服务端 500 条上限顺序提交、先持久化后发送并保留重放 ID；`web/src/services/api/user-data.ts`、`web/src/lib/canvas/canvas-content.ts`、`web/src/pages/canvas/canvas-sync-status.tsx`、`web/src/stores/use-sync-progress-store.ts` |
 | 内部资源保护与维护快照 | `backend/internal/canvas/canvas_history.go`、`repair_resources.go`、`backend/internal/repository/canvas_history.go`；仅供资源完整性维护和审计，不提供用户历史树、预览或恢复入口 |
