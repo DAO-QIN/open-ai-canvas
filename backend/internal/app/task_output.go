@@ -58,9 +58,28 @@ type TaskClientContext struct {
 	ArtifactType     string `json:"artifactType,omitempty"`
 }
 
+// TaskBillingSummary 是任务列表展示的计费摘要。冻结额与实收分列：只有已结算订单才有实收。
 type TaskBillingSummary struct {
-	AmountMicrocredits int64               `json:"amountMicrocredits"`
-	Status             model.BillingStatus `json:"status"`
+	// AmountMicrocredits 是下单时的冻结额（预授权），不是实际扣费；与 ReservedMicrocredits 相同。
+	AmountMicrocredits   int64 `json:"amountMicrocredits"`
+	ReservedMicrocredits int64 `json:"reservedMicrocredits"`
+	// ChargedMicrocredits 只在订单已结算（settled）时给出，是扣除差额退回后的实收。
+	ChargedMicrocredits *int64 `json:"chargedMicrocredits,omitempty"`
+	// RefundedMicrocredits 是已退回的金额：结算时的差额退回，或失败后整笔退回。
+	RefundedMicrocredits int64               `json:"refundedMicrocredits"`
+	Status               model.BillingStatus `json:"status"`
+}
+
+func taskBillingSummary(order model.BillingOrder) *TaskBillingSummary {
+	summary := &TaskBillingSummary{
+		AmountMicrocredits: order.AmountMicrocredits, ReservedMicrocredits: order.AmountMicrocredits,
+		RefundedMicrocredits: order.RefundedAmountMicrocredits, Status: order.Status,
+	}
+	if order.Status == model.BillingStatusSettled {
+		charged := order.ActualAmountMicrocredits
+		summary.ChargedMicrocredits = &charged
+	}
+	return summary
 }
 
 func taskSummariesForOutput(tasks []model.Task) []TaskSummary {
@@ -72,7 +91,7 @@ func taskSummariesForOutputWithBilling(tasks []model.Task, orders map[string]mod
 	for _, task := range tasks {
 		summary := taskSummaryForOutput(task)
 		if order, ok := orders[task.ID]; ok {
-			summary.Billing = &TaskBillingSummary{AmountMicrocredits: order.AmountMicrocredits, Status: order.Status}
+			summary.Billing = taskBillingSummary(order)
 			if summary.ProviderRequestID == "" {
 				summary.ProviderRequestID = order.ProviderRequestID
 			}
