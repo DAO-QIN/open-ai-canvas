@@ -4,6 +4,13 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 ---
 
 # 待测试
+## 画布写入回执瘦身与过期清理
+- 已修复：`canvas_mutation_receipts.result_json` 每次 operations 都写入整份画布正文且从不清理，Agent 高频编辑会让数据库随编辑次数线性膨胀。现在回执只保存提交摘要；后台 worker 每小时分批删除创建超过 7 天的回执。旧格式回执仍可解码重放。
+- 已验证：`go test ./internal/canvas/ ./internal/repository/ ./internal/app/` 通过；临时用例确认 200 KB 画布的回执从包含整份正文降到 145 字节，2503 条过期回执分 3 批删除且保留未过期回执。未在 PostgreSQL 上实测分批删除语句。
+- [ ] PostgreSQL 部署升级后，确认 `canvas_mutation_receipts` 行数降到近 7 天量级，后端日志无 `canvas mutation receipt cleanup failed`。
+- [ ] 备份后在维护窗口执行 `VACUUM (FULL, ANALYZE) canvas_mutation_receipts;`，确认 `pg_total_relation_size` 下降。
+- [ ] 刷新、断网恢复后的画布 journal 重放仍返回原结果，不产生重复节点。
+
 ## 支付确认框金额货币
 - 已修复：支付确认框（扫码支付、跳转返回后的「确认支付结果」）金额写死「¥」，USD 充值商品的订单显示成「¥ 1.00」；改用 `formatPaymentAmount(order.amountFen, order.currency)`，与充值面板和后台订单列表一致。
 - 已验证：`bun run typecheck`、`bun run lint`、`bun test`（2880 项）通过；改动文件 Prettier 检查通过。未做浏览器验收。
