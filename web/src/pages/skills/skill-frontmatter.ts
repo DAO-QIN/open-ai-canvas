@@ -62,7 +62,12 @@ export function parseSkillFrontmatter(raw: string): SkillFrontmatterEntry[] | nu
         const block = dedent(nested);
         let value: string;
         if (/^[|>][+-]?$/.test(inline)) {
-            value = inline.startsWith("|") ? block.join("\n") : block.map((item) => item.trim()).join(" ").replace(/\s+/g, " ");
+            value = inline.startsWith("|")
+                ? block.join("\n")
+                : block
+                      .map((item) => item.trim())
+                      .join(" ")
+                      .replace(/\s+/g, " ");
         } else if (/^\[.*\]$/.test(inline) && !block.length) {
             value = inline
                 .slice(1, -1)
@@ -74,7 +79,10 @@ export function parseSkillFrontmatter(raw: string): SkillFrontmatterEntry[] | nu
             // 普通标量可以折行续写到缩进行，按 YAML 规则用空格拼接。
             value = unquote([inline, ...block.map((item) => item.trim()).filter(Boolean)].join(" "));
         } else if (block.length && block.every((item) => !item.trim() || item.startsWith("- "))) {
-            value = block.filter((item) => item.trim()).map((item) => unquote(item.slice(2).trim())).join("、");
+            value = block
+                .filter((item) => item.trim())
+                .map((item) => unquote(item.slice(2).trim()))
+                .join("、");
         } else {
             value = block.join("\n");
         }

@@ -142,13 +142,7 @@ export function MentionHoverPreview({ target }: { target: MentionHoverTarget }) 
 
     const caption = reference.title && reference.title !== reference.label ? reference.title : "";
     return createPortal(
-        <div
-            ref={cardRef}
-            aria-hidden
-            className="canvas-mention-hover-preview ra-pop-in"
-            data-placement={layout?.placement ?? "top"}
-            style={{ left: layout?.left ?? 0, top: layout?.top ?? 0, visibility: layout ? "visible" : "hidden" }}
-        >
+        <div ref={cardRef} aria-hidden className="canvas-mention-hover-preview ra-pop-in" data-placement={layout?.placement ?? "top"} style={{ left: layout?.left ?? 0, top: layout?.top ?? 0, visibility: layout ? "visible" : "hidden" }}>
             <div className="canvas-mention-hover-preview-media">
                 {imageUrl && !mediaFailed ? (
                     <img src={imageUrl} alt="" draggable={false} onLoad={place} onError={() => setFailedUrl(imageUrl)} />

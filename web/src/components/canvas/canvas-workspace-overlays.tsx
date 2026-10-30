@@ -342,21 +342,7 @@ export function CanvasConnectionCreateMenu({
     );
 }
 
-function ConnectionCreateOption({
-    active,
-    icon,
-    title,
-    description,
-    disabledReason,
-    onClick,
-}: {
-    active: boolean;
-    icon: ReactNode;
-    title: string;
-    description: string;
-    disabledReason?: string;
-    onClick: () => void;
-}) {
+function ConnectionCreateOption({ active, icon, title, description, disabledReason, onClick }: { active: boolean; icon: ReactNode; title: string; description: string; disabledReason?: string; onClick: () => void }) {
     const theme = canvasThemes[useActiveTheme()];
     return (
         <button
