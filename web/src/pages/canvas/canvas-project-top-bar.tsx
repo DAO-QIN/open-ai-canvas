@@ -82,6 +82,7 @@ export function CanvasTopBar({
     const { availableMicrocredits, refreshing } = useWalletBalance(user?.id, creditsEnabled);
     const titleRef = useRef<HTMLDivElement>(null);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
+    const [importMenuOpen, setImportMenuOpen] = useState(false);
 
     const handleShortDramaGuideToggle = () => {
         shortDramaGuide?.onToggle();
@@ -206,10 +207,11 @@ export function CanvasTopBar({
                             aria-label="搜索画布节点"
                         />
                     </CanvasTopBarTooltip>
-                    <CanvasTopBarTooltip label="导入第三方画布">
+                    <CanvasTopBarTooltip label="导入第三方画布" suppressed={importMenuOpen}>
                         <Dropdown
                             trigger={["click"]}
                             placement="bottomRight"
+                            onOpenChange={setImportMenuOpen}
                             menu={{
                                 items: [
                                     { key: "libtv", icon: <CopyPlus className="size-4" />, label: "导入 LibTV 画布", onClick: onImportLibTV },
@@ -292,9 +294,11 @@ function CanvasViewSwitch({ view, onChange, dockStyle, activeBg, color }: { view
 // 顶栏是 --z-toolbar 上的绝对定位浮层，会为子元素建立层叠上下文。行内绝对定位的提示
 // 无论 z-index 多高都无法越过它，会被顶栏下方 --z-panel-floating 的生成任务面板盖住，
 // 因此提示必须走 portal 的浮层层级。
-function CanvasTopBarTooltip({ label, children }: { label: string; children: ReactNode }) {
+// 提示向下弹出会盖住顶栏下方的节点工具栏：离开立即消失，且提示本身不接收指针，避免截获下方按钮的点击。
+// suppressed 用于对应菜单展开期间不再显示提示。
+function CanvasTopBarTooltip({ label, suppressed = false, children }: { label: string; suppressed?: boolean; children: ReactNode }) {
     return (
-        <Tooltip title={label} placement="bottom">
+        <Tooltip title={suppressed ? null : label} placement="bottom" mouseLeaveDelay={0} styles={{ root: { pointerEvents: "none" } }}>
             <span className="relative inline-flex">{children}</span>
         </Tooltip>
     );

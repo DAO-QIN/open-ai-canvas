@@ -23,6 +23,7 @@ import { createGenerationTask, cancelGenerationTask, queryGenerationTask, retryG
 import { capabilitySupportedModes, createWorkbenchTask, listWorkbenchTasks, listWorkbenchTools, normalizeWorkbenchGuide, resolveWorkbenchResourceURL, type WorkbenchKind, type WorkbenchPromptPreset, type WorkbenchTool } from "@/services/api/workbench";
 import { resourceStorageKey, resolveResourceUrl, uploadResourceFile } from "@/services/api/resources";
 import { formatCredits, requestCreditCost } from "@/constant/credits";
+import { taskBillingLabel } from "@/lib/generation-task-billing";
 import { useCreationPreferencesStore } from "@/stores/use-creation-preferences-store";
 import { logicalModelIDForConfig, modelDisplayName, modelOptionName, resolveModelChannel, selectableModelsByCapability, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -1026,7 +1027,7 @@ export function WorkbenchPage({ kind }: { kind: WorkbenchKind }) {
                         <div className="workbench-composer">
                             <div className="workbench-tool-bar">
                                 <span className="workbench-kind-label">{kind === "image" ? "图片生成" : "视频生成"}</span>
-                                <button type="button" className="workbench-tool-choice" aria-expanded={toolLibraryOpen} aria-haspopup="dialog" aria-controls="workbench-tool-library" onClick={() => setToolLibraryOpen((open) => !open)}>
+                                <button type="button" className="workbench-tool-choice" title={tool ? toolTitle(tool.name, tool.description || (isModelIdLike(tool.subtitle) ? "" : tool.subtitle)) : "选择创作工具"} aria-expanded={toolLibraryOpen} aria-haspopup="dialog" aria-controls="workbench-tool-library" onClick={() => setToolLibraryOpen((open) => !open)}>
                                     <span className="workbench-tool-choice-mark">{tool?.iconUrl ? <img src={tool.iconUrl} alt="" /> : kind === "image" ? <FileImage /> : <Video />}</span>
                                     <span className="workbench-tool-choice-copy">
                                         <small>{tool ? (isModelIdLike(tool.subtitle) ? tool.description || "创作工具" : tool.subtitle || tool.description || "创作工具") : "直接创作"}</small>
@@ -1481,7 +1482,7 @@ export function WorkbenchPage({ kind }: { kind: WorkbenchKind }) {
                                 </div>
                                 <div>
                                     <dt>积分</dt>
-                                    <dd>{detailTask.billing ? `${formatCredits(detailTask.billing.amountMicrocredits)} · ${detailTask.billing.status}` : "--"}</dd>
+                                    <dd>{detailTask.billing ? taskBillingLabel(detailTask.billing) : "--"}</dd>
                                 </div>
                                 <div>
                                     <dt>创建时间</dt>
@@ -1675,10 +1676,16 @@ function ParameterChips({ label, value, options, onChange }: { label: string; va
     );
 }
 
+/** 工具名最多显示两行，悬停提示给出完整名称与说明。 */
+function toolTitle(name: string, description?: string) {
+    const detail = description?.trim();
+    return detail && detail !== name ? `${name}\n${detail}` : name;
+}
+
 function QuickGoalCard({ tool, kind, onClick }: { tool: WorkbenchTool; kind: WorkbenchKind; onClick: () => void }) {
     const visual = toolVisual(tool, kind);
     return (
-        <button type="button" className={`workbench-goal-card is-${visual.tone}`} onClick={onClick}>
+        <button type="button" className={`workbench-goal-card is-${visual.tone}`} title={toolTitle(tool.name, tool.description || tool.subtitle)} onClick={onClick}>
             <span className="workbench-goal-icon">{tool.coverUrl || tool.iconUrl ? <img src={tool.coverUrl || tool.iconUrl} alt="" /> : visual.icon}</span>
             <span className="workbench-goal-copy">
                 <strong>{tool.name}</strong>
@@ -1693,7 +1700,7 @@ function ToolCard({ tool, selected, onClick }: { tool: WorkbenchTool; selected: 
     const visual = toolVisual(tool, tool.kind);
     const subtitle = isModelIdLike(tool.subtitle) ? tool.description || "" : tool.subtitle || tool.description;
     return (
-        <button type="button" className={`workbench-tool-card ${selected ? "is-selected" : ""} is-${visual.tone}`} aria-pressed={selected} onClick={onClick}>
+        <button type="button" className={`workbench-tool-card ${selected ? "is-selected" : ""} is-${visual.tone}`} title={toolTitle(tool.name, tool.description || subtitle)} aria-pressed={selected} onClick={onClick}>
             <SpotlightSurface className="workbench-tool-card-spotlight" contentClassName="workbench-tool-card-surface relative z-[1]" spotlightColor="color-mix(in srgb, var(--user-ink) 5%, transparent)">
                 <span className="workbench-tool-card-image">{tool.coverUrl || tool.iconUrl ? <img src={tool.coverUrl || tool.iconUrl} alt="" /> : visual.icon}</span>
                 <span className="workbench-tool-card-copy">

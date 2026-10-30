@@ -57,8 +57,15 @@ export type GenerationTask = {
     completedAt?: string;
     createdAt: string;
     updatedAt: string;
+    /** 计费摘要：冻结额与实收分列，只有已结算订单才有 chargedMicrocredits。 */
     billing?: {
+        /** 下单时的冻结额（预授权），不是实际扣费；与 reservedMicrocredits 相同。 */
         amountMicrocredits: number;
+        reservedMicrocredits: number;
+        /** 已结算（settled）时的实收，已扣除差额退回；其余状态不返回。 */
+        chargedMicrocredits?: number;
+        /** 已退回金额：结算时的差额退回，或失败后整笔退回。 */
+        refundedMicrocredits: number;
         status: TaskBillingStatus;
     };
     clientContext?: {

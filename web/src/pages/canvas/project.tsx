@@ -3399,6 +3399,8 @@ function CanvasViewportPage() {
                                     open={Boolean(timelineNode)}
                                     nodes={nodes}
                                     timeline={currentProject?.timeline || null}
+                                    selectedNodeIds={selectedNodeIds}
+                                    dramaAspectRatio={drama.active ? drama.summary?.production.settings.aspectRatio : undefined}
                                     onClose={() => setTimelineNodeId(null)}
                                     onOpenSubtitleDialog={(subNodeId) => {
                                         setTimelineNodeId(null);

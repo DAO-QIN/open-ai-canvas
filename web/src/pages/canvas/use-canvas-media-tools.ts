@@ -8,6 +8,7 @@ import { buildRegionEditPrompt } from "@/lib/canvas/image-region-edit";
 import type { CanvasImageEditPayload } from "@/components/canvas/canvas-node-image-edit-dialog";
 import type { CanvasImageLayerDecompositionPayload } from "@/components/canvas/canvas-node-layer-decomposition-dialog";
 import { buildCanvasTextEditPrompt, type CanvasImageTextEditPayload, type CanvasImageTextLine } from "@/components/canvas/canvas-node-text-edit-dialog";
+import { canvasTextDetectionModel, canvasTextDetectionSupportError } from "@/components/canvas/canvas-node-text-detection";
 import type { CanvasImageAnnotationPayload } from "@/components/canvas/canvas-node-annotation-dialog";
 import type { CanvasImageSplitParams } from "@/components/canvas/canvas-node-split-dialog";
 import type { CanvasImageUpscaleParams } from "@/components/canvas/canvas-node-upscale-dialog";
@@ -908,12 +909,15 @@ export function useCanvasMediaTools({
     const detectImageText = useCallback(async (node: CanvasNodeData): Promise<CanvasImageTextLine[]> => {
         const source = nodeReferenceImage(node);
         if (!source) throw new Error("图片节点为空，无法识别文字");
-        const model = effectiveConfig.textModel || effectiveConfig.model;
+        const model = canvasTextDetectionModel(effectiveConfig);
         const config = { ...effectiveConfig, model, textModel: model };
         if (!isAiConfigReady(config, model)) {
             navigateToSettings({ continueCreation: true });
             throw new Error("请先配置可用的文字模型");
         }
+        // 识别要把图片交给文字模型；模型未声明看图能力时上游会直接 400，提交前拦下，不创建计费任务。
+        const supportError = canvasTextDetectionSupportError(config, model);
+        if (supportError) throw new Error(supportError);
         const result = await runBackendCanvasGenerationTask({
             projectId,
             nodeId: `${node.id}-text-detect`,
