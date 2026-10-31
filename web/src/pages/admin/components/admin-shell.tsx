@@ -7,11 +7,11 @@ import {
     BellRing,
     ChevronDown,
     CloudUpload,
-    Coins,
     CreditCard,
     Crown,
     Database,
     FileClock,
+    Globe,
     HardDrive,
     Home,
     Inbox,
@@ -48,6 +48,7 @@ import { BrandLogoFrame } from "@/components/brand/brand-logo";
 import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { publishWorkspaceSidebarCollapsed, readWorkspaceSidebarCollapsed, subscribeWorkspaceSidebarCollapsed } from "@/components/layout/workspace-sidebar-state";
 import { AppFeedbackProvider } from "@/components/layout/app-feedback";
+import { CreditIcon } from "@/constant/credits";
 import { cn } from "@/lib/utils";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -100,7 +101,7 @@ const adminNavigation: Array<{ label: string; items: AdminNavigationItem[] }> = 
             { path: "/admin/agent-lessons", label: "Agent 记忆", shortLabel: "记忆", description: "按用户查看个人记忆", icon: <BookMarked className="size-4" /> },
             { path: "/admin/payments", label: "支付充值", shortLabel: "支付", description: "支付渠道、订单与对账", icon: <CreditCard className="size-4" /> },
             { path: "/admin/promotion", label: "邀请返利", shortLabel: "返利", description: "推广规则、个人比例与返利核对", icon: <UsersRound className="size-4" /> },
-            { path: "/admin/credit-operations", label: "积分运营", shortLabel: "积分", description: "人工调账与异常计费", icon: <Coins className="size-4" /> },
+            { path: "/admin/credit-operations", label: "积分运营", shortLabel: "积分", description: "人工调账与异常计费", icon: <CreditIcon className="size-4" /> },
             { path: "/admin/redemption-codes", label: "兑换码", shortLabel: "兑换", description: "生成与查看兑换码批次", icon: <TicketCheck className="size-4" /> },
         ],
     },
@@ -117,6 +118,7 @@ const adminNavigation: Array<{ label: string; items: AdminNavigationItem[] }> = 
             { path: "/admin/settings/email", label: "邮件服务", shortLabel: "邮件", description: "注册验证码与 SMTP", icon: <Mail className="size-4" /> },
             { path: "/admin/settings/storage", label: "存储服务", shortLabel: "存储", description: "对象存储与资源存储", icon: <HardDrive className="size-4" /> },
             { path: "/admin/settings/ark-private-assets", label: "方舟素材库", shortLabel: "方舟", description: "Seedance 可信参考素材", icon: <CloudUpload className="size-4" /> },
+            { path: "/admin/settings/web-search", label: "联网搜索", shortLabel: "搜索", description: "创作 Agent 的网页搜索服务", icon: <Globe className="size-4" /> },
             { path: "/admin/settings/response-interception", label: "模型响应拦截", shortLabel: "拦截", description: "先启用策略，再配置替换规则", icon: <ShieldAlert className="size-4" /> },
             { path: "/admin/settings/third-party", label: "第三方参数配置", shortLabel: "三方", description: "先配置凭据，再开放用户入口", icon: <KeyRound className="size-4" /> },
             { path: "/admin/settings/system-update", label: "系统更新", shortLabel: "更新", description: "检查版本、备份与安全更新", icon: <RefreshCw className="size-4" /> },

@@ -60,6 +60,7 @@ import { logicalModelIDForConfig, modelOptionName, resolveModelRequestConfig, se
 import { selectImageInspectionModel } from "@/lib/canvas/image-to-previs-agent";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { useCreationAgentPreferences } from "@/stores/use-creation-preferences-store";
 import { getActiveUserScope } from "@/lib/user-scope";
 import { applyAgentCanvasPatches, refreshCanvasAfterAgent, prepareCanvasForCloudAction } from "@/services/user-data-sync";
 import { createAgentCanvasSync } from "@/services/agent-canvas-sync";
@@ -73,7 +74,7 @@ import { CanvasCloudAgentSettings, type AgentContextKey } from "./canvas-cloud-a
 import { useAgentPanelLayout } from "./use-agent-panel-layout";
 import { useAgentPanelDock } from "./use-agent-panel-dock";
 import "./canvas-cloud-agent.css";
-import { appendAgentError, appendUniqueMessage, applyAgentEvent, positiveNumber, type ApprovalState } from "./canvas-cloud-agent-events";
+import { appendAgentError, appendUniqueMessage, applyAgentEvent, EMPTY_AGENT_RUNNING_TOOLS, positiveNumber, reduceAgentRunningTools, type ApprovalState } from "./canvas-cloud-agent-events";
 import { AgentContextRing, AgentConversation, AgentHeader, AgentHistory, AgentLauncher, ComposerControls } from "./canvas-cloud-agent-panel-parts";
 import { AgentConnectorsBar } from "./canvas-cloud-agent-connectors";
 import { useGlobalAgentStore, type AgentPrefillRequest } from "@/stores/use-global-agent-store";
@@ -120,6 +121,7 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
     const [view, setView] = useState<AgentPanelView>("chat");
     const [run, setRun] = useState<AgentRun | null>(null);
     const [contextUsage, setContextUsage] = useState<AgentContextUsage>(() => emptyAgentContextUsage(""));
+    const [runningTools, setRunningTools] = useState(EMPTY_AGENT_RUNNING_TOOLS);
     const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "reconnecting" | "disconnected">("connecting");
     const [connectionEpoch, setConnectionEpoch] = useState(0);
     const [messages, setMessages] = useState<CloudAgentChatMessage[]>([]);
@@ -129,6 +131,10 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
     const [pendingAutoSubmit, setPendingAutoSubmit] = useState<AgentPrefillRequest | null>(null);
     const prefilledSubmissionRef = useRef<AgentPrefillRequest | null>(null);
     const [reasoningMode, setReasoningMode] = useState<AgentReasoningMode>("off");
+    // 联网搜索与首页「偏好」共用账号偏好 agent.webSearch（换设备沿用）；平台没开时设置里不显示开关。
+    const { agentWebSearch, setAgentWebSearch } = useCreationAgentPreferences();
+    const webSearchAvailable = useUserStore((state) => state.webSearchEnabled);
+    const webSearchPriceMicrocredits = useUserStore((state) => (state.features.creditsEnabled ? state.webSearchPriceMicrocredits : null));
     const [profileView, setProfileView] = useState<AgentProfileView | null>(null);
     const [profileLoading, setProfileLoading] = useState(false);
     const [profileSaving, setProfileSaving] = useState(false);
@@ -847,6 +853,9 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
     useEffect(() => {
         if (!run?.id) return;
         cloudRunTransitionRef.current = run.id;
+        // 每次（重新）订阅都从空开始：切回对话或重连时回放可能跳过已结束调用的完成事件，
+        // 宁可退回"正在思考"，也不让过期的联网提示一直挂着。
+        setRunningTools((current) => (current.items.length ? EMPTY_AGENT_RUNNING_TOOLS : current));
         const after = replayCursorRef.current.runId === run.id ? replayCursorRef.current.seq : 0;
         replayCursorRef.current = { runId: run.id, seq: after };
         lastSeqRef.current = after;
@@ -864,6 +873,7 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                 }
                 setMessages((current) => (current.some((item) => item.id === `stream-error-${run.id}`) ? current.filter((item) => item.id !== `stream-error-${run.id}`) : current));
                 setContextUsage((current) => reduceAgentContextUsage(current, event));
+                setRunningTools((current) => reduceAgentRunningTools(current, event));
                 applyAgentEvent(event, setMessages, setRun, setApproval, setPrompt);
                 canvasSyncRef.current?.receive(event);
                 // 采用到短剧改的是短剧数据而不是画布：刷新短剧侧栏、过期标记与制作台缓存。
@@ -1052,6 +1062,8 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                     canvasId,
                     prompt: value,
                     reasoningMode,
+                    // 只在用户关掉时声明；是否真能联网由后端按管理员配置在建轮次时定格。
+                    ...(agentWebSearch === "off" ? { webSearch: "off" as const } : {}),
                     profileRevision: profileView.revision,
                     model: modelOptionName(effectiveModel) || undefined,
                     ...(logicalModelId ? { logicalModelId } : requestConfig.channelId ? { channelId: requestConfig.channelId, channelModelKey: modelOptionName(effectiveModel) || undefined } : {}),
@@ -1531,6 +1543,10 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                                         onPermissionChange={setPermissionMode}
                                         reasoningMode={reasoningMode}
                                         onReasoningModeChange={setReasoningMode}
+                                        webSearchAvailable={webSearchAvailable}
+                                        webSearch={agentWebSearch}
+                                        webSearchPriceMicrocredits={webSearchPriceMicrocredits ?? undefined}
+                                        onWebSearchChange={setAgentWebSearch}
                                         profileView={profileView}
                                         profileLoading={profileLoading}
                                         profileSaving={profileSaving}
@@ -1638,6 +1654,7 @@ export const CanvasCloudAgentPanel = memo(function CanvasCloudAgentPanel() {
                                         undoStates={undoStates}
                                         references={conversationReferences}
                                         busy={busy || running}
+                                        workingLabel={run?.id && runningTools.runId === run.id ? runningTools.items.at(-1)?.label : undefined}
                                         approval={approval}
                                         approvalTargetGenerating={approvalTargetGenerating}
                                         nodeCount={canvasId ? nodeCount : null}

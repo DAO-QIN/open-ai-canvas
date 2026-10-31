@@ -51,6 +51,10 @@ export type AuthSessionPayload = {
     features?: FeatureAvailability;
     /** 当前账号所属分组的展示信息；分组配置缺失时为空。 */
     userGroup?: PublicUserGroup | null;
+    /** 管理员已开启并配置好联网搜索；创作页据此显示「联网」开关。 */
+    webSearchEnabled?: boolean;
+    /** 当前账号每次联网搜索实际扣的积分（微积分，已按分组倍率折算）；0 表示免费，缺省表示未开启或暂时算不出。 */
+    webSearchPriceMicrocredits?: number;
 };
 
 export type RuntimeLimits = {
@@ -326,6 +330,55 @@ export type AdminArkPrivateAssetSetting = {
     updatedBy?: string;
     createdAt?: string;
     updatedAt?: string;
+};
+
+export type WebSearchProvider = "deepseek" | "bocha" | "metaso" | "zhipu" | "tavily" | "serper" | "searxng";
+/** 智谱 Web Search 的搜索引擎；search_std 为基础版。 */
+export type WebSearchZhipuEngine = "search_std" | "search_pro" | "search_pro_sogou" | "search_pro_quark";
+/** 网页读取增强：留空只用服务端直接读取；deepseek 为 DeepSeek Fetch；jina 为 Jina Reader（云端或自建开源版）。 */
+export type WebReaderProvider = "" | "deepseek" | "jina";
+
+/** 联网搜索配置：密钥只写不读，hasApiKey / readerHasApiKey 表示服务端已保存。 */
+export type AdminWebSearchSetting = {
+    enabled: boolean;
+    provider: WebSearchProvider | "";
+    baseUrl: string;
+    hasApiKey: boolean;
+    maxResults: number;
+    engine: string;
+    dailyLimit: number;
+    /** 每人每分钟联网调用次数上限（搜索与网页读取合计，复用结果也计入）。 */
+    perMinuteLimit: number;
+    /** 每次搜索扣用户的积分（微积分，再乘用户分组倍率）；0 表示免费。 */
+    priceMicrocredits: number;
+    readerProvider: WebReaderProvider;
+    readerBaseUrl: string;
+    readerHasApiKey: boolean;
+    updatedBy?: string;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type AdminWebSearchSettingInput = {
+    enabled: boolean;
+    provider: WebSearchProvider | "";
+    baseUrl: string;
+    apiKey: string;
+    maxResults: number;
+    engine: string;
+    dailyLimit: number;
+    perMinuteLimit: number;
+    priceMicrocredits: number;
+    readerProvider: WebReaderProvider;
+    readerBaseUrl: string;
+    readerApiKey: string;
+};
+
+export type WebSearchTestResult = {
+    provider: WebSearchProvider | "";
+    results: Array<{ title: string; url: string; snippet?: string; siteName?: string; publishedAt?: string }>;
+    /** 测试网页读取增强时返回：标题、最终地址、正文开头和正文字数。 */
+    reader?: { title: string; url: string; excerpt: string; chars: number };
 };
 
 export type RuntimeResourcePolicy = {
@@ -625,6 +678,19 @@ export function getAdminArkPrivateAssetSetting() {
 
 export function updateAdminArkPrivateAssetSetting(input: Partial<AdminArkPrivateAssetSetting>) {
     return http.patch<{ setting: AdminArkPrivateAssetSetting }>("/admin/settings/ark-private-assets", input);
+}
+
+export function getAdminWebSearchSetting() {
+    return http.get<{ setting: AdminWebSearchSetting }>("/admin/settings/web-search");
+}
+
+export function updateAdminWebSearchSetting(input: AdminWebSearchSettingInput) {
+    return http.patch<{ setting: AdminWebSearchSetting }>("/admin/settings/web-search", input);
+}
+
+/** 用表单里的配置实际搜一次（target=reader 时读一次网页），不保存；未填密钥时沿用已保存的密钥。 */
+export function testAdminWebSearchSetting(input: AdminWebSearchSettingInput & { query?: string; target?: "search" | "reader"; url?: string }) {
+    return http.post<WebSearchTestResult>("/admin/settings/web-search/test", input);
 }
 
 export function getAdminRuntimePolicySetting() {
