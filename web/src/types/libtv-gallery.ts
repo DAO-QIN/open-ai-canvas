@@ -50,7 +50,7 @@ export type LibTVGalleryResponse = {
     requestId: string;
 };
 
-/** 首页精选画布：服务端缓存；nodeCount 为 0 表示该作品详情暂时读不到。 */
+/** 首页精选画布：服务端缓存，只收录复核通过的作品；nodeCount / connectionCount 来自复核时的公开快照。 */
 export type LibTVFeaturedItem = LibTVGalleryItem & { nodeCount: number; connectionCount: number };
 
 export type LibTVFeaturedResponse = {

@@ -602,7 +602,7 @@ describe("LibTV home featured canvases", () => {
 describe("LibTV inspiration navigation", () => {
     test("sidebar, title, command palette and route preload all know the inspiration page", () => {
         const sidebar = source("../src/components/layout/workspace-sidebar-nav.tsx");
-        // 参考站布局：首页、项目、画布、创作、灵感；侧栏「灵感」进入灵感库，「全部画布」从首页精选画布进入，也归在「灵感」下高亮。
+        // 侧栏顺序：首页、创作、项目、画布、灵感；侧栏「灵感」进入灵感库，「全部画布」从首页精选画布进入，也归在「灵感」下高亮。
         expect(sidebar.indexOf('toolItem("inspirations", "/inspirations")')).toBeGreaterThan(sidebar.indexOf('toolItem("create", "/create")'));
         expect(sidebar).toContain('if (slug === "inspiration") return "inspirations";');
         const tools = source("../src/constant/navigation-tools.ts");

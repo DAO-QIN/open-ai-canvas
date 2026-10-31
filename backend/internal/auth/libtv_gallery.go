@@ -54,6 +54,8 @@ type LibTVGalleryItem struct {
 	PublishedAt  string            `json:"publishedAt"`
 	Tags         []LibTVGalleryTag `json:"tags"`
 	SourceURL    string            `json:"sourceUrl"`
+	// snapshotID 是作品当前公开快照的版本，不对外输出；精选画布用它判断作品是否重新发布过。
+	snapshotID int64
 }
 
 type LibTVGalleryResult struct {
@@ -281,6 +283,7 @@ func libTVGalleryItem(work libTVPublishedTemplate) LibTVGalleryItem {
 		Description: strings.TrimSpace(work.Description), CoverURL: safeLibTVResourceURL(work.CoverURL), MediaURL: safeLibTVResourceURL(work.FinalOutput),
 		AuthorName: strings.TrimSpace(work.Nickname), AuthorAvatar: safeLibTVAvatarURL(work.Avatar), LikeCount: max(0, work.LikeCount),
 		PublishedAt: kernel.FirstNonEmpty(work.PublishAt, work.CreateAt), Tags: make([]LibTVGalleryTag, 0, len(work.Tags)), SourceURL: "https://www.liblib.tv/",
+		snapshotID: work.SnapshotID,
 	}
 	item.MediaType = libTVMediaType(item.MediaURL)
 	for _, tag := range work.Tags {
