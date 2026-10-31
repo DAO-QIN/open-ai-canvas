@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -109,17 +110,29 @@ func TestCreditUsageGroupsConsumptionByLocalDayAndAgentOrigin(t *testing.T) {
 	if report.From != "2025-10-29" || report.To != "2026-10-28" || report.Days != 365 || report.TimezoneOffset != 480 {
 		t.Fatalf("window = %s..%s days=%d offset=%d", report.From, report.To, report.Days, report.TimezoneOffset)
 	}
+	// 每天附带当天的模型构成，排序与顶层 models 相同；看板据此汇总单日、单周构成。
 	want := []CreditUsageDay{
-		{Date: "2025-10-29", TotalMicrocredits: 250_000, Count: 1},
-		{Date: "2026-10-26", TotalMicrocredits: 1_300_000, AgentMicrocredits: 500_000, Count: 3, AgentCount: 1},
-		{Date: "2026-10-27", TotalMicrocredits: 2_000_000, Count: 1},
-		{Date: "2026-10-28", TotalMicrocredits: 4_500_000, AgentMicrocredits: 4_500_000, Count: 2, AgentCount: 2},
+		{Date: "2025-10-29", TotalMicrocredits: 250_000, Count: 1, Models: []CreditUsageDayModel{
+			{Model: "", Capability: "audio", TotalMicrocredits: 250_000, Count: 1},
+		}},
+		{Date: "2026-10-26", TotalMicrocredits: 1_300_000, AgentMicrocredits: 500_000, Count: 3, AgentCount: 1, Models: []CreditUsageDayModel{
+			{Model: "gpt-image-1", Capability: "image", TotalMicrocredits: 700_000, Count: 1},
+			{Model: "nano-banana-pro", Capability: "image", TotalMicrocredits: 500_000, AgentMicrocredits: 500_000, Count: 1, AgentCount: 1},
+			{Model: "", Capability: "other", TotalMicrocredits: 100_000, Count: 1},
+		}},
+		{Date: "2026-10-27", TotalMicrocredits: 2_000_000, Count: 1, Models: []CreditUsageDayModel{
+			{Model: "nano-banana-pro", Capability: "image", TotalMicrocredits: 2_000_000, Count: 1},
+		}},
+		{Date: "2026-10-28", TotalMicrocredits: 4_500_000, AgentMicrocredits: 4_500_000, Count: 2, AgentCount: 2, Models: []CreditUsageDayModel{
+			{Model: "veo-3", Capability: "video", TotalMicrocredits: 3_000_000, AgentMicrocredits: 3_000_000, Count: 1, AgentCount: 1},
+			{Model: "gemini-3-pro", Capability: "text", TotalMicrocredits: 1_500_000, AgentMicrocredits: 1_500_000, Count: 1, AgentCount: 1},
+		}},
 	}
 	if len(report.Daily) != len(want) {
 		t.Fatalf("daily = %#v, want %#v", report.Daily, want)
 	}
 	for index := range want {
-		if report.Daily[index] != want[index] {
+		if !reflect.DeepEqual(report.Daily[index], want[index]) {
 			t.Fatalf("daily[%d] = %#v, want %#v", index, report.Daily[index], want[index])
 		}
 	}

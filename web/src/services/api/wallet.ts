@@ -250,16 +250,28 @@ export function getWallet(page = 1, pageSize = 30, type = "all") {
     return http.get<WalletSummary>("/wallet", { params: { type, page, pageSize } });
 }
 
-/** 一个本地自然日的积分消耗；服务端只返回有消耗的日期。 */
+/** 一个本地自然日的积分消耗；服务端只返回有消耗的日期。models 为当天按 (类型, 模型) 的构成。 */
 export type CreditUsageDay = {
     date: string;
     totalMicrocredits: number;
     agentMicrocredits: number;
     count: number;
     agentCount: number;
+    models: CreditUsageDayModel[];
 };
 
-export type CreditUsageCapability = "image" | "video" | "audio" | "text" | "other";
+/** 当天某个模型在某一生成类型下的消耗；键与 CreditUsageModel 相同，名称只在报告顶层的 models 里给出。 */
+export type CreditUsageDayModel = {
+    model: string;
+    capability: CreditUsageCapability;
+    totalMicrocredits: number;
+    agentMicrocredits: number;
+    count: number;
+    agentCount: number;
+};
+
+/** web_search 是创作 Agent 联网搜索的按次消耗。 */
+export type CreditUsageCapability = "image" | "video" | "audio" | "text" | "web_search" | "other";
 
 export type CreditUsageCategory = {
     capability: CreditUsageCapability;

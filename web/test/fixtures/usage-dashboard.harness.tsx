@@ -60,9 +60,32 @@ const report: CreditUsageReport = {
     to: "2026-10-28",
     days: 365,
     timezoneOffset: 480,
+    // 每天的模型构成合计等于当天数值，跨日合并后等于下面的 categories 与 models。
     daily: [
-        { date: "2026-10-01", totalMicrocredits: 34_000_000, agentMicrocredits: 30_000_000, count: 9, agentCount: 6 },
-        { date: "2026-10-02", totalMicrocredits: 14_000_000, agentMicrocredits: 0, count: 3, agentCount: 0 },
+        {
+            date: "2026-10-01",
+            totalMicrocredits: 34_000_000,
+            agentMicrocredits: 30_000_000,
+            count: 9,
+            agentCount: 6,
+            models: [
+                { model: "veo-3", capability: "video", totalMicrocredits: 25_000_000, agentMicrocredits: 25_000_000, count: 2, agentCount: 2 },
+                { model: "nano-banana-pro", capability: "image", totalMicrocredits: 6_000_000, agentMicrocredits: 5_000_000, count: 5, agentCount: 4 },
+                { model: "seedream-4", capability: "image", totalMicrocredits: 3_000_000, agentMicrocredits: 0, count: 2, agentCount: 0 },
+            ],
+        },
+        {
+            date: "2026-10-02",
+            totalMicrocredits: 14_000_000,
+            agentMicrocredits: 0,
+            count: 3,
+            agentCount: 0,
+            models: [
+                { model: "nano-banana-pro", capability: "image", totalMicrocredits: 6_000_000, agentMicrocredits: 0, count: 1, agentCount: 0 },
+                { model: "veo-3", capability: "video", totalMicrocredits: 5_000_000, agentMicrocredits: 0, count: 1, agentCount: 0 },
+                { model: "seedream-4", capability: "image", totalMicrocredits: 3_000_000, agentMicrocredits: 0, count: 1, agentCount: 0 },
+            ],
+        },
     ],
     categories: [
         { capability: "video", totalMicrocredits: 30_000_000, agentMicrocredits: 25_000_000, count: 3, agentCount: 2 },
@@ -144,8 +167,10 @@ async function press(target: Element, key: string, times = 1) {
 }
 
 const live = (host: HTMLElement) => normalize(host.querySelector('.usage-chart [aria-live="polite"]')?.textContent);
+const breakdownSubtitle = (host: HTMLElement) => normalize(host.querySelector("#usage-breakdown-title + p")?.textContent);
+const breakdownNote = (host: HTMLElement) => normalize(host.querySelector(".usage-empty-note")?.textContent);
 
-test("看板展示统计、整年热力图与构成，可切换口径和视图，并用键盘与悬停逐项查看", async () => {
+test("看板展示统计、整年热力图与构成，可切换口径和视图，用键盘与悬停逐项查看，构成跟随选中的一天 / 一周", async () => {
     useUserStore.getState().setUser(user);
     let usageParams: Record<string, unknown> | undefined;
     respond = (config) => {
@@ -175,53 +200,78 @@ test("看板展示统计、整年热力图与构成，可切换口径和视图�
         expect(host.querySelector('[data-day="338"]')?.getAttribute("data-level")).toBe("1");
         expect(host.querySelector('[data-day="0"]')?.getAttribute("data-level")).toBe("0");
         expect(texts(host, ".usage-months span")[0]).toBe("11月");
-        expect(texts(host, ".usage-breakdown-name")).toEqual(["视频", "图片"]);
-        expect(texts(host, ".usage-breakdown-share")).toEqual(["62.5%", "37.5%"]);
         expect(normalize(host.querySelector(".usage-panel-footer")?.textContent)).toContain("365 天中有 2 天产生消耗");
 
-        // 悬停单日：提示框与读屏文本同步。
-        const october2 = host.querySelector('[data-day="338"]')!;
+        // 构成跟随每日视图，默认是今天；今天没有消耗时提示点击格子查看其他日期。
+        expect(host.querySelector('[data-day="364"]')?.getAttribute("data-selected")).toBe("true");
+        expect(breakdownSubtitle(host)).toBe("按生成类型汇总今天（10月28日 周三）的积分消耗。");
+        expect(texts(host, ".usage-breakdown-name")).toEqual([]);
+        expect(breakdownNote(host)).toBe("今天还没有积分消耗，点击上方的格子查看其他日期。");
+
+        // 悬停单日：提示框与读屏文本同步，构成不随悬停变化。
+        const october2 = host.querySelector<HTMLElement>('[data-day="338"]')!;
         await act(async () => {
             october2.dispatchEvent(new (dom.PointerEvent ?? dom.MouseEvent)("pointermove", { bubbles: true }) as unknown as Event);
         });
         expect(live(host)).toBe("10月2日 周五，14 积分 · 3 笔");
         expect(normalize(host.querySelector(".usage-tooltip")?.textContent)).toBe("10月2日 周五14 积分 · 3 笔");
         expect(october2.getAttribute("data-active")).toBe("true");
+        expect(october2.getAttribute("data-selected")).toBeNull();
+        expect(texts(host, ".usage-breakdown-name")).toEqual([]);
 
-        // 切到 Agent 用量。
+        // 点击 10 月 2 日：构成切到这一天。
+        await act(async () => october2.click());
+        expect(october2.getAttribute("data-selected")).toBe("true");
+        expect(host.querySelector('[data-day="364"]')?.getAttribute("data-selected")).toBeNull();
+        expect(breakdownSubtitle(host)).toBe("按生成类型汇总10月2日 周五的积分消耗。");
+        expect(texts(host, ".usage-breakdown-name")).toEqual(["图片", "视频"]);
+        expect(texts(host, ".usage-breakdown-share")).toEqual(["64.3%", "35.7%"]);
+
+        // 切到 Agent 用量：选中的日期保留，这一天没有 Agent 消耗。
         await act(async () => radio(host, "Agent 用量").click());
         expect(radio(host, "Agent 用量").getAttribute("aria-checked")).toBe("true");
         expect(host.querySelector(".usage-tooltip")).toBeNull();
         expect(texts(host, ".usage-stat-label")[0]).toBe("Agent 总消耗");
         expect(texts(host, ".usage-stat-value")).toEqual(["30积分", "30积分", "0.58积分", "1天", "1天"]);
-        expect(texts(host, ".usage-breakdown-share")).toEqual(["83.3%", "16.7%"]);
         expect(host.querySelector('[data-day="338"]')?.getAttribute("data-level")).toBe("0");
+        expect(breakdownNote(host)).toBe("10月2日 周五没有Agent 积分消耗，点击上方的格子查看其他日期。");
 
-        // 每日热力图：End 到今天，左移 4 周、下移 1 天到 10 月 1 日。
+        // 每日热力图：End 到今天，左移 4 周、下移 1 天到 10 月 1 日；选中跟随方向键。
         const scroller = host.querySelector(".usage-chart-scroll")!;
         await press(scroller, "End");
         expect(live(host)).toBe("10月28日 周三，无消耗");
+        expect(breakdownNote(host)).toBe("今天还没有Agent 积分消耗，点击上方的格子查看其他日期。");
         await press(scroller, "ArrowLeft", 4);
         await press(scroller, "ArrowDown");
         expect(live(host)).toBe("10月1日 周四，30 积分 · 6 笔");
         expect(normalize(host.querySelector(".usage-tooltip")?.textContent)).toContain("30 积分 · 6 笔");
+        expect(texts(host, ".usage-breakdown-name")).toEqual(["视频", "图片"]);
+        expect(texts(host, ".usage-breakdown-share")).toEqual(["83.3%", "16.7%"]);
         await press(scroller, "Escape");
         expect(host.querySelector(".usage-tooltip")).toBeNull();
         expect(live(host)).toBe("");
+        expect(host.querySelector('[data-day="337"]')?.getAttribute("data-selected")).toBe("true");
 
-        // 每周柱状图。
+        // 每周柱状图：构成回到本周，方向键选中 9 月 28 日这一周。
         await act(async () => radio(host, "每周").click());
         expect(host.querySelector(".usage-chart")?.getAttribute("data-view")).toBe("weekly");
         expect(host.querySelectorAll(".usage-bar")).toHaveLength(53);
+        expect(breakdownSubtitle(host)).toBe("按生成类型汇总本周（10月26日 – 10月28日）的Agent 积分消耗。");
+        expect(breakdownNote(host)).toBe("本周还没有Agent 积分消耗，点击上方的柱子查看其他周。");
         await press(scroller, "End");
         expect(live(host)).toBe("10月26日 – 10月28日，本周无消耗");
         await press(scroller, "ArrowLeft", 4);
         expect(live(host)).toBe("9月28日 – 10月4日，30 积分 · 6 笔");
+        expect(host.querySelector('[data-week="48"]')?.getAttribute("data-selected")).toBe("true");
+        expect(breakdownSubtitle(host)).toBe("按生成类型汇总9月28日 – 10月4日的Agent 积分消耗。");
+        expect(texts(host, ".usage-breakdown-share")).toEqual(["83.3%", "16.7%"]);
         expect(normalize(host.querySelector(".usage-panel-footer")?.textContent)).toContain("每列为一周");
 
-        // 累计曲线。
+        // 累计曲线：构成为整个窗口，不选中单日。
         await act(async () => radio(host, "累计").click());
         expect(host.querySelector(".usage-area-line")?.getAttribute("d")).toStartWith("M ");
+        expect(breakdownSubtitle(host)).toBe("按生成类型汇总最近 365 天的Agent 积分消耗。");
+        expect(texts(host, ".usage-breakdown-share")).toEqual(["83.3%", "16.7%"]);
         await press(scroller, "End");
         expect(live(host)).toBe("10月28日 周三，累计 30 积分，当日无消耗");
         expect(normalize(host.querySelector(".usage-panel-footer")?.textContent)).toContain("截至今天累计消耗 30 积分");
@@ -235,7 +285,7 @@ test("看板展示统计、整年热力图与构成，可切换口径和视图�
     }
 });
 
-test("消耗构成可按模型查看：前台名称、类型标签、平均每笔与占比，跟随统计口径切换", async () => {
+test("消耗构成可按模型查看：前台名称、类型标签、平均每笔与占比，跟随选中的日期与统计口径切换", async () => {
     useUserStore.getState().setUser(user);
     respond = (config) => {
         if (config.url !== "/wallet/usage") throw new Error(`Unexpected API: ${config.url}`);
@@ -251,6 +301,15 @@ test("消耗构成可按模型查看：前台名称、类型标签、平均每�
         await act(async () => radio(host, "按模型").click());
         expect(radio(host, "按模型").getAttribute("aria-checked")).toBe("true");
         expect(host.querySelector(".usage-breakdown-list")).toBeNull();
+        expect(breakdownNote(host)).toBe("今天还没有积分消耗，点击上方的格子查看其他日期。");
+
+        // 点击 10 月 2 日：只列这一天用到的模型。
+        await act(async () => host.querySelector<HTMLElement>('[data-day="338"]')!.click());
+        expect(texts(host, ".usage-model-label")).toEqual(["Nano Banana Pro", "Veo 3", "seedream-4"]);
+        expect(meta()).toEqual(["1 笔|平均每笔 6|6 积分", "1 笔|平均每笔 5|5 积分", "1 笔|平均每笔 3|3 积分"]);
+
+        // 累计：整个窗口的模型排行。
+        await act(async () => radio(host, "累计").click());
         expect(normalize(host.querySelector("#usage-breakdown-title + p")?.textContent)).toBe("按模型汇总最近 365 天的积分消耗，并给出平均每笔消耗。");
         expect(host.querySelector(".usage-model-list")?.getAttribute("aria-label")).toBe("模型消耗排行");
         expect(texts(host, ".usage-model-label")).toEqual(["Veo 3", "Nano Banana Pro", "seedream-4"]);

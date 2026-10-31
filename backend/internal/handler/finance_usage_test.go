@@ -85,6 +85,10 @@ func TestWalletUsageHTTPContract(t *testing.T) {
 	if body.Code != 0 || body.Data.Days != 365 || body.Data.TimezoneOffset != 480 || len(body.Data.Daily) != 1 || body.Data.Daily[0].TotalMicrocredits != 1_500_000 {
 		t.Fatalf("report = %#v", body)
 	}
+	// 每天带当天的模型构成（不含名称），看板据此切换单日、单周构成。
+	if day := body.Data.Daily[0]; len(day.Models) != 1 || day.Models[0] != (service.CreditUsageDayModel{Model: "nano-banana-pro", Capability: "other", TotalMicrocredits: 1_500_000, Count: 1}) {
+		t.Fatalf("daily models = %#v", day.Models)
+	}
 	// 没有账单的消耗归入 other 类型；模型取流水上的编码，名称取前台模型。
 	if len(body.Data.Models) != 1 || body.Data.Models[0] != (service.CreditUsageModel{Model: "nano-banana-pro", Name: "Nano Banana Pro", Capability: "other", TotalMicrocredits: 1_500_000, Count: 1}) {
 		t.Fatalf("models = %#v", body.Data.Models)

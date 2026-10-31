@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 
 import { cumulativeUsage, formatUsageCreditsExact, formatUsageDay, usageLevelScale, type UsageDay, type UsageMonthLabel, type UsageWeek } from "@/lib/credit-usage";
 
@@ -11,6 +11,10 @@ type UsageActivityChartProps = {
     days: UsageDay[];
     weeks: UsageWeek[];
     monthLabels: UsageMonthLabel[];
+    /** 消耗构成正在展示的单日（每日视图）或单周（每周视图）下标；累计视图不选中。 */
+    selected?: number | null;
+    /** 点击、轻点或用方向键移到某一天 / 某一周时调用；累计视图不调用。 */
+    onSelect?: (index: number) => void;
 };
 
 // 面积图纵向留白（viewBox 百分比），让曲线不贴顶也不压住底边。
@@ -32,9 +36,10 @@ function buildArea(days: UsageDay[], leading: number) {
 
 /**
  * 积分活动图：每日热力图、每周柱状图与累计面积图共用同一套 53 列网格，
- * 切换视图时高度和月份刻度保持不变。悬停，或聚焦后用方向键，查看单日/单周数值。
+ * 切换视图时高度和月份刻度保持不变。悬停，或聚焦后用方向键，查看单日/单周数值；
+ * 每日、每周视图里点击或方向键同时选中该项，消耗构成随之切换。
  */
-export function UsageActivityChart({ view, days, weeks, monthLabels }: UsageActivityChartProps) {
+export function UsageActivityChart({ view, days, weeks, monthLabels, selected = null, onSelect }: UsageActivityChartProps) {
     const chartRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const areaRef = useRef<HTMLDivElement>(null);
@@ -51,6 +56,9 @@ export function UsageActivityChart({ view, days, weeks, monthLabels }: UsageActi
     const weekLevel = useMemo(() => usageLevelScale(weeks.map((week) => week.value)), [weeks]);
     const months = useMemo(() => monthlyTotals(days), [days]);
     const lastIndex = view === "weekly" ? columns - 1 : days.length - 1;
+    // 累计曲线只看数值，不选中。
+    const select = view === "cumulative" ? undefined : onSelect;
+    const selectedIndex = select && selected !== null && selected >= 0 && selected <= lastIndex ? selected : null;
 
     useEffect(() => {
         setActive(null);
@@ -104,9 +112,14 @@ export function UsageActivityChart({ view, days, weeks, monthLabels }: UsageActi
         setActive(Math.min(days.length - 1, Math.max(0, slot - leading)));
     };
 
+    const onClick = (event: MouseEvent<HTMLDivElement>) => {
+        const target = (event.target as HTMLElement).closest<HTMLElement>(view === "daily" ? "[data-day]" : "[data-week]");
+        if (target) select?.(Number(view === "daily" ? target.dataset.day : target.dataset.week));
+    };
+
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         if (lastIndex < 0) return;
-        const current = active ?? lastIndex;
+        const current = active ?? selectedIndex ?? lastIndex;
         const steps: Record<string, number> =
             view === "daily"
                 ? { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 }
@@ -123,10 +136,13 @@ export function UsageActivityChart({ view, days, weeks, monthLabels }: UsageActi
         } else return;
         event.preventDefault();
         followActiveRef.current = true;
-        setActive(Math.min(lastIndex, Math.max(0, next)));
+        const target = Math.min(lastIndex, Math.max(0, next));
+        setActive(target);
+        // 选中跟随方向键，键盘用户不必再按确认键，消耗构成直接切到这一项。
+        select?.(target);
     };
 
-    // 触屏没有悬停：按下即选中所点的格子/柱子；鼠标仍由移动决定。
+    // 触屏没有悬停：按下即显示所点格子/柱子的提示框，抬起后的 click 再把它选为构成；鼠标仍由移动决定提示框。
     const pick = view === "daily" ? pickDay : view === "weekly" ? pickWeek : pickArea;
     const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
         if (event.pointerType !== "mouse") pick(event);
@@ -136,24 +152,25 @@ export function UsageActivityChart({ view, days, weeks, monthLabels }: UsageActi
         if (event.pointerType === "mouse") setActive(null);
     };
 
-    // 聚焦时若没有悬停项，默认选中最近一项，方向键从今天开始移动；鼠标点击时悬停项已由指针决定。
+    // 聚焦时若没有悬停项，从消耗构成正在展示的一项（默认最近一项）开始，方向键由此移动；鼠标点击时悬停项已由指针决定。
     const onFocus = (event: FocusEvent<HTMLDivElement>) => {
         if (event.target !== event.currentTarget) return;
-        setActive((current) => current ?? (lastIndex >= 0 ? lastIndex : null));
+        setActive((current) => current ?? selectedIndex ?? (lastIndex >= 0 ? lastIndex : null));
     };
 
     return (
-        <div ref={chartRef} className="usage-chart" data-view={view}>
+        <div ref={chartRef} className="usage-chart" data-view={view} data-selectable={select ? "true" : undefined}>
             <div
                 ref={scrollRef}
                 className="usage-chart-scroll"
                 role="group"
                 tabIndex={0}
-                aria-label={`${viewLabel(view)}，聚焦后可用方向键逐项查看`}
+                aria-label={`${viewLabel(view)}，聚焦后可用方向键逐项查看${select ? "，消耗构成随之切换" : ""}`}
                 aria-describedby={`${baseId}-live`}
                 onKeyDown={onKeyDown}
                 onFocus={onFocus}
                 onBlur={() => setActive(null)}
+                onClick={select ? onClick : undefined}
                 onPointerDown={onPointerDown}
                 onPointerLeave={onPointerLeave}
             >
@@ -170,6 +187,7 @@ export function UsageActivityChart({ view, days, weeks, monthLabels }: UsageActi
                                             className="usage-cell"
                                             data-level={cell.level}
                                             data-day={cell.index}
+                                            data-selected={view === "daily" && selectedIndex === cell.index ? "true" : undefined}
                                             data-active={view === "daily" && active === cell.index ? "true" : undefined}
                                             data-usage-anchor={view === "daily" && active === cell.index ? "true" : undefined}
                                         />
@@ -180,7 +198,7 @@ export function UsageActivityChart({ view, days, weeks, monthLabels }: UsageActi
                         {view === "weekly" ? (
                             <div className="usage-bars" aria-hidden="true" onPointerMove={pickWeek}>
                                 {weeks.map((week, index) => (
-                                    <span key={index} className="usage-bar-slot" data-week={index} data-active={active === index ? "true" : undefined}>
+                                    <span key={index} className="usage-bar-slot" data-week={index} data-selected={selectedIndex === index ? "true" : undefined} data-active={active === index ? "true" : undefined}>
                                         <span
                                             className="usage-bar"
                                             data-level={weekLevel(week.value)}
