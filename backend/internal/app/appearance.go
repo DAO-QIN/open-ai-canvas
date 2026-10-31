@@ -50,7 +50,10 @@ const (
 	defaultAppearanceHeroTitle = "让一个故事，\n从文字走向银幕。"
 	defaultCreationTitle       = "和{brandName}聊聊创作想法"
 	defaultCreationDescription = "从一个画面、一个角色或一句话开始。"
-	defaultRedeemPurchaseURL   = "" // 默认不配置购买链接，前端为空时不展示入口
+	// 创作首页「画布」面（/create?mode=canvas）的标题与副标题，和「生成」面分开配置。
+	defaultCreationCanvasTitle       = "从一张画布，展开你的灵感"
+	defaultCreationCanvasDescription = "新建空白画布，或复制一张精选画布。"
+	defaultRedeemPurchaseURL         = "" // 默认不配置购买链接，前端为空时不展示入口
 )
 
 type AppearanceSetting struct {
@@ -64,6 +67,8 @@ type AppearanceSetting struct {
 	AuthHeroDescription       string                `json:"authHeroDescription"`
 	CreationTitle             string                `json:"creationTitle"`
 	CreationDescription       string                `json:"creationDescription"`
+	CreationCanvasTitle       string                `json:"creationCanvasTitle"`
+	CreationCanvasDescription string                `json:"creationCanvasDescription"`
 	LogoResourceID            string                `json:"logoResourceId"`
 	DarkLogoResourceID        string                `json:"darkLogoResourceId"`
 	LogoFrameEnabled          bool                  `json:"logoFrameEnabled"`
@@ -92,6 +97,8 @@ type PublicAppearanceSetting struct {
 	AuthHeroDescription       string              `json:"authHeroDescription"`
 	CreationTitle             string              `json:"creationTitle"`
 	CreationDescription       string              `json:"creationDescription"`
+	CreationCanvasTitle       string              `json:"creationCanvasTitle"`
+	CreationCanvasDescription string              `json:"creationCanvasDescription"`
 	LogoURL                   string              `json:"logoUrl"`
 	DarkLogoURL               string              `json:"darkLogoUrl"`
 	FaviconURL                string              `json:"faviconUrl"`
@@ -129,18 +136,20 @@ type AdminAppearanceSetting struct {
 
 func defaultAppearanceSetting() AppearanceSetting {
 	return AppearanceSetting{
-		Canvas:              defaultCanvasAppearance(),
-		SchemaVersion:       appearanceSchemaVersion,
-		BrandName:           defaultAppearanceBrandName,
-		BrandSlug:           defaultAppearanceBrandSlug,
-		AuthHeroTitle:       defaultAppearanceHeroTitle,
-		CreationTitle:       defaultCreationTitle,
-		CreationDescription: defaultCreationDescription,
-		AuthVideoAutoplay:   true,
-		LogoFrameEnabled:    true,
-		SkinID:              defaultAppearanceSkinID,
-		SkinThemes:          defaultAppearanceSkinThemes(),
-		RedeemPurchaseURL:   defaultRedeemPurchaseURL,
+		Canvas:                    defaultCanvasAppearance(),
+		SchemaVersion:             appearanceSchemaVersion,
+		BrandName:                 defaultAppearanceBrandName,
+		BrandSlug:                 defaultAppearanceBrandSlug,
+		AuthHeroTitle:             defaultAppearanceHeroTitle,
+		CreationTitle:             defaultCreationTitle,
+		CreationDescription:       defaultCreationDescription,
+		CreationCanvasTitle:       defaultCreationCanvasTitle,
+		CreationCanvasDescription: defaultCreationCanvasDescription,
+		AuthVideoAutoplay:         true,
+		LogoFrameEnabled:          true,
+		SkinID:                    defaultAppearanceSkinID,
+		SkinThemes:                defaultAppearanceSkinThemes(),
+		RedeemPurchaseURL:         defaultRedeemPurchaseURL,
 	}
 }
 
@@ -222,6 +231,11 @@ func (s *Service) UpdateAppearance(actor *model.User, value AppearanceSetting) (
 		value.CreationTitle = defaultCreationTitle
 	}
 	value.CreationDescription = normalizeAppearanceCopy(value.CreationDescription)
+	value.CreationCanvasTitle = normalizeAppearanceCopy(value.CreationCanvasTitle)
+	if value.CreationCanvasTitle == "" {
+		value.CreationCanvasTitle = defaultCreationCanvasTitle
+	}
+	value.CreationCanvasDescription = normalizeAppearanceCopy(value.CreationCanvasDescription)
 	value.LogoResourceID = strings.TrimSpace(value.LogoResourceID)
 	value.DarkLogoResourceID = strings.TrimSpace(value.DarkLogoResourceID)
 	value.AuthVideoResourceID = strings.TrimSpace(value.AuthVideoResourceID)
@@ -515,6 +529,11 @@ func (s *Service) readAppearance() (*model.SystemSetting, AppearanceSetting, err
 		value.CreationTitle = defaultCreationTitle
 	}
 	value.CreationDescription = normalizeAppearanceCopy(value.CreationDescription)
+	value.CreationCanvasTitle = normalizeAppearanceCopy(value.CreationCanvasTitle)
+	if value.CreationCanvasTitle == "" {
+		value.CreationCanvasTitle = defaultCreationCanvasTitle
+	}
+	value.CreationCanvasDescription = normalizeAppearanceCopy(value.CreationCanvasDescription)
 	value.SkinID = strings.TrimSpace(value.SkinID)
 	if value.SkinID == "" {
 		value.SkinID = defaultAppearanceSkinID
@@ -594,6 +613,12 @@ func validateAppearanceSetting(value AppearanceSetting) error {
 		return err
 	}
 	if err := validateAppearanceCopy(value.CreationDescription, "创作首页副标题", 160, false); err != nil {
+		return err
+	}
+	if err := validateAppearanceCopy(value.CreationCanvasTitle, "创作首页画布标题", 80, true); err != nil {
+		return err
+	}
+	if err := validateAppearanceCopy(value.CreationCanvasDescription, "创作首页画布副标题", 160, false); err != nil {
 		return err
 	}
 	if err := validateAppearanceSkinThemes(value.SkinThemes, value.SkinID); err != nil {
@@ -793,35 +818,37 @@ func publicAppearanceSetting(setting *model.SystemSetting, value AppearanceSetti
 		revision = strconv.FormatInt(setting.UpdatedAt.UTC().UnixNano(), 36)
 	}
 	result := &PublicAppearanceSetting{
-		PetCatalog:          catalog,
-		Updates:             publicUpdateAnnouncement(value.Updates, revision),
-		Canvas:              value.Canvas,
-		SchemaVersion:       appearanceSchemaVersion,
-		BrandName:           value.BrandName,
-		BrandSlug:           value.BrandSlug,
-		AuthHeroTitle:       value.AuthHeroTitle,
-		AuthHeroDescription: value.AuthHeroDescription,
-		CreationTitle:       value.CreationTitle,
-		CreationDescription: value.CreationDescription,
-		LogoURL:             defaultAppearanceLogoURL,
-		DarkLogoURL:         defaultAppearanceLogoURL,
-		FaviconURL:          appearanceIconURL(value, "favicon.ico"),
-		AppleTouchIconURL:   appearanceIconURL(value, "apple-touch-icon.png"),
-		LogoFrameEnabled:    value.LogoFrameEnabled,
-		AuthVideoURL:        defaultAppearanceVideoURL,
-		AuthVideoPosterURL:  defaultAppearancePosterURL,
-		AuthVideoAutoplay:   value.AuthVideoAutoplay,
-		SkinID:              value.SkinID,
-		ActiveSkin:          activeAppearanceSkin(value.SkinThemes, value.SkinID),
-		SEOTitle:            effectiveAppearanceSEOTitle(value),
-		SEODescription:      effectiveAppearanceSEODescription(value),
-		SEOKeywords:         value.SEOKeywords,
-		FooterCopyright:     effectiveAppearanceCopyright(value),
-		ICPFilingEnabled:    value.ICPFilingEnabled && value.ICPFilingNumber != "",
-		ICPFilingNumber:     value.ICPFilingNumber,
-		RedeemPurchaseURL:   safeAppearancePurchaseURL(value.RedeemPurchaseURL),
-		Configured:          setting != nil,
-		Revision:            revision,
+		PetCatalog:                catalog,
+		Updates:                   publicUpdateAnnouncement(value.Updates, revision),
+		Canvas:                    value.Canvas,
+		SchemaVersion:             appearanceSchemaVersion,
+		BrandName:                 value.BrandName,
+		BrandSlug:                 value.BrandSlug,
+		AuthHeroTitle:             value.AuthHeroTitle,
+		AuthHeroDescription:       value.AuthHeroDescription,
+		CreationTitle:             value.CreationTitle,
+		CreationDescription:       value.CreationDescription,
+		CreationCanvasTitle:       value.CreationCanvasTitle,
+		CreationCanvasDescription: value.CreationCanvasDescription,
+		LogoURL:                   defaultAppearanceLogoURL,
+		DarkLogoURL:               defaultAppearanceLogoURL,
+		FaviconURL:                appearanceIconURL(value, "favicon.ico"),
+		AppleTouchIconURL:         appearanceIconURL(value, "apple-touch-icon.png"),
+		LogoFrameEnabled:          value.LogoFrameEnabled,
+		AuthVideoURL:              defaultAppearanceVideoURL,
+		AuthVideoPosterURL:        defaultAppearancePosterURL,
+		AuthVideoAutoplay:         value.AuthVideoAutoplay,
+		SkinID:                    value.SkinID,
+		ActiveSkin:                activeAppearanceSkin(value.SkinThemes, value.SkinID),
+		SEOTitle:                  effectiveAppearanceSEOTitle(value),
+		SEODescription:            effectiveAppearanceSEODescription(value),
+		SEOKeywords:               value.SEOKeywords,
+		FooterCopyright:           effectiveAppearanceCopyright(value),
+		ICPFilingEnabled:          value.ICPFilingEnabled && value.ICPFilingNumber != "",
+		ICPFilingNumber:           value.ICPFilingNumber,
+		RedeemPurchaseURL:         safeAppearancePurchaseURL(value.RedeemPurchaseURL),
+		Configured:                setting != nil,
+		Revision:                  revision,
 	}
 	if setting != nil {
 		result.UpdatedAt = setting.UpdatedAt
