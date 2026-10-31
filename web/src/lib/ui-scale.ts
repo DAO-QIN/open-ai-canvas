@@ -26,6 +26,20 @@ export function currentUiScale() {
     return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
 }
 
+/**
+ * 实测 getBoundingClientRect 与样式像素之比。按 CSS 标准实现 zoom 的浏览器（已在 Chrome 实测）里 rect 是屏幕像素，桌面端为 0.9；
+ * 未缩放的页面为 1，按未缩放坐标返回 rect 的浏览器也是 1。按实测比例换算，不依赖浏览器采用哪种 zoom 模型。
+ */
+export function clientRectScale() {
+    if (typeof document === "undefined" || typeof getComputedStyle !== "function") return 1;
+    const root = document.documentElement;
+    const styled = Number.parseFloat(getComputedStyle(root).width);
+    const measured = root.getBoundingClientRect().width;
+    if (!(styled > 0) || !(measured > 0)) return 1;
+    // 保留三位小数，避免样式宽度的小数让比例变成 0.89996 这类值。
+    return Math.round((measured / styled) * 1000) / 1000;
+}
+
 /** 屏幕像素（clientX、getBoundingClientRect、innerWidth）换成写进样式的 CSS 像素。 */
 export function toLayoutPx(screenPx: number) {
     return screenPx / currentUiScale();
