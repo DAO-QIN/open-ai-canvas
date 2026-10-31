@@ -87,7 +87,7 @@ func (s *Service) cloudAgentCreationVisibleResult(userID string, req CloudAgentR
 		if err != nil {
 			return nil, BadAuthRequest("当前可见成品不属于本会话，请刷新后重试")
 		}
-		tasks = append(tasks, map[string]any{"taskId": task.ID, "kind": strings.TrimPrefix(task.Type, "canvas_"), "status": task.Status, "outputs": cloudAgentCreationTaskOutputs(task)})
+		tasks = append(tasks, map[string]any{"taskId": task.ID, "kind": cloudAgentCreationTaskKind(task), "status": task.Status, "outputs": cloudAgentCreationTaskOutputs(task)})
 	}
 	return map[string]any{"messageId": req.LatestVisibleResult.MessageID, "tasks": tasks}, nil
 }

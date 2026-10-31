@@ -1,4 +1,4 @@
-// 管理端系统设置接口：对象存储、方舟私有素材、绘图引擎与资源/请求运行策略。
+// 管理端系统设置接口：对象存储、方舟私有素材、联网搜索、绘图引擎与资源/请求运行策略。
 
 package handler
 
@@ -97,6 +97,60 @@ func registerAdminSettingRoutes(r *gin.RouterGroup, svc *service.Service) {
 			return
 		}
 		ok(c, gin.H{"setting": setting})
+	})
+	r.GET("/admin/settings/web-search", func(c *gin.Context) {
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		setting, err := svc.AdminWebSearchSetting(user)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, gin.H{"setting": setting})
+	})
+	r.PATCH("/admin/settings/web-search", func(c *gin.Context) {
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
+		var req service.WebSearchSettingRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
+		setting, err := svc.UpdateWebSearchSetting(user, req)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, gin.H{"setting": setting})
+	})
+	r.POST("/admin/settings/web-search/test", func(c *gin.Context) {
+		user, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		if !enforceRateLimit(c, "admin-web-search-test:"+user.ID, 6, time.Minute) {
+			return
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
+		var req service.WebSearchTestRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
+		result, err := svc.TestAdminWebSearchSetting(user, req)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, result)
 	})
 	r.GET("/admin/settings/drawing-engine", func(c *gin.Context) {
 		user, err := currentUser(c, svc)

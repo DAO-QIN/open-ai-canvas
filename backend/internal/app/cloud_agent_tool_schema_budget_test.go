@@ -7,10 +7,10 @@ import (
 )
 
 // 工具 schema 是每一步都要发出去（并且是前缀缓存的第一段）的固定开销，因此值得钉住体积：
-// 平台工具全集按 auto + canvas + 技能 + 视觉工具构造，覆盖最大条件工具集。
+// 平台工具全集按 auto + canvas + 技能 + 视觉工具 + 联网搜索构造，覆盖最大条件工具集。
 func platformToolSchema(t *testing.T) ([]map[string]any, []byte) {
 	t.Helper()
-	req := CloudAgentRequest{PermissionMode: "auto", ContextScope: []string{"canvas"}, SkillsEnabled: true, MemoryMode: "auto", VisionEnabled: true}
+	req := CloudAgentRequest{PermissionMode: "auto", ContextScope: []string{"canvas"}, SkillsEnabled: true, MemoryMode: "auto", VisionEnabled: true, WebSearchEnabled: true}
 	req.Budget.MaxGenerationTasks = 1
 	tools := cloudAgentTools(req)
 	raw, err := json.Marshal(tools)
@@ -70,9 +70,11 @@ func TestCloudAgentToolSchemaStaysCompact(t *testing.T) {
 	// 描述后为 36,072 字节；启用视觉工具后为 29 个工具、36,883 字节，预算显式上调到
 	// 37,500，保留约1.7%的余量。长期记忆改用 memory_update（替换 remember_lesson /
 	// recall_lessons）并新增 skill_market_search、skill_recommend 后为 30 个工具、37,277 字节，
-	// 预算不变。新增工具或字段时请重新测量并有意识地
+	// 预算不变。画布助手接入联网后（web_fetch 总是可用，web_search 随本轮联网开关；两者排在
+	// 工具表末尾，不影响前面的缓存前缀）全集为 32 个工具、39,361 字节，预算显式上调到 40,000，
+	// 保留约1.6%的余量。新增工具或字段时请重新测量并有意识地
 	// 调整这个数字，而不是让 schema 悄悄膨胀（它每一步都要发、还在前缀最前面）。
-	if len(raw) > 37500 {
-		t.Fatalf("平台工具 schema 体积 %d 字节超出预算 37500：请压缩描述或显式调整预算", len(raw))
+	if len(raw) > 40000 {
+		t.Fatalf("平台工具 schema 体积 %d 字节超出预算 40000：请压缩描述或显式调整预算", len(raw))
 	}
 }

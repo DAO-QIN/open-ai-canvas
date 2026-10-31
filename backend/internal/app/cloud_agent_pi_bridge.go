@@ -434,7 +434,37 @@ func (s *Service) cloudAgentPiTool(ctx context.Context, userID, runID string, pa
 			return map[string]any{"content": content, "isError": cloudAgentToolContentIsError(content)}, nil
 		}
 	}
+	if state.Request.Surface == "creation" || cloudAgentWebTool(call.Function.Name) {
+		s.recordCloudAgentToolStarted(ctx, userID, runID, call)
+	}
 	return s.executeCloudAgentRuntimeTool(ctx, userID, runID, call)
+}
+
+// cloudAgentWebTool 标出要等出站请求的联网工具：画布助手只为它们上报 tool_started，其余工具在结束时才落一行。
+func cloudAgentWebTool(name string) bool { return name == "web_search" || name == "web_fetch" }
+
+// recordCloudAgentToolStarted 让界面在工具执行期间显示"正在…"：创作页每个工具都上报，画布助手只上报联网工具。
+// 只是展示事件：写入失败不阻断工具，重放和恢复路径在此之前已经返回，同一调用重复上报时前端按 callId 去重。
+func (s *Service) recordCloudAgentToolStarted(ctx context.Context, userID, runID string, call cloudAgentCall) {
+	payload := map[string]any{"toolName": call.Function.Name, "callId": call.ID, "text": "工具开始执行"}
+	switch call.Function.Name {
+	case "web_search", "web_fetch":
+		var args struct {
+			Query string `json:"query"`
+			URL   string `json:"url"`
+		}
+		if json.Unmarshal([]byte(call.Function.Arguments), &args) == nil {
+			if query := strings.TrimSpace(args.Query); query != "" {
+				payload["query"] = truncateRunes(query, 200)
+			}
+			if target := strings.TrimSpace(args.URL); target != "" {
+				payload["url"] = truncateRunes(target, 500)
+			}
+		}
+	}
+	if err := s.broadcastAgentEvent(userID, runID, "tool_started", payload, cloudAgentFence(ctx)); err != nil {
+		log.Printf("[Agent] tool_started event failed in run %s (%s): %v", runID, call.Function.Name, err)
+	}
 }
 
 func cloudAgentCommittedToolReplay(state *cloudAgentRuntime, call cloudAgentCall) (string, bool) {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 )
@@ -9,7 +10,8 @@ import (
 // 时间线渲染：把前端 TimelineProject 快照（tracks/clips 平铺，见
 // web/src/types/timeline.ts TimelineProject v2）展开为可执行的 ffmpeg 步骤。
 // 与前端 timeline-to-ffmpeg.ts 保持同一数据流：trim（按 sourceStartMs 裁切）
-// → 空隙补黑场静音 → concat。字幕不烧录（依赖 libass），单独产出 SRT。
+// → 空隙补黑场静音 → concat。字幕总是单独产出 SRT；burnSubtitles=true 时再用
+// subtitles 滤镜（依赖 libass 和中文字体）烧录进画面，烧录失败由执行器退回不烧录。
 //
 // 输入布局统一为「每个片段两个输入：视频源 + 音频源」，空隙展开为独立
 // 黑场片段，因此第 i 个片段的视频输入为 2i、音频输入为 2i+1。
@@ -51,6 +53,8 @@ type renderProject struct {
 	// Width/Height 为输出画布尺寸；缺省按 1920x1080 横屏输出。
 	Width  int `json:"width,omitempty"`
 	Height int `json:"height,omitempty"`
+	// BurnSubtitles 要求把字幕烧录进画面；SRT 仍随结果单独返回。
+	BurnSubtitles bool `json:"burnSubtitles,omitempty"`
 }
 
 type renderSource struct {
@@ -77,9 +81,18 @@ type renderPlan struct {
 	// AudioOverlays 是音频轨上的独立片段（配音、音乐），在主序列拼接后按 startMs 混入。
 	AudioOverlays []renderSegment
 	SubtitleSRT   string
+	// BurnSubtitles 为真且 SubtitleSRT 非空时，滤镜图读取工作目录里的 renderSubtitleFile 烧录字幕。
+	BurnSubtitles bool
 	HasMedia      bool
 	Width         int
 	Height        int
+}
+
+const renderSubtitleFile = "subtitles.srt"
+
+// burnsSubtitles 表示本次渲染命令包含字幕烧录。
+func (plan renderPlan) burnsSubtitles() bool {
+	return plan.BurnSubtitles && strings.TrimSpace(plan.SubtitleSRT) != ""
 }
 
 // buildRenderPlan 挑选可见视频/图片轨片段按 startMs 排序，并把片段之间的
@@ -122,7 +135,7 @@ func buildRenderPlan(project renderProject) renderPlan {
 		return clips[i].StartMs < clips[j].StartMs
 	})
 
-	plan := renderPlan{SubtitleSRT: buildRenderSubtitleSRT(project), AudioOverlays: overlays, Width: renderWidth, Height: renderHeight}
+	plan := renderPlan{SubtitleSRT: buildRenderSubtitleSRT(project), BurnSubtitles: project.BurnSubtitles, AudioOverlays: overlays, Width: renderWidth, Height: renderHeight}
 	if project.Width >= 16 && project.Height >= 16 && project.Width <= 4096 && project.Height <= 4096 {
 		// libx264 yuv420p 要求偶数尺寸。
 		plan.Width, plan.Height = project.Width&^1, project.Height&^1
@@ -274,6 +287,12 @@ func buildRenderFFmpegArgs(plan renderPlan, target string) []string {
 		audioOut = "abase"
 	}
 	filters = append(filters, fmt.Sprintf("%sconcat=n=%d:v=1:a=1[vout][%s]", concatInputs.String(), len(plan.Segments), audioOut))
+	videoOut := "vout"
+	if plan.burnsSubtitles() {
+		// 文件名是工作目录内的固定相对路径，样式由尺寸计算，不拼接任何外部输入。
+		filters = append(filters, fmt.Sprintf("[vout]subtitles=filename=%s:force_style='%s'[vsub]", renderSubtitleFile, renderSubtitleStyle(width, height)))
+		videoOut = "vsub"
+	}
 	if len(overlays) > 0 {
 		var mixInputs strings.Builder
 		mixInputs.WriteString("[abase]")
@@ -297,7 +316,7 @@ func buildRenderFFmpegArgs(plan renderPlan, target string) []string {
 
 	args = append(args,
 		"-filter_complex", strings.Join(filters, ";"),
-		"-map", "[vout]", "-map", "[aout]",
+		"-map", "["+videoOut+"]", "-map", "[aout]",
 		"-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
 		"-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
 		"-t", fmt.Sprintf("%.3f", planTotalSeconds(plan)),
@@ -312,6 +331,20 @@ func planTotalSeconds(plan renderPlan) float64 {
 		total += seg.DurationMs
 	}
 	return float64(total) / 1000
+}
+
+// renderSubtitleFont 与后端镜像安装的中文字体一致；本机缺这款字体时 libass 会按字符回退到可用字体。
+const renderSubtitleFont = "WenQuanYi Zen Hei"
+
+// renderSubtitleStyle 让字幕大小随输出画面的短边变化。libass 把 SRT 换算到 288 行高的坐标系，
+// 竖屏若沿用横屏的数值，字会大到一行放不下几个字。
+func renderSubtitleStyle(width, height int) string {
+	short, tall := float64(min(width, height)), float64(max(height, 1))
+	units := func(pixels float64) float64 { return pixels * 288 / tall }
+	fontSize := max(8, int(math.Round(units(short*0.055))))
+	outline := math.Max(0.5, math.Round(units(short*0.004)*10)/10)
+	margin := max(8, int(math.Round(units(short*0.06))))
+	return fmt.Sprintf("FontName=%s,FontSize=%d,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=%.1f,Shadow=0,MarginV=%d", renderSubtitleFont, fontSize, outline, margin)
 }
 
 // renderFadeFilters 生成片段首尾的纯色淡入淡出；颜色只接受白名单，避免拼进滤镜表达式。

@@ -6,11 +6,12 @@ import "yingce/backend/internal/model"
 // imported ordinary tasks, with the same user and project boundaries.
 // Submission order also includes pending/failed tasks, so late completion cannot
 // silently renumber a task that the user already referred to.
+// Agent 提交的视频合成（timeline_render）同样是本会话成品；普通创作上下文只会带入图片和视频任务。
 func (r *Repository) CreationMediaTasks(userID, sessionID, runID string, offset, limit int, ordinaryTaskIDs ...string) ([]model.Task, error) {
 	var tasks []model.Task
 	query := r.db.Model(&model.Task{}).Select("tasks.*").
 		Joins("LEFT JOIN cloud_agent_executions a ON a.id = tasks.agent_run_id AND a.user_id = tasks.user_id").
-		Where("tasks.user_id = ? AND tasks.project_id = ? AND tasks.type IN ?", userID, "", []string{"canvas_image", "canvas_video"})
+		Where("tasks.user_id = ? AND tasks.project_id = ? AND tasks.type IN ?", userID, "", []string{"canvas_image", "canvas_video", model.TaskTypeTimelineRender})
 	if runID != "" {
 		query = query.Where("a.session_id = ? AND a.surface = ? AND a.id = ?", sessionID, "creation", runID)
 	} else if len(ordinaryTaskIDs) > 0 {

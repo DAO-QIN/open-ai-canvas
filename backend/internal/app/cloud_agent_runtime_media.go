@@ -289,6 +289,10 @@ func (s *Service) enqueueCloudAgentTask(run *model.CloudAgentExecution, state *c
 				metadata, _ := req.Input["metadata"].(map[string]any)
 				payload["imageBatchId"], payload["imageBatchTotal"], payload["imageBatchItemId"] = batch.PlanID, len(batch.Items), metadata["imageBatchItemId"]
 			}
+			if state.Approval != nil && state.Approval.Decision == "approve" {
+				// 创作页把任务对回已确认的方案卡，结果直接显示在对应卡片里。
+				payload["approvalId"] = state.Approval.ID
+			}
 			state.event(run.ID, "generation_task_created", payload)
 			if cloudAgentCreationReturnsOnSubmit(state, media) {
 				// 提交即返回：回执随任务一起落库，桥接层读到工具结果立即交还模型，本轮不等待出图。

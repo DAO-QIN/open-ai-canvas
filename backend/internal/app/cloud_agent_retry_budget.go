@@ -131,6 +131,8 @@ func cloudAgentRemainingBudget(repo *repository.Repository, userID string, state
 		}
 	}
 	addTasks(state.TaskIDs)
+	// 联网搜索的按次订单挂在运行自己的主任务（即运行 ID）下，主任务本身不计费。
+	addTasks([]string{state.RuntimeRunID})
 	if source := cloudAgentBudgetSource(state.Request, state.RetryBudgetRunID); source != "" || state.Request.Retry != nil {
 		if state.Request.Surface != "creation" || state.Request.SessionID == "" || source == "" {
 			return 0, BadAuthRequest("无法确认重试所属会话和原始预算")
@@ -147,6 +149,7 @@ func cloudAgentRemainingBudget(repo *repository.Repository, userID string, state
 		for id, record := range records {
 			if roots[id] == original {
 				addTasks(record.TaskIDs)
+				addTasks([]string{id})
 			}
 		}
 	}
@@ -160,7 +163,8 @@ func cloudAgentRemainingBudget(repo *repository.Repository, userID string, state
 		ids = append(ids, id)
 	}
 	for offset := 0; offset < len(ids); offset += 500 {
-		orders, err := repo.BillingOrdersByTaskIDs(userID, ids[offset:min(offset+500, len(ids))])
+		// 主任务下可能有多张联网搜索订单，必须逐张累计，不能按任务去重。
+		orders, err := repo.BillingOrdersForTasks(userID, ids[offset:min(offset+500, len(ids))])
 		if err != nil {
 			return 0, err
 		}

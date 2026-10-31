@@ -39,6 +39,16 @@ func cloudAgentImageBatchProperties() map[string]any {
 }
 
 func (s *Service) prepareCloudAgentImageBatch(run *model.CloudAgentExecution, state *cloudAgentRuntime, call cloudAgentCall) (*cloudAgentCommerceBatch, error) {
+	minimum := 2
+	if state.Approval != nil && state.Approval.Batch != nil && len(state.Approval.Batch.UserSkipped) > 0 {
+		// 用户在方案卡上移出部分项后，剩余一项也按原批次续期报价。
+		minimum = 1
+	}
+	return s.prepareCloudAgentImageBatchItems(run, state, call, minimum)
+}
+
+// prepareCloudAgentImageBatchItems 是批次准入；minimum 只在用户移出部分项后降为 1，模型新提交的批次仍须至少两项。
+func (s *Service) prepareCloudAgentImageBatchItems(run *model.CloudAgentExecution, state *cloudAgentRuntime, call cloudAgentCall, minimum int) (*cloudAgentCommerceBatch, error) {
 	var args struct {
 		Items         []cloudAgentImageBatchItem `json:"items"`
 		WaitForResult bool                       `json:"waitForResult,omitempty"`
@@ -46,7 +56,7 @@ func (s *Service) prepareCloudAgentImageBatch(run *model.CloudAgentExecution, st
 	if err := decodeCloudAgentJSONObject(call.Function.Arguments, &args); err != nil {
 		return nil, cloudAgentJSONArgumentError(err)
 	}
-	if state.Request.Surface != "creation" || state.Request.MediaSettings == nil || state.Request.MediaSettings.Image == nil || len(args.Items) < 2 || len(args.Items) > 20 {
+	if state.Request.Surface != "creation" || state.Request.MediaSettings == nil || state.Request.MediaSettings.Image == nil || len(args.Items) < max(1, minimum) || len(args.Items) > 20 {
 		return nil, &cloudAgentArgumentError{BadAuthRequest("图片批次须包含 2–20 个独立交付项，并使用本轮已选图片模型")}
 	}
 	if limit := state.Request.Budget.MaxGenerationTasks; limit > 0 && state.Generations+len(args.Items) > limit {
@@ -153,7 +163,7 @@ func (s *Service) advanceCloudAgentImageBatch(run *model.CloudAgentExecution, st
 			if executeDirectly {
 				state.CommerceBatch = batch
 			} else {
-				preview := cloudAgentImageBatchPreview(batch)
+				preview := s.cloudAgentImageBatchApprovalPreview(state, call, batch)
 				state.Approval = &cloudAgentApproval{ID: fmt.Sprintf("%s-%d-%d", run.ID, state.Step, state.CallIndex), Call: call, CallHash: cloudAgentApprovalCallHash(call), Preview: preview, Batch: batch}
 				if err := leaseCloudAgentCommerceBatch(repo, run.UserID, run.ID, state.Approval.ID, batch); err != nil {
 					return err
@@ -178,7 +188,7 @@ func (s *Service) advanceCloudAgentImageBatch(run *model.CloudAgentExecution, st
 		return s.advanceCloudAgentImageBatch(latest, &fresh, call)
 	}
 	minimum := 2
-	if len(state.RetryReplay) > 0 {
+	if len(state.RetryReplay) > 0 || len(batch.UserSkipped) > 0 {
 		minimum = 1
 	}
 	if batch.Kind != "images" || batch.PlanID != cloudAgentID(run.UserID, run.ID+":image-batch:"+call.ID) || batch.PlanHash != cloudAgentApprovalCallHash(call) || len(batch.Items) < minimum || len(batch.Items) > 20 {
@@ -273,7 +283,7 @@ func (s *Service) advanceCloudAgentImageBatch(run *model.CloudAgentExecution, st
 					return err
 				}
 			}
-			cloudAgentToolResult(run.ID, state, call, map[string]any{"phase": "accepted", "batchId": batch.PlanID, "total": len(batch.Items), "complete": false, "taskSubmitted": true, "delivery": "conversation", "batchResults": results, "estimatedCredits": math.Round(float64(batch.QuoteMicrocredits)/float64(CreditScale)*10000) / 10000, "instruction": cloudAgentCreationAcceptedInstruction}, nil)
+			cloudAgentToolResult(run.ID, state, call, cloudAgentWithUserAdjustments(map[string]any{"phase": "accepted", "batchId": batch.PlanID, "total": len(batch.Items), "complete": false, "taskSubmitted": true, "delivery": "conversation", "batchResults": results, "estimatedCredits": math.Round(float64(batch.QuoteMicrocredits)/float64(CreditScale)*10000) / 10000, "instruction": cloudAgentCreationAcceptedInstruction}, batch), nil)
 			return cloudAgentSave(current, state)
 		}
 		if waiting == "" && !capacityBlocked {
@@ -288,7 +298,7 @@ func (s *Service) advanceCloudAgentImageBatch(run *model.CloudAgentExecution, st
 					return err
 				}
 			}
-			cloudAgentToolResult(run.ID, state, call, map[string]any{"batchId": batch.PlanID, "total": len(batch.Items), "complete": true, "taskSubmitted": true, "batchResults": results}, nil)
+			cloudAgentToolResult(run.ID, state, call, cloudAgentWithUserAdjustments(map[string]any{"batchId": batch.PlanID, "total": len(batch.Items), "complete": true, "taskSubmitted": true, "batchResults": results}, batch), nil)
 		}
 		return cloudAgentSave(current, state)
 	})

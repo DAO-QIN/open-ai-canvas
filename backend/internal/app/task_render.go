@@ -55,22 +55,27 @@ func (w *taskWorkerCoordinator) processTimelineRender(task *model.Task, ctx cont
 		seg.Source.HasAudio = hasAudio
 	}
 
-	args := buildRenderFFmpegArgs(plan, filepath.Join(workDir, "render-output.mp4"))
-	if len(args) == 0 {
+	if plan.burnsSubtitles() {
+		if err := os.WriteFile(filepath.Join(workDir, renderSubtitleFile), []byte(plan.SubtitleSRT), 0o600); err != nil {
+			return w.failTimelineTask(task, "渲染失败", "写入字幕文件失败")
+		}
+	}
+	if len(buildRenderFFmpegArgs(plan, filepath.Join(workDir, "render-output.mp4"))) == 0 {
 		return w.failTimelineTask(task, "渲染失败", "无法生成渲染命令")
 	}
 	if err := w.progress(task, "正在渲染…", 30); err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, ffmpegBin, args...)
-	cmd.Dir = workDir
-	output, runErr := cmd.CombinedOutput()
+	subtitlesBurned := plan.burnsSubtitles()
+	output, runErr := runRenderFFmpeg(ctx, ffmpegBin, workDir, plan)
+	if runErr != nil && subtitlesBurned && ctx.Err() == nil {
+		// 烧录依赖 ffmpeg 的 libass 和中文字体；缺任一项时退回不烧录，字幕仍以 SRT 随结果返回。
+		s.logInfo(task.UserID, task.ID, "字幕烧录失败，改为不烧录字幕重新渲染", truncateRenderOutput(output))
+		plan.BurnSubtitles, subtitlesBurned = false, false
+		output, runErr = runRenderFFmpeg(ctx, ffmpegBin, workDir, plan)
+	}
 	if runErr != nil {
-		detail := strings.TrimSpace(string(output))
-		if len(detail) > 400 {
-			detail = detail[len(detail)-400:]
-		}
-		return w.failTimelineTask(task, "渲染失败", fmt.Sprintf("ffmpeg 渲染失败：%s", detail))
+		return w.failTimelineTask(task, "渲染失败", fmt.Sprintf("ffmpeg 渲染失败：%s", truncateRenderOutput(output)))
 	}
 
 	if err := w.progress(task, "写入资源…", 85); err != nil {
@@ -95,11 +100,12 @@ func (w *taskWorkerCoordinator) processTimelineRender(task *model.Task, ctx cont
 	}
 
 	result := timelineRenderResult{
-		ResourceID:  resource.ID,
-		FileName:    fileName,
-		Size:        stat.Size(),
-		DurationMs:  durationMs,
-		SubtitleSRT: plan.SubtitleSRT,
+		ResourceID:      resource.ID,
+		FileName:        fileName,
+		Size:            stat.Size(),
+		DurationMs:      durationMs,
+		SubtitleSRT:     plan.SubtitleSRT,
+		SubtitlesBurned: subtitlesBurned,
 	}
 	payload, err := json.Marshal(result)
 	if err != nil {
@@ -116,6 +122,21 @@ func (w *taskWorkerCoordinator) processTimelineRender(task *model.Task, ctx cont
 	}
 	s.logInfo(task.UserID, task.ID, fmt.Sprintf("时间线渲染完成，时长 %.1fs", float64(durationMs)/1000), "")
 	return nil
+}
+
+// runRenderFFmpeg 在工作目录内执行一次渲染；输出文件固定为 render-output.mp4，失败时返回 ffmpeg 输出供诊断。
+func runRenderFFmpeg(ctx context.Context, ffmpegBin, workDir string, plan renderPlan) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, ffmpegBin, buildRenderFFmpegArgs(plan, filepath.Join(workDir, "render-output.mp4"))...)
+	cmd.Dir = workDir
+	return cmd.CombinedOutput()
+}
+
+func truncateRenderOutput(output []byte) string {
+	detail := strings.TrimSpace(string(output))
+	if len(detail) > 400 {
+		detail = strings.ToValidUTF8(detail[len(detail)-400:], "")
+	}
+	return detail
 }
 
 func planDurationMs(plan renderPlan) int64 {

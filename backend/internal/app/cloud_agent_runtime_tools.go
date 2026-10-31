@@ -140,6 +140,13 @@ func cloudAgentToolResult(runID string, state *cloudAgentRuntime, call cloudAgen
 		return false
 	}
 	exhausted := cloudAgentTrackToolRepair(runID, state, call, result, err, payload)
+	if fields, ok := result.(map[string]any); ok && err == nil {
+		// 按次扣费的金额只给界面显示（工具行「消耗 N 积分」），不写进模型上下文。
+		if charged, ok := fields[cloudAgentToolChargedField]; ok {
+			payload[cloudAgentToolChargedField] = charged
+			delete(fields, cloudAgentToolChargedField)
+		}
+	}
 	raw, _ := json.Marshal(result)
 	payload["result"] = result
 	if call.Function.Name == agenttool.SkillReadFile && err == nil {
@@ -662,6 +669,7 @@ func (s *Service) advanceCloudAgentApprovalTool(run *model.CloudAgentExecution, 
 				if err != nil {
 					return err
 				}
+				cloudAgentDecorateMediaPreview(&preview, state, call, plan, modelName, preparedMedia)
 			} else {
 				if binding.Handler.Preview == nil {
 					return BadAuthRequest("工具缺少审批预演入口")

@@ -191,7 +191,12 @@ func RegisterAuthRoutes(r *gin.RouterGroup, svc *service.Service) {
 			failService(c, err)
 			return
 		}
-		ok(c, gin.H{"user": publicUser, "userGroup": svc.PublicUserGroupFor(user), "runtimeLimits": limits, "drawingEngine": drawingEngine, "features": features})
+		webSearchEnabled, webSearchPrice := svc.WebSearchSession(user)
+		payload := gin.H{"user": publicUser, "userGroup": svc.PublicUserGroupFor(user), "runtimeLimits": limits, "drawingEngine": drawingEngine, "features": features, "webSearchEnabled": webSearchEnabled}
+		if webSearchPrice != nil {
+			payload["webSearchPriceMicrocredits"] = *webSearchPrice
+		}
+		ok(c, payload)
 	})
 	r.GET("/channels/system", func(c *gin.Context) {
 		actor, err := currentUser(c, svc)

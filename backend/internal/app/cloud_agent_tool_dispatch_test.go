@@ -51,26 +51,32 @@ func TestCloudAgentAdvertisedToolsMatchAuthorization(t *testing.T) {
 		for _, canvas := range []bool{false, true} {
 			for _, skills := range []bool{false, true} {
 				for _, vision := range []bool{false, true} {
-					t.Run(fmt.Sprintf("%s/canvas=%t/skills=%t/vision=%t", permission, canvas, skills, vision), func(t *testing.T) {
-						req := CloudAgentRequest{PermissionMode: permission, VisionEnabled: vision}
-						if canvas {
-							req.ContextScope = []string{"canvas"}
-						}
-						if skills {
-							req.SkillsEnabled = true
-							req.MemoryMode = "auto"
-						}
-						advertised := map[string]bool{}
-						for _, definition := range cloudAgentTools(req) {
-							function := definition["function"].(map[string]any)
-							advertised[function["name"].(string)] = true
-						}
-						for _, name := range append(CloudAgentSupportedToolNames(), "unknown_tool") {
-							if cloudAgentToolAllowed(req, name) != advertised[name] {
-								t.Errorf("%s advertisement differs from execution authorization", name)
+					for _, webSearch := range []bool{false, true} {
+						t.Run(fmt.Sprintf("%s/canvas=%t/skills=%t/vision=%t/webSearch=%t", permission, canvas, skills, vision, webSearch), func(t *testing.T) {
+							req := CloudAgentRequest{PermissionMode: permission, VisionEnabled: vision, WebSearchEnabled: webSearch}
+							if canvas {
+								req.ContextScope = []string{"canvas"}
 							}
-						}
-					})
+							if skills {
+								req.SkillsEnabled = true
+								req.MemoryMode = "auto"
+							}
+							advertised := map[string]bool{}
+							for _, definition := range cloudAgentTools(req) {
+								function := definition["function"].(map[string]any)
+								advertised[function["name"].(string)] = true
+							}
+							for _, name := range append(CloudAgentSupportedToolNames(), "unknown_tool") {
+								if cloudAgentToolAllowed(req, name) != advertised[name] {
+									t.Errorf("%s advertisement differs from execution authorization", name)
+								}
+							}
+							// 画布入口：读取网页总是可用，搜索只跟本轮联网开关走。
+							if !advertised["web_fetch"] || advertised["web_search"] != webSearch {
+								t.Errorf("web tools: web_fetch=%t web_search=%t, want web_fetch=true web_search=%t", advertised["web_fetch"], advertised["web_search"], webSearch)
+							}
+						})
+					}
 				}
 			}
 		}

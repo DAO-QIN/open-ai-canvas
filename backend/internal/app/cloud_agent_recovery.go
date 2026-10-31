@@ -63,7 +63,7 @@ func (s *Service) finishCloudAgentCleanup(ctx context.Context, run *model.CloudA
 			awaitingMedia = true
 			continue
 		}
-		if keepSubmittedMedia && (task.Type == "canvas_image" || task.Type == "canvas_video") {
+		if keepSubmittedMedia && (task.Type == "canvas_image" || task.Type == "canvas_video" || task.Type == model.TaskTypeTimelineRender) {
 			continue
 		}
 		if task.Status == model.TaskStatusQueued || task.Status == model.TaskStatusRunning {

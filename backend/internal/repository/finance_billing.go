@@ -109,6 +109,26 @@ func (r *Repository) BillingOrdersByTaskIDs(userID string, taskIDs []string) (ma
 	return result, nil
 }
 
+// BillingOrdersForTasks 返回这些任务名下的全部订单。生成任务与订单一一对应，但 Agent 主任务下还挂着
+// 本轮联网搜索的按次订单，同一任务可能有多张，累计花费时不能用按任务去重的 BillingOrdersByTaskIDs。
+func (r *Repository) BillingOrdersForTasks(userID string, taskIDs []string) ([]model.BillingOrder, error) {
+	orders := []model.BillingOrder{}
+	if len(taskIDs) == 0 {
+		return orders, nil
+	}
+	err := r.db.Where("user_id = ? AND task_id IN ?", userID, taskIDs).Find(&orders).Error
+	return orders, err
+}
+
+// BillingOrderByIdempotencyKey 按用户与幂等键读取订单，不存在时返回 gorm.ErrRecordNotFound。
+func (r *Repository) BillingOrderByIdempotencyKey(userID, key string) (*model.BillingOrder, error) {
+	var order model.BillingOrder
+	if err := r.db.First(&order, "user_id = ? AND idempotency_key = ?", userID, key).Error; err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
 // AutoRefundableBillingOrders 返回审核队列中可以自动退回的订单。上游已确认生成作品
 // 的订单（任务带作品检查点，或结果保存失败）不在其中：作品可能已经交付或稍后补交付，
 // 自动退款会让平台承担上游费用，同时让用户的“重试保存”失效。

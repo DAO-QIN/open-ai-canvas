@@ -495,11 +495,14 @@ func RegisterAgentRoutes(r *gin.RouterGroup, svc *service.Service) {
 			failService(c, err)
 			return
 		}
-		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
+		// 方案卡改写会带上最多 20 项提示词，单项上限 8000 字。
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 256<<10)
 		var req struct {
-			Decision      string                           `json:"decision"`
-			Reason        string                           `json:"reason"`
-			MediaSettings *service.CloudAgentMediaSettings `json:"mediaSettings,omitempty"`
+			Decision      string                               `json:"decision"`
+			Reason        string                               `json:"reason"`
+			MediaSettings *service.CloudAgentMediaSettings     `json:"mediaSettings,omitempty"`
+			Items         []service.CloudAgentApprovalItemEdit `json:"items,omitempty"`
+			SkipItemIDs   []string                             `json:"skipItemIds,omitempty"`
 		}
 		decoder := json.NewDecoder(c.Request.Body)
 		decoder.DisallowUnknownFields()
@@ -507,7 +510,7 @@ func RegisterAgentRoutes(r *gin.RouterGroup, svc *service.Service) {
 			fail(c, http.StatusBadRequest, err)
 			return
 		}
-		if req.Decision != "approve" && req.Decision != "reject" && req.Decision != "refresh" {
+		if req.Decision != "approve" && req.Decision != "reject" && req.Decision != "refresh" && req.Decision != "update" {
 			fail(c, http.StatusBadRequest, errors.New("decision 无效"))
 			return
 		}
@@ -515,11 +518,29 @@ func RegisterAgentRoutes(r *gin.RouterGroup, svc *service.Service) {
 			fail(c, http.StatusBadRequest, errors.New("reason 无效"))
 			return
 		}
+		if (len(req.Items) > 0) != (req.Decision == "update") || (len(req.SkipItemIDs) > 0 && (req.Decision != "approve" || req.MediaSettings != nil || req.Reason != "")) || len(req.Items) > 20 || len(req.SkipItemIDs) > 20 {
+			fail(c, http.StatusBadRequest, errors.New("方案调整参数无效"))
+			return
+		}
 		if err := decoder.Decode(&struct{}{}); err != io.EOF {
 			fail(c, http.StatusBadRequest, errors.New("请求必须只包含一个 JSON 对象"))
 			return
 		}
-		if err := svc.DecideCloudAgentApproval(user.ID, c.Param("id"), c.Param("approvalId"), req.Decision, req.Reason, req.MediaSettings); err != nil {
+		switch {
+		case req.Decision == "update":
+			approvalID, err := svc.UpdateCloudAgentApprovalItems(user.ID, c.Param("id"), c.Param("approvalId"), req.Items)
+			if err != nil {
+				failService(c, err)
+				return
+			}
+			ok(c, gin.H{"accepted": true, "approvalId": approvalID})
+			return
+		case len(req.SkipItemIDs) > 0:
+			err = svc.ApproveCloudAgentApprovalItems(user.ID, c.Param("id"), c.Param("approvalId"), req.SkipItemIDs)
+		default:
+			err = svc.DecideCloudAgentApproval(user.ID, c.Param("id"), c.Param("approvalId"), req.Decision, req.Reason, req.MediaSettings)
+		}
+		if err != nil {
 			failService(c, err)
 			return
 		}

@@ -68,7 +68,10 @@ func (s *Service) refreshCloudAgentCommerceApproval(userID, id, approvalID strin
 				batch, err = s.prepareCloudAgentImageBatch(run, &state, approval.Call)
 			}
 			if err == nil {
-				preview = cloudAgentImageBatchPreview(batch)
+				// 用户在方案卡上的改写与移出随续期保留，Agent 收尾时仍能说明实际提交的内容。
+				batch.UserEdited, batch.UserSkipped = approval.Batch.UserEdited, approval.Batch.UserSkipped
+				preview = s.cloudAgentImageBatchApprovalPreview(&state, approval.Call, batch)
+				carrySkippedProposals(approval.Preview, &preview)
 			}
 		} else {
 			if plan == nil || approval.Batch.PlanID != plan.PlanID || approval.Batch.Version != plan.Version || approval.Batch.PlanHash != cloudAgentCommercePlanHash(plan) {
@@ -80,7 +83,7 @@ func (s *Service) refreshCloudAgentCommerceApproval(userID, id, approvalID strin
 			}
 			batch, err = s.prepareCloudAgentCommerceBatch(run, &state, plan, approval.Call)
 			if err == nil {
-				preview = cloudAgentCommerceBatchPreview(plan, batch, state.Request.Budget.MaxCredits)
+				preview = s.cloudAgentCommerceBatchApprovalPreview(plan, batch, state.Request.Budget.MaxCredits)
 			}
 		}
 		if err != nil {
