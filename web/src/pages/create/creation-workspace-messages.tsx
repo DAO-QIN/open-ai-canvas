@@ -2,8 +2,9 @@ import { usableResultUrl, creationResultEntries } from "./creation-result-urls";
 import { CreationResultImage } from "./creation-result-image";
 import { conversationTimeFormatter, type CreationMessage } from "./creation-types";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, FileText, Film, Image as ImageIcon, Maximize2, Music2, Pencil, RefreshCw, UserRound, X, AlertCircle, AlertTriangle, CircleStop, CloudOff, ImageOff, RotateCcw, type LucideIcon, Blocks, Orbit } from "lucide-react";
-import { CreationIcon, type CreationIconName } from "./creation-icons";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, FileText, Film, Image as ImageIcon, Maximize2, Music2, Pencil, RefreshCw, UserRound, AlertCircle, AlertTriangle, CircleStop, CloudOff, ImageOff, RotateCcw, type LucideIcon, Blocks, Orbit } from "lucide-react";
+import { CreationIcon } from "./creation-icons";
+import { CreationTypeIcon } from "@/components/creation/creation-type-icon";
 import { GenerationToolCard, type GenerationToolStatus } from "@/components/ai/generation-tool-card";
 import { MessageReasoning } from "@/components/ai/message-reasoning";
 import { AIMessageMarkdown } from "@/components/ai/ai-message-markdown";
@@ -12,12 +13,15 @@ import { UserAvatar } from "@/components/layout/user-avatar";
 import { BrandLogoFrame } from "@/components/brand/brand-logo";
 import { BrandWordmark } from "@/components/brand/brand-wordmark";
 import { generationErrorMessage } from "@/lib/generation-error";
-import { useEffect, useId, useState, type ReactNode, type CSSProperties } from "react";
-import { AgentOutputPreference } from "@/services/api/agent";
+import { Fragment, useEffect, useId, useState, type ReactNode, type CSSProperties, type DragEvent } from "react";
+import { CreditSymbol } from "@/constant/credits";
+import { CreationAgentProcessFold, CreationAgentQuestionCard, CreationAgentReplySources, CreationShimmerText, creationAgentFlowBlocks, creationAgentReplySources, renderCreationAgentProcessStep, type CreationAgentFlowBlock } from "./creation-agent-flow";
+import { AgentOutputPreference, type AgentApprovalProposal } from "@/services/api/agent";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { type CreationReference, displayCreationPrompt } from "./creation-references";
 import { useUserStore } from "@/stores/use-user-store";
-import { type CreationAttachment, creationAttachmentKind, creationMediaAspectRatio, type CreationMode } from "./creation-assets";
+import { creationAttachmentKind, creationMediaAspectRatio, type CreationMode } from "./creation-assets";
+import { startCreationResultImageDrag } from "./creation-reference-drag";
 import { getResourceAccess, resolveResourceAccessURL, resolveResourceUrl, resourceIdFromStorageKey } from "@/services/api/resources";
 import { CachedResourceImage } from "@/components/cached-resource-image";
 import { Tooltip } from "@/components/ui/base/tooltip";
@@ -25,16 +29,20 @@ import { useAssetStore, type Asset, type ImageAsset, type VideoAsset } from "@/s
 import { creationResultAssetIds, creationResultStorageKeys } from "@/lib/canvas/canvas-asset-handoff";
 import { resolveMediaUrl } from "@/services/file-storage";
 import { resolveImageUrl } from "@/services/image-storage";
-import { Button } from "antd";
+import { Button, Dropdown, type MenuProps } from "antd";
 import { CanvasImagePreview } from "@/components/canvas/canvas-image-preview";
+import { creationImageMoreGroups, creationImagePrimaryActions, creationImagePrimaryActionsReferenceFirst, creationImageTools, type CreationResultImageIntent } from "./creation-image-tool-catalog";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { creationAgentLatestMediaTasks, projectCreationAgentMediaBatches } from "./creation-agent-conversation";
+import { CreationAgentProposalGroup, creationAgentProposalTaskIds, type CreationAgentProposalHandlers, type CreationAgentProposalOptions } from "./creation-agent-proposals";
 import { saveAs } from "file-saver";
-import { createCreationImagesZip, creationImageDownloadBaseName, creationImagesZipName, downloadCreationImage } from "./creation-media-download";
+import { createCreationImagesZip, creationImageDownloadBaseName, creationImagesZipName, downloadCreationImage, downloadCreationSubtitle } from "./creation-media-download";
 import { creationMessageNeedsResultSync } from "./creation-conversations";
 import { GenerationPhaseSteps } from "@/components/ai/generation-phase-steps";
 import { generationPhaseHint, generationPhaseLabel, generationPhaseStep, generationTaskPhase, generationTaskSavingState, generationTaskShowsProgress, type GenerationPhase } from "@/lib/generation-task-display";
 import { useTaskElapsed } from "@/hooks/use-task-elapsed";
+import { isMusicAudioModel } from "@/lib/audio-generation";
+import { useEffectiveConfig } from "@/stores/use-config-store";
 import "./creation-results.css";
 // 创作页消息流：用户消息、媒体结果、生成中占位、引用素材与预览。
 
@@ -62,6 +70,16 @@ export function CreationMessageView({
     onCreateAgentTaskVariant,
     onQueryInterjection,
     onUseResultImage,
+    redoHandler,
+    referenceActionFirst = false,
+    onAnswerQuestion,
+    questionPending = false,
+    questionDisabled = false,
+    proposalHandlers,
+    activeApprovalId,
+    approvalBusy = false,
+    approvalChanged = false,
+    proposalOptions,
     submitting = false,
     nested = false,
 }: {
@@ -84,21 +102,41 @@ export function CreationMessageView({
     retryDisabled?: boolean;
     onCreateAgentTaskVariant?: (task: CreationMessage) => void;
     onQueryInterjection?: (message: CreationMessage) => Promise<void>;
-    /** 结果图上的操作条：变体、转视频、作为参考。不传则不显示。 */
+    /** 结果图上的操作条和「更多」工具菜单（预览大图里也有）。不传则不显示。 */
     onUseResultImage?: CreationResultImageHandler;
+    /** 结果下方「重做」的入口；对某条结果返回 undefined（还原不出原提示词）时不显示。 */
+    redoHandler?: (item: CreationMessage) => CreationResultRedoHandler | undefined;
+    /** 操作条把「作为参考」排第一（输入框是 Agent 时）。 */
+    referenceActionFirst?: boolean;
+    /** 回答 Agent 提问；不传时提问只读展示，需要在输入框回复。 */
+    onAnswerQuestion?: (answer: string) => Promise<boolean>;
+    /** 这条提问仍在等待回答（属于最新一轮且尚无后续轮次）。 */
+    questionPending?: boolean;
+    questionDisabled?: boolean;
+    /** 方案卡的确认、改写与拒绝；只在本轮待确认时传入。 */
+    proposalHandlers?: CreationAgentProposalHandlers;
+    /** 会话当前待确认的审批 ID；只有与之相同的方案卡可以操作。 */
+    activeApprovalId?: string;
+    approvalBusy?: boolean;
+    approvalChanged?: boolean;
+    proposalOptions?: CreationAgentProposalOptions;
     submitting?: boolean;
     nested?: boolean;
 }) {
     const brandName = useAppearanceStore((state) => state.appearance.brandName);
+    const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const assistantName = useAppearanceStore((state) => state.appearance.canvas?.agentName || state.appearance.brandName);
     const [replyExpanded, setReplyExpanded] = useState(false);
     const [retryPending, setRetryPending] = useState(false);
     const replyId = useId();
+    const config = useEffectiveConfig();
     useEffect(() => {
         setReplyExpanded(false);
     }, [item.id]);
     if (item.role === "user") return <CreationUserMessage item={item} shotNumber={shotNumber} onEditUserMessage={onEditUserMessage} onQueryInterjection={onQueryInterjection} />;
     const mode = item.mode || "text";
+    // 音乐和其他音频同为 audio 模式，结果卡按生成时的模型叫"音乐"或"音频"。
+    const music = mode === "audio" && isMusicAudioModel(config, item.model || "");
     const compactOutput = mode === "agent" && !item.agentContinuation && outputPreference === "concise";
     const mediaTasks = creationAgentLatestMediaTasks(item.agentContinuation ? [] : agentTasks || []);
     const pendingTaskStates = mediaTasks.filter((task) => task.agentRunId === item.agentRunId && task.taskStatePending);
@@ -108,17 +146,27 @@ export function CreationMessageView({
     const collapsibleReply = compactStructuredOutput && !agentRunning && !textStreaming;
     const runningMediaCount = mediaTasks.filter((task) => task.agentRunId === item.agentRunId && !task.taskStatePending && (task.status === "pending" || task.status === "streaming")).length;
     const mediaSettled = mediaTasks.length > 0 && mediaTasks.length >= Math.max(item.batchTotal || 0, item.commercePlan?.items.length || 0) && mediaTasks.every((task) => !task.taskStatePending && (task.status === "done" || task.status === "error" || task.status === "cancelled"));
+    // 有执行时间线的回复：工具已逐行展示，末尾状态只说"现在在做什么"；正在输出的思考或正文自己就是进度。
+    const steps = mode === "agent" && item.agentSteps?.length ? item.agentSteps : undefined;
+    const processStreaming = Boolean(steps?.some((step) => ((step.kind === "reasoning" || step.kind === "text") && step.streaming) || (step.kind === "tool" && step.status === "running")));
     const agentActivity =
-        mode === "agent" && agentRunning && !textStreaming && !item.agentQuestion
+        mode === "agent" && agentRunning && !textStreaming && !processStreaming && !item.agentQuestion
             ? item.agentActivity === "等待你确认"
                 ? item.agentActivity
                 : pendingTaskStates.length
                   ? "正在同步任务状态…"
                   : runningMediaCount
                     ? `${runningMediaCount} 项媒体任务生成中…`
-                    : item.agentActivity || (mediaSettled ? "" : "正在处理请求…")
+                    : steps
+                      ? mediaSettled
+                          ? ""
+                          : "正在思考…"
+                      : item.agentActivity || (mediaSettled ? "" : "正在处理请求…")
             : "";
-    const failedMediaTasks = mode === "agent" && !agentRunning ? mediaTasks.filter((task) => task.agentRunId === item.agentRunId && task.status === "error") : [];
+    const activityBusy = Boolean(agentActivity) && agentActivity !== "等待你确认";
+    // 视频合成失败不走"重试失败项"（那条路径只重放生成任务）：说明原因，由用户在对话里让 Agent 重新合成。
+    const failedMediaTasks = mode === "agent" && !agentRunning ? mediaTasks.filter((task) => task.agentRunId === item.agentRunId && task.status === "error" && !task.composition) : [];
+    const failedCompositions = mode === "agent" && !agentRunning ? mediaTasks.filter((task) => task.agentRunId === item.agentRunId && task.status === "error" && task.composition) : [];
     const retryFailedItems = async () => {
         if (retryPending || retryDisabled || !failedMediaTasks.length || !onRetryAgentTasks) return;
         setRetryPending(true);
@@ -159,7 +207,7 @@ export function CreationMessageView({
     const multipleDeliveries = deliveryTotal > 1 || mediaTasks.some((task) => (task.batchTotal || 0) > 1);
     const singleMedia = mediaTasks.length === 1 && deliveryTotal === 1 ? mediaTasks[0] : undefined;
     const compactSummary = singleMedia?.status === "done" && !singleMedia.taskStatePending
-        ? `${singleMedia.mode === "video" ? "视频" : "图片"}已生成。`
+        ? singleMedia.composition ? "视频已合成。" : `${singleMedia.mode === "video" ? "视频" : "图片"}已生成。`
         : mediaTasks.length
         ? `${deliveryTotal} 项交付${taskSummary ? `：${taskSummary}${deliveryTotal > mediaTasks.length ? `，${deliveryTotal - mediaTasks.length} 项待提交` : ""}` : "，状态待确认"}。`
         : `创作方案已准备，共 ${deliveryTotal} 项交付。`;
@@ -172,18 +220,22 @@ export function CreationMessageView({
           : item.status === "pending"
             ? mode === "agent"
                 ? "处理中"
-                : "生成中"
+                : item.composition
+                  ? "合成中"
+                  : "生成中"
             : item.status === "cancelled"
               ? "已停止"
               : item.status === "error"
-                ? "生成失败"
+                ? item.composition
+                    ? "合成失败"
+                    : "生成失败"
                 : "";
     const heading =
         mode !== "text" && mode !== "agent" ? (
             <>
                 {shotNumber > 0 ? <span className="creation-shot-badge">镜 {shotNumber}</span> : null}
-                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<CreationIcon name="auto" />} />
-                <strong>{mode === "image" ? "图像生成" : mode === "audio" ? "音频生成" : "视频生成"}</strong>
+                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<CreationTypeIcon name="agent" />} />
+                <strong>{creationResultTitle(mode, music, Boolean(item.composition))}</strong>
                 {item.status === "pending" ? (
                     <span className="creation-message-progress-copy">
                         {item.submissionPending ? (
@@ -194,14 +246,16 @@ export function CreationMessageView({
                             )
                         ) : item.taskStatePending ? (
                             "正在同步任务状态…"
+                        ) : item.composition ? (
+                            "正在合成视频……"
                         ) : (
                             <>
-                                {brandName}正在生成{creationMediaNoun(mode)}……
+                                {brandName}正在生成{creationMediaNoun(mode, music)}……
                             </>
                         )}
                     </span>
                 ) : item.status === "done" ? (
-                    <span className="creation-message-progress-copy">{mode === "image" ? "图片" : creationMediaNoun(mode)}已生成</span>
+                    <span className="creation-message-progress-copy">{item.composition ? "视频已合成" : `${mode === "image" ? "图片" : creationMediaNoun(mode, music)}已生成`}</span>
                 ) : null}
                 {item.status === "done" && !item.agentRunId ? (
                     <button type="button" className="creation-message-variant-action" onClick={onCreateVariant}>
@@ -215,7 +269,7 @@ export function CreationMessageView({
         ) : (
             <>
                 {shotNumber > 0 ? <span className="creation-shot-badge">镜 {shotNumber}</span> : null}
-                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<CreationIcon name="auto" />} />
+                <BrandLogoFrame className="creation-message-mark" logoClassName="size-full" fallback={<CreationTypeIcon name="agent" />} />
                 <strong>
                     <BrandWordmark name={assistantName} />
                 </strong>
@@ -225,51 +279,197 @@ export function CreationMessageView({
         );
     const toolStatus: GenerationToolStatus = item.status === "pending" ? "running" : item.status === "error" ? "error" : item.status === "cancelled" ? "cancelled" : "completed";
     const Container = nested ? "div" : "article";
+    // 已确认方案的任务结果显示在各自的方案卡里，不再进入回复底部的媒体组。
+    const proposalSets = mode === "agent" && !item.agentContinuation ? item.agentProposalSets || [] : [];
+    const proposalTaskIds = creationAgentProposalTaskIds(proposalSets, mediaTasks);
+    const groupedTasks = proposalTaskIds.size ? mediaTasks.filter((task) => !proposalTaskIds.has(task.id)) : mediaTasks;
+    const mediaGroups = mode === "agent" ? projectCreationAgentMediaBatches(proposalTaskIds.size ? { ...item, batchTotal: undefined, commercePlan: undefined } : item, groupedTasks) : [];
+    const renderMediaGroup = (task: CreationMessage) => {
+        const sources = task.batchId ? mediaTasks.filter((source) => source.agentRunId === item.agentRunId && source.mode === "image") : [task];
+        return (
+            <div
+                key={task.id}
+                className="creation-agent-media-batch"
+                role="group"
+                aria-label={
+                    sources
+                        .map((source) => source.content)
+                        .filter(Boolean)
+                        .join("、") || "整套媒体生成"
+                }
+            >
+                <CreationMessageView
+                    nested
+                    item={task}
+                    shotNumber={0}
+                    onRetryFailure={retryFailedItems}
+                    onCreateVariant={() => onCreateAgentTaskVariant?.(sources[0])}
+                    onEditUserMessage={onEditUserMessage}
+                    onContinueCanvas={onContinueCanvas}
+                    openingCanvas={openingCanvas}
+                    onUseResultImage={onUseResultImage}
+                    redoHandler={redoHandler}
+                    referenceActionFirst={referenceActionFirst}
+                />
+            </div>
+        );
+    };
+    const failedMediaNotice = (
+        <>
+            {failedMediaTasks.length > 0 ? (
+                <div className="creation-message-error">
+                    <span>{multipleDeliveries ? "生成失败，请重试失败项。" : generationErrorMessage(failedMediaTasks[0].error || "生成失败")}</span>
+                    <button type="button" disabled={retryPending || retryDisabled} aria-busy={retryPending} onClick={() => void retryFailedItems()}>
+                        <RefreshCw size={16} />
+                        {retryPending ? "正在核对原任务…" : "重试失败项"}
+                    </button>
+                </div>
+            ) : null}
+            {failedCompositions.length > 0 ? (
+                <div className="creation-message-error" role="status">
+                    <span>{`视频合成失败：${generationErrorMessage(failedCompositions[0].error || "合成失败")}。可以直接告诉我调整后重新合成，原素材不受影响。`}</span>
+                </div>
+            ) : null}
+        </>
+    );
+    // 时间线里的媒体落点：同一批图片只在第一张提交的位置出现一次，没有落点的仍放在回复末尾。
+    const anchoredMedia = new Map<string, CreationMessage>();
+    for (const step of steps || []) {
+        if (step.kind !== "media") continue;
+        const group = mediaGroups.find((candidate) => candidate.taskIds?.includes(step.taskId));
+        if (group && ![...anchoredMedia.values()].includes(group)) anchoredMedia.set(step.id, group);
+    }
+    const placedMedia = new Set(anchoredMedia.values());
     const agentMediaResults =
         mode === "agent" ? (
             <>
-                {projectCreationAgentMediaBatches(item, mediaTasks).map((task) => {
-                    const sources = task.batchId ? mediaTasks.filter((source) => source.agentRunId === item.agentRunId && source.mode === "image") : [task];
-                    return (
-                        <div
-                            key={task.id}
-                            className="creation-agent-media-batch"
-                            role="group"
-                            aria-label={
-                                sources
-                                    .map((source) => source.content)
-                                    .filter(Boolean)
-                                    .join("、") || "整套媒体生成"
-                            }
-                        >
-                            <CreationMessageView
-                                nested
-                                item={task}
-                                shotNumber={0}
-                                onRetryFailure={retryFailedItems}
-                                onCreateVariant={() => onCreateAgentTaskVariant?.(sources[0])}
-                                onEditUserMessage={onEditUserMessage}
-                                onContinueCanvas={onContinueCanvas}
-                                openingCanvas={openingCanvas}
-                                onUseResultImage={onUseResultImage}
-                            />
-                        </div>
-                    );
-                })}
-                {failedMediaTasks.length > 0 ? (
-                    <div className="creation-message-error">
-                        <span>{multipleDeliveries ? "生成失败，请重试失败项。" : generationErrorMessage(failedMediaTasks[0].error || "生成失败")}</span>
-                        <button type="button" disabled={retryPending || retryDisabled} aria-busy={retryPending} onClick={() => void retryFailedItems()}>
-                            <RefreshCw size={16} />
-                            {retryPending ? "正在核对原任务…" : "重试失败项"}
-                        </button>
-                    </div>
-                ) : null}
+                {mediaGroups.filter((group) => !placedMedia.has(group)).map(renderMediaGroup)}
+                {failedMediaNotice}
             </>
         ) : null;
+    const questionNode =
+        mode === "agent" && item.agentQuestion ? (
+            onAnswerQuestion ? (
+                <CreationAgentQuestionCard key={`${item.id}:question`} question={item.agentQuestion} pending={questionPending} disabled={questionDisabled} onAnswer={onAnswerQuestion} />
+            ) : (
+                <CreationAgentQuestionSummary question={item.agentQuestion} />
+            )
+        ) : null;
+    // 方案卡一项一个结果：任务上的批次计数属于整批，放进单项会显示成「已生成 1 张」「0/3」。
+    const renderProposalResult = (task: CreationMessage, proposal: AgentApprovalProposal) => (
+        <MediaResult
+            item={{ ...task, batchTotal: undefined, batchCompletedCount: undefined, batchFailedCount: undefined }}
+            ratioHint={proposal.size}
+            showResultSize
+            onRetryFailure={onRetryAgentTasks ? () => onRetryAgentTasks([task]) : undefined}
+            onCreateVariant={() => onCreateAgentTaskVariant?.(task)}
+            onContinueCanvas={onContinueCanvas}
+            openingCanvas={openingCanvas}
+            onUseResultImage={onUseResultImage}
+            onRedo={redoHandler?.(task)}
+            referenceActionFirst={referenceActionFirst}
+        />
+    );
+    const proposalsNode = proposalSets.length ? (
+        <>
+            {proposalSets.map((set) => (
+                <CreationAgentProposalGroup
+                    key={set.rootId}
+                    set={set}
+                    tasks={mediaTasks}
+                    active={Boolean(activeApprovalId && activeApprovalId === set.approvalId)}
+                    busy={approvalBusy}
+                    changed={approvalChanged}
+                    options={proposalOptions}
+                    handlers={activeApprovalId === set.approvalId ? proposalHandlers : undefined}
+                    renderResult={renderProposalResult}
+                />
+            ))}
+        </>
+    ) : null;
+    const reviewSource = mode === "agent" && !item.agentContinuation ? (agentReview ?? null) : null;
+    const reviewNode =
+        reviewSource || proposalsNode ? (
+            <>
+                {reviewSource}
+                {proposalsNode}
+            </>
+        ) : null;
+    const questionAnchored = Boolean(steps?.some((step) => step.kind === "question"));
+    const reviewAnchored = Boolean(reviewNode && steps?.some((step) => step.kind === "review"));
+    const spentCredits = mode === "agent" && !agentRunning && creditsEnabled && item.agentSpentCredits ? item.agentSpentCredits : 0;
+    // 联网来源汇总只在本轮停下后出现，避免搜索进行中卡片反复增长。
+    const replySources = steps && !agentRunning ? creationAgentReplySources(steps) : [];
+    const flowBlocks = steps ? creationAgentFlowBlocks(steps, { collapsed: collapsibleReply && !replyExpanded, fold: outputPreference === "concise" && !agentRunning }) : [];
+    const flowSegments: Array<{ kind: "content"; key: string; blocks: CreationAgentFlowBlock[] } | { kind: "anchor"; key: string; node: ReactNode }> = [];
+    for (const block of flowBlocks) {
+        const step = block.kind === "step" ? block.step : undefined;
+        const anchorNode = step?.kind === "media" ? (anchoredMedia.get(step.id) ? renderMediaGroup(anchoredMedia.get(step.id)!) : null) : step?.kind === "review" ? reviewNode : step?.kind === "question" ? questionNode : undefined;
+        if (anchorNode !== undefined) {
+            if (anchorNode) flowSegments.push({ kind: "anchor", key: step!.id, node: anchorNode });
+            continue;
+        }
+        const last = flowSegments.at(-1);
+        if (last?.kind === "content") last.blocks.push(block);
+        else flowSegments.push({ kind: "content", key: `content-${block.kind === "fold" ? block.id : block.step.id}`, blocks: [block] });
+    }
+    const renderFlowBlock = (block: CreationAgentFlowBlock) =>
+        block.kind === "fold" ? <CreationAgentProcessFold key={block.id} steps={block.steps} renderStep={renderCreationAgentProcessStep} /> : <Fragment key={block.step.id}>{renderCreationAgentProcessStep(block.step)}</Fragment>;
     return (
         <Container className={`creation-assistant-message is-${mode}`}>
-            {mode === "text" || mode === "agent" ? (
+            {(mode === "text" || mode === "agent") && steps ? (
+                <>
+                    <div className="creation-message-heading">{heading}</div>
+                    {(compactStructuredOutput && !(singleMedia?.status === "done" && !singleMedia.taskStatePending)) || collapsibleReply ? (
+                        <div className="creation-message-content creation-agent-flow">
+                            {compactStructuredOutput && !(singleMedia?.status === "done" && !singleMedia.taskStatePending) ? (
+                                <p className="creation-agent-output-summary" role="status">
+                                    {compactSummary}
+                                </p>
+                            ) : null}
+                            {collapsibleReply ? (
+                                <button type="button" className="creation-agent-plan-toggle creation-agent-full-reply-toggle" aria-expanded={replyExpanded} onClick={() => setReplyExpanded((value) => !value)}>
+                                    {replyExpanded ? "收起完整回复" : "查看完整回复"}
+                                    {replyExpanded ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
+                                </button>
+                            ) : null}
+                        </div>
+                    ) : null}
+                    {flowSegments.map((segment) =>
+                        segment.kind === "anchor" ? (
+                            <Fragment key={segment.key}>{segment.node}</Fragment>
+                        ) : (
+                            <div key={segment.key} className="creation-message-content creation-agent-flow">
+                                {segment.blocks.map(renderFlowBlock)}
+                            </div>
+                        ),
+                    )}
+                    {agentActivity ? (
+                        <div className="creation-message-content creation-agent-flow">
+                            <p className="creation-agent-status" role="status">
+                                <CreationShimmerText busy={activityBusy}>{agentActivity}</CreationShimmerText>
+                            </p>
+                        </div>
+                    ) : null}
+                    {!questionAnchored ? questionNode : null}
+                    {compactOutput ? agentMediaResults : null}
+                    {!reviewAnchored ? reviewNode : null}
+                    {!compactOutput ? agentMediaResults : null}
+                    {replySources.length ? (
+                        <div className="creation-message-content creation-agent-flow">
+                            <CreationAgentReplySources sources={replySources} />
+                        </div>
+                    ) : null}
+                    {spentCredits ? (
+                        <div className="creation-message-content creation-agent-flow">
+                            <p className="creation-agent-usage">
+                                <CreditSymbol aria-hidden="true" />
+                                <span>本轮消耗 {spentCredits.toLocaleString("zh-CN", { maximumFractionDigits: 4 })} 积分</span>
+                            </p>
+                        </div>
+                    ) : null}
+                </>
+            ) : mode === "text" || mode === "agent" ? (
                 <>
                     <div className="creation-message-heading">{heading}</div>
                     {mode !== "agent" && item.reasoning ? (
@@ -306,47 +506,14 @@ export function CreationMessageView({
                             </span>
                         ) : null}
                         {agentActivity ? (
-                            <span role="status" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                {agentActivity !== "等待你确认" ? <WorkingDots dotSize={5} gap={2} /> : null}
-                                <span>{agentActivity}</span>
+                            <span role="status" className="creation-agent-status">
+                                <CreationShimmerText busy={activityBusy}>{agentActivity}</CreationShimmerText>
                             </span>
                         ) : null}
                     </div>
-                    {mode === "agent" && item.agentQuestion ? (
-                        <section className="creation-agent-question" aria-label="待确认的问题">
-                            <h3>需要你确认</h3>
-                            <p>{item.agentQuestion.question}</p>
-                            {item.agentQuestion.fields?.length ? (
-                                <ul>
-                                    {item.agentQuestion.fields.map((field, index) => (
-                                        <li key={`${field.title}-${index}`}>
-                                            <strong>
-                                                {field.title}
-                                                {field.required ? "（必填）" : ""}
-                                            </strong>
-                                            {field.options?.length ? (
-                                                <span>：{field.options.map((option) => `${option.label}${option.detail ? `（${option.detail}）` : ""}`).join("、")}</span>
-                                            ) : field.placeholder ? (
-                                                <span>：{field.placeholder}</span>
-                                            ) : null}
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : item.agentQuestion.options.length ? (
-                                <ol>
-                                    {item.agentQuestion.options.map((option, index) => (
-                                        <li key={`${option.label}-${index}`}>
-                                            <strong>{option.label}</strong>
-                                            {option.detail ? <span> — {option.detail}</span> : null}
-                                        </li>
-                                    ))}
-                                </ol>
-                            ) : null}
-                            <small>{item.agentQuestion.allowFreeform ? "请在输入框回复选项或补充说明。" : "请在输入框回复一个选项。"}</small>
-                        </section>
-                    ) : null}
+                    {questionNode}
                     {compactOutput ? agentMediaResults : null}
-                    {mode === "agent" && !item.agentContinuation ? agentReview : null}
+                    {reviewNode}
                     {!compactOutput ? agentMediaResults : null}
                 </>
             ) : (
@@ -363,6 +530,8 @@ export function CreationMessageView({
                             onContinueCanvas={onContinueCanvas}
                             openingCanvas={openingCanvas}
                             onUseResultImage={onUseResultImage}
+                            onRedo={redoHandler?.(item)}
+                            referenceActionFirst={referenceActionFirst}
                         />
                     )}
                 </GenerationToolCard>
@@ -388,6 +557,39 @@ export function CreationMessageView({
                 </div>
             ) : null}
         </Container>
+    );
+}
+
+/** 没有回答入口时（历史只读或旧调用方），提问按原样列出，由用户在输入框回复。 */
+function CreationAgentQuestionSummary({ question }: { question: NonNullable<CreationMessage["agentQuestion"]> }) {
+    return (
+        <section className="creation-agent-question" aria-label="待确认的问题">
+            <h3>需要你确认</h3>
+            <p>{question.question}</p>
+            {question.fields?.length ? (
+                <ul>
+                    {question.fields.map((field, index) => (
+                        <li key={`${field.title}-${index}`}>
+                            <strong>
+                                {field.title}
+                                {field.required ? "（必填）" : ""}
+                            </strong>
+                            {field.options?.length ? <span>：{field.options.map((option) => `${option.label}${option.detail ? `（${option.detail}）` : ""}`).join("、")}</span> : field.placeholder ? <span>：{field.placeholder}</span> : null}
+                        </li>
+                    ))}
+                </ul>
+            ) : question.options.length ? (
+                <ol>
+                    {question.options.map((option, index) => (
+                        <li key={`${option.label}-${index}`}>
+                            <strong>{option.label}</strong>
+                            {option.detail ? <span> — {option.detail}</span> : null}
+                        </li>
+                    ))}
+                </ol>
+            ) : null}
+            <small>{question.allowFreeform ? "请在输入框回复选项或补充说明。" : "请在输入框回复一个选项。"}</small>
+        </section>
     );
 }
 
@@ -534,39 +736,79 @@ function usableResultUrls(urls: string[]) {
 }
 
 /** 生成中、结果卡里对媒体的叫法。 */
-function creationMediaNoun(mode: CreationMode | undefined) {
-    return mode === "video" ? "视频" : mode === "audio" ? "音频" : "图像";
+function creationMediaNoun(mode: CreationMode | undefined, music = false) {
+    return mode === "video" ? "视频" : mode === "audio" ? (music ? "音乐" : "音频") : "图像";
 }
 
-export type CreationResultImageIntent = "variant" | "upscale" | "inpaint" | "expand" | "video" | "reference";
+/** 生成结果的标题：结果卡和导出的 Markdown 共用；音乐和配音、音效同为 audio 模式，按所用模型区分。 */
+export function creationResultTitle(mode: CreationMode | undefined, music = false, composition = false) {
+    if (composition) return "视频合成";
+    return mode === "image" ? "图像生成" : mode === "audio" ? (music ? "音乐生成" : "音频生成") : "视频生成";
+}
+
+export type { CreationResultImageIntent } from "./creation-image-tool-catalog";
 export type CreationResultImageRef = { url: string; storageKey?: string; index: number };
 export type CreationResultImageHandler = (image: CreationResultImageRef, intent: CreationResultImageIntent) => void;
+/** 打开「重做」弹窗；参数是弹窗里展示的那张图（单张、叠卡最前面那张）。 */
+export type CreationResultRedoHandler = (image: CreationResultImageRef) => void;
 
-export const creationImageActionItems: Array<{ intent: CreationResultImageIntent; icon: CreationIconName; label: string; title: string }> = [
-    { intent: "variant", icon: "variant", label: "用这张图做变体", title: "变体" },
-    { intent: "upscale", icon: "hd", label: "把这张图重绘成高清版", title: "高清" },
-    { intent: "inpaint", icon: "inpaint", label: "框选这张图的局部来修改", title: "局部修改" },
-    { intent: "expand", icon: "expand", label: "把这张图向四周扩展", title: "扩图" },
-    { intent: "video", icon: "toVideo", label: "用这张图做视频", title: "转视频" },
-    { intent: "reference", icon: "reference", label: "把这张图作为参考", title: "作为参考" },
-];
+const creationImageMenuItems: MenuProps["items"] = creationImageMoreGroups.map((group) => ({
+    type: "group" as const,
+    key: group.title,
+    label: group.title,
+    children: group.items.map(({ intent, icon: Icon }) => ({
+        key: intent,
+        icon: <Icon size={16} strokeWidth={1.75} aria-hidden="true" />,
+        label: (
+            <span className="creation-image-tool-menu-item">
+                <span className="creation-image-tool-menu-name">{creationImageTools[intent].title}</span>
+                <span className="creation-image-tool-menu-desc">{creationImageTools[intent].description}</span>
+            </span>
+        ),
+    })),
+}));
 
 /**
- * 结果图上的操作条：只放和这一张图有关的操作，整组的操作（添加到画布、批量下载）留在图下面。
- * 桌面端悬停或键盘聚焦时浮出；触屏设备常驻显示。局部修改先打开框选弹窗，在弹窗里确认后才生成；
- * 其余操作只把图片、参数和提示词填进输入框，不会直接生成。
+ * 结果图上的操作条（参考即梦）：常用工具平铺，其余在「更多」菜单里；只放和这一张图有关的操作，
+ * 整组的操作（添加到画布、重做、批量下载）留在图下面。桌面端悬停或键盘聚焦时浮出，触屏设备常驻，预览大图里 inline 常驻。
+ * 转视频、作为参考只把图放进输入框；其余工具先打开弹窗，在弹窗里确认后直接生成，结果接在对话末尾。
+ * 输入框是 Agent 时「作为参考」排第一（referenceActionFirst）。
  */
-function CreationImageActions({ image, onUse }: { image: CreationResultImageRef; onUse?: CreationResultImageHandler }) {
+function CreationImageActions({ image, onUse, inline = false, referenceActionFirst = false }: { image: CreationResultImageRef; onUse?: CreationResultImageHandler; inline?: boolean; referenceActionFirst?: boolean }) {
+    const [menuOpen, setMenuOpen] = useState(false);
     if (!onUse) return null;
     const ready = Boolean(image.url || image.storageKey);
-    // 用 div 和原生 title：旧的消息样式会把结果卡里的每个 span 压成 27px 并隐藏。
+    const primaryActions = referenceActionFirst ? creationImagePrimaryActionsReferenceFirst : creationImagePrimaryActions;
+    // 用 div 和原生 title：旧的消息样式会把结果卡里的每个 span 压成 27px 并隐藏；菜单挂在 body 上，不受影响。
     return (
-        <div className="creation-image-actions" role="group" aria-label={`第 ${image.index + 1} 张图的操作`}>
-            {creationImageActionItems.map((action) => (
+        <div className={`creation-image-actions${inline ? " is-inline" : ""}${menuOpen ? " is-menu-open" : ""}`} role="group" aria-label={`第 ${image.index + 1} 张图的操作`}>
+            {primaryActions.map((action) => (
                 <button key={action.intent} type="button" title={action.title} aria-label={action.label} disabled={!ready} onClick={() => onUse(image, action.intent)}>
                     <CreationIcon name={action.icon} size={18} />
                 </button>
             ))}
+            <Dropdown
+                open={ready && menuOpen}
+                onOpenChange={(open) => setMenuOpen(ready && open)}
+                trigger={["click"]}
+                menu={{
+                    items: creationImageMenuItems,
+                    onClick: ({ key }) => {
+                        setMenuOpen(false);
+                        onUse(image, key as CreationResultImageIntent);
+                    },
+                    "aria-label": "更多图片工具",
+                }}
+                placement={inline ? "top" : "topLeft"}
+                autoAdjustOverflow
+                arrow={false}
+                classNames={{ root: "creation-image-tool-menu" }}
+                getPopupContainer={() => document.body}
+            >
+                <button type="button" title="更多工具" aria-label="更多图片工具" aria-haspopup="menu" aria-expanded={menuOpen} disabled={!ready}>
+                    <CreationIcon name="more" size={18} />
+                </button>
+            </Dropdown>
         </div>
     );
 }
@@ -582,6 +824,10 @@ export function MediaResult({
     onContinueCanvas,
     openingCanvas,
     onUseResultImage,
+    onRedo,
+    referenceActionFirst = false,
+    ratioHint,
+    showResultSize = false,
 }: {
     item: CreationMessage;
     submitting?: boolean;
@@ -593,9 +839,19 @@ export function MediaResult({
     onContinueCanvas: (ids?: string[]) => void;
     openingCanvas: boolean;
     onUseResultImage?: CreationResultImageHandler;
+    /** 图下操作行的「重做」：打开弹窗按原提示词重新生成；不传时不显示（还原不出原提示词）。 */
+    onRedo?: CreationResultRedoHandler;
+    /** 操作条把「作为参考」排第一（输入框是 Agent 时）。 */
+    referenceActionFirst?: boolean;
+    /** 任务参数里没有画幅时（如 Agent 任务）用来占位的画幅，例如方案卡上的 1824x1024。 */
+    ratioHint?: string;
+    /** 在图下操作行最后标出实际像素（方案卡用），图片或视频加载出来之前不标。 */
+    showResultSize?: boolean;
 }) {
     const [previewUrl, setPreviewUrl] = useState("");
     const [previewType, setPreviewType] = useState<"image" | "video">("image");
+    // 正在大图预览的结果图：预览里也放同一条操作条，选了工具先关预览再打开工具弹窗。
+    const [previewImage, setPreviewImage] = useState<CreationResultImageRef | null>(null);
     const [batchPreviewOpen, setBatchPreviewOpen] = useState(false);
     const [batchPreviewIndex, setBatchPreviewIndex] = useState(0);
     const [batchExpanded, setBatchExpanded] = useState(false);
@@ -603,7 +859,12 @@ export function MediaResult({
     const [downloadingImage, setDownloadingImage] = useState<number | null>(null);
     const [downloadError, setDownloadError] = useState("");
     const [recoveringSubmission, setRecoveringSubmission] = useState(false);
+    // 加载出来的实际像素，按结果身份记（showResultSize 时才写入）。
+    const [naturalSizes, setNaturalSizes] = useState<Record<string, string>>({});
+    // 显示的是展示档位时，图片本身只有长边 1600；标尺寸用后端给的原图像素。
+    const [originalSizes, setOriginalSizes] = useState<Record<string, string>>({});
     const assets = useAssetStore((state) => state.assets);
+    const config = useEffectiveConfig();
     const storedResultUrls = item.resultUrls || [];
     const resultStorageKeys = item.resultStorageKeys?.length ? item.resultStorageKeys : creationResultStorageKeys(assets, { messageId: item.id, taskIds: item.taskIds || [], resultUrls: storedResultUrls });
     // 展示地址按 storageKey 保存；effect 重跑（素材库更新、续签）时不回退到历史 hint。
@@ -617,10 +878,18 @@ export function MediaResult({
             if (!active || !url) return;
             setResolvedByKey((current) => (current[storageKey] === url ? current : { ...current, [storageKey]: url }));
         };
+        // 图片取展示档位（长边 1600，还没生成时后端先给原图）；预览和下载另取原图。视频、音频取原件。
+        // 展示档位只为省流量：取不到时（例如后端还没升级）退回原图，不让图片因此显示不出来。
+        const displayAccess = (storageKey: string) =>
+            item.mode === "video" || item.mode === "audio" ? getResourceAccess(storageKey, "display") : getResourceAccess(storageKey, "display", "display").catch(() => getResourceAccess(storageKey, "display"));
         const refreshRemote = async (index: number, storageKey: string): Promise<void> => {
             try {
-                const access = await getResourceAccess(storageKey, "display");
+                const access = await displayAccess(storageKey);
                 if (!active) return;
+                if (access.actualVariant === "display" && access.originalWidth && access.originalHeight) {
+                    const size = `${access.originalWidth}x${access.originalHeight}`;
+                    setOriginalSizes((current) => (current[storageKey] === size ? current : { ...current, [storageKey]: size }));
+                }
                 updateResultUrl(storageKey, resolveResourceAccessURL(access.url));
                 const refreshAt = access.refreshAt ? new Date(access.refreshAt).getTime() : Number.NaN;
                 const expiresAt = access.expiresAt ? new Date(access.expiresAt).getTime() : Number.NaN;
@@ -697,7 +966,7 @@ export function MediaResult({
     if (submissionNotice && !expectedResultCount) return submissionNotice;
     if (item.status === "pending" && !displayResultUrls.length)
         return (
-            <CreationMediaPending item={item} refreshing={refreshingResult} onRefresh={onRefreshResult} onRetry={() => void onRetryFailure?.()} />
+            <CreationMediaPending item={item} ratioHint={ratioHint} refreshing={refreshingResult} onRefresh={onRefreshResult} onRetry={() => void onRetryFailure?.()} />
         );
     if ((item.status === "error" || item.status === "cancelled") && !expectedResultCount)
         return (
@@ -716,26 +985,36 @@ export function MediaResult({
         );
     const isVideo = item.mode === "video";
     const isAudio = item.mode === "audio";
+    const audioNoun = isAudio && isMusicAudioModel(config, item.model || "") ? "音乐" : "音频";
+    const subtitleSrt = item.composition ? item.compositionSubtitles?.srt : undefined;
     const activeBatchUrl = displayResultUrls[batchPreviewIndex] || "";
     const loadingResult = (
         <span className="creation-media-result-placeholder" role="status">
-            {isVideo ? "视频加载中" : isAudio ? "音频加载中" : "图片加载中"}
+            {isVideo ? "视频加载中" : isAudio ? `${audioNoun}加载中` : "图片加载中"}
         </span>
     );
-    if (isAudio)
+    if (isAudio) {
+        // 音乐模型一次常返回两首，每首各一条播放器和下载，不能只放第一首。
+        const unit = audioNoun === "音乐" ? "首" : "段";
+        const several = displayResultUrls.length > 1;
         return (
             <div className="creation-media-result">
-                <div className="creation-audio-result">{displayResultUrls[0] ? <audio controls preload="metadata" src={displayResultUrls[0]} aria-label="生成的音频" /> : loadingResult}</div>
-                <div className="creation-media-actions">
-                    <span>音频结果</span>
-                    <a href={displayResultUrls[0] || undefined} aria-disabled={!displayResultUrls[0]} download>
-                        <Download />
-                        下载
-                    </a>
-                </div>
+                {displayResultUrls.map((url, index) => (
+                    <div key={downloadImages[index]?.storageKey || index} className="creation-audio-track">
+                        <div className="creation-audio-result">{url ? <audio controls preload="metadata" src={url} aria-label={several ? `生成的${audioNoun}，第 ${index + 1} ${unit}` : `生成的${audioNoun}`} /> : loadingResult}</div>
+                        <div className="creation-media-actions">
+                            <span>{several ? `第 ${index + 1} ${unit}` : `${audioNoun}结果`}</span>
+                            <a href={url || undefined} aria-disabled={!url} download>
+                                <Download />
+                                下载
+                            </a>
+                        </div>
+                    </div>
+                ))}
                 {submissionNotice}
             </div>
         );
+    }
     const stackedUrls = displayResultUrls.length > 1 ? Array.from({ length: Math.min(2, displayResultUrls.length - 1) }, (_, offset) => displayResultUrls[(batchPreviewIndex + offset + 1) % displayResultUrls.length]) : [];
     const moveBatchPreview = (direction: -1 | 1) => setBatchPreviewIndex((current) => (current + direction + displayResultUrls.length) % displayResultUrls.length);
     const downloadImage = async (index: number) => {
@@ -774,20 +1053,45 @@ export function MediaResult({
         }
         return resolveImageUrl(image.storageKey, image.url);
     };
+    const placeholderRatio = creationMediaAspectRatio(item.settings?.ratio || ratioHint, "image");
+    // 尺寸只写加载出来的实际像素（图片 naturalWidth/Height，视频元数据），不写方案上请求的尺寸。
+    // 单张和视频标第一项，叠图标最前面那张，展开成网格后各张尺寸可能不同，不标。
+    const sizeKey = (index: number) => downloadImages[index]?.storageKey || `#${index}`;
+    const rememberSize = (index: number) => (width: number, height: number) => {
+        if (!showResultSize || !(width > 0 && height > 0)) return;
+        const key = sizeKey(index);
+        const text = `${width}x${height}`;
+        setNaturalSizes((current) => (current[key] === text ? current : { ...current, [key]: text }));
+    };
+    const sizeIndex = isVideo || displayResultUrls.length <= 1 ? 0 : batchExpanded ? -1 : batchPreviewIndex;
+    const loadedSize = showResultSize && sizeIndex >= 0 ? naturalSizes[sizeKey(sizeIndex)] || "" : "";
+    const sizeText = loadedSize ? originalSizes[sizeKey(sizeIndex)] || loadedSize : "";
+    // 单张的下载已在图上右下角，图下一行放「重做」；多张仍保留打包下载。弹窗里展示单张或叠卡最前面那张。
+    // 还在生成或状态待确认时不给重做，免得同一组没出完又提交一次、再扣一次积分。
+    const redoIndex = displayResultUrls.length > 1 && !batchExpanded ? batchPreviewIndex : 0;
+    const redoSource = downloadImages[redoIndex];
+    const redoImage = onRedo && !isVideo && item.status !== "pending" && !item.taskStatePending && redoSource ? { url: redoSource.url, storageKey: redoSource.storageKey, index: redoIndex } : undefined;
+    // 结果图可以直接拖进输入框：落在某张参考图上替换那一张，否则加到参考素材最后（同「作为参考」）。
+    const resultDragProps = (image: CreationResultImageRef) =>
+        onUseResultImage && image.url
+            ? { draggable: true, onDragStart: (event: DragEvent<HTMLElement>) => startCreationResultImageDrag(event.dataTransfer, image) }
+            : {};
     const imageResult = (url: string, index: number) => (
-        <div key={downloadImages[index].storageKey || index} className="creation-image-result" style={displayResultUrls.length > 1 ? { aspectRatio: "1" } : !url ? { aspectRatio: creationMediaAspectRatio(item.settings?.ratio, "image") } : undefined}>
+        <div key={downloadImages[index].storageKey || index} className="creation-image-result" style={displayResultUrls.length > 1 ? { aspectRatio: "1" } : !url ? { aspectRatio: placeholderRatio } : undefined} {...resultDragProps({ url, storageKey: downloadImages[index].storageKey, index })}>
             <CreationResultImage
                 url={url}
                 alt={`生成结果 ${index + 1}`}
                 square={displayResultUrls.length > 1}
-                ratio={creationMediaAspectRatio(item.settings?.ratio, "image")}
+                ratio={placeholderRatio}
                 onReload={() => reloadImage(index)}
+                onNaturalSize={rememberSize(index)}
                 onPreview={(loadedUrl) => {
                     setPreviewType("image");
                     setPreviewUrl(loadedUrl);
+                    setPreviewImage({ url, storageKey: downloadImages[index].storageKey, index });
                 }}
             />
-            <CreationImageActions image={{ url, storageKey: downloadImages[index].storageKey, index }} onUse={onUseResultImage} />
+            <CreationImageActions image={{ url, storageKey: downloadImages[index].storageKey, index }} onUse={onUseResultImage} referenceActionFirst={referenceActionFirst} />
             <button type="button" className="creation-image-result-download" onClick={() => void downloadImage(index)} disabled={downloadingBatch || downloadingImage !== null} aria-label={`下载生成图片 ${index + 1}`} title="下载图片">
                 <Download aria-hidden="true" />
             </button>
@@ -803,11 +1107,12 @@ export function MediaResult({
                     onClick={() => {
                         if (!displayResultUrls[0]) return;
                         setPreviewType("video");
+                        setPreviewImage(null);
                         setPreviewUrl(displayResultUrls[0]);
                     }}
                     aria-label="预览生成视频"
                 >
-                    {displayResultUrls[0] ? <video muted preload="metadata" src={displayResultUrls[0]} /> : loadingResult}
+                    {displayResultUrls[0] ? <video muted playsInline preload="metadata" src={displayResultUrls[0]} onLoadedMetadata={(event) => rememberSize(0)(event.currentTarget.videoWidth, event.currentTarget.videoHeight)} /> : loadingResult}
                     {displayResultUrls[0] ? (
                         <span>
                             <Maximize2 />
@@ -826,9 +1131,9 @@ export function MediaResult({
                                     {url ? <CreationResultImage url={url} alt="" square /> : null}
                                 </span>
                             ))}
-                            <span className="creation-image-result-stack-front">
-                                <CreationResultImage key={batchPreviewIndex} url={activeBatchUrl} alt={`生成结果 ${batchPreviewIndex + 1}`} square previewLabel={`展开预览第 ${batchPreviewIndex + 1} 张图片`} onPreview={() => setBatchPreviewOpen(true)} onReload={() => reloadImage(batchPreviewIndex)} />
-                                <CreationImageActions image={{ url: activeBatchUrl, storageKey: downloadImages[batchPreviewIndex]?.storageKey, index: batchPreviewIndex }} onUse={onUseResultImage} />
+                            <span className="creation-image-result-stack-front" {...resultDragProps({ url: activeBatchUrl, storageKey: downloadImages[batchPreviewIndex]?.storageKey, index: batchPreviewIndex })}>
+                                <CreationResultImage key={batchPreviewIndex} url={activeBatchUrl} alt={`生成结果 ${batchPreviewIndex + 1}`} square previewLabel={`展开预览第 ${batchPreviewIndex + 1} 张图片`} onPreview={() => setBatchPreviewOpen(true)} onReload={() => reloadImage(batchPreviewIndex)} onNaturalSize={rememberSize(batchPreviewIndex)} />
+                                <CreationImageActions image={{ url: activeBatchUrl, storageKey: downloadImages[batchPreviewIndex]?.storageKey, index: batchPreviewIndex }} onUse={onUseResultImage} referenceActionFirst={referenceActionFirst} />
                             </span>
                         </span>
                         <span className="creation-image-result-stack-controls" aria-label="切换批次图片">
@@ -859,30 +1164,78 @@ export function MediaResult({
                 <Button type="link" size="small" loading={openingCanvas} disabled={!canContinueWithResults} title={canContinueWithResults ? undefined : "素材保存完成后才能转入画布"} onClick={() => onContinueCanvas(resultAssetIds)}>
                     添加到画布
                 </Button>
+                {redoImage ? (
+                    <Button type="link" size="small" title="按原提示词再生成一次，可以换模型和尺寸" onClick={() => onRedo?.(redoImage)}>
+                        <RotateCcw />
+                        重做
+                    </Button>
+                ) : null}
                 {!isVideo && displayResultUrls.length > 1 ? (
                     <Button type="link" size="small" onClick={() => setBatchExpanded((expanded) => !expanded)}>
                         {batchExpanded ? "收起" : "展开"}
                     </Button>
                 ) : null}
                 {isVideo ? (
-                    <a href={displayResultUrls[0] || undefined} aria-disabled={!displayResultUrls[0]} download>
+                    <>
+                        <a href={displayResultUrls[0] || undefined} aria-disabled={!displayResultUrls[0]} download>
+                            <Download />
+                            下载
+                        </a>
+                        {subtitleSrt ? (
+                            <button type="button" onClick={() => downloadCreationSubtitle(item.content, subtitleSrt)}>
+                                <Download />
+                                字幕 SRT
+                            </button>
+                        ) : null}
+                    </>
+                ) : displayResultUrls.length > 1 ? (
+                    <Button type="link" size="small" loading={downloadingBatch || downloadingImage !== null} disabled={downloadingBatch || downloadingImage !== null} onClick={() => void downloadBatch()}>
                         <Download />
-                        下载
-                    </a>
-                ) : (
-                    <Button type="link" size="small" loading={downloadingBatch || downloadingImage !== null} disabled={downloadingBatch || downloadingImage !== null} onClick={() => void (displayResultUrls.length > 1 ? downloadBatch() : downloadImage(0))}>
-                        <Download />
-                        {displayResultUrls.length > 1 ? "批量下载" : "下载"}
+                        批量下载
                     </Button>
-                )}
+                ) : null}
+                {sizeText ? (
+                    <span className="creation-media-actions-size">
+                        <span className="sr-only">尺寸 </span>
+                        {sizeText}
+                    </span>
+                ) : null}
             </div>
+            {subtitleSrt && item.compositionSubtitles?.burn && !item.compositionSubtitles.burned ? (
+                <p className="creation-media-subtitle-note" role="status">
+                    字幕没能烧录进画面，已附 SRT 字幕文件，可下载后导入剪辑软件或播放器。
+                </p>
+            ) : null}
             {submissionNotice}
             {downloadError ? (
                 <div className="creation-message-error" role="alert">
                     {downloadError}
                 </div>
             ) : null}
-            <CreationMediaPreviewModal url={previewUrl} type={previewType} onClose={() => setPreviewUrl("")} />
+            <CreationMediaPreviewModal
+                url={previewUrl}
+                type={previewType}
+                // 对话里显示的是展示档位：预览先铺上这张已加载的图，再换成原图。
+                originalStorageKey={previewType === "image" ? previewImage?.storageKey : undefined}
+                onClose={() => {
+                    setPreviewUrl("");
+                    setPreviewImage(null);
+                }}
+                footer={
+                    previewType === "image" && previewImage && onUseResultImage ? (
+                        <CreationImageActions
+                            inline
+                            image={previewImage}
+                            referenceActionFirst={referenceActionFirst}
+                            onUse={(image, intent) => {
+                                setPreviewUrl("");
+                                setPreviewImage(null);
+                                onUseResultImage(image, intent);
+                            }}
+                        />
+                    ) : undefined
+                }
+            />
             <AppModal
                 open={batchPreviewOpen}
                 centered
@@ -903,6 +1256,19 @@ export function MediaResult({
                             <ChevronRight aria-hidden="true" />
                         </button>
                     </div>
+                    {onUseResultImage ? (
+                        <div className="creation-image-batch-preview-tools">
+                            <CreationImageActions
+                                inline
+                                image={{ url: activeBatchUrl, storageKey: downloadImages[batchPreviewIndex]?.storageKey, index: batchPreviewIndex }}
+                                referenceActionFirst={referenceActionFirst}
+                                onUse={(image, intent) => {
+                                    setBatchPreviewOpen(false);
+                                    onUseResultImage(image, intent);
+                                }}
+                            />
+                        </div>
+                    ) : null}
                     <div className="creation-image-batch-preview-thumbs" aria-label="生成图片缩略图">
                         {displayResultUrls.map((url, index) => (
                             <button
@@ -924,7 +1290,7 @@ export function MediaResult({
     );
 }
 
-export function CreationMediaPending({ item, refreshing, onRefresh, onRetry }: { item: CreationMessage; refreshing: boolean; onRefresh: () => void; onRetry: () => void }) {
+export function CreationMediaPending({ item, ratioHint, refreshing, onRefresh, onRetry }: { item: CreationMessage; ratioHint?: string; refreshing: boolean; onRefresh: () => void; onRetry: () => void }) {
     const mode: CreationMode = item.mode || "image";
     const kind = mode === "video" ? "video" : "image";
     const phase: GenerationPhase = item.taskIds?.length ? generationTaskPhase({ status: item.generationStatus || "running", stage: item.generationStage, mediaStage: item.generationMediaStage }) : "submitting";
@@ -937,7 +1303,7 @@ export function CreationMediaPending({ item, refreshing, onRefresh, onRetry }: {
             : null;
     const elapsed = useTaskElapsed(item.createdAt);
     const hint = generationPhaseHint(phase, kind, item.generationStage);
-    const aspectRatio = creationMediaAspectRatio(item.settings?.ratio, mode);
+    const aspectRatio = creationMediaAspectRatio(item.settings?.ratio || ratioHint, mode);
     const specs = creationPendingSpecs(item);
     const Icon = mode === "video" ? Film : ImageIcon;
     return (
@@ -1129,72 +1495,18 @@ export function CreationMessageReferences({ references }: { references: Creation
     );
 }
 
-export function CreationMediaPreviewModal({ url, type, onClose }: { url: string; type: "image" | "video"; onClose: () => void }) {
-    if (type === "image") return <CanvasImagePreview src={url} alt="媒体预览" onClose={onClose} />;
+/** originalStorageKey：图片预览按资源取原图，url 作为原图加载出来之前的占位。 */
+export function CreationMediaPreviewModal({ url, type, onClose, footer, originalStorageKey }: { url: string; type: "image" | "video"; onClose: () => void; footer?: ReactNode; originalStorageKey?: string }) {
+    if (type === "image") {
+        if (url && originalStorageKey) return <CanvasImagePreview src={url} storageKey={originalStorageKey} placeholderSrc={url} alt="媒体预览" onClose={onClose} footer={footer} />;
+        return <CanvasImagePreview src={url} alt="媒体预览" onClose={onClose} footer={footer} />;
+    }
 
     return (
         <AppModal flush open={Boolean(url)} title={null} footer={null} centered destroyOnHidden width="min(1160px, calc(100vw - 32px))" onCancel={onClose} className="creation-media-preview-modal">
-            {url ? <video controls autoPlay className="creation-media-preview-video" src={url} /> : null}
+            {/* playsInline：iPhone 上在弹窗里播放，不强制进入系统全屏。 */}
+            {url ? <video controls autoPlay playsInline className="creation-media-preview-video" src={url} /> : null}
         </AppModal>
-    );
-}
-
-export function CreationAttachmentThumbnail({ item, onPreview, onRemove }: { item: CreationAttachment; onPreview: (type: "image" | "video", url: string) => void; onRemove: (id: string) => void }) {
-    const kind = creationAttachmentKind(item);
-    const previewable = kind === "image" || kind === "video";
-    const url = (kind === "video" ? item.url : item.previewUrl) || "";
-    const imageUrl = kind === "image" ? resolveResourceUrl(item.storageKey, item.previewUrl) : "";
-    const previewUrl = kind === "image" ? imageUrl : url;
-    const content =
-        kind === "video" ? (
-            <video src={item.url} poster={item.previewUrl !== item.url ? item.previewUrl : undefined} muted playsInline preload="metadata" aria-label={item.name} />
-        ) : kind === "image" ? (
-            <CachedResourceImage
-                storageKey={item.storageKey}
-                src={imageUrl}
-                alt={item.name}
-                loading="lazy"
-                decoding="async"
-                fallback={
-                    <span className="creation-chat-file-icon">
-                        <ImageIcon />
-                    </span>
-                }
-            />
-        ) : (
-            <span className="creation-chat-file-icon">
-                {kind === "audio" ? <Music2 /> : <FileText />}
-                <em>{item.name}</em>
-            </span>
-        );
-    return (
-        <div className="creation-reference-card-content">
-            {previewable ? (
-                <button type="button" className="creation-reference-card-preview" onClick={() => onPreview(kind === "video" ? "video" : "image", previewUrl)} aria-label={`放大预览 ${item.name}`} disabled={!previewUrl}>
-                    {content}
-                    <span aria-hidden="true">
-                        <Maximize2 />
-                    </span>
-                </button>
-            ) : (
-                <div className="creation-reference-card-preview is-file" aria-label={item.name}>
-                    {content}
-                </div>
-            )}
-            <button
-                type="button"
-                className="creation-reference-card-remove"
-                onPointerDownCapture={(event) => event.stopPropagation()}
-                onMouseDownCapture={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                    event.stopPropagation();
-                    onRemove(item.id);
-                }}
-                aria-label={`移除 ${item.name}`}
-            >
-                <X />
-            </button>
-        </div>
     );
 }
 

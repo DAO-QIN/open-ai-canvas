@@ -163,6 +163,10 @@
     transition:
         transform var(--user-motion),
         background-color var(--user-motion);
+    /* 视口外的卡片先跳过样式计算、排版和绘制，滚到附近再做：创作页首屏下方一次挂上整批卡片时不卡。
+       高度先按一张卡估算，渲染过一次后浏览器记住实际高度。 */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 300px;
 }
 
 .inspiration-card:hover,
@@ -406,6 +410,14 @@
     object-fit: cover;
 }
 
+.inspiration-detail-cover .inspiration-detail-video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: var(--color-neutral-950, #000);
+}
+
 /* 提示词正文保留原始换行，长内容只在区域内部滚动。 */
 .inspiration-prompt-block {
     position: relative;
@@ -457,6 +469,34 @@
     }
     .inspiration-detail-cover {
         height: 224px;
+    }
+    /* 手机上只留浏览、收藏和使用：导入 / 导出 / 新建灵感、来源筛选和卡片「更多」菜单留给桌面端。
+       来源角标在窄卡片上会和「视频样片」叠在一起，来源仍在详情弹窗里完整展示。 */
+    .inspiration-hall-header p,
+    .inspiration-hall-actions,
+    .inspiration-hall-select.is-source,
+    .inspiration-card-source,
+    .inspiration-card .inspiration-card-action[aria-haspopup="menu"] {
+        display: none;
+    }
+    .inspiration-hall-header {
+        margin-bottom: var(--space-3);
+    }
+    /* 独立的灵感库页面里灵感区是第一块内容，不再留创作页里用来分隔上一块的大间距。 */
+    .app-user-content > div > .inspiration-hall:first-child {
+        margin-top: var(--space-2);
+    }
+    .inspiration-card .inspiration-card-actions {
+        top: var(--space-2);
+        right: var(--space-2);
+    }
+    .inspiration-card .inspiration-card-action {
+        width: var(--space-8);
+        height: var(--space-8);
+    }
+    .inspiration-card-kind {
+        right: var(--space-2);
+        bottom: var(--space-2);
     }
 }
 

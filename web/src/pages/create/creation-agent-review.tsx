@@ -15,6 +15,8 @@ type ReviewProps = {
     onModify?: (notes: string) => Promise<boolean>;
     onDefer?: () => void;
     onRefreshQuote?: () => void;
+    /** 审批改由逐项方案卡展示时，这里只保留重要信息、执行计划和修改备注。 */
+    approvalInProposals?: boolean;
 };
 
 const roleNames: Record<string, string> = { product: "产品", competitor: "竞品风格", style: "风格", reference: "一般参考", person: "人物", source: "源素材" };
@@ -32,7 +34,7 @@ const layoutNames: Record<string, string> = {
 };
 const imageRoleNames: Record<string, string> = { main: "白底主图", secondary: "商品副图", a_plus: "A+ 内容", banner: "横幅", other: "其他" };
 
-export function CreationAgentReview({ outputPreference = "detailed", plan, items, approval, changed, submitting, onApprove, onReject, onModify, onDefer, onRefreshQuote }: ReviewProps) {
+export function CreationAgentReview({ outputPreference = "detailed", plan, items, approval, changed, submitting, onApprove, onReject, onModify, onDefer, onRefreshQuote, approvalInProposals = false }: ReviewProps) {
     const [notes, setNotes] = useState("");
     const [modifying, setModifying] = useState(false);
     const detailed = outputPreference === "detailed";
@@ -45,7 +47,7 @@ export function CreationAgentReview({ outputPreference = "detailed", plan, items
         setExecutionExpanded(detailed);
     }, [detailed]);
     const showImportantInfo = Boolean(plan && plan.showImportantInfo !== false);
-    if (!showImportantInfo && !items?.length && !approval) return null;
+    if (!showImportantInfo && !items?.length && (!approval || approvalInProposals)) return null;
     const references = new Map((plan?.references || []).map((item) => [item.resourceId, item]));
     const factNames = new Map((plan?.productFacts || []).map((fact) => [fact.id, fact.claim]));
     const domestic = plan?.language.toLowerCase().startsWith("zh");
@@ -319,7 +321,7 @@ export function CreationAgentReview({ outputPreference = "detailed", plan, items
                     </button>
                 </div>
             ) : null}
-            {approval ? (
+            {approval && !approvalInProposals ? (
                 <div className="creation-agent-approval">
                     <h3>{approval.preview?.title || "等待执行审批"}</h3>
                     {approval.preview?.description ? <p>{approval.preview.description}</p> : null}

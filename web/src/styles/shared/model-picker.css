@@ -892,29 +892,39 @@ html:not(.dark) .creation-home .creation-chat-composer .creation-model-picker.ca
     .canvas-model-picker-option,
 .canvas-model-picker-description { transition: none !important; }
 }
-/* composer 里的模型选择与旁边的参数、参考内容是同一种 34px 浅底按钮（8px 圆角、无边、悬停不浮起）。 */
+/* composer 里的模型选择和旁边的偏好、技能是同一种幽灵按钮（参考即梦）：不铺底、不画边，正文色，
+   悬停或展开时出浅底；宽度跟着模型名走，太长才截断。 */
 .app-user-workspace .creation-chat-composer .creation-model-picker.canvas-composer-model-picker {
+    width: auto !important;
+    max-width: min(240px, 60cqw) !important;
     min-height: var(--button-height) !important;
+    border: 0 !important;
     border-radius: var(--button-radius) !important;
-    background: var(--button-tonal-bg) !important;
-    color: var(--button-ghost-fg) !important;
+    background: transparent !important;
+    color: var(--user-ink) !important;
     transition: background-color var(--button-motion), color var(--button-motion) !important;
 }
 .app-user-workspace .creation-chat-composer .creation-model-picker.canvas-composer-model-picker:hover,
 .app-user-workspace .creation-chat-composer .creation-model-picker.canvas-composer-model-picker[aria-expanded="true"] {
-    background: var(--button-tonal-hover-bg) !important;
-    color: var(--button-ghost-hover-fg) !important;
+    background: var(--button-ghost-hover-bg) !important;
+    color: var(--user-ink) !important;
     box-shadow: none;
 }
-.app-user-workspace .creation-launchpad .creation-model-picker.canvas-composer-model-picker {
+.app-user-workspace :is(.creation-launchpad, .creation-thread-composer) .creation-model-picker.canvas-composer-model-picker {
     min-height: var(--button-height) !important;
     height: var(--button-height) !important;
-    padding-inline: 10px 12px;
-    font-size: var(--button-font-size-sm);
-    border: 0 !important;
+    padding-inline: 9px;
 }
-.app-user-workspace .creation-launchpad .creation-model-picker.canvas-composer-model-picker {
-    width: min(232px, 60cqw) !important;
+/* 浅色主题的通用规则 html:not(.dark) .canvas-composer-model-picker 在 utilities 层且带 !important，
+   层内的 !important 压过层外，只能在同层用更具体的选择器把创作页工具栏改回幽灵按钮。 */
+@layer utilities {
+    html:not(.dark) .app-user-workspace .creation-chat-composer .creation-model-picker.canvas-composer-model-picker {
+        background: transparent !important;
+        color: var(--user-ink) !important;
+    }
+    html:not(.dark) .app-user-workspace .creation-chat-composer .creation-model-picker.canvas-composer-model-picker:is(:hover, [aria-expanded="true"]) {
+        background: var(--button-ghost-hover-bg) !important;
+    }
 }
 /* 模型与渠道共用菜单高度约束，长列表在各自区域滚动。 */
 .app-user-workspace .creation-model-picker-menu.is-brand-list {
@@ -929,10 +939,6 @@ html:not(.dark) .creation-home .creation-chat-composer .creation-model-picker.ca
 .app-user-workspace .creation-model-picker-menu .canvas-model-picker-option .text-amber-600 svg { width: 13px; height: 13px; }
 .dark .app-user-workspace .creation-model-picker-menu .canvas-model-picker-option .text-amber-600,
 .dark .app-user-workspace .creation-model-picker-menu .canvas-model-picker-option .dark\:text-amber-300 { color: #f0a943 !important; background: color-mix(in srgb, #e28a17 18%, var(--user-surface)) !important; }
-.app-user-workspace .creation-chat-composer.is-thread .creation-model-picker.canvas-composer-model-picker {
-    min-height: 32px !important;
-    height: 32px !important;
-}
 .creation-model-picker-surface .creation-model-picker-menu.is-brand-list {
     padding: 8px !important;
 }

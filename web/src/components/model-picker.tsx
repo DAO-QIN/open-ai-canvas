@@ -1,16 +1,18 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { Check, ChevronDown, Coins, Search, X } from "lucide-react";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 import { Popover } from "antd";
 import { usePopoverAnchorAlign } from "@/hooks/use-popover-anchor-align";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { AppModal } from "@/components/ui/product/app-modal/app-modal";
 
+import { CreditIcon } from "@/constant/credits";
 import { imageQualityLabel } from "@/lib/image-quality";
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { modelCapabilityConfigFor, resolveVideoResolutionValue, videoDurationConfigForResolution, videoDurationOptions } from "@/lib/model-capabilities";
+import { isMusicAudioModel } from "@/lib/audio-generation";
 import { formatPriceRange, modelQuoteDescription, modelQuoteRequest, normalizeTierResolution, priceTierSummaryLabel, priceTiersForCurrentSelection } from "@/lib/model-pricing";
 import { compatibleModelInGroup, configuredModelDisplayName, modelCompatibilityError, resolveCompatibleModel, type ModelRequirements } from "@/lib/model-selection";
-import { filterModelPickerGroups, groupModelsForPicker, isDirectSystemModel, modelChannelLabel, type ModelPickerGroup } from "@/lib/model-picker-groups";
+import { filterModelPickerGroups, groupModelsForPicker, isDirectSystemModel, modelChannelLabel, UNCATEGORIZED_MODEL_GROUP, type ModelPickerGroup } from "@/lib/model-picker-groups";
 import { cn } from "@/lib/utils";
 import { modelDisplayName, modelIcon, modelOptionName, resolveModelChannel, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
@@ -479,7 +481,7 @@ export function ModelLabel({
     disabledReason?: string;
     showDescription: boolean;
 }) {
-    const meta = modelMenuMeta(model, capability);
+    const meta = modelMenuMeta(model, capability, capability === "audio" && isMusicAudioModel(config, model));
     const channel = resolveModelChannel(config, model);
     const logicalCost = channel.modelCosts?.find((item) => item.model === modelOptionName(model));
     const logicalSpec = logicalCost?.logicalCapabilitySpec;
@@ -614,7 +616,10 @@ function modelMenuPrice(config: AiConfig, model: string, capability?: ModelCapab
 
 function pickerModelDisplayName(config: AiConfig, model: string, showConfiguredModelName: boolean) {
     const name = showConfiguredModelName ? configuredModelDisplayName(config, model) : modelDisplayName(config, model);
-    return isDirectSystemModel(config, model) ? `${name} · ${modelChannelLabel(config, model)}` : name;
+    if (!isDirectSystemModel(config, model)) return name;
+    // 「未分类」只是菜单里的分组名，选中后只显示模型自己的名字，不拼成「未分类 · xxx」。
+    const channelLabel = modelChannelLabel(config, model);
+    return name === UNCATEGORIZED_MODEL_GROUP ? channelLabel : `${name} · ${channelLabel}`;
 }
 
 function pickerModelOptionLabel(config: AiConfig, model: string, showConfiguredModelName: boolean) {
@@ -669,7 +674,7 @@ function ModelPrice({ price, quote, compact = false }: { price: ModelMenuPrice |
         const label = quote.estimated ? `预估:${amount}` : `${amount}`;
         return (
             <span className="model-picker-price inline-flex shrink-0 items-center gap-1 text-[var(--fs-tiny)] font-semibold tabular-nums" aria-label={modelQuoteDescription(quote)}>
-                <Coins className="model-picker-price-icon" aria-hidden="true" />
+                <CreditIcon className="model-picker-price-icon" aria-hidden="true" />
                 {compact ? label : `${label} 积分`}
             </span>
         );
@@ -679,7 +684,7 @@ function ModelPrice({ price, quote, compact = false }: { price: ModelMenuPrice |
     if (price.kind === "tiers") {
         return (
             <span className="model-picker-price inline-flex shrink-0 items-center gap-1 text-[var(--fs-tiny)] font-semibold tabular-nums">
-                <Coins className="model-picker-price-icon" aria-hidden="true" />
+                <CreditIcon className="model-picker-price-icon" aria-hidden="true" />
                 {compact ? price.compactLabel : price.label}
             </span>
         );
@@ -687,14 +692,14 @@ function ModelPrice({ price, quote, compact = false }: { price: ModelMenuPrice |
     if (price.kind === "estimate") {
         return (
             <span className="model-picker-price inline-flex shrink-0 items-center text-[var(--fs-tiny)] font-semibold">
-                <Coins className="model-picker-price-icon" aria-hidden="true" />
+                <CreditIcon className="model-picker-price-icon" aria-hidden="true" />
                 {price.label || "按量预估"}
             </span>
         );
     }
     return (
         <span className="model-picker-price inline-flex shrink-0 items-center gap-1 text-[var(--fs-tiny)] font-semibold tabular-nums">
-            <Coins className="model-picker-price-icon" aria-hidden="true" />
+            <CreditIcon className="model-picker-price-icon" aria-hidden="true" />
             {price.value.toLocaleString("zh-CN", { maximumFractionDigits: compact ? 3 : 6 })}
             {compact ? "/" : " 积分/"}
             {price.unit}
@@ -786,7 +791,8 @@ function ModelAvailabilityBadge({ availability, available, showAvailability }: {
         </div>
     ) : null;
     return (
-        <Popover ref={popoverRef} open={open} onOpenChange={setOpen} content={content} trigger={["hover", "focus"]} placement="topRight" arrow={false}>
+        // 触屏没有悬停：轻点也能展开最近成功率说明。
+        <Popover ref={popoverRef} open={open} onOpenChange={setOpen} content={content} trigger={["hover", "focus", "click"]} placement="topRight" arrow={false}>
             <span
                 className={`model-picker-availability is-${availability?.dataState || "unavailable"}`}
                 role="img"
@@ -803,7 +809,7 @@ function ModelAvailabilityBadge({ availability, available, showAvailability }: {
         </Popover>
     );
 }
-function modelMenuMeta(model: string, capability?: ModelCapability): { description: string; time?: string } {
+function modelMenuMeta(model: string, capability?: ModelCapability, music = false): { description: string; time?: string } {
     const name = modelOptionName(model).toLowerCase();
     if (capability === "image") {
         if (name.includes("nano banana") || name.includes("nanobanana") || name.includes("imagen")) return { description: "Gemini 高质量图片生成，适合角色和商业成片" };
@@ -817,7 +823,8 @@ function modelMenuMeta(model: string, capability?: ModelCapability): { descripti
         if (name.includes("seedance") || name.includes("sora")) return { description: "镜头生成与图生视频，适合成片流程", time: "3m" };
         return { description: "视频生成模型", time: "3m" };
     }
-    if (capability === "audio") return { description: "语音、音效或音乐生成", time: "20s" };
+    // 音乐模型和配音、音效模型同属音频能力，但用途和耗时不同，分开说明。
+    if (capability === "audio") return music ? { description: "歌曲、纯音乐生成", time: "3m" } : { description: "配音、音效生成", time: "20s" };
     if (name.includes("claude")) return { description: "长文本、推理与创意写作", time: "10s" };
     if (name.includes("gemini")) return { description: "多模态理解与快速文本生成", time: "10s" };
     if (name.includes("deepseek")) return { description: "推理、代码和结构化文本", time: "10s" };

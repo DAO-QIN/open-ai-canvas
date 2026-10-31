@@ -121,7 +121,8 @@ const resourceCache = new Map<string, RemoteResource>();
 const resourceRequests = new Map<string, Promise<RemoteResource>>();
 const missingResourceIds = new Set<string>();
 export type ResourceAccessPurpose = "display" | "copy" | "download" | "browser-process" | "provider-input";
-export type ResourceAccessVariant = "original" | "playback" | "thumbnail";
+/** display 是对话结果图的展示档位（长边 1600）；未生成或无需生成时后端回落原件。 */
+export type ResourceAccessVariant = "original" | "playback" | "thumbnail" | "display";
 export type ResourceAccess = {
     resourceId: string;
     requestedVariant: ResourceAccessVariant;
@@ -533,6 +534,7 @@ function rememberUploadedResource(resource: RemoteResource, generation: number, 
 
 const RESOURCE_ACCESS_BATCH_LIMIT = 100;
 const RESOURCE_ACCESS_BATCH_DELAY_MS = 16;
+const PENDING_DISPLAY_ACCESS_CACHE_MS = 60_000;
 
 function resourceAccessAbortError() {
     return new DOMException("资源访问请求已因账号切换失效", "AbortError");
@@ -557,10 +559,13 @@ async function completeResourceAccessBatchEntry(entry: PendingResourceAccess, it
     if (entry.generation !== accessGeneration || entry.scope !== getActiveUserScope()) throw resourceAccessAbortError();
     if (!item?.access?.url) throw new ApiError(item?.error?.msg || "后端未返回资源访问地址", { code: item?.error?.code, reason: item?.error?.reason });
     const value = item.access;
-    const cachedEntry = { value, expiresAt: resourceAccessCacheExpiry(value) } satisfies CachedResourceAccess;
+    // 展示图还在后台生成时拿到的是原图地址：只在内存里短暂复用、不跨页面保存，稍后再打开就能换成展示图。
+    const displayPending = value.requestedVariant === "display" && value.fallbackReason === "display_not_ready";
+    const expiresAt = resourceAccessCacheExpiry(value);
+    const cachedEntry = { value, expiresAt: displayPending ? Math.min(expiresAt, Date.now() + PENDING_DISPLAY_ACCESS_CACHE_MS) : expiresAt } satisfies CachedResourceAccess;
     if (cachedEntry.expiresAt > Date.now()) {
         accessCache.set(entry.key, cachedEntry);
-        if (entry.payload.purpose === "display") await persistDisplayAccess(entry.scope, entry.payload.resourceId, entry.payload.variant, cachedEntry);
+        if (entry.payload.purpose === "display" && !displayPending) await persistDisplayAccess(entry.scope, entry.payload.resourceId, entry.payload.variant, cachedEntry);
     }
     if (entry.generation !== accessGeneration || entry.scope !== getActiveUserScope()) {
         accessCache.delete(entry.key);
@@ -597,7 +602,7 @@ export async function invalidateResourceAccess(storageKey: string) {
     );
     if (scope !== getActiveUserScope()) return;
     for (const key of accessCache.keys()) if (key.startsWith(prefix)) accessCache.delete(key);
-    await Promise.allSettled(["original", "thumbnail"].map((variant) => localForageStorageForScope(scope).removeItem(persistedDisplayAccessKey(id, variant as ResourceAccessVariant))));
+    await Promise.allSettled(["original", "thumbnail", "display"].map((variant) => localForageStorageForScope(scope).removeItem(persistedDisplayAccessKey(id, variant as ResourceAccessVariant))));
     if (scope === getActiveUserScope()) resourceAccessListeners.forEach((listener) => listener(id));
 }
 

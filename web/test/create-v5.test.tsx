@@ -116,9 +116,10 @@ test("局部修改在对话里显示成一行，@区域N 去掉 @", () => {
     expect(regionEditDisplayPrompt("@区域1 换成一艘渔船\n\n@区域2 去掉路人 ")).toBe("局部修改：区域1 换成一艘渔船；区域2 去掉路人");
 });
 
-test("音频生成：类型菜单有入口，只收文字，不接参考素材", () => {
-    expect(creationComposerModeOptions.map((item) => item.key)).toEqual(["agent", "image", "video", "audio"]);
-    expect(creationComposerModeOptions.find((item) => item.key === "audio")?.label).toBe("音频生成");
+test("音乐生成、音频生成：类型菜单各有入口，只收文字，不接参考素材", () => {
+    expect(creationComposerModeOptions.map((item) => item.key)).toEqual(["agent", "image", "video", "music", "audio"]);
+    expect(creationComposerModeOptions.find((item) => item.key === "music")).toMatchObject({ label: "音乐生成", mode: "audio", audioKind: "music" });
+    expect(creationComposerModeOptions.find((item) => item.key === "audio")).toMatchObject({ label: "音频生成", mode: "audio", audioKind: "speech" });
     expect(modeLabels.audio).toBe("音频");
     expect(creationFileAccepted("audio", { type: "image/png", name: "a.png" })).toBe(false);
     expect(creationFileAccepted("audio", { type: "audio/mpeg", name: "a.mp3" })).toBe(false);

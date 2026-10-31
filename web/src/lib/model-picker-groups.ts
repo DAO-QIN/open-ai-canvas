@@ -12,6 +12,9 @@ export type ModelPickerGroup = {
 
 export { isDirectSystemModel } from "@/lib/model-selection";
 
+/** 后台没填展示名的平台模型归在这一组（新建渠道模型的默认展示名也是它）；它是分组名，不是模型名。 */
+export const UNCATEGORIZED_MODEL_GROUP = "未分类";
+
 // Search preserves each channel choice and the catalogue order, including the last group.
 export function filterModelPickerGroups(groups: ModelPickerGroup[], query: string): ModelPickerGroup[] {
     const term = query.trim().toLocaleLowerCase();
@@ -38,7 +41,7 @@ export function groupModelsForPicker(config: AiConfig, options: string[]): Model
         const directModels = models.filter((value) => isDirectSystemModel(config, value));
         for (const value of directModels) {
             const cost = channel.modelCosts?.find((item) => item.model === modelOptionName(value));
-            const label = cost?.displayName?.trim() || "未分类";
+            const label = cost?.displayName?.trim() || UNCATEGORIZED_MODEL_GROUP;
             const key = JSON.stringify(["product", label]);
             let group = groups.get(key);
             if (!group) {

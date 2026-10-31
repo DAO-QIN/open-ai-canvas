@@ -2,40 +2,61 @@
 .home-page { display: block; width: 100%; height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .home-page-inner { display: flex; width: 100%; max-width: 1680px; flex-direction: column; gap: var(--space-8); margin-inline: auto; padding: var(--space-6) var(--space-10) var(--space-12); }
 
-/* 新建画布：点阵底的大卡片 */
-.home-new-canvas { position: relative; display: flex; width: 100%; min-height: 188px; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); overflow: hidden; border: 1px solid var(--user-border); border-radius: 18px; padding: var(--space-6); background-color: var(--library-surface); background-image: radial-gradient(color-mix(in srgb, var(--user-ink) 22%, transparent) 1px, transparent 1.2px); background-size: 22px 22px; background-position: center; color: var(--user-ink); cursor: pointer; transition: border-color var(--user-motion), background-color var(--user-motion); }
-.home-new-canvas:hover:not(:disabled) { border-color: color-mix(in srgb, var(--user-ink) 24%, transparent); background-color: var(--library-surface-hover); }
+/* 新建画布卡片与工具入口共用的组件 token。表面参考 liblib.tv：用墨色半透明叠在页面底色上，不铺实底；
+   浅色靠浅渐变和 1px 轮廓分层，深色靠细描边和内侧底光分层。明暗主题只换这一组变量。 */
+.home-page {
+    --home-surface: color-mix(in srgb, var(--user-ink) 4%, transparent);
+    --home-surface-hover: color-mix(in srgb, var(--user-ink) 6%, transparent);
+    --home-edge: var(--user-border);
+    --home-dot: color-mix(in srgb, var(--user-ink) 14%, transparent);
+    --home-dot-light: color-mix(in srgb, var(--user-ink) 36%, transparent);
+    --home-underglow: transparent;
+    --home-tile-fill: linear-gradient(180deg, color-mix(in srgb, var(--user-ink) 4%, transparent), color-mix(in srgb, var(--user-ink) 6%, transparent));
+    --home-tile-shadow: 0 0 0 1px color-mix(in srgb, var(--user-ink) 7%, transparent);
+    --home-tile-hover: color-mix(in srgb, var(--user-ink) 4%, transparent);
+}
+.dark .home-page {
+    --home-surface: color-mix(in srgb, var(--user-ink) 5%, transparent);
+    --home-surface-hover: color-mix(in srgb, var(--user-ink) 7%, transparent);
+    --home-edge: var(--user-border-strong);
+    --home-dot: color-mix(in srgb, var(--user-ink) 10%, transparent);
+    --home-dot-light: color-mix(in srgb, var(--user-ink) 70%, transparent);
+    --home-underglow: color-mix(in srgb, var(--user-ink) 15%, transparent);
+    --home-tile-fill: var(--home-surface);
+    --home-tile-shadow: inset 0 -4px 16px color-mix(in srgb, var(--user-ink) 5%, transparent);
+}
+
+/* 新建画布：点阵底的大卡片。点阵平时很淡，扩散的亮点和鼠标光斑经过时才把它点亮。 */
+.home-new-canvas { position: relative; isolation: isolate; display: flex; width: 100%; min-height: 160px; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); overflow: hidden; border: 1px solid var(--home-edge); border-radius: var(--r-lg); padding: var(--space-6); background-color: var(--home-surface); background-image: radial-gradient(circle, var(--home-dot) .4px, transparent 1.4px); background-size: 18px 18px; background-position: center; color: var(--user-ink); cursor: pointer; transition: background-color var(--user-motion); }
+.home-new-canvas:hover:not(:disabled) { background-color: var(--home-surface-hover); }
 .home-new-canvas:focus-visible { outline: 2px solid var(--control-focus-ring); outline-offset: 3px; }
 .home-new-canvas:disabled { cursor: wait; }
-.home-new-canvas-icon { display: grid; width: 100px; height: 60px; place-items: center; border-radius: 14px; background: var(--user-ink); color: var(--workspace-page, var(--user-surface)); box-shadow: 0 8px 24px color-mix(in srgb, var(--user-ink) 18%, transparent); transition: transform var(--user-motion); }
-.home-new-canvas:hover:not(:disabled) .home-new-canvas-icon { transform: translateY(-2px); }
-.home-new-canvas-icon svg { width: 28px; height: 28px; stroke-width: 2; }
-.home-new-canvas-label { font-size: var(--fs-body); font-weight: 650; letter-spacing: .02em; }
-/* 光效：两圈从中心扩散的亮点 + 跟随鼠标的光斑 + 按钮背后的柔光。只用点阵本身变亮，不加额外色块。 */
+/* 新建按钮像一颗键帽：上实下略透的渐变、一圈接近页面底色的细边和柔和外光，悬停整体放大 5%。 */
+.home-new-canvas-icon { position: relative; z-index: 1; display: grid; width: 88px; height: 52px; place-items: center; border: 1px solid color-mix(in srgb, var(--user-ink) 10%, var(--user-page-bg)); border-radius: var(--r-2xl); background: linear-gradient(180deg, var(--user-ink) 25%, color-mix(in srgb, var(--user-ink) 87%, transparent) 89%); color: var(--user-page-bg); box-shadow: 0 1.5px 19px color-mix(in srgb, var(--user-ink) 12%, transparent); transition: transform var(--user-motion); }
+.home-new-canvas:hover:not(:disabled) .home-new-canvas-icon { transform: scale(1.05); }
+.home-new-canvas-icon svg { width: 32px; height: 32px; stroke-width: 1.65; }
+.home-new-canvas-label { position: relative; z-index: 1; font-size: var(--fs-heading); font-weight: 500; line-height: 1.5; }
+/* 光效：两圈从中心扩散的亮点 + 跟随鼠标的光斑 + 从下沿透进来的柔光。亮点只是同一套点阵变亮，不加额外色块。 */
 @property --home-ripple-radius { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
-.home-new-canvas { isolation: isolate; --home-dot-light: color-mix(in srgb, var(--user-ink) 32%, transparent); }
-.dark .home-new-canvas { --home-dot-light: rgb(255 255 255 / .6); }
-.home-new-canvas-icon, .home-new-canvas-label { position: relative; z-index: 1; }
 .home-new-canvas-glow, .home-new-canvas-glow > span { position: absolute; inset: 0; pointer-events: none; }
-.home-new-canvas-ripple, .home-new-canvas-spotlight { background: radial-gradient(circle, var(--home-dot-light) .8px, transparent 1.5px) center / 22px 22px; }
+.home-new-canvas-ripple, .home-new-canvas-spotlight { background: radial-gradient(circle, var(--home-dot-light) .4px, transparent 1.4px) center / 18px 18px; }
 .home-new-canvas-ripple { opacity: 0; -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent max(0px, calc(var(--home-ripple-radius) - 40px)), #000 var(--home-ripple-radius), transparent calc(var(--home-ripple-radius) + 40px)); mask-image: radial-gradient(circle at 50% 50%, transparent max(0px, calc(var(--home-ripple-radius) - 40px)), #000 var(--home-ripple-radius), transparent calc(var(--home-ripple-radius) + 40px)); animation: home-dot-ripple 4.2s cubic-bezier(.33, 0, .2, 1) infinite; }
 .home-new-canvas-ripple.is-delayed { animation-delay: -2.1s; }
 .home-new-canvas-spotlight { opacity: 0; -webkit-mask-image: radial-gradient(circle 130px at var(--home-pointer-x, 50%) var(--home-pointer-y, 50%), #000, transparent); mask-image: radial-gradient(circle 130px at var(--home-pointer-x, 50%) var(--home-pointer-y, 50%), #000, transparent); transition: opacity .25s ease; }
 .home-new-canvas:hover:not(:disabled) .home-new-canvas-spotlight { opacity: 1; }
-.home-new-canvas-halo { inset: auto; left: 50%; top: 50%; width: 260px; height: 160px; translate: -50% -62%; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--user-ink) 10%, transparent), transparent); filter: blur(6px); transition: opacity .25s ease, transform .25s ease; }
-.dark .home-new-canvas-halo { background: radial-gradient(closest-side, rgb(255 255 255 / .16), transparent); }
-.home-new-canvas:hover:not(:disabled) .home-new-canvas-halo { transform: scale(1.12); }
-.dark .home-new-canvas-icon { box-shadow: 0 0 0 1px rgb(255 255 255 / .08), 0 10px 40px rgb(255 255 255 / .18); }
+/* 底部柔光：铺到卡片外再模糊，被卡片圆角裁掉后只剩下沿一层亮。选择器要压过上面的 inset: 0。 */
+.home-new-canvas-glow > .home-new-canvas-halo { inset: -24%; background: linear-gradient(180deg, transparent 40%, var(--home-underglow)); filter: blur(20px); }
 @keyframes home-dot-ripple { 0% { --home-ripple-radius: 0%; opacity: 0; } 15% { opacity: .85; } 100% { --home-ripple-radius: 100%; opacity: 0; } }
 
-/* 工具入口 */
-.home-tool-entries ul { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+/* 工具入口：无描边的半透明图块，悬停只叠一层 4% 的墨色，不位移。 */
+.home-tool-entries ul { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--space-4) var(--space-2); margin: 0; padding: 0; list-style: none; }
 .home-tool-entries li { min-width: 0; }
-.home-tool-entry { display: flex; width: 100%; min-width: 0; flex-direction: column; align-items: center; gap: var(--space-3); border: 0; padding: 0; background: transparent; color: var(--user-ink); font-size: var(--fs-body); cursor: pointer; }
-.home-tool-entry-icon { display: grid; width: 100%; max-width: 116px; height: 66px; place-items: center; border: 1px solid var(--user-border); border-radius: 14px; background: var(--library-surface); color: var(--user-ink); transition: background var(--user-motion), border-color var(--user-motion), transform var(--user-motion); }
-.home-tool-entry-icon svg { width: 26px; height: 26px; }
-.home-tool-entry-label { overflow: hidden; max-width: 100%; color: color-mix(in srgb, var(--user-ink) 86%, transparent); text-overflow: ellipsis; white-space: nowrap; }
-.home-tool-entry:hover:not(:disabled) .home-tool-entry-icon { border-color: color-mix(in srgb, var(--user-ink) 22%, transparent); background: var(--library-surface-hover); transform: translateY(-2px); }
+.home-tool-entry { display: flex; width: 100%; min-width: 0; flex-direction: column; align-items: center; gap: var(--space-2); border: 0; padding: 0; background: transparent; color: var(--user-ink); font-size: var(--fs-body); cursor: pointer; }
+.home-tool-entry-icon { position: relative; display: grid; width: 100%; max-width: 104px; height: 56px; place-items: center; overflow: hidden; border-radius: var(--r-2xl); background: var(--home-tile-fill); box-shadow: var(--home-tile-shadow); color: var(--user-ink); }
+.home-tool-entry-icon::before { position: absolute; inset: 0; border-radius: inherit; background: var(--home-tile-hover); content: ""; opacity: 0; pointer-events: none; transition: opacity var(--user-motion); }
+.home-tool-entry:hover:not(:disabled) .home-tool-entry-icon::before { opacity: 1; }
+.home-tool-entry-icon svg { position: relative; width: 24px; height: 24px; }
+.home-tool-entry-label { overflow: hidden; max-width: 100%; line-height: 22px; text-overflow: ellipsis; white-space: nowrap; }
 .home-tool-entry:focus-visible { outline: none; }
 .home-tool-entry:focus-visible .home-tool-entry-icon { outline: 2px solid var(--control-focus-ring); outline-offset: 2px; }
 .home-tool-entry:disabled { cursor: wait; opacity: .6; }
@@ -114,7 +135,7 @@
 .home-canvas-dialog-links a { display: inline-flex; align-items: center; gap: 2px; color: var(--user-accent); }
 .home-canvas-dialog-links svg { width: 14px; height: 14px; }
 
-@media (max-width: 1280px) { .home-page-inner { padding-inline: var(--space-6); } .home-tool-entries ul { gap: var(--space-3); } }
+@media (max-width: 1280px) { .home-page-inner { padding-inline: var(--space-6); } }
 @media (max-width: 1100px) {
     .home-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .home-tool-entries ul { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: var(--space-5); }
@@ -126,19 +147,26 @@
 }
 @media (max-width: 640px) {
     .home-page-inner { gap: var(--space-6); padding: var(--space-4) var(--space-4) var(--space-10); }
-    .home-new-canvas { min-height: 148px; }
-    .home-new-canvas-icon { width: 80px; height: 50px; }
+    .home-new-canvas { min-height: 136px; }
+    .home-new-canvas-icon { width: 76px; height: 46px; }
+    .home-new-canvas-icon svg { width: 28px; height: 28px; }
     .home-tool-entries ul { gap: var(--space-3) var(--space-2); }
-    .home-tool-entry { font-size: var(--fs-caption); gap: var(--space-2); }
-    .home-tool-entry-icon { height: 54px; }
+    .home-tool-entry { font-size: var(--fs-caption); }
+    .home-tool-entry-icon { height: 50px; }
     .home-tool-entry-icon svg { width: 22px; height: 22px; }
+    .home-tool-entry-label { line-height: 18px; }
     .home-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+    /* 两列时精选画布只放 4 张，避免最后一行孤零零一张；角标缩小，不盖住半张封面。 */
+    .home-card-grid.is-featured-canvases > .home-card:nth-child(n + 5) { display: none; }
+    .home-card-badge, .home-card-kind { padding: 1px 6px; font-size: 11px; }
+    .home-card-badge { display: block; top: 6px; left: 6px; max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .home-card-kind { right: 6px; bottom: 6px; }
     .home-section-heading { align-items: flex-start; }
     .home-section-heading-main { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 }
 @media (prefers-reduced-motion: reduce) {
     .home-new-canvas-ripple { animation: none; opacity: 0; }
-    .home-new-canvas-spotlight, .home-new-canvas-halo { transition: none; }
-    .home-card-cover img, .home-tool-entry-icon, .home-new-canvas-icon, .home-card-overlay { transition: none; }
+    .home-new-canvas, .home-new-canvas-spotlight { transition: none; }
+    .home-card-cover img, .home-tool-entry-icon::before, .home-new-canvas-icon, .home-card-overlay { transition: none; }
     .home-card.is-placeholder .home-card-cover, .home-card-line { animation: none; }
 }

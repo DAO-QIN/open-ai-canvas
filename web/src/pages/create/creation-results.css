@@ -64,8 +64,8 @@
 }
 
 /* 结果图上的操作条（CreationImageActions）：深色玻璃，亮图暗图上都看得清。
-   桌面端悬停或键盘聚焦到这张图时浮出，触屏设备常驻；下载仍在右下角。
-   六个按钮在窄图上（手机两列）放不下一行：限宽后换行，给下载按钮留位；
+   桌面端悬停或键盘聚焦到这张图时浮出，「更多」菜单打开期间保持显示；触屏设备常驻；下载仍在右下角。
+   七个工具加「更多」在 320px 宽的批次卡上刚好一行；更窄的图（手机两列）限宽后换行，给下载按钮留位；
    圆角取单行高度的一半，单行仍是胶囊，换行后是圆角块。 */
 .creation-home .creation-image-actions {
     --creation-glass-bg: rgb(14 14 17 / 52%);
@@ -90,8 +90,8 @@
 }
 .creation-home .creation-image-actions button {
     display: grid;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     place-items: center;
     padding: 0;
     border: 0;
@@ -100,14 +100,15 @@
     color: #fff;
     cursor: pointer;
 }
-.creation-home .creation-image-actions button:hover:not(:disabled) { background: rgb(255 255 255 / 18%); }
+.creation-home .creation-image-actions button:hover:not(:disabled),
+.creation-home .creation-image-actions button[aria-expanded="true"] { background: rgb(255 255 255 / 18%); }
 .creation-home .creation-image-actions button:disabled { cursor: default; opacity: .45; }
 .creation-home .creation-image-actions button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .creation-home :is(.creation-image-result, .creation-image-result-stack-front):hover .creation-image-actions,
-.creation-home :is(.creation-image-result, .creation-image-result-stack-front):focus-within .creation-image-actions { opacity: 1; transform: none; }
+.creation-home :is(.creation-image-result, .creation-image-result-stack-front):focus-within .creation-image-actions,
+.creation-home .creation-image-actions.is-menu-open { opacity: 1; transform: none; }
 @media (hover: none) {
     .creation-home .creation-image-actions { opacity: 1; transform: none; }
-    .creation-home .creation-image-actions button { width: 28px; height: 28px; }
 }
 @media (max-width: 480px) {
     .creation-home .creation-image-actions { left: 6px; bottom: 6px; }
@@ -116,7 +117,80 @@
     .creation-home .creation-image-actions { transition: none; }
 }
 
-/* 音频结果：一条原生播放器，宽度跟消息走。 */
+/* 预览大图里的同一条操作条：放在图片下方常驻显示，颜色跟随主题，不盖在图上。 */
+.creation-image-actions.is-inline {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 100%;
+    gap: var(--space-half);
+    padding: var(--space-1);
+    border-radius: var(--r-full);
+    background: color-mix(in srgb, var(--foreground) 6%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+.creation-image-actions.is-inline button {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--foreground);
+    cursor: pointer;
+    transition: background-color var(--motion-dur-fast) var(--motion-ease-out);
+}
+.creation-image-actions.is-inline button:hover:not(:disabled),
+.creation-image-actions.is-inline button[aria-expanded="true"] { background: color-mix(in srgb, var(--foreground) 10%, transparent); }
+.creation-image-actions.is-inline button:disabled { cursor: default; opacity: .45; }
+.creation-image-actions.is-inline button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.creation-image-batch-preview-tools { display: flex; justify-content: center; }
+@media (prefers-reduced-motion: reduce) {
+    .creation-image-actions.is-inline button { transition: none; }
+}
+
+/* 「更多」工具菜单：按用途分组，每项是名称加一行说明；菜单挂在 body 上，配色取用户工作台浮层 token。 */
+.creation-image-tool-menu .ant-dropdown-menu {
+    width: 296px;
+    max-width: calc(100vw - 24px);
+    max-height: min(72vh, 620px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 6px;
+    border: 1px solid var(--user-border);
+    border-radius: var(--r-lg);
+    background: var(--user-surface);
+    box-shadow: var(--shadow-md);
+    font: inherit;
+}
+.creation-image-tool-menu .ant-dropdown-menu-item-group-title { padding: var(--space-2) 10px var(--space-1); color: var(--user-ink-soft); font-size: var(--fs-caption); font-weight: 600; }
+.creation-image-tool-menu .ant-dropdown-menu-item-group + .ant-dropdown-menu-item-group { margin-top: var(--space-1); border-top: 1px solid var(--user-border); }
+.creation-image-tool-menu .ant-dropdown-menu-item-group-list { margin: 0 !important; }
+.creation-image-tool-menu .ant-dropdown-menu-item { display: flex; align-items: center; min-height: 44px; padding: 5px 10px !important; border-radius: var(--r-md); color: var(--user-ink); }
+.creation-image-tool-menu .ant-dropdown-menu-item-icon { width: 16px; height: 16px; min-width: 16px; margin-inline-end: 10px !important; color: var(--user-ink-muted); }
+.creation-image-tool-menu .ant-dropdown-menu-item:hover,
+.creation-image-tool-menu .ant-dropdown-menu-item-active { background: var(--user-surface-hover); }
+.creation-image-tool-menu .ant-dropdown-menu-item:focus-visible { outline: 2px solid var(--user-accent); outline-offset: -2px; }
+.creation-image-tool-menu .ant-dropdown-menu-title-content { flex: 1 1 auto; min-width: 0; }
+.creation-image-tool-menu-item { display: flex; min-width: 0; flex-direction: column; gap: 1px; line-height: 1.35; }
+.creation-image-tool-menu-name { font-size: var(--fs-ui); font-weight: 500; }
+.creation-image-tool-menu-desc { overflow: hidden; color: var(--user-ink-soft); font-size: var(--fs-caption); text-overflow: ellipsis; white-space: nowrap; }
+
+/* 音频结果：每首（段）一条原生播放器加下载，宽度跟消息走；音乐一次返回多首时上下排开。 */
+.creation-home .creation-audio-track + .creation-audio-track { margin-top: var(--space-4); }
 .creation-home .creation-audio-result { display: flex; width: min(520px, 100%); min-height: 60px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--creation-surface-muted); }
 .creation-home .creation-audio-result audio { display: block; width: 100%; height: 40px; }
 .creation-home .creation-audio-result .creation-media-result-placeholder { min-height: 40px; background: transparent; }
+
+/* 视频合成：字幕烧录退回时的说明，跟在结果操作行下面。 */
+.creation-home .creation-media-subtitle-note { margin: var(--space-2) 0 0; color: var(--creation-muted); font-size: var(--fs-label); line-height: 1.5; }
+
+/* 长对话：视口外的旧消息先跳过样式计算、排版和绘制，滚到附近再渲染，切到创作页时不用一次排完整段历史。
+   最近四条照常渲染，停在底部、跟随最新消息不受影响；估计高度只给没渲染过的消息占位，渲染过一次就记住实际高度。
+   这种包含会裁掉超出消息盒的阴影和焦点框，用 overflow-clip-margin 留出余量，不支持它的浏览器不启用。
+   跳到某一镜、回到最新之前，页面给滚动区加 data-thread-revealed，先排出全部消息再定位。 */
+@supports (overflow-clip-margin: 1px) {
+    .creation-home .creation-thread-scroll:not([data-thread-revealed]) .creation-thread-message:not(:nth-last-child(-n + 4)) { content-visibility: auto; contain-intrinsic-size: auto 320px; overflow-clip-margin: 48px; }
+}

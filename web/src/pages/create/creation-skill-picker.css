@@ -1,0 +1,229 @@
+/* 「技能」菜单（参考即梦）：360 宽，上面一行搜索，中间是已安装的创作技能，底部「管理技能」打开技能商店弹窗。
+   浮层外壳（底色、圆角、投影）沿用 .creation-control-popover-surface，这里只排版内容。 */
+.creation-skill-picker {
+    display: flex;
+    flex-direction: column;
+    width: min(360px, calc(100vw - 24px));
+    max-height: min(440px, 64dvh);
+    color: var(--user-ink);
+}
+.creation-skill-picker-search {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--space-2);
+    height: 44px;
+    padding: 0 var(--space-4);
+    border-bottom: 1px solid var(--user-border);
+    color: var(--user-ink-soft);
+    cursor: text;
+}
+.creation-skill-picker-search > svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+}
+.creation-skill-picker-search input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--user-ink);
+    font: inherit;
+    font-size: 13px;
+}
+.creation-skill-picker-search input::placeholder {
+    color: var(--user-ink-soft);
+}
+.creation-skill-picker-search:focus-within {
+    color: var(--user-ink-muted);
+}
+.creation-skill-picker-list {
+    display: grid;
+    flex: 1 1 auto;
+    align-content: start;
+    gap: 2px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-2);
+}
+.creation-skill-picker-option {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) 16px;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 52px;
+    padding: var(--space-2);
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--user-motion);
+}
+.creation-skill-picker-option:hover,
+.creation-skill-picker-option[aria-pressed="true"] {
+    background: var(--user-surface-hover);
+}
+.creation-skill-picker-option:focus-visible {
+    outline: 2px solid var(--control-focus-ring);
+    outline-offset: -2px;
+}
+.creation-skill-picker-option[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.creation-skill-picker-option[aria-disabled="true"]:hover {
+    background: transparent;
+}
+.creation-skill-picker-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--user-surface-muted);
+    color: var(--user-ink-muted);
+}
+.creation-skill-picker-option[aria-pressed="true"] .creation-skill-picker-icon {
+    background: var(--user-surface);
+    color: var(--user-ink);
+}
+.creation-skill-picker-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+.creation-skill-picker-copy strong,
+.creation-skill-picker-copy span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.creation-skill-picker-copy strong {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+.creation-skill-picker-copy span {
+    color: var(--user-ink-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+.creation-skill-picker-check {
+    width: 16px;
+    height: 16px;
+    color: var(--user-ink);
+}
+/* 空态、加载、出错、没登录：一句话加一个动作，居中放在列表位置。 */
+.creation-skill-picker-state {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
+    margin: 0;
+    padding: var(--space-8) var(--space-4);
+    color: var(--user-ink-muted);
+    font-size: 12px;
+    line-height: 1.6;
+    text-align: center;
+}
+.creation-skill-picker-state p {
+    margin: 0;
+}
+.creation-skill-picker-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 var(--space-4);
+    border: 0;
+    border-radius: var(--button-radius);
+    background: var(--user-surface-muted);
+    color: var(--user-ink);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--user-motion);
+}
+.creation-skill-picker-action:hover {
+    background: var(--user-surface-hover);
+    color: var(--user-ink);
+}
+.creation-skill-picker-footer {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    border-top: 1px solid var(--user-border);
+}
+.creation-skill-picker-manage {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 36px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--button-radius);
+    background: transparent;
+    color: var(--user-ink);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color var(--user-motion);
+}
+.creation-skill-picker-manage:hover {
+    background: var(--user-surface-hover);
+    color: var(--user-ink);
+}
+.creation-skill-picker-manage > svg {
+    width: 16px;
+    height: 16px;
+    color: var(--user-ink-muted);
+}
+.creation-skill-picker-footer small {
+    padding-inline: var(--space-2);
+    color: var(--user-ink-soft);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.creation-skill-picker-action:focus-visible,
+.creation-skill-picker-manage:focus-visible {
+    outline: 2px solid var(--control-focus-ring);
+    outline-offset: 2px;
+}
+
+/* 触发器：选了技能时在「技能」后面带个数。 */
+.creation-skill-trigger-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--user-ink);
+    color: var(--user-surface);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .creation-skill-picker-option,
+    .creation-skill-picker-action,
+    .creation-skill-picker-manage {
+        transition: none;
+    }
+}

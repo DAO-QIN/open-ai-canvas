@@ -1,103 +1,85 @@
 /* 创作页背景层（creation-backdrops.tsx）。
-   空态：22px 点阵 + 顶部中性冷白月光，和加载动画（DotRippleField，RIPPLE_CYCLE_MS = 2.6s）同一套点距与节奏；
-   进页面只扩散一圈涟漪，之后静止。对话中：最新一组结果的缩略图重度模糊作底色。
-   颜色只从 --user-ink 推导，明暗主题各自成立；"减少动态效果"静止，"减少透明度"不画。 */
-
-@property --creation-launch-ripple-radius {
-    syntax: "<length>";
-    inherits: false;
-    initial-value: 0px;
-}
+   空态（参考 kunrouai.com 的动态方格）：舞台只铺底色和顶部一团柔光；方格画在 canvas 上（CreationGridBackdrop），
+   挂在工作区舞台插槽里（components/layout/workspace-stage-backdrop.tsx），铺满整个舞台、从透明顶栏下面穿过，顶栏和内容是同一块背景。
+   方格向左上缓慢漂移，指针所在的格子亮起后淡出；四周淡出，视线落在标题和输入框附近。进页面只淡入，不再有扩散的光圈。
+   对话中：最新一组结果的缩略图重度模糊作底色（CreationAmbientBackdrop），同样挂在舞台插槽里、从透明顶栏下面穿过；
+   舞台是 --user-page-bg（globals.css 里 is-creation-workspace 的规则），内容区不铺底色。
+   颜色只从 --user-ink（线）和 --user-accent（悬停格）推导，明暗主题和皮肤各自成立；"减少动态效果"下方格静止，"减少透明度"不画结果图底色。 */
 
 .creation-home-scroll {
     position: relative;
-    isolation: isolate;
 }
 
-.creation-launch-backdrop {
-    --creation-launch-dot: color-mix(in srgb, var(--user-ink) 15%, transparent);
-    --creation-launch-dot-lit: color-mix(in srgb, var(--user-ink) 58%, transparent);
-    --creation-launch-glow: color-mix(in srgb, var(--user-ink) 10%, transparent);
-    position: absolute;
-    inset: 0 0 auto 0;
-    z-index: -1;
-    height: min(720px, 92vh);
-    overflow: hidden;
-    pointer-events: none;
+/* 只在空态首屏（有 .creation-launchpad）时生效；--creation-launch-offset 是首屏上方留白，标题按它定位。 */
+.app-user-workspace .app-workspace-shell.is-creation-workspace .app-workspace-stage:has(.creation-home .creation-launchpad) {
+    --creation-launch-offset: clamp(var(--space-4), 7vh, var(--space-16));
+    --creation-launch-glow: color-mix(in srgb, var(--user-ink) 8%, transparent);
+    background: radial-gradient(ellipse 62% 48% at 50% 0%, var(--creation-launch-glow), transparent 72%), var(--user-page-bg) !important;
 }
 
-.creation-home-scroll > .creation-launch-backdrop {
-    width: auto;
-    max-width: none;
-    margin: 0;
+html:not(.dark) .app-user-workspace .app-workspace-shell.is-creation-workspace .app-workspace-stage:has(.creation-home .creation-launchpad) {
+    --creation-launch-glow: color-mix(in srgb, var(--user-ink) 4%, transparent);
 }
 
-html:not(.dark) .creation-launch-backdrop {
-    --creation-launch-dot: color-mix(in srgb, var(--user-ink) 11%, transparent);
-    --creation-launch-dot-lit: color-mix(in srgb, var(--user-ink) 40%, transparent);
-    --creation-launch-glow: color-mix(in srgb, var(--user-ink) 5%, transparent);
+/* 空态和对话中内容区都不铺底色，透出舞台插槽里的方格或结果图底色（舞台本身就是同一个 --user-page-bg）。 */
+.app-user-workspace .creation-home:has(.creation-launchpad),
+.app-user-workspace .creation-home:has(.creation-thread-workbench) {
+    background: transparent !important;
 }
 
-.creation-launch-backdrop > span {
+/* 方格画布：线和悬停格的颜色、透明度、格子边长由这里给；脚本在尺寸变化、切换主题或皮肤时重新读取。
+   四周淡出画在画布里（见 creation-backdrops.tsx 的 GRID_VIGNETTE），这里不加 mask-image：遮罩会让画布每帧多一次主线程绘制。 */
+.creation-grid {
+    --creation-grid-cell: 44px;
+    --creation-grid-line-alpha: 0.115;
+    --creation-grid-hover: var(--user-accent);
+    --creation-grid-hover-alpha: 0.1;
     position: absolute;
     inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    color: var(--user-ink);
+    transition: opacity 0.45s ease;
+    animation: creation-grid-in 0.7s ease-out;
 }
 
-.creation-launch-moonlight {
-    left: 50% !important;
-    right: auto !important;
-    top: -340px !important;
-    width: min(1180px, 140vw);
-    height: 760px;
-    transform: translateX(-50%);
-    background: radial-gradient(closest-side, var(--creation-launch-glow), transparent);
+html:not(.dark) .creation-grid {
+    --creation-grid-line-alpha: 0.105;
+    --creation-grid-hover-alpha: 0.075;
 }
 
-.creation-launch-dots,
-.creation-launch-ripple {
-    background-position: center 11px;
-    background-size: 22px 22px;
-}
-
-.creation-launch-dots {
-    background-image: radial-gradient(circle, var(--creation-launch-dot) 1px, transparent 1.6px);
-    -webkit-mask-image: radial-gradient(ellipse 62% 64% at 50% 16%, #000 0%, rgb(0 0 0 / 0.5) 48%, transparent 82%);
-    mask-image: radial-gradient(ellipse 62% 64% at 50% 16%, #000 0%, rgb(0 0 0 / 0.5) 48%, transparent 82%);
-}
-
-/* 一圈涟漪：只亮起波前经过的点，跑完停在完全透明，不循环。 */
-.creation-launch-ripple {
+/* 首屏滚出视口后（往下看灵感库）方格淡出，脚本同时停帧。 */
+.creation-grid.is-paused {
     opacity: 0;
-    background-image: radial-gradient(circle, var(--creation-launch-dot-lit) 1.1px, transparent 1.8px);
-    -webkit-mask-image: radial-gradient(circle at 50% 96px, transparent max(0px, calc(var(--creation-launch-ripple-radius) - 48px)), #000 var(--creation-launch-ripple-radius), transparent calc(var(--creation-launch-ripple-radius) + 48px));
-    mask-image: radial-gradient(circle at 50% 96px, transparent max(0px, calc(var(--creation-launch-ripple-radius) - 48px)), #000 var(--creation-launch-ripple-radius), transparent calc(var(--creation-launch-ripple-radius) + 48px));
-    animation: creation-launch-ripple 2.6s cubic-bezier(0.2, 0.6, 0.3, 1) 0.15s 1 both;
 }
 
-@keyframes creation-launch-ripple {
-    0% {
-        --creation-launch-ripple-radius: 0px;
-        opacity: 0;
-    }
-    15% {
-        opacity: 0.9;
-    }
-    100% {
-        --creation-launch-ripple-radius: 900px;
+@keyframes creation-grid-in {
+    from {
         opacity: 0;
     }
 }
 
-/* 对话中背景：放在工作区最底层，往下渐隐，不影响文字对比度。 */
+@media (max-width: 720px) {
+    .app-user-workspace .app-workspace-shell.is-creation-workspace .app-workspace-stage:has(.creation-home .creation-launchpad) {
+        --creation-launch-offset: var(--space-2);
+    }
+    .creation-grid {
+        --creation-grid-cell: 40px;
+    }
+}
+
+/* 对话工作区自成一层：创作计划浮层按它定位，层级也关在里面，不会盖过顶栏弹出的镜头列表。 */
 .creation-home .creation-thread-workbench {
     position: relative;
     isolation: isolate;
 }
 
+/* 对话中背景：挂在舞台插槽里，从舞台顶端（顶栏后面）铺起，往下渐隐，不影响文字对比度。
+   插槽靠文档顺序排在顶栏和内容下面，这里不能写负 z-index，否则会沉到舞台底色下面。 */
 .creation-ambient {
     position: absolute;
     inset: 0 0 auto 0;
-    z-index: -1;
     height: 72%;
     overflow: hidden;
     pointer-events: none;
@@ -127,9 +109,9 @@ html:not(.dark) .creation-ambient img {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .creation-launch-ripple {
+    .creation-grid {
         animation: none;
-        opacity: 0;
+        transition: none;
     }
     .creation-ambient img {
         animation: none;
@@ -138,6 +120,13 @@ html:not(.dark) .creation-ambient img {
 
 @media (prefers-reduced-transparency: reduce) {
     .creation-ambient {
+        display: none;
+    }
+}
+
+/* 高对比度模式下不画装饰方格。 */
+@media (forced-colors: active) {
+    .creation-grid {
         display: none;
     }
 }

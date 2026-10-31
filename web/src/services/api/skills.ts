@@ -58,12 +58,17 @@ export type Skill = {
     libraryCategoryId?: string;
     /** 已安装或自建技能的 Agent 使用方式：auto 可被 Agent 自动发现，manual 只在点名或固定时使用。 */
     agentMode?: SkillAgentMode;
+    /** 用户主动选择这个技能时能用的 Agent 入口，只由 /skills/added 返回：没声明入口的两个都能用，声明不合法时为空数组。 */
+    agentSurfaces?: SkillAgentSurface[];
 };
 
 export type SkillAgentMode = "auto" | "manual";
 
+/** creation 是首页创作 Agent，canvas 是画布助手。 */
+export type SkillAgentSurface = "creation" | "canvas";
+
 /** /skills/added 只返回运行时目录需要的引用字段，不携带编辑器和同步详情。 */
-export type AddedSkillReference = Pick<Skill, "skillId" | "skillName" | "description" | "versionId" | "version" | "tag" | "isLike" | "isAdded" | "isOwner" | "libraryCategoryId" | "agentMode">;
+export type AddedSkillReference = Pick<Skill, "skillId" | "skillName" | "description" | "versionId" | "version" | "tag" | "isLike" | "isAdded" | "isOwner" | "libraryCategoryId" | "agentMode" | "agentSurfaces">;
 
 /** 按行业推荐的内置技能（GET /skills/recommendations）。 */
 export type SkillRecommendationItem = {
@@ -316,6 +321,7 @@ function normalizeAddedSkillReference(skill: AddedSkillReference): Skill {
         isOwner: skill.isOwner,
         libraryCategoryId: skill.libraryCategoryId || "",
         agentMode: skill.agentMode,
+        agentSurfaces: skill.agentSurfaces,
     };
 }
 

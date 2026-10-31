@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Tooltip } from "@/components/ui/base/tooltip";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { MediaPlaceholder } from "@/components/ui/product/media-placeholder";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { catalogIdOf, inspirationSourceOf, type CreationInspiration } from "@/lib/inspirations/catalog";
 import { isCustomInspiration } from "@/lib/inspirations/resolve";
 import { modeLabels } from "@/pages/create/creation-types";
@@ -41,6 +42,7 @@ export function InspirationDetailModal({
     onCopy: (text: string, label: string) => void;
 }) {
     const showSources = useUserStore((state) => state.features.inspirationSourcesVisible);
+    const canHover = useMediaQuery("(hover: hover)");
     const [usingPrompt, setUsingPrompt] = useState(false);
     const source = item ? inspirationSourceOf(item) : null;
     const custom = item ? isCustomInspiration(catalogIdOf(item)) : false;
@@ -61,7 +63,8 @@ export function InspirationDetailModal({
             {item ? (
                 <div className="flex max-h-[76vh] flex-col">
                     <div className="inspiration-detail-cover">
-                        <InspirationCover key={item.image} image={item.image} />
+                        {/* 卡片上的视频样片靠鼠标悬停播放；触屏设备在详情里给出可点播的播放器。 */}
+                        {item.video && !canHover ? <video key={item.video} className="inspiration-detail-video" src={item.video} poster={item.image} controls playsInline preload="none" /> : <InspirationCover key={item.image} image={item.image} />}
                     </div>
 
                     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">

@@ -5,6 +5,7 @@ import { creationModelKey } from "../src/pages/create/creation-types";
 
 const page = readFileSync(resolve(import.meta.dir, "../src/pages/create/index.tsx"), "utf8").replace(/\s+/g, " ");
 const workspace = readFileSync(resolve(import.meta.dir, "../src/pages/create/creation-workspace.tsx"), "utf8").replace(/\s+/g, " ");
+const modePicker = readFileSync(resolve(import.meta.dir, "../src/pages/create/creation-mode-picker.tsx"), "utf8").replace(/\s+/g, " ");
 const styles = readFileSync(resolve(import.meta.dir, "../src/pages/create/creation-product.css"), "utf8");
 
 test("首页复用原模型选择器，Agent 主栏是对话模型，图片视频模型进入偏好", () => {
@@ -31,17 +32,26 @@ test("首页 Agent 权限与自动参数接入实际服务端执行流程", () =
     expect(page).not.toContain("<CreationAgentEntry");
 });
 
-test("创作类型菜单脱离 Composer 裁切容器、自动避让；固定宽度，每项名字加一句说明，选中项打勾", () => {
-    expect(workspace).toContain('placement={variant === "thread" ? "topLeft" : "bottomLeft"} autoAdjustOverflow');
-    expect(workspace).toContain('getPopupContainer={() => document.body}');
-    expect(workspace).toContain('<span className="creation-mode-menu-name">{item.label}</span>');
-    expect(workspace).toContain('<span className="creation-mode-menu-description">{item.description}</span>');
-    expect(workspace).toContain('<CreationIcon name="check" className="creation-mode-menu-check" />');
-    // 菜单不再跟随按钮宽度：按钮只有"自动"两个字，跟随会把说明挤掉。
-    expect(workspace).not.toContain("setPopupStyle({ width, minWidth: width");
+test("创作类型菜单脱离 Composer 裁切容器、自动避让；只放生成类型，每项只有图标和名称，选中项打勾，图标与首页共用", () => {
+    expect(modePicker).toContain('placement={variant === "thread" ? "topLeft" : "bottomLeft"} autoAdjustOverflow');
+    expect(modePicker).toContain('getPopupContainer={() => document.body}');
+    expect(modePicker).toContain('<span className="creation-mode-menu-name">{option.label}</span>');
+    expect(modePicker).not.toContain("creation-mode-menu-description");
+    expect(modePicker).not.toContain('type: "group"');
+    // 去短剧工作台的入口不放进类型菜单。
+    expect(modePicker).not.toContain('type: "divider"');
+    expect(modePicker).not.toContain("短剧");
+    expect(workspace).not.toContain("onOpenShortDrama");
+    expect(page).not.toContain("onOpenShortDrama");
+    expect(modePicker).toContain('<CreationIcon name="check" className="creation-mode-menu-check" />');
+    expect(modePicker).toContain('from "@/components/creation/creation-type-icon"');
+    expect(workspace).toContain("<CreationModePicker value={activeModeKey} options={modeOptions}");
+    // 菜单不跟随按钮宽度：按钮只有"Agent 模式"几个字。
+    expect(modePicker).not.toContain("setPopupStyle({ width, minWidth: width");
     expect(styles).not.toContain(".creation-mode-dropdown .creation-mode-menu");
-    expect(styles).toContain(".creation-mode-menu .ant-dropdown-menu { width: 300px;");
-    expect(styles).toContain(".creation-mode-menu .ant-dropdown-menu-item { display: flex; align-items: center; min-height: 50px;");
+    expect(styles).not.toContain("creation-mode-menu-description");
+    expect(styles).toContain(".creation-mode-menu .ant-dropdown-menu { min-width: 216px;");
+    expect(styles).toContain(".creation-mode-menu .ant-dropdown-menu-item { display: flex; align-items: center; min-height: 44px;");
 });
 
 test("首页移除虚构上下文进度，发送继续走实际提交入口", () => {
@@ -50,5 +60,5 @@ test("首页移除虚构上下文进度，发送继续走实际提交入口", ()
     expect(styles).not.toContain("creation-context-estimate");
     expect(page).not.toContain("本地估算");
     expect(page).not.toContain("未测量");
-    expect(page).toContain('onSubmit: () => void (isEmpty && creationSurface === "canvas" ? submitToCanvas() : submit())');
+    expect(page).toContain("onSubmit: () => void submit(),");
 });

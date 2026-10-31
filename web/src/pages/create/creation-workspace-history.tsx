@@ -7,14 +7,25 @@ import { useUserStore } from "@/stores/use-user-store";
 import { App, Dropdown } from "antd";
 import { displayCreationPrompt } from "./creation-references";
 import { AppDrawer } from "@/components/ui/product/app-drawer";
-import { Clapperboard, Download, Image as ImageIcon, Link as LinkIcon, MessageSquareText, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
-import { CreationIcon } from "./creation-icons";
-
-/** "自动"会话在历史列表里用满月条纹图标，不再用星星。 */
-const AutoGlyph = () => <CreationIcon name="auto" />;
+import { AudioLines, Clapperboard, Download, Image as ImageIcon, Link as LinkIcon, MessageSquareText, MoreHorizontal, Music, Pencil, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { CreationTypeIcon } from "@/components/creation/creation-type-icon";
+import { isMusicAudioModel } from "@/lib/audio-generation";
+import { useEffectiveConfig } from "@/stores/use-config-store";
 import { Link } from "react-router";
 import { conversationTimestamp } from "./creation-conversations";
-import { formatMessageTime } from "./creation-workspace-messages";
+import { creationResultTitle, formatMessageTime } from "./creation-workspace-messages";
+
+/** Agent 会话在历史列表里用钢笔，和创作类型菜单里的 Agent 是同一个图标。 */
+const AgentGlyph = () => <CreationTypeIcon name="agent" />;
+
+/** 按会话最近一条消息的类型配图标；音乐和配音、音效同为 audio 模式，按所用模型区分，和结果卡标题一致。 */
+function historyTypeIcon(message: CreationMessage | undefined, isMusicModel: (model: string) => boolean) {
+    if (message?.mode === "image") return ImageIcon;
+    if (message?.mode === "video") return Clapperboard;
+    if (message?.mode === "audio") return isMusicModel(message.model || "") ? Music : AudioLines;
+    if (message?.mode === "text") return MessageSquareText;
+    return AgentGlyph;
+}
 
 export function creationConversationBucket(updatedAt: string): "today" | "yesterday" | "week" | "earlier" {
     const at = new Date(updatedAt).getTime();
@@ -71,6 +82,8 @@ export function CreationHistoryDrawer({
 
     const assistantName = useAppearanceStore((state) => state.appearance.canvas?.agentName || state.appearance.brandName);
     const exportUser = useUserStore((state) => state.user);
+    const config = useEffectiveConfig();
+    const isMusicModel = (model: string) => isMusicAudioModel(config, model);
 
     const { message: drawerToast } = App.useApp();
 
@@ -172,7 +185,7 @@ export function CreationHistoryDrawer({
                             const showGroupHead = !keyword.trim() && (index === 0 || creationConversationBucket(conversation.updatedAt) !== creationConversationBucket(visibleConversations[index - 1].updatedAt));
                             const latest = conversationPreviewMessage(conversation);
                             const active = conversation.id === activeId;
-                            const HistoryTypeIcon = latest?.mode === "video" ? Clapperboard : latest?.mode === "image" ? ImageIcon : latest?.mode === "text" ? MessageSquareText : AutoGlyph;
+                            const HistoryTypeIcon = historyTypeIcon(latest, isMusicModel);
                             return [
                                 showGroupHead ? (
                                     <li key={`${conversation.id}-group`} className="creation-history-group-head">
@@ -249,7 +262,7 @@ export function CreationHistoryDrawer({
                                                         } else if (key === "rename") {
                                                             beginRename(conversation);
                                                         } else if (key === "export") {
-                                                            downloadCreationConversation(conversation, assistantName, exportUser?.displayName || "你");
+                                                            downloadCreationConversation(conversation, assistantName, exportUser?.displayName || "你", isMusicModel);
                                                             drawerToast.success("对话已导出为 Markdown");
                                                         } else {
                                                             onDelete(conversation);
@@ -281,11 +294,13 @@ export function CreationHistoryDrawer({
     );
 }
 
-export function buildConversationExportMarkdown(conversation: CreationConversation, assistantName: string, userName: string) {
+export function buildConversationExportMarkdown(conversation: CreationConversation, assistantName: string, userName: string, isMusicModel: (model: string) => boolean = () => false) {
     const lines: string[] = [`# ${conversation.title.trim() || "新创作"}`, ""];
     for (const message of conversation.messages) {
         const stamp = formatMessageTime(message.createdAt);
-        const modeTag = message.mode && message.mode !== "text" ? (message.mode === "image" ? "[图像生成] " : "[视频生成] ") : "";
+        // 生成结果的标签和结果卡标题同一套叫法；Agent 和文本回复不加标签。
+        const mode = message.mode;
+        const modeTag = mode === "image" || mode === "video" || mode === "audio" ? `[${creationResultTitle(mode, mode === "audio" && isMusicModel(message.model || ""), Boolean(message.composition))}] ` : "";
         const speaker = message.role === "user" ? userName || "我" : assistantName;
         if (message.role === "user") {
             const prompt = displayCreationPrompt(message.content, message.references || []).trim();
@@ -302,9 +317,9 @@ export function buildConversationExportMarkdown(conversation: CreationConversati
     return lines.join("\n").trim() + "\n";
 }
 
-export function downloadCreationConversation(conversation: CreationConversation, assistantName: string, userName: string) {
+export function downloadCreationConversation(conversation: CreationConversation, assistantName: string, userName: string, isMusicModel?: (model: string) => boolean) {
     const safeTitle = (conversation.title.trim() || "新创作").replace(/[\\/:*?"<>|]/g, "_").slice(0, 60) || "新创作";
-    const blob = new Blob([buildConversationExportMarkdown(conversation, assistantName, userName)], { type: "text/markdown;charset=utf-8" });
+    const blob = new Blob([buildConversationExportMarkdown(conversation, assistantName, userName, isMusicModel)], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;

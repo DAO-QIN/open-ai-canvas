@@ -75,12 +75,40 @@ export type AgentApprovalPreviewItem = {
     summary: string;
 };
 
+/** 创作页逐项方案卡：每个生成项一张，含提示词、参数与该项报价（积分）。 */
+export type AgentApprovalProposal = {
+    itemId: string;
+    title: string;
+    mode: "image" | "video" | "audio" | string;
+    prompt: string;
+    size?: string;
+    quality?: string;
+    durationSeconds?: number;
+    model?: string;
+    credits: number;
+    referenceCount?: number;
+    taskId?: string;
+    /** 确认时被移出，不再生成。 */
+    skipped?: boolean;
+};
+
 export type AgentApprovalPreview = {
     kind: string;
     title: string;
     description: string;
     items: AgentApprovalPreviewItem[];
+    proposals?: AgentApprovalProposal[];
+    totalCredits?: number;
+    /** 允许改提示词与参数后重新报价。 */
+    editable?: boolean;
+    /** 允许确认时移出单项。 */
+    skippable?: boolean;
+    /** 本轮使用手动参数，卡片只允许改提示词。 */
+    parametersLocked?: boolean;
 };
+
+/** 方案卡上的一次改写；省略的字段保持原值，空字符串交给模型默认。 */
+export type AgentApprovalItemEdit = { itemId: string; prompt?: string; size?: string; quality?: string; durationSeconds?: number };
 
 export type AgentApproval = {
     modelName?: string;
@@ -195,6 +223,8 @@ export type CreateAgentRunInput = {
     attachments?: AgentCreationAttachment[];
     attachmentMode?: "replace" | "inherit" | "append";
     outputPreference?: AgentOutputPreference;
+    /** 用户关闭了输入框的「联网」开关：本轮不联网搜索。不传时按平台配置。 */
+    webSearch?: "off";
     mediaSettings?: { image?: AgentMediaChoice; video?: AgentMediaChoice };
 };
 
@@ -342,8 +372,17 @@ export function undoAgentCanvasRun(runId: string, input: { stepId?: string; expe
     return http.post<{ accepted: boolean; snapshotHash: string }>(`/agent/runs/${encodeURIComponent(runId)}/undo`, input, { signal });
 }
 
-export async function decideAgentApproval(runId: string, approvalId: string, decision: "approve" | "reject" | "refresh", reason?: string, signal?: AbortSignal, mediaSettings?: AgentMediaSettings) {
-    return http.post<{ accepted: boolean }>(`/agent/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}/decision`, { decision, reason: reason?.trim() || undefined, ...(mediaSettings ? { mediaSettings } : {}) }, { signal });
+export async function decideAgentApproval(runId: string, approvalId: string, decision: "approve" | "reject" | "refresh", reason?: string, signal?: AbortSignal, mediaSettings?: AgentMediaSettings, skipItemIds?: string[]) {
+    return http.post<{ accepted: boolean }>(
+        `/agent/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}/decision`,
+        { decision, reason: reason?.trim() || undefined, ...(mediaSettings ? { mediaSettings } : {}), ...(skipItemIds?.length ? { skipItemIds } : {}) },
+        { signal },
+    );
+}
+
+/** 方案卡改写：服务端重新准入与报价，返回轮换后的审批 ID；旧 ID 随即失效。 */
+export async function updateAgentApprovalItems(runId: string, approvalId: string, items: AgentApprovalItemEdit[], signal?: AbortSignal) {
+    return http.post<{ accepted: boolean; approvalId: string }>(`/agent/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}/decision`, { decision: "update", items }, { signal });
 }
 
 export function subscribeAgentEvents(

@@ -46,6 +46,8 @@ async function startHistory(local: CreationConversation[] = [conversation("activ
         useEffect: (effect: () => () => void) => {
             cleanup = effect();
         },
+        // 恢复和目录更新放在过渡里；测试里同步执行即可。
+        startTransition: (scope: () => void) => scope(),
         AbortController,
         conversationUserRef: { current: "alice" },
         smartCreationUserId: "alice",

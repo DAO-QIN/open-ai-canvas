@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-实现第一阶段（MVP）：**本地语音录制 + 浏览器语音识别转写**。点击"实时对话"按钮 → 输入行内展开波形录制条 → 停止后自动转写为文字 → 文字填入输入框或直接发送。
+实现第一阶段（MVP）：**本地语音录制 + 浏览器语音识别转写**。点击麦克风按钮 → 按钮原位变成录音胶囊 → 点完成后自动转写为文字 → 文字填入输入框或直接发送。
 
 第一阶段**不接入语音大模型、不依赖后端与 API Key**，转写由浏览器内置 Web Speech API 完成，零配置可用。
 
@@ -10,12 +10,13 @@
 
 ## 交互流程
 
-1. 点击"实时对话"按钮（`VoiceRecordingButton`）
-2. 输入行内展开 `VoiceRecordingInline` 录制条（不弹窗），自动开始录音
-3. 显示波形动画（AnalyserNode 实时音量）+ 时长
-4. 点击停止 → 停止录音并触发浏览器语音识别
-5. 识别成功 → 短暂显示"转写完成" → 回调文本，由调用方填入输入框或直接发送
-6. 识别失败（无语音 / 权限拒绝 / 网络异常）→ 录制条内提示并支持重试
+1. 点击麦克风按钮（`VoiceRecordingButton`）
+2. 按钮原位变成 `VoiceRecordingInline` 录音胶囊（不弹窗、与按钮同高），自动开始录音，焦点移到「完成」
+3. 胶囊里依次是取消、5 根实时音量条（AnalyserNode 频段能量）、时长、完成
+4. 点完成（或回车、录满 60 秒）→ 停止录音并等待浏览器语音识别收尾，胶囊同宽显示「识别中」
+5. 识别成功 → 立即回调文本，由调用方填入输入框或直接发送；胶囊变回按钮，焦点回到按钮
+6. 点取消或按 Esc → 放弃本次录音
+7. 识别失败（不支持 / 权限拒绝 / 无语音 / 网络异常）→ 轻提示说明原因，胶囊收回成按钮，再点一次即可重试
 
 ---
 
@@ -25,16 +26,16 @@
 用户点击"实时对话"按钮
         │
         ▼
-VoiceRecordingButton（输入行内展开录制条，不弹窗）
+VoiceRecordingButton（按钮原位变成录音胶囊，不弹窗）
         │
         ▼
-VoiceRecordingInline 内联波形录制条
-        ├── useVoiceRecording：MediaRecorder 录制 + AnalyserNode 实时波形
-        ├── AudioWaveform：SVG 波形动画 + 时长显示
+VoiceRecordingInline 录音胶囊（voice-recording.css）
+        ├── useVoiceRecording：MediaRecorder 录制 + AnalyserNode 实时频段能量
+        ├── AudioWaveform：5 根音量条 + 时长显示
         └── useSpeechRecognition：Web Speech API 实时转写
                 │
                 ▼
-点击停止 → speech.stop() 返回文本 → onTranscribed(文本) → 填入输入框
+点击完成 → speech.stop() 返回文本 → onTranscribed(文本) → 填入输入框
 ```
 
 ## 前端实现
@@ -43,22 +44,22 @@ VoiceRecordingInline 内联波形录制条
 
 | 文件 | 说明 |
 |------|------|
-| `components/conversation/voice-recording-button.tsx` | 语音输入按钮：点击后输入行内展开录制条（局部状态，不弹窗） |
-| `components/conversation/voice-recording-inline.tsx` | 内联波形录制条：波形 + 时长 + 停止/取消，停止后自动转写 |
-| `components/conversation/audio-waveform.tsx` | SVG 波形可视化组件 |
+| `components/conversation/voice-recording-button.tsx` | 语音输入按钮：点击后原位变成录音胶囊（局部状态，不弹窗），收起后焦点回到按钮 |
+| `components/conversation/voice-recording-inline.tsx` | 录音胶囊：取消 + 音量条 + 时长 + 完成，完成后自动转写，失败用轻提示 |
+| `components/conversation/voice-recording.css` | 胶囊样式；页面用 `--voice-pill-*` 变量对齐自己的控件高度与底色 |
+| `components/conversation/audio-waveform.tsx` | 紧凑音量条（5 根竖条，减少动态效果时静止） |
 | `components/conversation/index.ts` | 组件统一导出 |
 
 ### Hook
 
 | 文件 | 说明 |
 |------|------|
-| `hooks/use-voice-recording.ts` | 语音录制逻辑（MediaRecorder + AnalyserNode，波形/时长/停止/取消） |
+| `hooks/use-voice-recording.ts` | 语音录制逻辑（MediaRecorder + AnalyserNode，波形/时长/停止/取消；录满时长自动停止；授权未完成就取消时释放麦克风） |
 | `hooks/use-speech-recognition.ts` | 浏览器语音识别（Web Speech API，start/stop/cancel，返回文本与错误） |
 
 ## 接入位置
 
-- 创建页主输入行：`web/src/pages/create/index.tsx`（`CreationComposer` 的 `creation-chat-controls`）
-- 画布 Agent 面板：`canvas-cloud-agent-panel.tsx`（输入行 left 插槽）
+- 创作页输入框：`web/src/pages/create/creation-workspace.tsx`（`CreationComposer` 右侧 `creation-submit-wrap`，发送键左边）
 - 测试页：`web/src/pages/test-voice-recording.tsx`（路由 `/test-voice-recording`）
 
 ## 使用示例
@@ -75,7 +76,7 @@ import { VoiceRecordingButton } from "@/components/conversation/voice-recording-
 ## 浏览器支持
 
 - 语音识别使用 Web Speech API（`SpeechRecognition` / `webkitSpeechRecognition`），Chrome / Edge 支持
-- 不支持时录制条内提示"当前浏览器不支持语音识别，请使用 Chrome 或 Edge 浏览器"，并可取消
+- 不支持时轻提示"当前浏览器不支持语音识别，请使用 Chrome 或 Edge 浏览器"，胶囊收回成按钮
 - 识别语言默认 `zh-CN`，可通过 `useSpeechRecognition({ lang })` 调整
 
 ## 已删除内容
@@ -102,7 +103,7 @@ import { VoiceRecordingButton } from "@/components/conversation/voice-recording-
 
 ## 下一步
 
-- [x] 内联波形录制 + 浏览器语音识别自动转写（第一阶段 MVP）
+- [x] 内联录音胶囊 + 浏览器语音识别自动转写（第一阶段 MVP）
 - [x] 移除第二阶段实验代码（WebSocket / WebRTC / Realtime API）
 - [ ] 语音播放功能（TTS）
 - [ ] 语音消息发送和显示

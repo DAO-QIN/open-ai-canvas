@@ -4,8 +4,9 @@ import type { GenerationTask } from "@/services/api/task-center";
 import { resolveResourceUrl } from "@/services/api/resources";
 import { ApiError, retryApiRead as retryCreationHistoryRead } from "@/services/api/request";
 export { retryApiRead as retryCreationHistoryRead } from "@/services/api/request";
-import type { CreationAgentPlanItem, CreationAgentQuestion, CreationCommercePlan, CreationConversation, CreationMessage } from "./creation-types";
+import type { CreationAgentPlanItem, CreationAgentProposalSet, CreationAgentQuestion, CreationAgentQuestionField, CreationCommercePlan, CreationConversation, CreationMessage } from "./creation-types";
 import { creationImageDownloadBaseName } from "./creation-media-download";
+import { createCreationAgentStepCollector } from "./creation-agent-steps";
 
 type SessionPage = { session: AgentSession; runs: AgentRun[]; nextRunCursor?: string };
 type RunPage = { runs: AgentRun[]; nextRunCursor?: string };
@@ -24,25 +25,136 @@ export const creationAgentRecoveryClient: CreationAgentRecoveryClient = {
 
 const terminal = new Set(["completed", "failed", "cancelled", "rejected"]);
 const text = (value: unknown) => (typeof value === "string" ? value : "");
+const record = (value: unknown): Record<string, unknown> => (value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {});
+const parsedRecord = (value: unknown) => {
+    if (typeof value !== "string") return record(value);
+    try {
+        return record(JSON.parse(value));
+    } catch {
+        return {};
+    }
+};
+
+/** 图片任务实际带上的参考素材，按提交顺序排（和提示词里 @图片N 的编号一致）；名称取本轮授权列表，查不到时按序号命名。 */
+function creationAgentTaskReferences(ids: unknown, resources: Map<string, NonNullable<AgentRun["attachments"]>[number]>): NonNullable<CreationMessage["attachments"]> {
+    if (!Array.isArray(ids)) return [];
+    return [...new Set(ids.map((id) => text(id).trim()).filter(Boolean))].map((id, index) => {
+        const known = resources.get(id);
+        const storageKey = `resource:${id}`;
+        return { id: storageKey, storageKey, name: known?.name || `参考图 ${index + 1}`, type: `${known?.kind || "image"}/*`, url: resolveResourceUrl(storageKey), previewUrl: "", bytes: 0 };
+    });
+}
+
+/**
+ * 生成工具调用参数里是模型写下的原始提示词；任务上的提示词还拼了素材用途说明，不适合拿给用户改。
+ * generate_media 的回执带 taskId；generate_image_batch 的 batchResults 按 itemId 对回调用里的每一项。
+ */
+function creationAgentToolPrompts(payload: Record<string, unknown>): Array<[string, string]> {
+    const toolName = text(payload.toolName);
+    if (toolName !== "generate_media" && toolName !== "generate_image_batch") return [];
+    const result = record(payload.result);
+    const args = parsedRecord(payload.arguments);
+    if (toolName === "generate_media") {
+        const taskId = text(result.taskId).trim();
+        const prompt = text(args.prompt).trim();
+        return taskId && prompt ? [[taskId, prompt]] : [];
+    }
+    const prompts = new Map((Array.isArray(args.items) ? args.items : []).map((item) => [text(record(item).id), text(record(item).prompt).trim()] as const));
+    return (Array.isArray(result.batchResults) ? result.batchResults : []).flatMap((item): Array<[string, string]> => {
+        const taskId = text(record(item).taskId).trim();
+        const prompt = prompts.get(text(record(item).itemId));
+        return taskId && prompt ? [[taskId, prompt]] : [];
+    });
+}
 const questionOptions = (value: unknown): CreationAgentQuestion["options"] =>
     Array.isArray(value)
         ? value.flatMap((item) => {
               if (!item || typeof item !== "object") return [];
               const option = item as Record<string, unknown>;
               const label = text(option.label).trim();
-              return label ? [{ label, ...(text(option.detail).trim() ? { detail: text(option.detail).trim() } : {}) }] : [];
+              return label ? [{ label, ...(text(option.detail).trim() ? { detail: text(option.detail).trim() } : {}), ...(text(option.id).trim() ? { id: text(option.id).trim() } : {}), ...(option.recommended === true ? { recommended: true } : {}) }] : [];
           })
         : [];
+const questionFieldTypes = new Set(["single_select", "multi_select", "segmented", "text", "textarea", "model_picker"]);
+
+/** 视频合成的受理回执（compose_video 的 tool_completed）；成片任务没有 generation_task_created 事件。 */
+export function creationAgentComposeReceipt(event: Pick<AgentEvent, "type" | "payload">): { taskId: string; title: string; subtitles?: { burn: boolean } } | undefined {
+    if (event.type !== "tool_completed" || event.payload?.toolName !== "compose_video") return undefined;
+    const result = event.payload.result && typeof event.payload.result === "object" ? (event.payload.result as Record<string, unknown>) : {};
+    const taskId = text(result.taskId).trim();
+    if (!taskId) return undefined;
+    return { taskId, title: text(result.title).trim() || "视频合成", ...(Number(result.subtitleCount) > 0 ? { subtitles: { burn: result.burnSubtitles === true } } : {}) };
+}
+
+/** 方案卡数据来自服务端预览；只接受结构完整的项，改写或续期（previousApprovalId）原地替换同一组卡片。 */
+function upsertProposalSet(sets: CreationAgentProposalSet[], approvalId: string, previousApprovalId: string, rawPreview: unknown) {
+    if (!rawPreview || typeof rawPreview !== "object") return;
+    const preview = rawPreview as Record<string, unknown>;
+    const proposals = Array.isArray(preview.proposals)
+        ? preview.proposals.flatMap((raw) => {
+              if (!raw || typeof raw !== "object") return [];
+              const item = raw as Record<string, unknown>;
+              const itemId = text(item.itemId).trim();
+              if (!itemId) return [];
+              const credits = typeof item.credits === "number" && Number.isFinite(item.credits) && item.credits >= 0 ? item.credits : 0;
+              return [
+                  {
+                      itemId,
+                      title: text(item.title) || "生成方案",
+                      mode: text(item.mode) || "image",
+                      prompt: text(item.prompt),
+                      ...(text(item.size) ? { size: text(item.size) } : {}),
+                      ...(text(item.quality) ? { quality: text(item.quality) } : {}),
+                      ...(typeof item.durationSeconds === "number" && item.durationSeconds > 0 ? { durationSeconds: item.durationSeconds } : {}),
+                      ...(text(item.model) ? { model: text(item.model) } : {}),
+                      credits,
+                      ...(typeof item.referenceCount === "number" && item.referenceCount > 0 ? { referenceCount: item.referenceCount } : {}),
+                      ...(text(item.taskId) ? { taskId: text(item.taskId) } : {}),
+                      ...(item.skipped === true ? { skipped: true } : {}),
+                  },
+              ];
+          })
+        : [];
+    if (!proposals.length) return;
+    const index = previousApprovalId ? sets.findIndex((set) => set.approvalId === previousApprovalId) : -1;
+    const next: CreationAgentProposalSet = {
+        rootId: index >= 0 ? sets[index].rootId : approvalId,
+        approvalId,
+        status: "pending",
+        kind: text(preview.kind),
+        title: text(preview.title),
+        proposals,
+        ...(typeof preview.totalCredits === "number" && Number.isFinite(preview.totalCredits) ? { totalCredits: preview.totalCredits } : {}),
+        editable: preview.editable === true,
+        skippable: preview.skippable === true,
+        parametersLocked: preview.parametersLocked === true,
+    };
+    if (index >= 0) sets[index] = next;
+    else sets.push(next);
+}
 
 function creationAgentQuestion(payload: Record<string, unknown>): CreationAgentQuestion | undefined {
     const question = text(payload.question).trim();
     if (!question) return undefined;
     const fields = Array.isArray(payload.fields)
-        ? payload.fields.flatMap((item) => {
+        ? payload.fields.flatMap((item): CreationAgentQuestionField[] => {
               if (!item || typeof item !== "object") return [];
               const field = item as Record<string, unknown>;
               const title = text(field.title || field.label).trim();
-              return title ? [{ title, required: field.required === true, options: questionOptions(field.options), placeholder: text(field.placeholder).trim() }] : [];
+              if (!title) return [];
+              const defaultValue = Array.isArray(field.defaultValue) ? field.defaultValue.filter((value): value is string => typeof value === "string" && Boolean(value.trim())) : text(field.defaultValue).trim();
+              return [
+                  {
+                      title,
+                      required: field.required === true,
+                      options: questionOptions(field.options),
+                      placeholder: text(field.placeholder).trim(),
+                      ...(text(field.id).trim() ? { id: text(field.id).trim() } : {}),
+                      ...(questionFieldTypes.has(text(field.type)) ? { type: text(field.type) as CreationAgentQuestionField["type"] } : {}),
+                      ...(field.allowCustom === true ? { allowCustom: true } : {}),
+                      ...(defaultValue.length ? { defaultValue } : {}),
+                  },
+              ];
           })
         : [];
     return {
@@ -103,20 +215,26 @@ export function projectCreationAgentConversation(session: AgentSession, unsorted
         const imageBatches = new Map<string, number>();
         const parts = new Map<string, { content: string; complete: boolean; continuation: boolean; createdAt: string }>();
         let hasInterjection = false;
+        const steps = createCreationAgentStepCollector(run.id);
         const setPart = (id: string, content: string, complete: boolean, createdAt: string) => {
             const previous = parts.get(id);
             const part = { content, complete, continuation: previous?.continuation ?? hasInterjection, createdAt: previous?.createdAt || createdAt };
             parts.set(id, part);
             if (part.continuation && !previous) messages.push({ id: `${run.id}:assistant:${id}`, role: "assistant", mode: "agent", content: "", createdAt: part.createdAt, agentRunId: run.id, agentContinuation: true });
+            steps.text(id, !previous, part.continuation, part.createdAt);
         };
         let agentQuestion: CreationAgentQuestion | undefined;
         let agentActivity: string | undefined;
+        const proposalSets: CreationAgentProposalSet[] = [];
+        const runResources = new Map((run.attachments || []).map((item) => [item.resourceId, item]));
+        const taskPrompts = new Map<string, string>();
         const events = [...(run.events || [])].filter((event) => event.runId === run.id && event.seq > 0).sort((a, b) => a.seq - b.seq);
         const seen = new Set<number>();
         for (const event of events) {
             if (seen.has(event.seq)) continue;
             seen.add(event.seq);
             const payload = event.payload || {};
+            steps.observe(event);
             if (typeof payload.imageBatchId === "string" && typeof payload.imageBatchTotal === "number" && Number.isInteger(payload.imageBatchTotal) && payload.imageBatchTotal > 0 && payload.imageBatchTotal <= 20)
                 imageBatches.set(payload.imageBatchId, payload.imageBatchTotal);
             if (event.type === "assistant_message" || event.type === "assistant_snapshot" || event.type === "assistant_delta") {
@@ -124,10 +242,15 @@ export function projectCreationAgentConversation(session: AgentSession, unsorted
                 const content = text(payload.text || payload.summary || payload.message);
                 setPart(id, event.type === "assistant_delta" ? `${parts.get(id)?.content || ""}${content}` : content, event.type === "assistant_message", event.createdAt);
                 agentActivity = undefined;
+            } else if (event.type === "reasoning_delta" || event.type === "reasoning_message") {
+                steps.reasoning(event);
+            } else if (event.type === "model_failure_recovered") {
+                steps.notice(`notice-${event.seq}`, "模型返回异常，已自动重试这一步", event.createdAt);
             } else if (["user_interjection", "user_interjection_delivered", "user_interjection_dropped"].includes(event.type)) {
                 const id = text(payload.messageId);
                 if (!id) continue;
                 hasInterjection = true;
+                steps.interjection(id);
                 const previous = messages.find((item) => item.id === id && item.agentRunId === run.id);
                 const message: CreationMessage = {
                     ...previous,
@@ -146,6 +269,7 @@ export function projectCreationAgentConversation(session: AgentSession, unsorted
                 const taskId = text(payload.taskId);
                 if (!taskId) continue;
                 const mode = payload.mode === "video" ? "video" : "image";
+                const references = creationAgentTaskReferences(payload.attachmentResourceIds, runResources);
                 if (!messages.some((item) => item.id === `task-${taskId}`))
                     messages.push({
                         id: `task-${taskId}`,
@@ -157,10 +281,15 @@ export function projectCreationAgentConversation(session: AgentSession, unsorted
                         taskIds: [taskId],
                         agentRunId: run.id,
                         commerceItemId: text(payload.commerceItemId) || undefined,
+                        ...(text(payload.approvalId) ? { approvalId: text(payload.approvalId) } : {}),
+                        ...(text(payload.imageBatchItemId) ? { batchItemId: text(payload.imageBatchItemId) } : {}),
                         ...(imageBatches.has(text(payload.imageBatchId)) ? { batchId: text(payload.imageBatchId), batchTotal: imageBatches.get(text(payload.imageBatchId)) } : {}),
+                        ...(references.length ? { agentGeneration: { references } } : {}),
                     });
+                steps.media(taskId, event.createdAt);
             } else if (event.type === "plan_updated" && payload.inherited !== true && Array.isArray(payload.items)) {
                 agentActivity = "创作计划已更新";
+                steps.plan(event);
                 agentPlanItems = payload.items.filter((item): item is CreationAgentPlanItem => Boolean(item && typeof item === "object" && "id" in item && "title" in item && "status" in item));
                 if (payload.plan && typeof payload.plan === "object" && !Array.isArray(payload.plan)) {
                     agentCommercePlan = {
@@ -180,17 +309,50 @@ export function projectCreationAgentConversation(session: AgentSession, unsorted
                         call: { id: text(payload.callId), function: { name: text(payload.toolName), arguments: text(payload.arguments) } },
                         preview: payload.preview as NonNullable<CreationConversation["agentApproval"]>["preview"],
                     };
+                if (approvalId) upsertProposalSet(proposalSets, approvalId, text(payload.previousApprovalId), payload.preview);
+                steps.anchor("review", event.createdAt);
             } else if (event.type === "approval_decided") {
                 if (agentApproval?.approvalId === payload.approvalId) agentApproval = undefined;
+                const decided = proposalSets.find((set) => set.approvalId === payload.approvalId);
+                if (decided) decided.status = payload.decision === "approve" ? "approved" : "rejected";
             } else if (event.type === "user_question") {
                 agentQuestion = creationAgentQuestion(payload);
+                if (agentQuestion) steps.anchor("question", event.createdAt);
+            } else if (event.type === "tool_started") {
+                steps.toolStarted(event);
             } else if (event.type === "tool_completed") {
-                const labels: Record<string, string> = { creation_media_read: "已查询创作素材", skill_read_file: "已读取创作技能", model_list: "已查询可用模型" };
+                const labels: Record<string, string> = { creation_media_read: "已查询创作素材", skill_read_file: "已读取创作技能", model_list: "已查询可用模型", web_search: "已联网搜索", web_fetch: "已读取网页" };
                 agentActivity = labels[text(payload.toolName)];
+                steps.tool(event);
+                for (const [taskId, prompt] of creationAgentToolPrompts(payload)) taskPrompts.set(taskId, prompt);
+                // 视频合成没有生成事件：受理回执里的 taskId 就是成片任务，按普通视频任务卡跟进状态。
+                const composed = creationAgentComposeReceipt(event);
+                if (composed) {
+                    if (!messages.some((item) => item.id === `task-${composed.taskId}`))
+                        messages.push({
+                            id: `task-${composed.taskId}`,
+                            role: "assistant",
+                            mode: "video",
+                            content: composed.title,
+                            createdAt: event.createdAt,
+                            status: "pending",
+                            taskIds: [composed.taskId],
+                            agentRunId: run.id,
+                            composition: true,
+                            ...(composed.subtitles ? { compositionSubtitles: composed.subtitles } : {}),
+                        });
+                    steps.media(composed.taskId, event.createdAt);
+                }
             } else if (event.type === "tool_failed") {
                 agentActivity = undefined;
+                steps.tool(event);
             }
             agentContextUsage = reduceAgentContextUsage(agentContextUsage, event);
+        }
+        // 回执和建任务事件的先后不作保证，整轮读完再把原始提示词挂到对应的任务上。
+        for (const [taskId, prompt] of taskPrompts) {
+            const index = messages.findIndex((item) => item.id === `task-${taskId}` && item.agentRunId === run.id);
+            if (index >= 0) messages[index] = { ...messages[index], agentGeneration: { ...messages[index].agentGeneration, prompt } };
         }
         if (run.activeMessage) {
             const id = run.activeMessage.messageId || "assistant";
@@ -198,24 +360,35 @@ export function projectCreationAgentConversation(session: AgentSession, unsorted
             // Snapshots can be ahead of replayed deltas. A persisted final message wins.
             if (!previous || (!previous.complete && run.activeMessage.text.length > previous.content.length)) setPart(id, run.activeMessage.text, false, run.updatedAt);
         }
+        const latestPart = [...parts.values()].at(-1);
+        const runActive = run.status === "running" || run.status === "queued";
+        const timeline = steps.finish({
+            partText: (id) => parts.get(id)?.content || "",
+            partStreaming: (id) => {
+                const part = parts.get(id);
+                if (!part || part.complete || !part.content || run.status !== "running") return false;
+                return part.continuation || (!agentQuestion && part === latestPart);
+            },
+            runActive: runActive && !agentQuestion,
+        });
         for (const [id, part] of parts)
             if (part.continuation) {
                 const index = messages.findIndex((item) => item.id === `${run.id}:assistant:${id}`);
                 const streaming = run.status === "running" && !part.complete && Boolean(part.content);
-                messages[index] = { ...messages[index], content: part.content, model: run.model, status: streaming ? "streaming" : "done", agentTextStreaming: streaming };
+                const continuationSteps = timeline.continuations.get(id);
+                messages[index] = { ...messages[index], content: part.content, model: run.model, status: streaming ? "streaming" : "done", agentTextStreaming: streaming, agentSteps: continuationSteps?.length ? continuationSteps : undefined };
             }
         const content = [...parts.values()]
             .filter((part) => !part.continuation)
             .map((part) => part.content)
             .filter(Boolean)
             .join("\n\n");
-        const latestPart = [...parts.values()].at(-1);
         const agentTextStreaming = run.status === "running" && !agentQuestion && Boolean(latestPart?.content && !latestPart.complete && !latestPart.continuation);
         if (terminal.has(run.status)) agentActivity = undefined;
         else if (agentQuestion) agentActivity = "等待你回复";
         else if (run.status === "waiting_approval") agentActivity = "等待你确认";
         const hasStructuredOutput = Boolean(agentCommercePlan || agentPlanItems?.length || messages.length > replyIndex);
-        if (content || agentQuestion || hasStructuredOutput || !terminal.has(run.status) || run.status === "failed" || run.status === "cancelled") {
+        if (content || agentQuestion || hasStructuredOutput || timeline.main.length || !terminal.has(run.status) || run.status === "failed" || run.status === "cancelled") {
             messages.splice(replyIndex, 0, {
                 id: `${run.id}:assistant`,
                 role: "assistant",
@@ -229,11 +402,28 @@ export function projectCreationAgentConversation(session: AgentSession, unsorted
                 agentQuestion,
                 agentTextStreaming,
                 agentActivity,
+                agentSteps: timeline.main.length ? timeline.main : undefined,
+                agentSpentCredits: typeof run.spentCredits === "number" && run.spentCredits > 0 ? run.spentCredits : undefined,
+                ...(proposalSets.length ? { agentProposalSets: proposalSets.map((set) => (set.status === "pending" && run.status !== "waiting_approval" && terminal.has(run.status) ? { ...set, status: "expired" as const } : set)) } : {}),
                 ...(imageBatches.size ? { batchTotal: [...imageBatches.values()].reduce((total, count) => total + count, 0) } : {}),
                 status: run.status === "failed" ? "error" : run.status === "cancelled" || run.status === "rejected" ? "cancelled" : terminal.has(run.status) ? "done" : "streaming",
                 ...(run.failureMessage ? { error: run.failureMessage } : {}),
             });
         }
+        // 最后一次补充说明之后只有思考或工具、还没有新正文：单独的续答容器让它们出现在补充气泡下方。
+        if (timeline.trailing)
+            messages.push({
+                id: `${run.id}:assistant:after-${timeline.trailing.key}`,
+                role: "assistant",
+                mode: "agent",
+                content: "",
+                createdAt: timeline.trailing.createdAt,
+                model: run.model,
+                agentRunId: run.id,
+                agentContinuation: true,
+                status: "done",
+                agentSteps: timeline.trailing.steps,
+            });
         agentContextUsage = reduceAgentContextUsage(agentContextUsage, { runId: run.id, type: "run_status", payload: { status: run.status } });
         if (terminal.has(run.status)) agentApproval = undefined;
         else if (run.approval && !run.approval.decision) agentApproval = run.approval;
@@ -450,6 +640,8 @@ function mergeProjectedCreationAgentConversation(current: CreationConversation, 
         previousAgentIds.add(`error-${run.id}`);
         for (const event of run.events || []) {
             if (event.type === "generation_task_created" && text(event.payload?.taskId)) previousAgentIds.add(`task-${text(event.payload?.taskId)}`);
+            const composed = creationAgentComposeReceipt(event);
+            if (composed) previousAgentIds.add(`task-${composed.taskId}`);
         }
     }
     for (const message of current.messages) {
@@ -467,7 +659,9 @@ function mergeProjectedCreationAgentConversation(current: CreationConversation, 
             ...previous,
             ...message,
             attachments: mergeCreationAgentAttachments(previous.attachments, message.attachments),
-            ...(previous.taskIds?.length && previous.status !== "pending" ? { status: previous.status, resultUrls: previous.resultUrls, resultStorageKeys: previous.resultStorageKeys, error: previous.error } : {}),
+            ...(previous.taskIds?.length && previous.status !== "pending"
+                ? { status: previous.status, resultUrls: previous.resultUrls, resultStorageKeys: previous.resultStorageKeys, error: previous.error, ...(previous.compositionSubtitles?.srt ? { compositionSubtitles: previous.compositionSubtitles } : {}) }
+                : {}),
         };
     });
     const replacements = new Map(messages.map((message) => [message.id, message]));
@@ -535,8 +729,11 @@ function prepareCachedCreationAgentConversation(conversation: CreationConversati
     const titles = new Map<string, string>(
         (conversation.agentRuns || []).flatMap((run) =>
             (run.events || []).flatMap((event) => {
+                if (event.runId !== run.id) return [];
                 const taskId = text(event.payload?.taskId);
-                return event.runId === run.id && event.type === "generation_task_created" && taskId ? [[`task-${taskId}`, text(event.payload?.title) || "媒体生成任务"] as const] : [];
+                if (event.type === "generation_task_created" && taskId) return [[`task-${taskId}`, text(event.payload?.title) || "媒体生成任务"] as const];
+                const composed = creationAgentComposeReceipt(event);
+                return composed ? [[`task-${composed.taskId}`, composed.title] as const] : [];
             }),
         ),
     );
@@ -582,10 +779,14 @@ export function applyCreationAgentTaskState(conversation: CreationConversation, 
     if (!conversation.messages.some((message) => message.id === id)) return conversation;
     let urls: string[] = task.previewUrl ? [task.previewUrl] : [];
     let keys: string[] = [];
+    let subtitles: { srt: string; burned: boolean } | undefined;
     if (task.status === "succeeded" && task.resultJson) {
         try {
-            const result = JSON.parse(task.resultJson) as { images?: Array<{ dataUrl?: string; storageKey?: string }>; video?: { dataUrl?: string; storageKey?: string } };
+            const result = JSON.parse(task.resultJson) as { images?: Array<{ dataUrl?: string; storageKey?: string }>; video?: { dataUrl?: string; storageKey?: string }; resourceId?: unknown; subtitleSrt?: unknown; subtitlesBurned?: unknown };
             const media = [...(result.images || []), ...(result.video ? [result.video] : [])];
+            // 视频合成（timeline_render）的结果只有成片资源 ID，字幕另附 SRT 并标明是否已烧录进画面。
+            if (typeof result.resourceId === "string" && result.resourceId) media.push({ storageKey: `resource:${result.resourceId}` });
+            if (typeof result.subtitleSrt === "string" && result.subtitleSrt.trim()) subtitles = { srt: result.subtitleSrt, burned: result.subtitlesBurned === true };
             urls = [...new Set([...urls, ...media.map((item) => item.dataUrl || "").filter(Boolean)])];
             keys = [...new Set(media.map((item) => item.storageKey || "").filter(Boolean))];
         } catch {
@@ -605,6 +806,7 @@ export function applyCreationAgentTaskState(conversation: CreationConversation, 
                       generationErrorCode: undefined,
                       ...(urls.length ? { resultUrls: urls } : {}),
                       ...(keys.length ? { resultStorageKeys: keys } : {}),
+                      ...(message.composition && subtitles ? { compositionSubtitles: { burn: message.compositionSubtitles?.burn === true, ...subtitles } } : {}),
                       error: task.status === "failed" || (task.status === "succeeded" && !urls.length && !keys.length) ? task.error || "任务已结束，但生成结果暂时无法读取" : undefined,
                   },
         ),
@@ -701,6 +903,7 @@ export function appendCreationAgentEvent(conversation: CreationConversation, eve
                   ...(typeof payload.revision === "number" ? { revision: payload.revision } : {}),
                   ...(typeof payload.eventCount === "number" && Number.isSafeInteger(payload.eventCount) && payload.eventCount >= 0 ? { eventCount: payload.eventCount } : {}),
                   ...(typeof payload.cleanupPending === "boolean" ? { cleanupPending: payload.cleanupPending } : {}),
+                  ...(typeof payload.spentCredits === "number" && Number.isFinite(payload.spentCredits) ? { spentCredits: payload.spentCredits } : {}),
                   failureMessage: text(payload.failureMessage) || run.failureMessage,
                   approval: payload.approval && typeof payload.approval === "object" ? (payload.approval as AgentRun["approval"]) : undefined,
                   updatedAt: event.createdAt,
