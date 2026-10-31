@@ -6,7 +6,8 @@ import { PaymentCheckoutCode } from "@/components/payment-checkout-code";
 import { AppModal } from "@/components/ui/product/app-modal";
 import { createClientUUID } from "@/lib/client-id";
 import { paymentOrderGrantLabel } from "@/lib/payment-order-grant";
-import { closePaymentOrder, createPaymentOrder, getPaymentOrder, queryPaymentOrder, refreshPaymentCheckout, type PaymentOrder } from "@/services/api/payments";
+import { closePaymentOrder, createPaymentOrder, formatPaymentAmount, getPaymentOrder, PAYMENT_ERROR_REASON, queryPaymentOrder, refreshPaymentCheckout, type CreatePaymentOrderInput, type PaymentOrder } from "@/services/api/payments";
+import { ApiError } from "@/services/api/request";
 
 function grantedText(order: PaymentOrder) {
     return order.productKind === "storage" ? "支付已确认，存储空间已扩容" : "支付已确认，积分已经到账";
@@ -18,9 +19,10 @@ function notGrantedText(order: PaymentOrder) {
 
 /**
  * 在线支付下单、扫码、轮询、关单与重建收银台的共用流程。
- * onGranted 对每个订单只触发一次，调用方在其中刷新余额或容量。
+ * onGranted 对每个订单只触发一次，调用方在其中刷新余额或容量；
+ * onQuoteChanged 在服务端报价与用户确认的金额不一致时触发，调用方刷新商品让用户重新确认。
  */
-export function usePaymentOrderFlow({ onGranted }: { onGranted: (order: PaymentOrder) => Promise<void> | void }) {
+export function usePaymentOrderFlow({ onGranted, onQuoteChanged }: { onGranted: (order: PaymentOrder) => Promise<void> | void; onQuoteChanged?: () => Promise<void> | void }) {
     const { message } = App.useApp();
     const [order, setOrder] = useState<PaymentOrder | null>(null);
     const [open, setOpen] = useState(false);
@@ -31,6 +33,8 @@ export function usePaymentOrderFlow({ onGranted }: { onGranted: (order: PaymentO
     const grantedOrderId = useRef("");
     const onGrantedRef = useRef(onGranted);
     onGrantedRef.current = onGranted;
+    const onQuoteChangedRef = useRef(onQuoteChanged);
+    onQuoteChangedRef.current = onQuoteChanged;
 
     const settle = async (next: PaymentOrder) => {
         if (next.status !== "credited" || grantedOrderId.current === next.id) return;
@@ -52,16 +56,16 @@ export function usePaymentOrderFlow({ onGranted }: { onGranted: (order: PaymentO
         return () => window.clearInterval(interval);
     }, [open]);
 
-    /** 切换商品或支付方式后必须换新的幂等键，否则后端会拒绝“同键不同单”。 */
+    /** 切换商品、份数或支付方式后必须换新的幂等键，否则后端会拒绝“同键不同单”。 */
     const resetIdempotency = () => {
         idempotencyKey.current = "";
     };
 
-    const start = async (productId: string, providerId: string) => {
+    const start = async (input: Omit<CreatePaymentOrderInput, "idempotencyKey">) => {
         setCreating(true);
         try {
             if (!idempotencyKey.current) idempotencyKey.current = createClientUUID();
-            const result = await createPaymentOrder({ productId, providerId, idempotencyKey: idempotencyKey.current });
+            const result = await createPaymentOrder({ ...input, idempotencyKey: idempotencyKey.current });
             idempotencyKey.current = "";
             setOrder(result.order);
             await settle(result.order);
@@ -71,6 +75,13 @@ export function usePaymentOrderFlow({ onGranted }: { onGranted: (order: PaymentO
             }
             setOpen(true);
         } catch (error) {
+            if (error instanceof ApiError && error.reason === PAYMENT_ERROR_REASON.quoteChanged) {
+                // 服务端明确拒绝、没有建单：换新的幂等键，刷新商品后由用户按新价格重新确认。
+                idempotencyKey.current = "";
+                message.warning(error.message);
+                await onQuoteChangedRef.current?.();
+                return;
+            }
             message.error(error instanceof Error ? error.message : "创建支付订单失败");
         } finally {
             setCreating(false);
@@ -152,7 +163,7 @@ export function usePaymentOrderFlow({ onGranted }: { onGranted: (order: PaymentO
                     <span className="workspace-wallet-payment-icon">
                         <CreditCard />
                     </span>
-                    <strong>¥ {(order.amountFen / 100).toFixed(2)}</strong>
+                    <strong>{formatPaymentAmount(order.amountFen, order.currency)}</strong>
                     <p>
                         {order.productName} · {paymentOrderGrantLabel(order)}
                     </p>

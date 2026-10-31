@@ -48,13 +48,13 @@ export const creationPlays: Array<{ id: string; label: string; cover: string; mo
 export type CreationSurface = "generate" | "canvas";
 
 /**
- * 标题下方的"生成 | 画布"：生成就是这里的对话；画布模式下输入框不变，点发送会新建画布，
- * 把这句话和参考图交给画布里的阿Q 接着做。
+ * 标题下方的"生成 | 画布"：生成就是这里的对话；画布面（地址栏 ?mode=canvas，参考 kunrouai.com）不显示输入框，
+ * 换成「新建画布」+ 最近画布和精选画布。两面的标题、副标题分别在后台「外观设置 → 创作首页」配置。
  */
 export function CreationSurfaceSwitch({ value, onChange, disabled }: { value: CreationSurface; onChange: (value: CreationSurface) => void; disabled?: boolean }) {
     const options: Array<{ value: CreationSurface; label: string; title: string }> = [
         { value: "generate", label: "生成", title: "在这里对话生成" },
-        { value: "canvas", label: "画布", title: "发送后新建画布，交给画布里的阿Q" },
+        { value: "canvas", label: "画布", title: "新建画布，或打开最近的画布" },
     ];
     return (
         <div className="creation-surface-switch" role="group" aria-label="创作方式">

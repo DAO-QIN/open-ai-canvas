@@ -1,15 +1,15 @@
 import { ImageSizePicker } from "@/components/image-size-picker";
-import { useCreationPreferencesStore } from "@/stores/use-creation-preferences-store";
+import { useCreationPreferencesStore, type CreationAgentPreferences } from "@/stores/use-creation-preferences-store";
 import { ImageParameterFields } from "@/components/image-parameter-fields";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { imageResolutionUsesQuality, imageSizePresets } from "@/lib/image-size-presets";
 import { createPortal } from "react-dom";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
-import { Button, Dropdown, Popover } from "antd";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode, type RefObject } from "react";
+import { Button, Popover } from "antd";
 import { useWorkspaceTopBarMount } from "@/components/layout/workspace-top-bar-extension";
 import { Tooltip } from "@/components/ui/base/tooltip";
-import { Reorder, LayoutGroup, motion, useReducedMotion } from "motion/react";
-import { Brain, ChevronDown, ChevronLeft, ChevronRight, Clapperboard, Clock3, History, LoaderCircle, Maximize2, Minimize2, Plus, SlidersHorizontal, Square, Trash2, Waves, X, ArrowUp, Film, Image as ImageIcon, MessageSquareText, Lightbulb, Orbit, PenLine } from "lucide-react";
+import { Switch } from "@/components/ui/base/switch";
+import { Brain, ChevronDown, Clapperboard, Clock3, History, LoaderCircle, Plus, SlidersHorizontal, Square, Trash2, Waves, X, ArrowUp, Film, Image as ImageIcon, MessageSquareText, Lightbulb, Orbit, PenLine } from "lucide-react";
 
 
 import { formatVideoResolutionLabel as videoResolutionLabel } from "@/lib/video-generation-options";
@@ -19,7 +19,7 @@ import { ModelPicker } from "@/components/model-picker";
 import { AgentContextRing, AgentPermissionControl } from "@/components/canvas/canvas-cloud-agent-panel-parts";
 import type { AgentContextUsageView } from "@/lib/canvas/agent-context-usage";
 import type { AgentOutputPreference, AgentPermissionMode } from "@/services/api/agent";
-import { CreditSymbol, requestCreditCost } from "@/constant/credits";
+import { CreditSymbol, formatCredits, requestCreditCost } from "@/constant/credits";
 import { ASSET_CATEGORY_LABELS } from "@/lib/asset-category";
 import { formatShotOrdinal } from "@/lib/shot-label";
 import { buildImageResolutionOptions, formatImageResolutionSize, supportsImageResolutionPresets } from "@/lib/image-resolution-tiers";
@@ -28,22 +28,29 @@ import { mergedImageCapabilityConfig, type ModelRequirements } from "@/lib/model
 import { imageQualityLabel } from "@/lib/image-quality";
 import { modelQuoteDescription, modelQuoteRequest } from "@/lib/model-pricing";
 import { quoteModel, type LogicalModelQuote } from "@/services/api/logical-models";
-import { modelOptionName, resolveModelChannel, selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
+import { modelOptionName, resolveModelChannel, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useGlobalAgentStore } from "@/stores/use-global-agent-store";
 import type { PromptOptimizerProvider } from "@/lib/plugins/plugin-types";
-import { type CreationReference } from "./creation-references";
-import { creationAttachmentKind, type CreationAttachment, type CreationMode } from "./creation-assets";
-import { countOptions, creationComposerModeOptions, creationHasInput, creationModelCapability, modeLabels, qualityOptions, resolutionOptions, type CreationShotRailEntry } from "./creation-types";
+import type { Skill } from "@/services/api/skills";
+import { resolveSkillMentions, SKILL_RUNTIME_PROFILES } from "@/services/skill-runtime";
+import { appendCreationSkillMention, removeCreationSkillMention, type CreationReference } from "./creation-references";
+import { CreationSkillPicker, type CreationSkillsStatus } from "./creation-skill-picker";
+import { type CreationAttachment, type CreationMode } from "./creation-assets";
+import { countOptions, creationComposerModeKey, creationComposerModeOptions, creationHasInput, creationModelCapability, modeLabels, qualityOptions, resolutionOptions, type CreationShotRailEntry } from "./creation-types";
+import { CreationModePicker } from "./creation-mode-picker";
 import { creationMessageNeedsResultSync } from "./creation-conversations";
 
 import "./creation-product.css";
 import "./creation-scrollbars.css";
 import "@/components/canvas/canvas-cloud-agent.css";
-import { CreationAttachmentThumbnail, CreationMediaPreviewModal } from "./creation-workspace-messages";
+import { CreationMediaPreviewModal, type CreationResultImageRef } from "./creation-workspace-messages";
+import { CreationReferenceStack } from "./creation-reference-stack";
+import { hasCreationReferenceDrag, readCreationReferenceDrop } from "./creation-reference-drag";
+import { canvasResourceMentionToken } from "@/lib/canvas/canvas-resource-references";
 import { CreationIcon } from "./creation-icons";
 import type { CanvasAudioSettingKey } from "@/components/canvas/canvas-audio-settings-popover";
-import { audioFormatLabelForConfig, audioVoiceLabelForConfig, isMusicAudioConfig, musicInstrumentalForConfig } from "@/lib/audio-generation";
+import { audioFormatLabelForConfig, audioModelsOfKind, audioVoiceLabelForConfig, isMusicAudioConfig, isMusicAudioModel, musicInstrumentalForConfig, type AudioGenerationKind } from "@/lib/audio-generation";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 
@@ -76,16 +83,17 @@ export function CreationWorkspaceToolbar({
     const railRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (!railOpen) return;
-        const onPointerDown = (event: MouseEvent) => {
+        // pointerdown 同时覆盖鼠标和触屏：手机上点列表外任意处也能收起镜头列表。
+        const onPointerDown = (event: Event) => {
             if (railRef.current && !railRef.current.contains(event.target as Node)) setRailOpen(false);
         };
-        window.addEventListener("mousedown", onPointerDown);
-        return () => window.removeEventListener("mousedown", onPointerDown);
+        window.addEventListener("pointerdown", onPointerDown);
+        return () => window.removeEventListener("pointerdown", onPointerDown);
     }, [railOpen]);
     const mount = useWorkspaceTopBarMount();
     const toolbar = <header className="creation-thread-toolbar">
         <div className="creation-toolbar-shots" ref={railRef}>
-            <button type="button" className="creation-rail-trigger" aria-expanded={railOpen} aria-haspopup="listbox" onClick={() => setRailOpen((open) => !open)}><Clapperboard />镜头时间线{shots.length > 0 ? <em className="creation-rail-count">{shots.length}</em> : null}</button>
+            <button type="button" className="creation-rail-trigger" aria-expanded={railOpen} aria-haspopup="listbox" aria-label={shots.length ? `镜头时间线，共 ${shots.length} 镜` : "镜头时间线"} onClick={() => setRailOpen((open) => !open)}><Clapperboard /><span className="creation-rail-trigger-label">镜头时间线</span>{shots.length > 0 ? <em className="creation-rail-count">{shots.length}</em> : null}</button>
             {railOpen ? <div className="creation-rail-pop" role="listbox" aria-label="镜头时间线">
                 <div className="creation-rail-pop-head"><span className="creation-rail-pop-title">镜头时间线<small>{shots.length ? `共 ${shots.length} 镜` : "空轨道"}</small></span><button type="button" className="creation-rail-pop-close" aria-label="关闭镜头列表" onClick={() => setRailOpen(false)}><X /></button></div>
                 {shots.length ? <ol className="creation-rail-list">{shots.map((shot) => {
@@ -127,16 +135,22 @@ type ComposerProps = {
     maxReferences: number;
     references: CreationReference[];
     onRemoveAttachment: (id: string) => void;
-    onClearAttachments: () => void;
     onClearComposer: () => void;
     onReorderAttachments: (attachments: CreationAttachment[]) => void;
     onReplaceAttachment: (targetAttachmentId: string, replacement: CreationAttachment) => void;
     onReplaceReferenceFiles: (targetAttachmentId: string, files: File[]) => void;
     onPasteFiles: (files: File[]) => void;
+    /** 「参考素材 → 上传图片」选好的本机图片；与粘贴同一条上传路径（存进素材库再加入本轮）。 */
+    onUploadFiles: (files: File[]) => void;
+    /** 打开本机文件选择前调用；返回 false 表示已拦下（例如游客先去登录），不弹出文件选择。 */
+    onBeforeUpload: () => boolean;
+    /** 游客：拿不到模型目录（参考上限为 0），添加入口照样可点，选上传或素材库时先登录。 */
+    referenceSignInRequired: boolean;
     onOpenLibrary: () => void;
-    onModeChange: (mode: CreationMode) => void;
-    /** 类型菜单分隔线下的"短剧制作"入口；不传则不显示。 */
-    onOpenShortDrama?: () => void;
+    /** 对话里的生成结果拖进输入框：落在某张卡片上替换那一张，否则加到参考素材最后。 */
+    onDropResultImage: (image: CreationResultImageRef, targetAttachmentId?: string) => void;
+    /** 音乐生成和音频生成都是 audio 模式，audioKind 指明要切到哪一类模型。 */
+    onModeChange: (mode: CreationMode, audioKind?: AudioGenerationKind) => void;
     model: string;
     modelRequirements: ModelRequirements;
     videoProfile: VideoCapabilityConfig;
@@ -165,6 +179,7 @@ type ComposerProps = {
     setTextStreaming: (value: boolean) => void;
     textThinking: boolean;
     setTextThinking: (value: boolean) => void;
+
     promptOptimizerProvider: PromptOptimizerProvider | null;
     smartCreationAvailable: boolean;
     smartCreationActive: boolean;
@@ -173,16 +188,26 @@ type ComposerProps = {
     onToggleSmartCreation: () => void;
     composerFocusRef: RefObject<HTMLTextAreaElement | null>;
     onPromptFocus: () => void;
+    /** Agent 工具栏的「技能」：skills 是能在首页用的已安装技能，library 是全部已安装技能（技能商店的「我的技能」用）；不传则不显示。 */
+    skillPicker?: { skills: Skill[]; library: Skill[]; status: CreationSkillsStatus; signInRequired: boolean; onRefresh: () => Promise<void>; onSignIn: () => void };
     placeholderOverride?: string;
     onSubmit: () => void;
     agentPermissionMode: AgentPermissionMode;
     onAgentPermissionChange: (mode: AgentPermissionMode) => void;
     agentOutputPreference: AgentOutputPreference;
     onAgentOutputPreferenceChange: (preference: AgentOutputPreference) => void;
+    agentReasoningMode: CreationAgentPreferences["reasoningMode"];
+    onAgentReasoningModeChange: (mode: CreationAgentPreferences["reasoningMode"]) => void;
+    agentWebSearch: CreationAgentPreferences["webSearch"];
+    onAgentWebSearchChange: (mode: CreationAgentPreferences["webSearch"]) => void;
+    /** 平台开启并配置好联网搜索时才在「偏好」里显示「联网搜索」。 */
+    agentWebSearchAvailable: boolean;
+    /** 每次联网搜索实际扣的积分（微积分，已按账号分组折算）；未开启积分、免费或暂时算不出时不传。 */
+    agentWebSearchPriceMicrocredits?: number;
     agentContextView: AgentContextUsageView;
     agentInputError?: string;
     agentImageModel: string;
-    /** 自动模式发送前预估（1 张当前图片模型的积分），拿不到报价时为 null。 */
+    /** Agent 模式发送前预估（1 张当前图片模型的积分），拿不到报价时为 null。 */
     agentEstimateCredits?: number | null;
     agentVideoModel: string;
     agentImageSelectionMode: "preferred" | "fixed";
@@ -209,7 +234,25 @@ type ComposerProps = {
     onAgentVideoSettingChange: (key: "size" | "quality" | "durationSeconds", value: string | number) => void;
 };
 
-type CreationReferenceFilter = "all" | "image" | "video" | "audio" | "file";
+/**
+ * 输入框的默认提示：告诉用户从哪下手（参考即梦）。能加参考素材时点明「+」，Agent 和图片顺带说 @ 能引用什么。
+ * 对话里的输入框和首页同样大，只是改说「接着改」；触屏（平铺布局）上手机的输入框更紧凑，提示用短句，免得窄屏上折成两行。
+ */
+function creationComposerPlaceholder({ variant, mode, music, noun, canAddReference, compact }: { variant: "empty" | "thread"; mode: CreationMode; music: boolean; noun: string; canAddReference: boolean; compact: boolean }) {
+    if (variant === "thread") {
+        if (mode === "video") return "接着改，或描述下一个镜头";
+        if (music) return "接着改，或描述下一首";
+        if (mode === "audio") return "接着改，或写下一段配音";
+        if (!canAddReference) return "接着改，或 @ 某一张";
+        return compact ? `接着改，或点「+」加${noun}` : `接着改，点「+」加${noun}，或 @ 某一张`;
+    }
+    if (mode === "video") return canAddReference ? "描述镜头和动作，点「+」上传首帧或参考素材" : "描述镜头、动作和运镜";
+    if (music) return "描述曲风、心情，或直接写歌词";
+    if (mode === "audio") return "写下配音文案，或描述想要的声音";
+    if (mode === "image") return canAddReference ? "描述想要的画面，点「+」上传参考图，输入 @ 引用某一张" : "描述想要的画面：主体、场景、光线和风格";
+    // 「+」下面写的就是 noun（参考素材），提示里用同一个词。
+    return canAddReference ? `说说你的想法或剧本，点「+」加${noun}，输入 @ 引用素材或技能` : "说说你的想法或剧本，输入 @ 引用素材或技能";
+}
 
 export function CreationComposer(props: ComposerProps) {
     const [previewUrl, setPreviewUrl] = useState("");
@@ -217,14 +260,10 @@ export function CreationComposer(props: ComposerProps) {
     const [promptOptimizerOpen, setPromptOptimizerOpen] = useState(false);
     const compact = useMediaQuery("(max-width: 720px)");
     const [moreOpen, setMoreOpen] = useState(false);
-    const [referenceFilter, setReferenceFilter] = useState<CreationReferenceFilter>("all");
-    const [canDragReferences, setCanDragReferences] = useState(false);
+    // 鼠标设备：参考素材叠在提示词左边，悬停展开、可拖动排序；触屏没有悬停，平铺在提示词上方。
+    const referenceLayout = useMediaQuery("(hover: hover) and (pointer: fine)") ? "stack" : "tiled";
     const [dropTargetReferenceId, setDropTargetReferenceId] = useState<string | null>(null);
-    const attachmentTrackRef = useRef<HTMLUListElement>(null);
-    const cardDragRef = useRef<{ startX: number; startY: number; moved: boolean } | null>(null);
-    const suppressAttachmentClickRef = useRef(false);
-    const [trackState, setTrackState] = useState({ canScrollLeft: false, canScrollRight: false, isExpanded: true, isDragging: false });
-    const previousAttachmentCountRef = useRef(0);
+    const composerRef = useRef<HTMLDivElement>(null);
     const interactionBusy = props.busy || props.referenceReplacementBusy || props.referencePasteBusy || props.smartCreationPlanning;
     const stopping = props.mode === "agent" && props.stopping;
     const canStop = props.mode === "agent" && props.generationActive && Boolean(props.onStop);
@@ -276,7 +315,7 @@ export function CreationComposer(props: ComposerProps) {
             });
         return () => controller.abort();
     }, [creditsEnabled, quoteRequest]);
-    // 自动模式按 1 张当前图片模型预估（阿Q 实际规划超出 1.2 倍时才会在对话里请你确认）。
+    // Agent 模式按 1 张当前图片模型预估（阿Q 实际规划超出 1.2 倍时才会在对话里请你确认）。
     const agentEstimate = props.mode === "agent" && props.agentPermissionMode !== "read_only" ? (props.agentEstimateCredits ?? null) : null;
     const generationCredits = props.mode === "agent" ? agentEstimate : routeQuote ? routeQuote.amountMicrocredits / 1_000_000 : credits;
     const showCost = creditsEnabled && !props.smartCreationActive && !interjecting && generationCredits !== null && generationCredits !== undefined;
@@ -307,121 +346,116 @@ export function CreationComposer(props: ComposerProps) {
     // own progress while this composer is immediately available for another
     // prompt. Only work that still blocks submission owns the spinner.
     const showWorkingSpinner = stopping || (interactionBusy && !canStop);
-    // 占位文字不超过 14 个字，细节交给示例和玩法，不在输入框里写说明书。
-    const placeholder = props.mode === "video" ? "接着改，或描述下一个镜头" : props.mode === "audio" ? "接着改，或写下一段配音" : "接着改，或 @ 某一张";
-    const emptyPlaceholder = props.mode === "video" ? "描述镜头，或拖入一张首帧" : props.mode === "audio" ? "写下配音文案，或描述声音" : "描述画面，或拖入一张图";
-    const audioAvailable = useMemo(() => selectableModelsByCapability(props.config, "audio").length > 0, [props.config]);
+    // 音乐生成和音频生成都是 audio 模式，按当前模型区分；模型菜单只列同一类，免得在音频里选到音乐模型。
+    const musicModels = useMemo(() => audioModelsOfKind(props.config, "music"), [props.config]);
+    const speechModels = useMemo(() => audioModelsOfKind(props.config, "speech"), [props.config]);
+    const musicMode = props.mode === "audio" && isMusicAudioModel(props.config, props.model);
+    const activeModeKey = creationComposerModeKey(props.mode, musicMode ? "music" : "speech");
+    // 没有对应模型的类型不进菜单，免得选了也发不出去；当前类型始终保留。
+    const modeOptions = useMemo(
+        () => creationComposerModeOptions.filter((option) => option.key === activeModeKey || !option.audioKind || (option.audioKind === "music" ? musicModels : speechModels).length > 0),
+        [activeModeKey, musicModels, speechModels],
+    );
+    const audioModelFilter = useMemo(() => (props.mode === "audio" ? (model: string) => isMusicAudioModel(props.config, model) === musicMode : undefined), [musicMode, props.config, props.mode]);
     const imageReferencesSupported = props.imageProfile.references.maxImages > 0;
     const referencesSupported = props.mode === "audio" ? false : props.mode === "image" ? imageReferencesSupported : props.mode !== "video" || props.maxReferences > 0;
-    const canAddMoreReferences = referencesSupported && props.attachments.length < props.maxReferences;
+    const referenceNoun = props.mode === "image" ? "参考图" : "参考素材";
+    const placeholder = creationComposerPlaceholder({ variant: props.variant, mode: props.mode, music: musicMode, noun: referenceNoun, canAddReference: referencesSupported, compact: referenceLayout === "tiled" });
+    const canAddMoreReferences = referencesSupported && (props.referenceSignInRequired || props.attachments.length < props.maxReferences);
+    // 没有可用上限时说清原因：游客先登录，没选模型先选模型，选了的模型确实不收参考素材。
+    const referenceUnavailableText = props.referenceSignInRequired ? "登录后可添加参考素材" : props.model ? "当前模型不支持参考素材" : "选好模型后可添加参考素材";
     const addReferenceLabel = interactionBusy
         ? props.referenceReplacementBusy
             ? "正在替换参考图"
-            : props.mode === "agent"
-              ? "思考中暂不能添加参考内容"
-              : "生成中暂不能添加参考内容"
+            : props.referencePasteBusy
+              ? "正在上传参考图"
+              : props.mode === "agent"
+                ? "思考中暂不能添加参考素材"
+                : "生成中暂不能添加参考素材"
         : canAddMoreReferences
-          ? "添加更多参考内容"
-          : `已达到当前模型的参考内容上限（${props.maxReferences} 个）`;
-    const referenceCounts = useMemo(
-        () =>
-            props.attachments.reduce(
-                (counts, attachment) => {
-                    const kind = creationAttachmentKind(attachment);
-                    counts[kind] += 1;
-                    return counts;
-                },
-                { image: 0, video: 0, audio: 0, file: 0 },
-            ),
-        [props.attachments],
-    );
-    const visibleAttachments = useMemo(() => (referenceFilter === "all" ? props.attachments : props.attachments.filter((attachment) => creationAttachmentKind(attachment) === referenceFilter)), [props.attachments, referenceFilter]);
+          ? props.referenceSignInRequired || props.maxReferences <= 0
+              ? "添加参考素材"
+              : `添加${props.mode === "image" ? "参考图" : "参考素材"}（${props.attachments.length}/${props.maxReferences}）`
+          : props.maxReferences > 0
+            ? `已达到当前模型的参考素材上限（${props.maxReferences} 个）`
+            : referenceUnavailableText;
+    // 卡片角标用提示词里的叫法（@图片1、@视频1），拖动换顺序后编号跟着变，提示词按素材身份引用，不会错位。
+    const referenceLabels = useMemo(() => new Map(props.references.flatMap((reference) => (reference.attachmentId ? [[reference.attachmentId, reference.label] as const] : []))), [props.references]);
+    const referenceUnit = props.mode === "image" ? "张" : "个";
+    const showReferences = props.attachments.length > 0 || referencesSupported;
+    const referenceSummary = props.referencePasteBusy
+        ? "正在上传参考图…"
+        : props.referenceReplacementBusy
+          ? "正在替换参考图…"
+          : referencesSupported && props.maxReferences > 0
+            ? `${referenceNoun} ${props.attachments.length}/${props.maxReferences} ${referenceUnit}`
+            : props.attachments.length
+              ? `${referenceNoun} ${props.attachments.length} ${referenceUnit} · 当前模型不支持参考素材`
+              : referenceUnavailableText;
     const imageSettingsSupported = props.imageProfile.size.parameter !== "none" || props.imageProfile.quality.supported || props.imageProfile.maxOutputs > 1;
-    const updateTrackScrollState = useCallback(() => {
-        const track = attachmentTrackRef.current;
-        if (!track) return;
-        setTrackState((current) => ({
-            ...current,
-            canScrollLeft: track.scrollLeft > 1,
-            canScrollRight: track.scrollLeft + track.clientWidth < track.scrollWidth - 1,
-        }));
-    }, []);
-    const setReferencePanelExpanded = useCallback((isExpanded: boolean) => {
-        setTrackState((current) => ({ ...current, isExpanded }));
-        if (!isExpanded) setReferenceFilter("all");
-    }, []);
-    useEffect(() => {
-        const hadAttachments = previousAttachmentCountRef.current > 0;
-        if (!props.attachments.length) setReferencePanelExpanded(false);
-        else if (!hadAttachments) setReferencePanelExpanded(true);
-        previousAttachmentCountRef.current = props.attachments.length;
-        updateTrackScrollState();
-    }, [props.attachments.length, setReferencePanelExpanded, updateTrackScrollState]);
-    useEffect(() => {
-        const query = window.matchMedia("(hover: hover) and (pointer: fine)");
-        const update = () => setCanDragReferences(query.matches);
-        update();
-        query.addEventListener("change", update);
-        return () => query.removeEventListener("change", update);
-    }, []);
-    useEffect(() => {
-        const frame = window.requestAnimationFrame(updateTrackScrollState);
-        return () => window.cancelAnimationFrame(frame);
-    }, [referenceFilter, trackState.isExpanded, updateTrackScrollState, visibleAttachments.length]);
-    const beginCardDrag = (event: PointerEvent<HTMLElement>) => {
-        if (event.button !== 0 || interactionBusy || !trackState.isExpanded) return;
-        if ((event.target as HTMLElement).closest(".creation-reference-card-remove")) return;
-        cardDragRef.current = { startX: event.clientX, startY: event.clientY, moved: false };
-    };
-    const endCardDrag = (event: PointerEvent<HTMLElement>) => {
-        const drag = cardDragRef.current;
-        if (!drag) return;
-        cardDragRef.current = null;
-        if (drag.moved) {
-            suppressAttachmentClickRef.current = true;
-            window.setTimeout(() => {
-                suppressAttachmentClickRef.current = false;
-            }, 0);
-        }
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-        setTrackState((current) => ({ ...current, isDragging: false }));
-    };
-    const moveCardDrag = (event: PointerEvent<HTMLElement>) => {
-        const drag = cardDragRef.current;
-        if (!drag || drag.moved) return;
-        if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) <= 4) return;
-        drag.moved = true;
-        setTrackState((current) => ({ ...current, isDragging: true, isExpanded: true }));
-    };
     const previewAttachment = (type: "image" | "video", url: string) => {
-        if (suppressAttachmentClickRef.current || cardDragRef.current?.moved) return;
         setPreviewType(type);
         setPreviewUrl(url);
     };
-    const reorderVisibleAttachments = useCallback(
-        (next: CreationAttachment[]) => {
-            if (referenceFilter === "all") {
-                props.onReorderAttachments(next);
+    // 插入引用后把光标放回提示词末尾。有引用标签时输入框是可编辑区，composerFocusRef 只指向纯文本框，所以按类名找当前那一个。
+    const focusPromptEnd = () =>
+        window.requestAnimationFrame(() => {
+            const editor = composerRef.current?.querySelector<HTMLElement>('textarea.creation-chat-mention-editor, [role="textbox"].creation-chat-mention-editor');
+            if (!editor) return;
+            editor.focus({ preventScroll: true });
+            if (editor instanceof HTMLTextAreaElement) {
+                editor.setSelectionRange(editor.value.length, editor.value.length);
                 return;
             }
-            const visibleIds = new Set(visibleAttachments.map((attachment) => attachment.id));
-            const reordered = [...next];
-            props.onReorderAttachments(props.attachments.map((attachment) => (visibleIds.has(attachment.id) ? reordered.shift() || attachment : attachment)));
-        },
-        [props.attachments, props.onReorderAttachments, referenceFilter, visibleAttachments],
-    );
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            window.getSelection()?.removeAllRanges();
+            window.getSelection()?.addRange(range);
+        });
+    // 卡片上的「@」：把这一张引用到提示词末尾，和在输入框里打 @ 选它一样。
+    const mentionAttachment = (attachmentId: string) => {
+        const reference = props.references.find((item) => item.attachmentId === attachmentId);
+        if (!reference) return;
+        const prompt = props.prompt;
+        props.setPrompt(`${prompt}${prompt && !/\s$/.test(prompt) ? " " : ""}${canvasResourceMentionToken(reference)} `);
+        focusPromptEnd();
+    };
+    // 「技能」菜单：选中状态直接从提示词里读（技能标签、@名称、/名称），删掉标签也就取消了选择。
+    const skillPicker = props.mode === "agent" ? props.skillPicker : undefined;
+    const selectedSkillIds = skillPicker ? resolveSkillMentions(props.prompt, skillPicker.skills).map((skill) => skill.skillId) : [];
+    // 技能商店弹窗里选技能时 focusPrompt 为 false：弹窗还开着，焦点留在弹窗里，关上后回到「技能」按钮。
+    const toggleSkill = (skill: Skill, options?: { focusPrompt?: boolean }) => {
+        if (selectedSkillIds.includes(skill.skillId)) {
+            props.setPrompt(removeCreationSkillMention(props.prompt, skill));
+            return;
+        }
+        props.setPrompt(appendCreationSkillMention(props.prompt, skill.skillId));
+        if (options?.focusPrompt !== false) focusPromptEnd();
+    };
+    // 拖进输入框的本机图片、对话里的生成结果：落在卡片上由卡片自己处理（替换那一张），其余位置都加到最后。
+    const acceptsReferenceDrop = referencesSupported && !interactionBusy;
+    const addDroppedReferences = (dataTransfer: DataTransfer) => {
+        const { resultImage, files } = readCreationReferenceDrop(dataTransfer);
+        if (resultImage) props.onDropResultImage(resultImage);
+        else if (files.length && props.onBeforeUpload()) props.onUploadFiles(files);
+    };
+    const handleReferenceDragOver = (event: DragEvent<HTMLDivElement>) => {
+        if (event.defaultPrevented || !hasCreationReferenceDrag(event.dataTransfer)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = acceptsReferenceDrop ? "copy" : "none";
+    };
+    const handleReferenceDrop = (event: DragEvent<HTMLDivElement>) => {
+        if (event.defaultPrevented || !hasCreationReferenceDrag(event.dataTransfer)) return;
+        event.preventDefault();
+        if (acceptsReferenceDrop) addDroppedReferences(event.dataTransfer);
+    };
     useEffect(() => {
         if (!canOptimizePrompt) setPromptOptimizerOpen(false);
     }, [canOptimizePrompt]);
     useEffect(() => {
         if (props.smartCreationActive) setPromptOptimizerOpen(false);
     }, [props.smartCreationActive]);
-    const scrollAttachmentTrack = (direction: -1 | 1) => {
-        const track = attachmentTrackRef.current;
-        if (!track) return;
-        track.scrollBy({ left: direction * Math.max(track.clientWidth * 0.72, 120), behavior: "smooth" });
-        window.setTimeout(updateTrackScrollState, 180);
-    };
     const imageReferenceAtPoint = (x: number, y: number) => {
         for (const element of document.elementsFromPoint(x, y)) {
             const chip = element.closest<HTMLElement>("[data-mention-reference-id]");
@@ -434,157 +468,78 @@ export function CreationComposer(props: ComposerProps) {
     // 输入框不再套流光描边和跟随鼠标的聚光：一层细描边加半透明底，焦点时描边加深。
     const composer = (
         <div className="creation-composer-shell">
-            <div className={`creation-chat-composer is-${props.variant}`}>
+            <div ref={composerRef} className={`creation-chat-composer is-${props.variant}`} onDragOver={handleReferenceDragOver} onDrop={handleReferenceDrop}>
                 <div className="creation-chat-writing-surface">
-                    <div className="creation-chat-editor">
-                        <CanvasResourceMentionTextarea
-                            ref={props.composerFocusRef}
-                            value={props.prompt}
-                            references={props.references}
-                            mentionMenuWidth={400}
-                            sendOnEnter
-                            onFocus={props.onPromptFocus}
-                            onChange={props.setPrompt}
-                            onSubmit={props.onSubmit}
-                            containerClassName="creation-chat-mention-container"
-                            className="creation-chat-mention-editor creation-scrollbar"
-                            style={{ color: "var(--creation-text)", height: "auto", maxHeight: "min(320px, 35dvh)" }}
-                            placeholder={props.placeholderOverride || (props.variant === "empty" ? emptyPlaceholder : placeholder)}
-                            aria-label="创作提示词，可使用 @ 引用当前参考内容或技能；回车发送，Shift+回车换行"
-                            spellCheck
-                            disabled={interactionBusy}
-                            activeDropReferenceId={dropTargetReferenceId}
-                            onPasteFiles={props.onPasteFiles}
-                            onReferenceFilesDrop={(reference, files) => {
-                                const target = props.references.find((item) => item.id === reference.id);
-                                if (target?.attachmentId) props.onReplaceReferenceFiles(target.attachmentId, files);
-                            }}
-                        />
-                        {props.attachments.length || referencesSupported ? (
-                            <div className={`creation-reference-panel${trackState.isExpanded ? " is-expanded" : ""}`} aria-busy={interactionBusy}>
-                                {trackState.isExpanded ? (
-                                    <div className="creation-reference-panel-header">
-                                        <div className="creation-reference-filter-tabs" role="group" aria-label="筛选参考内容">
-                                            {(
-                                                [
-                                                    { id: "all", label: "全部", count: props.attachments.length },
-                                                    { id: "image", label: "图片", count: referenceCounts.image },
-                                                    { id: "video", label: "视频", count: referenceCounts.video },
-                                                    { id: "audio", label: "音频", count: referenceCounts.audio },
-                                                    { id: "file", label: "文件", count: referenceCounts.file },
-                                                ] as const
-                                            ).map((filter) => (
-                                                <button key={filter.id} type="button" aria-pressed={referenceFilter === filter.id} className={referenceFilter === filter.id ? "is-active" : undefined} onClick={() => setReferenceFilter(filter.id)}>
-                                                    {filter.label}
-                                                    {filter.count ? ` (${filter.count})` : ""}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <div className="creation-reference-panel-actions">
-                                            {props.attachments.length ? (
-                                                <button type="button" onClick={props.onClearAttachments} disabled={interactionBusy}>
-                                                    清空全部素材
-                                                </button>
-                                            ) : null}
-                                            <Tooltip title="收起素材面板">
-                                                <button type="button" className="creation-reference-panel-collapse" onClick={() => setReferencePanelExpanded(false)} aria-label="收起素材面板">
-                                                    <Minimize2 aria-hidden="true" />
-                                                </button>
-                                            </Tooltip>
-                                        </div>
-                                    </div>
-                                ) : null}
-                                <div className="creation-reference-track-wrapper">
-                                    <div className="creation-reference-stack-shell">
-                                        {trackState.canScrollLeft ? (
-                                            <button type="button" className="creation-reference-track-button is-left" onClick={() => scrollAttachmentTrack(-1)} aria-label="向左浏览参考内容" title="向左浏览参考内容">
-                                                <ChevronLeft aria-hidden="true" />
-                                            </button>
-                                        ) : null}
-                                        <Reorder.Group<CreationAttachment[]>
-                                            as="ul"
-                                            ref={attachmentTrackRef}
-                                            className={`creation-reference-track${trackState.isExpanded ? " is-expanded" : ""}${trackState.isDragging ? " is-dragging" : ""}${visibleAttachments.length ? "" : " is-empty"}`}
-                                            axis="x"
-                                            values={visibleAttachments}
-                                            onReorder={reorderVisibleAttachments}
-                                            layoutScroll
-                                            role="list"
-                                            aria-label="参考内容轨道"
-                                            onScroll={updateTrackScrollState}
-                                        >
-                                            {visibleAttachments.map((item) => (
-                                                <Reorder.Item<CreationAttachment>
-                                                    key={item.id}
-                                                    value={item}
-                                                    layout="position"
-                                                    drag={trackState.isExpanded && canDragReferences && !interactionBusy}
-                                                    className="creation-reference-stack-card"
-                                                    onPointerDown={beginCardDrag}
-                                                    onPointerMove={moveCardDrag}
-                                                    onPointerUp={endCardDrag}
-                                                    onPointerCancel={endCardDrag}
-                                                    onDragStart={() => {
-                                                        setDropTargetReferenceId(null);
-                                                        setTrackState((current) => ({ ...current, isDragging: true, isExpanded: true }));
-                                                    }}
-                                                    onDrag={(_, info) => {
-                                                        if (creationAttachmentKind(item) !== "image") return;
-                                                        const target = imageReferenceAtPoint(info.point.x, info.point.y);
-                                                        setDropTargetReferenceId(target?.attachmentId !== item.id ? target?.id || null : null);
-                                                    }}
-                                                    onDragEnd={(_, info) => {
-                                                        const target = creationAttachmentKind(item) === "image" ? imageReferenceAtPoint(info.point.x, info.point.y) : undefined;
-                                                        setDropTargetReferenceId(null);
-                                                        setTrackState((current) => ({ ...current, isDragging: false, isExpanded: true }));
-                                                        if (target?.attachmentId && target.attachmentId !== item.id) props.onReplaceAttachment(target.attachmentId, item);
-                                                    }}
-                                                >
-                                                    <CreationAttachmentThumbnail item={item} onPreview={previewAttachment} onRemove={props.onRemoveAttachment} />
-                                                </Reorder.Item>
-                                            ))}
-                                            {!visibleAttachments.length && props.attachments.length ? <li className="creation-reference-filter-empty">该类型暂无参考内容</li> : null}
-                                            {referencesSupported ? (
-                                                <li className="creation-reference-add-slot">
-                                                    <Tooltip title={addReferenceLabel}>
-                                                        <button type="button" className="creation-reference-add-button" onClick={props.onOpenLibrary} disabled={interactionBusy || !canAddMoreReferences} aria-label={addReferenceLabel}>
-                                                            <Plus aria-hidden="true" />
-                                                            <span>参考内容</span>
-                                                        </button>
-                                                    </Tooltip>
-                                                </li>
-                                            ) : null}
-                                        </Reorder.Group>
-                                        {trackState.canScrollRight ? (
-                                            <button type="button" className="creation-reference-track-button is-right" onClick={() => scrollAttachmentTrack(1)} aria-label="向右浏览参考内容" title="向右浏览参考内容">
-                                                <ChevronRight aria-hidden="true" />
-                                            </button>
-                                        ) : null}
-                                        {!trackState.isExpanded && props.attachments.length ? (
-                                            <Tooltip title="查看全部">
-                                                <button type="button" className="creation-reference-panel-expand" onClick={() => setReferencePanelExpanded(true)} aria-label={`查看全部 ${props.attachments.length} 个参考内容`} aria-expanded="false">
-                                                    <Maximize2 aria-hidden="true" />
-                                                </button>
-                                            </Tooltip>
-                                        ) : null}
-                                    </div>
-                                </div>
-                            </div>
+                    <div className={`creation-chat-editor${showReferences ? (referenceLayout === "stack" ? " has-reference-stack" : " has-reference-row") : ""}`}>
+                        {/* 参考素材（参考即梦）：提示词左边一摞斜放的小卡片，悬停展开；「+」选上传或素材库，
+                            展开后按住卡片拖动换顺序，拖到提示词里的 @图片 上替换那一张。 */}
+                        {showReferences ? (
+                            <CreationReferenceStack
+                                variant={props.variant}
+                                layout={referenceLayout}
+                                attachments={props.attachments}
+                                labels={referenceLabels}
+                                noun={referenceNoun}
+                                status={referenceSummary}
+                                busy={interactionBusy}
+                                uploading={props.referencePasteBusy}
+                                showAdd={referencesSupported}
+                                canAdd={!interactionBusy && canAddMoreReferences}
+                                addLabel={addReferenceLabel}
+                                onBeforeUpload={props.onBeforeUpload}
+                                onUploadFiles={props.onUploadFiles}
+                                onOpenLibrary={props.onOpenLibrary}
+                                onDropAdd={addDroppedReferences}
+                                onPreview={previewAttachment}
+                                onRemove={props.onRemoveAttachment}
+                                onMention={interactionBusy ? undefined : mentionAttachment}
+                                onReorder={props.onReorderAttachments}
+                                findPromptImageAt={imageReferenceAtPoint}
+                                onPromptDropTargetChange={setDropTargetReferenceId}
+                                onReplaceWithAttachment={props.onReplaceAttachment}
+                                onReplaceWithFiles={props.onReplaceReferenceFiles}
+                                onDropResultImage={props.onDropResultImage}
+                            />
                         ) : null}
-                        {interjectionHint ? (
-                            <p role="status" style={{ color: "var(--creation-muted)", fontSize: "var(--fs-label)" }}>
-                                {interjectionHint}
-                            </p>
-                        ) : props.mode === "agent" && props.agentInputError ? (
-                            <p className="creation-agent-error" role="alert">
-                                {props.agentInputError}
-                            </p>
-                        ) : null}
+                        <div className="creation-chat-editor-main">
+                            <CanvasResourceMentionTextarea
+                                ref={props.composerFocusRef}
+                                value={props.prompt}
+                                references={props.references}
+                                mentionMenuWidth={400}
+                                sendOnEnter
+                                onFocus={props.onPromptFocus}
+                                onChange={props.setPrompt}
+                                onSubmit={props.onSubmit}
+                                containerClassName="creation-chat-mention-container"
+                                className="creation-chat-mention-editor creation-scrollbar"
+                                style={{ color: "var(--creation-text)", height: "auto", maxHeight: "min(320px, 35dvh)" }}
+                                placeholder={props.placeholderOverride || placeholder}
+                                aria-label="创作提示词，可使用 @ 引用当前参考内容或技能；回车发送，Shift+回车换行"
+                                spellCheck
+                                disabled={interactionBusy}
+                                activeDropReferenceId={dropTargetReferenceId}
+                                onPasteFiles={props.onPasteFiles}
+                                onReferenceFilesDrop={(reference, files) => {
+                                    const target = props.references.find((item) => item.id === reference.id);
+                                    if (target?.attachmentId) props.onReplaceReferenceFiles(target.attachmentId, files);
+                                }}
+                            />
+                            {interjectionHint ? (
+                                <p role="status" style={{ color: "var(--creation-muted)", fontSize: "var(--fs-label)" }}>
+                                    {interjectionHint}
+                                </p>
+                            ) : props.mode === "agent" && props.agentInputError ? (
+                                <p className="creation-agent-error" role="alert">
+                                    {props.agentInputError}
+                                </p>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
                 <footer className="creation-chat-dock">
                     <div className="creation-chat-controls">
-                        <ModePicker mode={props.mode} variant={props.variant} audioAvailable={audioAvailable} onModeChange={props.onModeChange} onOpenShortDrama={props.onOpenShortDrama} />
+                        <CreationModePicker value={activeModeKey} options={modeOptions} variant={props.variant} onSelect={(option) => props.onModeChange(option.mode, option.audioKind)} />
                         {canOptimizePrompt ? (
                             <Tooltip title="用 AI 优化提示词">
                                 <button
@@ -606,9 +561,10 @@ export function CreationComposer(props: ComposerProps) {
                             value={props.model}
                             onChange={props.onModelChange}
                             capability={creationModelCapability(props.mode)}
+                            modelFilter={audioModelFilter}
                             requirements={props.modelRequirements}
                             className="creation-model-picker"
-                            placeholder={props.mode === "agent" ? "选择模型" : `选择${modeLabels[props.mode]}模型`}
+                            placeholder={props.mode === "agent" ? "选择模型" : `选择${musicMode ? "音乐" : modeLabels[props.mode]}模型`}
                             showSelectedPrice={false}
                             showOptionPrices
                             variant="creation"
@@ -616,6 +572,22 @@ export function CreationComposer(props: ComposerProps) {
                         {props.mode === "agent" ? (
                             <>
                                 <AgentExecutionSettings {...props} />
+                                {skillPicker ? (
+                                    <CreationSkillPicker
+                                        variant={props.variant}
+                                        skills={skillPicker.skills}
+                                        library={skillPicker.library}
+                                        status={skillPicker.status}
+                                        selectedIds={selectedSkillIds}
+                                        max={SKILL_RUNTIME_PROFILES.creation.maxSkills}
+                                        signInRequired={skillPicker.signInRequired}
+                                        disabled={interactionBusy || interjecting}
+                                        disabledReason={interjecting ? "Agent 运行中，本轮结束后可以选技能" : undefined}
+                                        onRefresh={skillPicker.onRefresh}
+                                        onToggle={toggleSkill}
+                                        onSignIn={skillPicker.onSignIn}
+                                    />
+                                ) : null}
                                 <AgentPermissionControl mode={props.agentPermissionMode} onChange={props.onAgentPermissionChange} surface="creation" />
                             </>
                         ) : null}
@@ -645,7 +617,8 @@ export function CreationComposer(props: ComposerProps) {
                                 </Tooltip>
                             </>
                         ) : null}
-                        {props.prompt.trim() || props.attachments.length || props.references.some((reference) => reference.active) ? (
+                        {/* 技能一直列在 @ 菜单里（读到技能库后都是可用状态），不算要清空的内容。 */}
+                        {props.prompt.trim() || props.attachments.length || props.references.some((reference) => reference.active && reference.kind !== "skill") ? (
                             <Tooltip title="清空提示词和参考内容">
                                 <button type="button" className="creation-chat-control is-clear" onClick={props.onClearComposer} disabled={interactionBusy} aria-label="清空提示词和参考内容">
                                     <Trash2 />
@@ -718,91 +691,14 @@ export function CreationComposer(props: ComposerProps) {
     );
 }
 
-const creationModeIcons = { agent: "auto", image: "image", video: "video", audio: "audio" } as const;
-
-/**
- * 输入框左下角的"创作类型"菜单（参考即梦 Agent 页）：按钮显示当前类型，点开是一张带说明的菜单，
- * 选中项打勾。分隔线下的"短剧制作"只是去短剧工作台的入口，不是生成类型；后台关闭短剧时不显示。
- */
-function ModePicker({ mode, variant, audioAvailable, onModeChange, onOpenShortDrama }: { mode: CreationMode; variant: "empty" | "thread"; audioAvailable: boolean; onModeChange: (mode: CreationMode) => void; onOpenShortDrama?: () => void }) {
-    const [open, setOpen] = useState(false);
-    const shortDramaEnabled = useUserStore((state) => state.features.shortDramaEnabled) && Boolean(onOpenShortDrama);
-    // 没有可用的音频模型时不显示"音频生成"，免得选了也发不出去。
-    const modeOptions = creationComposerModeOptions.filter((item) => item.key !== "audio" || audioAvailable || mode === "audio");
-    const activeItem = modeOptions.find((item) => item.key === mode) || modeOptions[0];
-    const selectMode = (key: string) => {
-        setOpen(false);
-        if (key === "short-drama") {
-            onOpenShortDrama?.();
-            return;
-        }
-        if ((key === "agent" || key === "image" || key === "video" || key === "audio") && key !== mode) onModeChange(key);
-    };
-    const menuItems = [
-        {
-            type: "group" as const,
-            key: "types",
-            label: "创作类型",
-            children: modeOptions.map((item) => ({
-                key: item.key,
-                icon: <CreationIcon name={creationModeIcons[item.key]} size={20} />,
-                label: (
-                    <span className="creation-mode-menu-item">
-                        <span className="creation-mode-menu-name">{item.label}</span>
-                        <span className="creation-mode-menu-description">{item.description}</span>
-                        {item.key === mode ? (
-                            <>
-                                <CreationIcon name="check" className="creation-mode-menu-check" />
-                                <span className="sr-only">（当前）</span>
-                            </>
-                        ) : null}
-                    </span>
-                ),
-            })),
-        },
-        ...(shortDramaEnabled
-            ? [
-                  { type: "divider" as const, key: "short-drama-divider" },
-                  {
-                      key: "short-drama",
-                      icon: <CreationIcon name="film" size={20} />,
-                      label: (
-                          <span className="creation-mode-menu-item">
-                              <span className="creation-mode-menu-name">短剧制作</span>
-                              <span className="creation-mode-menu-description">去工作台</span>
-                          </span>
-                      ),
-                  },
-              ]
-            : []),
-    ];
-    return (
-        <div className="creation-mode-dropdown" data-active-mode={mode}>
-            <Dropdown
-                open={open}
-                onOpenChange={setOpen}
-                trigger={["click"]}
-                menu={{ items: menuItems, selectedKeys: [mode], onClick: ({ key }) => selectMode(String(key)) }}
-                placement={variant === "thread" ? "topLeft" : "bottomLeft"}
-                autoAdjustOverflow
-                arrow={false}
-                classNames={{ root: "creation-mode-menu" }}
-                getPopupContainer={() => document.body}
-            >
-                <button type="button" className="creation-mode-select" aria-haspopup="menu" aria-expanded={open} aria-label={`创作类型：${activeItem.label}`}>
-                    <CreationIcon name={creationModeIcons[activeItem.key]} />
-                    <span>{activeItem.label}</span>
-                    <CreationIcon name="chevronDown" className="creation-mode-select-chevron" />
-                </button>
-            </Dropdown>
-        </div>
-    );
-}
-
 function AgentExecutionSettings(props: ComposerProps) {
     const [open, setOpen] = useState(false);
     const syncStatus = useCreationPreferencesStore((state) => state.syncStatus);
     const boundedNumber = (value: string, fallback: number, max: number) => Math.max(0, Math.min(max, Number.isFinite(Number(value)) ? Number(value) : fallback));
+    const concise = props.agentOutputPreference === "concise";
+    // 本机与账号的保存状态要分开说：只有同步完成才说"已保存到账号"。
+    const syncText =
+        syncStatus === "synced" ? "已保存到账号，换设备也能用" : syncStatus === "error" ? "已保存在本机，同步到账号失败，联网后会自动重试" : syncStatus === "saving" || syncStatus === "loading" ? "正在同步到账号…" : "已保存在本机";
     return (
         <Popover
             open={open}
@@ -812,160 +708,187 @@ function AgentExecutionSettings(props: ComposerProps) {
             arrow={false}
             classNames={{ root: "creation-control-popover", container: "creation-control-popover-surface", content: "creation-control-popover-content" }}
             content={
-                <div className="creation-agent-settings-menu">
-                    <p className="creation-agent-output-help" role="status">
-                        {syncStatus === "synced"
-                            ? "偏好已保存到当前账号"
-                            : syncStatus === "error"
-                              ? "偏好已保存在此浏览器，账号同步暂未完成，联网后会重试"
-                              : syncStatus === "saving" || syncStatus === "loading"
-                                ? "正在同步账号偏好…"
-                                : "偏好已保存在此浏览器"}
-                    </p>
-                    <section>
-                        <h3>输出偏好</h3>
-                        <div className="creation-agent-parameter-switch" role="group" aria-label="输出偏好">
-                            <button type="button" aria-pressed={props.agentOutputPreference === "concise"} onClick={() => props.onAgentOutputPreferenceChange("concise")}>
-                                简洁
-                            </button>
-                            <button type="button" aria-pressed={props.agentOutputPreference === "detailed"} onClick={() => props.onAgentOutputPreferenceChange("detailed")}>
-                                详细
-                            </button>
+                <div className="creation-agent-settings-menu creation-scrollbar" role="group" aria-label="创作偏好">
+                    <header className="creation-pref-header">
+                        <strong>创作偏好</strong>
+                        <span>改动从下一次发送开始生效</span>
+                    </header>
+                    <section className="creation-pref-group" aria-label="回复">
+                        <div className="creation-pref-row">
+                            <div className="creation-pref-copy">
+                                <strong>回复风格</strong>
+                                <span>{concise ? "先看图和要点，详细说明可以展开看" : "完整写出思路、重点和每张图的方案"}</span>
+                            </div>
+                            <div className="creation-pref-segmented" role="group" aria-label="回复风格">
+                                <button type="button" aria-pressed={concise} onClick={() => props.onAgentOutputPreferenceChange("concise")}>
+                                    简洁
+                                </button>
+                                <button type="button" aria-pressed={!concise} onClick={() => props.onAgentOutputPreferenceChange("detailed")}>
+                                    详细
+                                </button>
+                            </div>
                         </div>
-                        <p className="creation-agent-output-help">{props.agentOutputPreference === "concise" ? "直接展示图片和主要信息，完整说明可按需展开。" : "展示完整说明、重要信息和逐图方案。"}</p>
-                    </section>
-                    <section>
-                        <h3>默认图片模型</h3>
-                        <ModelPicker
-                            config={props.config}
-                            value={props.agentImageModel}
-                            onChange={props.onAgentImageModelChange}
-                            capability="image"
-                            className="creation-model-picker"
-                            placeholder="选择默认图片模型"
-                            fullWidth
-                            showSelectedPrice={false}
-                            showOptionPrices
-                            variant="creation"
-                        />
-                    </section>
-                    <section>
-                        <h3>默认视频模型</h3>
-                        <ModelPicker
-                            config={props.config}
-                            value={props.agentVideoModel}
-                            onChange={props.onAgentVideoModelChange}
-                            capability="video"
-                            className="creation-model-picker"
-                            placeholder="选择默认视频模型"
-                            fullWidth
-                            showSelectedPrice={false}
-                            showOptionPrices
-                            variant="creation"
-                        />
-                    </section>
-                    <section>
-                        <h3>模型选择</h3>
-                        <p className="creation-agent-output-help">优先使用所选模型；模型不支持当前素材或规格，或服务明确拒绝且未创建任务时，可在已授权费用内尝试兼容模型。</p>
-                        {(["image", "video"] as const).map((kind) => {
-                            const image = kind === "image";
-                            const value = image ? props.agentImageSelectionMode : props.agentVideoSelectionMode;
-                            const change = image ? props.onAgentImageSelectionModeChange : props.onAgentVideoSelectionModeChange;
-                            return (
-                                <div key={kind}>
-                                    <span>{image ? "图片" : "视频"}</span>
-                                    <div className="creation-agent-parameter-switch" role="group" aria-label={`${image ? "图片" : "视频"}模型选择`}>
-                                        <button type="button" aria-pressed={value === "preferred"} onClick={() => change("preferred")}>
-                                            优先使用
-                                        </button>
-                                        <button type="button" aria-pressed={value === "fixed"} onClick={() => change("fixed")}>
-                                            固定模型
-                                        </button>
-                                    </div>
+                        <div className="creation-pref-row">
+                            <div className="creation-pref-copy">
+                                <strong id="creation-pref-thinking">深度思考</strong>
+                                <span>先想清楚再动手，复杂需求更稳，回复会慢一点</span>
+                            </div>
+                            <Switch size="sm" checked={props.agentReasoningMode !== "off"} onChange={(checked) => props.onAgentReasoningModeChange(checked ? "auto" : "off")} aria-labelledby="creation-pref-thinking" />
+                        </div>
+                        {props.agentWebSearchAvailable ? (
+                            <div className="creation-pref-row">
+                                <div className="creation-pref-copy">
+                                    <strong id="creation-pref-web-search">联网搜索</strong>
+                                    <span>查热点和最新资料时自动上网，并附上来源；关掉后仍能读取你发的链接</span>
+                                    {props.agentWebSearchPriceMicrocredits ? <span>每次搜索 {formatCredits(props.agentWebSearchPriceMicrocredits)} 积分，没搜到结果不扣；读取网页不扣积分</span> : null}
                                 </div>
-                            );
-                        })}
+                                <Switch size="sm" checked={props.agentWebSearch !== "off"} onChange={(checked) => props.onAgentWebSearchChange(checked ? "auto" : "off")} aria-labelledby="creation-pref-web-search" />
+                            </div>
+                        ) : null}
+                    </section>
+                    <section className="creation-pref-group">
+                        <h3>默认模型</h3>
+                        <div className="creation-pref-model">
+                            <span>图片</span>
+                            <ModelPicker
+                                config={props.config}
+                                value={props.agentImageModel}
+                                onChange={props.onAgentImageModelChange}
+                                capability="image"
+                                className="creation-model-picker"
+                                placeholder="选择默认图片模型"
+                                fullWidth
+                                showSelectedPrice={false}
+                                showOptionPrices
+                                variant="creation"
+                            />
+                        </div>
+                        <div className="creation-pref-model">
+                            <span>视频</span>
+                            <ModelPicker
+                                config={props.config}
+                                value={props.agentVideoModel}
+                                onChange={props.onAgentVideoModelChange}
+                                capability="video"
+                                className="creation-model-picker"
+                                placeholder="选择默认视频模型"
+                                fullWidth
+                                showSelectedPrice={false}
+                                showOptionPrices
+                                variant="creation"
+                            />
+                        </div>
                     </section>
                     <details className="creation-agent-advanced-preferences">
-                        <summary>生成偏好与预算</summary>
+                        <summary>
+                            更多设置
+                            <span>换用模型、花费上限、图片和视频规格</span>
+                        </summary>
                         <div>
-                            <section>
-                                <h3>执行预算</h3>
-                                <div className="creation-agent-budget-grid">
-                                    <label>
-                                        积分上限
-                                        <input type="number" min="0" value={props.agentMaxCredits} onChange={(event) => props.onAgentBudgetChange("maxCredits", boundedNumber(event.target.value, 200, 100000))} />
-                                    </label>
-                                    <label>
-                                        任务上限（0 为不限）
-                                        <input type="number" min="0" value={props.agentMaxGenerationTasks} onChange={(event) => props.onAgentBudgetChange("maxGenerationTasks", boundedNumber(event.target.value, 0, 100))} />
-                                    </label>
-                                    <label>
-                                        视频总秒数
-                                        <input type="number" min="0" value={props.agentMaxVideoSeconds} onChange={(event) => props.onAgentBudgetChange("maxVideoSeconds", boundedNumber(event.target.value, 30, 3600))} />
-                                    </label>
-                                </div>
+                            <section className="creation-pref-group">
+                                <h3>模型做不了时</h3>
+                                {(["image", "video"] as const).map((kind) => {
+                                    const image = kind === "image";
+                                    const value = image ? props.agentImageSelectionMode : props.agentVideoSelectionMode;
+                                    const change = image ? props.onAgentImageSelectionModeChange : props.onAgentVideoSelectionModeChange;
+                                    const id = `creation-pref-${kind}-fallback`;
+                                    return (
+                                        <div key={kind} className="creation-pref-row">
+                                            <div className="creation-pref-copy">
+                                                <strong id={id}>{image ? "图片" : "视频"}自动换用其他模型</strong>
+                                            </div>
+                                            <Switch size="sm" checked={value === "preferred"} onChange={(checked) => change(checked ? "preferred" : "fixed")} aria-labelledby={id} />
+                                        </div>
+                                    );
+                                })}
+                                <p className="creation-pref-hint">只在所选模型做不了（不支持当前素材或尺寸）、还没开始生成时换用；花费不超过你已确认的额度。关掉则只用所选模型。</p>
                             </section>
-                            <section>
-                                <h3>图片参数</h3>
-                                <div className="creation-agent-parameter-switch">
-                                    <button type="button" aria-pressed={props.agentImageParameterMode === "auto"} onClick={() => props.onAgentImageParameterModeChange("auto")}>
-                                        自动
-                                    </button>
-                                    <button type="button" aria-pressed={props.agentImageParameterMode === "manual"} onClick={() => props.onAgentImageParameterModeChange("manual")}>
-                                        手动约束
-                                    </button>
-                                </div>
-                                {props.agentImageParameterMode === "manual" ? (
-                                    <div className="creation-agent-budget-grid">
-                                        <label>
-                                            尺寸/比例
-                                            <input value={props.agentImageSize} onChange={(event) => props.onAgentImageSettingChange("size", event.target.value)} />
-                                        </label>
-                                        <label>
-                                            质量
-                                            <input value={props.agentImageQuality} onChange={(event) => props.onAgentImageSettingChange("quality", event.target.value)} />
-                                        </label>
-                                        <label>
-                                            数量
-                                            <input type="number" min="1" value={props.agentImageCount} onChange={(event) => props.onAgentImageSettingChange("count", Math.max(1, Number(event.target.value) || 1))} />
-                                        </label>
-                                    </div>
-                                ) : null}
+                            <section className="creation-pref-group">
+                                <h3>单次花费上限</h3>
+                                <label className="creation-pref-field">
+                                    <span>最多花费</span>
+                                    <input type="number" min="0" value={props.agentMaxCredits} onChange={(event) => props.onAgentBudgetChange("maxCredits", boundedNumber(event.target.value, 200, 100000))} />
+                                    <em>积分</em>
+                                </label>
+                                <label className="creation-pref-field">
+                                    <span>最多生成</span>
+                                    <input type="number" min="0" value={props.agentMaxGenerationTasks} onChange={(event) => props.onAgentBudgetChange("maxGenerationTasks", boundedNumber(event.target.value, 0, 100))} />
+                                    <em>项</em>
+                                </label>
+                                <label className="creation-pref-field">
+                                    <span>视频总时长</span>
+                                    <input type="number" min="0" value={props.agentMaxVideoSeconds} onChange={(event) => props.onAgentBudgetChange("maxVideoSeconds", boundedNumber(event.target.value, 30, 3600))} />
+                                    <em>秒</em>
+                                </label>
+                                <p className="creation-pref-hint">每次发送最多用这么多；「最多生成」和「视频总时长」填 0 表示不限。</p>
                             </section>
-                            <section>
-                                <h3>视频参数</h3>
-                                <div className="creation-agent-parameter-switch">
-                                    <button type="button" aria-pressed={props.agentVideoParameterMode === "auto"} onClick={() => props.onAgentVideoParameterModeChange("auto")}>
-                                        自动
-                                    </button>
-                                    <button type="button" aria-pressed={props.agentVideoParameterMode === "manual"} onClick={() => props.onAgentVideoParameterModeChange("manual")}>
-                                        手动约束
-                                    </button>
-                                </div>
-                                {props.agentVideoParameterMode === "manual" ? (
-                                    <div className="creation-agent-budget-grid">
-                                        <label>
-                                            画幅
-                                            <input value={props.agentVideoSize} onChange={(event) => props.onAgentVideoSettingChange("size", event.target.value)} />
-                                        </label>
-                                        <label>
-                                            清晰度
-                                            <input value={props.agentVideoQuality} onChange={(event) => props.onAgentVideoSettingChange("quality", event.target.value)} />
-                                        </label>
-                                        <label>
-                                            时长（秒）
-                                            <input type="number" min="1" value={props.agentVideoSeconds} onChange={(event) => props.onAgentVideoSettingChange("durationSeconds", Math.max(1, Number(event.target.value) || 1))} />
-                                        </label>
-                                    </div>
-                                ) : null}
-                            </section>
+                            {(["image", "video"] as const).map((kind) => {
+                                const image = kind === "image";
+                                const manual = (image ? props.agentImageParameterMode : props.agentVideoParameterMode) === "manual";
+                                const change = image ? props.onAgentImageParameterModeChange : props.onAgentVideoParameterModeChange;
+                                const label = image ? "图片规格" : "视频规格";
+                                return (
+                                    <section key={kind} className="creation-pref-group">
+                                        <div className="creation-pref-row">
+                                            <div className="creation-pref-copy">
+                                                <strong>{label}</strong>
+                                                <span>{manual ? "按下面填的规格生成" : image ? "由阿Q 按需求决定比例、画质和张数" : "由阿Q 按需求决定画幅、清晰度和时长"}</span>
+                                            </div>
+                                            <div className="creation-pref-segmented" role="group" aria-label={label}>
+                                                <button type="button" aria-pressed={!manual} onClick={() => change("auto")}>
+                                                    自动
+                                                </button>
+                                                <button type="button" aria-pressed={manual} onClick={() => change("manual")}>
+                                                    自定义
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {manual && image ? (
+                                            <>
+                                                <label className="creation-pref-field">
+                                                    <span>比例或尺寸</span>
+                                                    <input value={props.agentImageSize} placeholder="如 16:9" onChange={(event) => props.onAgentImageSettingChange("size", event.target.value)} />
+                                                </label>
+                                                <label className="creation-pref-field">
+                                                    <span>画质</span>
+                                                    <input value={props.agentImageQuality} placeholder="auto" onChange={(event) => props.onAgentImageSettingChange("quality", event.target.value)} />
+                                                </label>
+                                                <label className="creation-pref-field">
+                                                    <span>张数</span>
+                                                    <input type="number" min="1" value={props.agentImageCount} onChange={(event) => props.onAgentImageSettingChange("count", Math.max(1, Number(event.target.value) || 1))} />
+                                                    <em>张</em>
+                                                </label>
+                                            </>
+                                        ) : null}
+                                        {manual && !image ? (
+                                            <>
+                                                <label className="creation-pref-field">
+                                                    <span>画幅</span>
+                                                    <input value={props.agentVideoSize} placeholder="如 16:9" onChange={(event) => props.onAgentVideoSettingChange("size", event.target.value)} />
+                                                </label>
+                                                <label className="creation-pref-field">
+                                                    <span>清晰度</span>
+                                                    <input value={props.agentVideoQuality} placeholder="如 720" onChange={(event) => props.onAgentVideoSettingChange("quality", event.target.value)} />
+                                                </label>
+                                                <label className="creation-pref-field">
+                                                    <span>时长</span>
+                                                    <input type="number" min="1" value={props.agentVideoSeconds} onChange={(event) => props.onAgentVideoSettingChange("durationSeconds", Math.max(1, Number(event.target.value) || 1))} />
+                                                    <em>秒</em>
+                                                </label>
+                                            </>
+                                        ) : null}
+                                    </section>
+                                );
+                            })}
                         </div>
                     </details>
+                    <p className="creation-pref-sync" role="status">
+                        {syncText}
+                    </p>
                 </div>
             }
         >
-            <button type="button" className="creation-chat-control" aria-label="Agent 创作偏好" aria-expanded={open}>
+            <button type="button" className="creation-chat-control creation-agent-preferences-trigger" aria-label="Agent 创作偏好" aria-expanded={open}>
                 <SlidersHorizontal />
                 <span>偏好</span>
             </button>
@@ -1129,7 +1052,8 @@ function GenerationSettingsMenu(props: ComposerProps) {
 function AudioSettingsMenu({ config, onChange }: { config: AiConfig; onChange: (key: CanvasAudioSettingKey, value: string) => void }) {
     const [open, setOpen] = useState(false);
     const theme = canvasThemes[useActiveTheme()];
-    const summary = isMusicAudioConfig(config) ? (musicInstrumentalForConfig(config) ? "纯音乐" : "歌曲") : [audioVoiceLabelForConfig(config, config.audioVoice) || "默认音色", audioFormatLabelForConfig(config, config.audioFormat)].filter(Boolean).join(" · ");
+    const music = isMusicAudioConfig(config);
+    const summary = music ? (musicInstrumentalForConfig(config) ? "纯音乐" : "歌曲") : [audioVoiceLabelForConfig(config, config.audioVoice) || "默认音色", audioFormatLabelForConfig(config, config.audioFormat)].filter(Boolean).join(" · ");
     return (
         <Popover
             open={open}
@@ -1146,7 +1070,7 @@ function AudioSettingsMenu({ config, onChange }: { config: AiConfig; onChange: (
                 </div>
             }
         >
-            <button type="button" className="creation-chat-control" aria-label={`音频设置：${summary}`}>
+            <button type="button" className="creation-chat-control" aria-label={`${music ? "音乐设置" : "音频设置"}：${summary}`}>
                 <SlidersHorizontal />
                 <span>{summary}</span>
                 <ChevronDown className={open ? "is-open" : ""} />

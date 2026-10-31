@@ -403,8 +403,8 @@ export default function SkillsPage() {
         />
     );
 
-    const railItem = ({ key, label, icon: Icon, count, active, nested = false, onClick }: { key: string; label: string; icon?: LucideIcon; count?: number; active: boolean; nested?: boolean; onClick: () => void }) => (
-        <button key={key} type="button" className={cn("skills-rail-item", nested && "is-nested")} aria-pressed={active} onClick={onClick}>
+    const railItem = ({ key, label, icon: Icon, count, active, nested = false, scope: itemScope, onClick }: { key: string; label: string; icon?: LucideIcon; count?: number; active: boolean; nested?: boolean; scope?: SkillScope; onClick: () => void }) => (
+        <button key={key} type="button" className={cn("skills-rail-item", nested && "is-nested")} data-scope={itemScope} aria-pressed={active} onClick={onClick}>
             {Icon ? <Icon aria-hidden="true" /> : null}
             <span className="skills-rail-item-label">{label}</span>
             {count !== undefined ? <span className="skills-rail-count">{formatSkillCount(count)}</span> : null}
@@ -420,8 +420,8 @@ export default function SkillsPage() {
 
                 <div className="skills-browser">
                     <aside className="skills-rail" aria-label="技能导航">
-                        <nav className="skills-rail-group" aria-label="技能范围">
-                            {scopeOptions.map((option) => railItem({ key: option.value, label: option.label, icon: option.icon, count: scopeCounts[option.value], active: scope === option.value, onClick: () => selectScope(option.value) }))}
+                        <nav className="skills-rail-group skills-rail-scopes" aria-label="技能范围">
+                            {scopeOptions.map((option) => railItem({ key: option.value, label: option.label, icon: option.icon, count: scopeCounts[option.value], active: scope === option.value, scope: option.value, onClick: () => selectScope(option.value) }))}
                         </nav>
 
                         {!isLibraryScope ? (
@@ -488,7 +488,7 @@ export default function SkillsPage() {
                                 <span className="app-projects-header-meta">{loading && !skills.length ? "—" : `${total} 个`}</span>
                             </div>
                             <CollectionToolbar label="搜索与排序技能" active={filtersActive} onReset={resetFilters} trailing={<><Button icon={<Sparkles className="size-4" />} onClick={() => setRecommendationsOpen(true)}>按行业推荐</Button><Button type="primary" icon={<Plus className="size-4" />} onClick={() => setInstallOpen(true)}>安装技能</Button></>}>
-                                <Input className="min-w-0 sm:!w-56" prefix={<Search />} value={search} allowClear placeholder="搜索技能或作者" aria-label="搜索技能或作者" onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
+                                <Input className="min-w-0 min-[721px]:!w-56" prefix={<Search />} value={search} allowClear placeholder="搜索技能或作者" aria-label="搜索技能或作者" onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                                 <Select aria-label="技能排序" className="w-28" value={sort} options={sortOptions} onChange={(value) => { setSort(value); setPage(1); }} />
                             </CollectionToolbar>
                         </div>

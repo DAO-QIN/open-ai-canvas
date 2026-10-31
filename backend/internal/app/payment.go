@@ -22,6 +22,8 @@ import (
 const (
 	maxActivePaymentOrdersPerUser = 5
 	maxTopupCreditsMicrocredits   = int64(1_000_000_000) * CreditScale
+	// 单笔应付金额上限：100 万主单位（元 / 美元），以最小单位计。
+	maxTopupOrderAmountFen = int64(100_000_000)
 )
 
 type PaymentProviderView struct {
@@ -71,12 +73,23 @@ type TopupProductRequest struct {
 	StockTotal          int64                   `json:"stockTotal"`
 	SaleStartAt         *time.Time              `json:"saleStartAt"`
 	SaleEndAt           *time.Time              `json:"saleEndAt"`
+	// PricingMode 为 custom 时 AmountFen / CreditsMicrocredits 表示每份售价与积分，
+	// CustomMinQuantity / CustomMaxQuantity 是用户可选的份数区间。
+	PricingMode       model.TopupPricingMode `json:"pricingMode"`
+	CustomMinQuantity int64                  `json:"customMinQuantity"`
+	CustomMaxQuantity int64                  `json:"customMaxQuantity"`
 }
 
 type CreatePaymentOrderRequest struct {
 	ProductID      string `json:"productId"`
 	ProviderID     string `json:"providerId"`
 	IdempotencyKey string `json:"idempotencyKey"`
+	// Quantity 是购买份数，只有自定义充值商品可以大于 1；省略按 1 份。
+	Quantity int64 `json:"quantity"`
+	// ExpectedAmountFen / ExpectedCreditsMicrocredits 是用户确认时看到的报价，可省略；
+	// 与按商品当前配置算出的结果不一致时返回 409 topup_quote_changed，不按新价格下单。
+	ExpectedAmountFen           int64 `json:"expectedAmountFen"`
+	ExpectedCreditsMicrocredits int64 `json:"expectedCreditsMicrocredits"`
 }
 
 type PaymentCheckoutView struct {
@@ -145,8 +158,8 @@ func (s *Service) CreatePaymentOrder(ctx context.Context, actor *model.User, req
 	productID := strings.TrimSpace(request.ProductID)
 	providerID := strings.TrimSpace(request.ProviderID)
 	if existing, err := s.repo.PaymentOrderByIdempotency(actor.ID, idempotencyKey); err == nil {
-		if existing.ProductID != productID || existing.ProviderID != providerID {
-			return nil, NewAppError(http.StatusConflict, "支付幂等标识已用于不同的商品或支付渠道")
+		if existing.ProductID != productID || existing.ProviderID != providerID || paymentOrderQuantity(existing.Quantity) != paymentOrderQuantity(request.Quantity) {
+			return nil, NewAppError(http.StatusConflict, "支付幂等标识已用于不同的商品、数量或支付渠道")
 		}
 		result := paymentOrderView(*existing)
 		return &result, nil
@@ -162,6 +175,13 @@ func (s *Service) CreatePaymentOrder(ctx context.Context, actor *model.User, req
 		if err := s.RequireFeature(FeatureCredits); err != nil {
 			return nil, err
 		}
+	}
+	quote, err := quoteTopupProduct(*product, request.Quantity)
+	if err != nil {
+		return nil, err
+	}
+	if (request.ExpectedAmountFen > 0 && request.ExpectedAmountFen != quote.AmountFen) || (request.ExpectedCreditsMicrocredits > 0 && request.ExpectedCreditsMicrocredits != quote.CreditsMicrocredits) {
+		return nil, topupQuoteChangedError()
 	}
 	provider, ok := s.paymentRegistry.Get(providerID)
 	if !ok {
@@ -187,7 +207,7 @@ func (s *Service) CreatePaymentOrder(ctx context.Context, actor *model.User, req
 		ProductID: product.ID, ProductName: product.Name, ProductKind: topupProductKind(product.Kind),
 		StorageBytes: product.StorageBytes, StorageDurationDays: product.StorageDurationDays, ProviderID: provider.Descriptor().ID,
 		PluginID: provider.Descriptor().PluginID, PluginVersion: provider.Descriptor().PluginVersion, ProviderConfigID: config.ID, ProviderConfigVersion: config.Version,
-		AmountFen: product.AmountFen, Currency: firstNonEmpty(product.Currency, model.PriceCurrencyCNY), CreditsMicrocredits: product.CreditsMicrocredits,
+		Quantity: quote.Quantity, AmountFen: quote.AmountFen, Currency: firstNonEmpty(product.Currency, model.PriceCurrencyCNY), CreditsMicrocredits: quote.CreditsMicrocredits,
 		Status: model.PaymentOrderCreated, CheckoutMode: provider.Descriptor().CheckoutMode,
 		ExpiresAt: now.Add(time.Duration(config.CloseAfterMinutes) * time.Minute),
 	}
@@ -563,6 +583,28 @@ func topupProductKind(kind model.TopupProductKind) model.TopupProductKind {
 		return kind
 	}
 	return model.TopupProductKindCredits
+}
+
+// topupPricingMode 把迁移前或未填写的计价方式视为固定套餐。
+func topupPricingMode(mode model.TopupPricingMode) model.TopupPricingMode {
+	if mode == model.TopupPricingCustom {
+		return mode
+	}
+	return model.TopupPricingFixed
+}
+
+// paymentOrderQuantity 把未填写的份数视为 1 份，用于幂等重放比对。
+func paymentOrderQuantity(quantity int64) int64 {
+	if quantity <= 0 {
+		return 1
+	}
+	return quantity
+}
+
+func topupQuoteChangedError() *AppError {
+	err := NewAppError(http.StatusConflict, "充值价格已更新，请确认新的金额后再支付")
+	err.Reason = ReasonTopupQuoteChanged
+	return err
 }
 
 func paymentOrderView(order model.PaymentOrder) PaymentOrderView {

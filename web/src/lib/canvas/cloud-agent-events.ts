@@ -10,6 +10,7 @@ import type { CloudAgentChatMessage, CloudAgentPlanItem } from "@/components/can
 import { AGENT_APPROVAL_SUPERSEDED_BY_NODE } from "@/lib/canvas/agent-media-approval";
 import { agentToolRetry, mergeAgentToolRetry } from "@/lib/canvas/agent-tool-retry";
 import { agentErrorPresentation } from "@/lib/canvas/agent-error-presentation";
+import { agentWebToolRunningLabel } from "@/lib/agent-web-tools";
 
 /** 待用户处理的 Agent 审批（面板状态与事件归约共用）。 */
 export type ApprovalState = { approvalId: string; detail: Record<string, unknown>; reason: string };
@@ -313,6 +314,8 @@ export function applyAgentEvent(
         setMessages((current) => appendUniqueMessage(current, { id: `skill-suggestion-${event.runId}`, role: "system", text: reason || "Agent 推荐安装技能", skillSuggestion: { reason, skills } }));
         return;
     }
+    // 画布的工具记录在结束时才落一行；联网工具的开始事件只驱动对话末尾的进行中提示（reduceAgentRunningTools）。
+    if (event.type === "tool_started") return;
     // 这两个工具成功时已有专门的记忆卡片和安装卡片，不再重复渲染通用工具行；失败仍按工具行展示。
     if (event.type === "tool_completed" && (payload.toolName === "memory_update" || payload.toolName === "skill_recommend")) return;
     if (event.type === "canvas_undone") {
@@ -379,6 +382,37 @@ export function applyAgentEvent(
         return;
     }
     if (event.type === "run_failed" || event.type === "error") setMessages((current) => upsertRunFailure(current, event, text));
+}
+
+/** 正在执行、已上报开始的工具（目前只有联网工具上报），按调用 ID 记录展示文案。 */
+export type AgentRunningTools = { runId: string; items: ReadonlyArray<{ callId: string; label: string }> };
+
+export const EMPTY_AGENT_RUNNING_TOOLS: AgentRunningTools = { runId: "", items: [] };
+
+const TERMINAL_RUN_STATUSES = new Set(["completed", "failed", "cancelled", "rejected"]);
+
+/**
+ * 联网搜索、读取网页要等出站请求，期间对话末尾显示「正在联网搜索「…」」而不是笼统的"正在思考"。
+ * 开始事件按调用 ID 记下，结束或失败事件移除；运行终止时清空，避免停在半路的调用一直显示进行中。
+ * 没有变化时返回原对象，状态不触发重渲染。
+ */
+export function reduceAgentRunningTools(current: AgentRunningTools, event: AgentEvent): AgentRunningTools {
+    const base = current.runId === event.runId ? current : { runId: event.runId, items: [] };
+    const payload = event.payload || {};
+    const callId = typeof payload.callId === "string" ? payload.callId : "";
+    if (event.type === "tool_started") {
+        const label = agentWebToolRunningLabel(String(payload.toolName || ""), payload);
+        if (!callId || !label || base.items.some((item) => item.callId === callId)) return base;
+        return { runId: event.runId, items: [...base.items, { callId, label }] };
+    }
+    if (!base.items.length) return base;
+    if ((event.type === "tool_completed" || event.type === "tool_failed") && base.items.some((item) => item.callId === callId)) {
+        return { runId: event.runId, items: base.items.filter((item) => item.callId !== callId) };
+    }
+    if (event.type === "run_cancelled" || event.type === "run_failed" || (event.type === "run_status" && TERMINAL_RUN_STATUSES.has(String(payload.status || "")))) {
+        return { runId: event.runId, items: [] };
+    }
+    return base;
 }
 
 function upsertRunFailure(current: CloudAgentChatMessage[], event: AgentEvent, text: string) {

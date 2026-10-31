@@ -10,11 +10,12 @@ import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { audioMetadata, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-generation-task-sync";
 import { createCanvasNode } from "@/lib/canvas/canvas-project-domain";
 import { isAudioFile } from "@/lib/canvas/canvas-project-generation";
-import { fitImageNodeSize, fitNodeSize, VIDEO_NODE_MAX_SIZE } from "@/lib/canvas/canvas-node-size";
-import { CANVAS_UPLOAD_ACCEPT, createFileUploadPlaceholder, uploadNodeType, uploadPercent } from "@/lib/canvas/canvas-file-upload";
+import { fitImageNodeSize, fitNodeSize, knownMediaSize, VIDEO_NODE_MAX_SIZE } from "@/lib/canvas/canvas-node-size";
+import { CANVAS_UPLOAD_ACCEPT, createFileUploadPlaceholder, readVideoSourceSize, uploadNodeType, uploadPercent } from "@/lib/canvas/canvas-file-upload";
+import { layoutInsertedNodes } from "@/lib/canvas/canvas-layout";
 import { recordReplacedMediaVersion } from "@/lib/canvas/canvas-media-versions";
-import { resourceIdFromStorageKey, resourceStorageKey, uploadResourceFile } from "@/services/api/resources";
-import { uploadMediaFile } from "@/services/file-storage";
+import { getResource, resourceIdFromStorageKey, resourceStorageKey, uploadResourceFile } from "@/services/api/resources";
+import { resolveVideoMediaUrl, uploadMediaFile } from "@/services/file-storage";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { prepareCanvasImage } from "@/services/canvas-image-loader";
 import { registerUploadPreview, releaseUploadPreview } from "@/services/canvas-upload-preview";
@@ -82,6 +83,45 @@ async function warmUploadedImage(storageKey?: string) {
         // 预热只是体验优化；节点仍会按正常资源加载路径显示。
     } finally {
         window.clearTimeout(timer);
+    }
+}
+
+const VIDEO_SIZE_PROBE_TIMEOUT_MS = 8000;
+const RESOURCE_SIZE_LOOKUP_TIMEOUT_MS = 5000;
+
+/**
+ * 素材记录里的宽高可能只是占位：生成结果转存完成前登记为 0、后端补成 1，或浏览器按 1024 兜底。
+ * 已上传的媒体以资源记录里实测的像素为准；读取失败或超时只放弃校正，图片节点解码后仍会按实际像素修正。
+ */
+async function resourceMediaSize(storageKey?: string) {
+    const resourceId = resourceIdFromStorageKey(storageKey);
+    if (!resourceId) return undefined;
+    let timer: number | undefined;
+    try {
+        // getResource 不设超时；这里只是插入前的尺寸校正，等不到就按素材记录插入，不能卡住整次插入。
+        const resource = await Promise.race([getResource(resourceId), new Promise<undefined>((resolve) => (timer = window.setTimeout(() => resolve(undefined), RESOURCE_SIZE_LOOKUP_TIMEOUT_MS)))]);
+        return resource ? knownMediaSize(resource.width, resource.height) : undefined;
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
+        return undefined;
+    } finally {
+        window.clearTimeout(timer);
+    }
+}
+
+/** 生成视频的资源记录不带画面尺寸，素材里也只有占位时读一次视频元数据，竖屏视频才不会进 16:9 的框。 */
+async function insertedVideoSize(payload: { url: string; storageKey?: string; width?: number; height?: number }) {
+    const known = (await resourceMediaSize(payload.storageKey)) || knownMediaSize(payload.width, payload.height);
+    if (known) return known;
+    try {
+        // 与节点播放用同一个地址（有浏览器兼容副本时用副本）；访问地址有缓存，节点随后播放不会重复签发。
+        const source = payload.storageKey ? await resolveVideoMediaUrl(payload.storageKey, payload.url) : payload.url;
+        if (!source) return undefined;
+        const [width, height] = await readVideoSourceSize(source, VIDEO_SIZE_PROBE_TIMEOUT_MS);
+        return knownMediaSize(width, height);
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
+        return undefined;
     }
 }
 
@@ -331,7 +371,8 @@ export function useCanvasUpload({ canvasId, domainProjectId, nodesRef, selectedN
                     message.error("素材图片不可用");
                     return;
                 }
-                const size = fitImageNodeSize(asset.data.width || NODE_DEFAULT_SIZE[CanvasNodeType.Image].width, asset.data.height || NODE_DEFAULT_SIZE[CanvasNodeType.Image].height);
+                const pixels = (await resourceMediaSize(asset.data.storageKey)) || knownMediaSize(asset.data.width, asset.data.height);
+                const size = fitImageNodeSize(pixels?.width || NODE_DEFAULT_SIZE[CanvasNodeType.Image].width, pixels?.height || NODE_DEFAULT_SIZE[CanvasNodeType.Image].height);
                 const center = position || getCanvasCenter();
                 const id = `image-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
                 const node: CanvasNodeData = {
@@ -345,8 +386,8 @@ export function useCanvasUpload({ canvasId, domainProjectId, nodesRef, selectedN
                         content,
                         storageKey: asset.data.storageKey,
                         status: NODE_STATUS_SUCCESS,
-                        naturalWidth: asset.data.width,
-                        naturalHeight: asset.data.height,
+                        naturalWidth: pixels?.width,
+                        naturalHeight: pixels?.height,
                         bytes: asset.data.bytes || getDataUrlByteSize(content.startsWith("data:") ? content : ""),
                         mimeType: asset.data.mimeType || "image/png",
                         prompt: typeof asset.metadata?.prompt === "string" ? asset.metadata.prompt : asset.title,
@@ -865,7 +906,8 @@ export function useCanvasUpload({ canvasId, domainProjectId, nodesRef, selectedN
         }
         if (payload.kind === "video") {
             const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
-            const size = fitNodeSize(payload.width || spec.width, payload.height || spec.height, VIDEO_NODE_MAX_SIZE.width, VIDEO_NODE_MAX_SIZE.height);
+            const pixels = await insertedVideoSize(payload);
+            const size = fitNodeSize(pixels?.width || spec.width, pixels?.height || spec.height, VIDEO_NODE_MAX_SIZE.width, VIDEO_NODE_MAX_SIZE.height);
             const id = `video-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
             return {
                 id,
@@ -878,8 +920,8 @@ export function useCanvasUpload({ canvasId, domainProjectId, nodesRef, selectedN
                     content: payload.url,
                     storageKey: payload.storageKey,
                     status: NODE_STATUS_SUCCESS,
-                    naturalWidth: payload.width,
-                    naturalHeight: payload.height,
+                    naturalWidth: pixels?.width,
+                    naturalHeight: pixels?.height,
                     durationMs: payload.durationMs,
                     hasAudio: payload.hasAudio,
                     bytes: payload.bytes,
@@ -888,21 +930,33 @@ export function useCanvasUpload({ canvasId, domainProjectId, nodesRef, selectedN
                 },
             } satisfies CanvasNodeData;
         }
-        const storedImage = payload.url
-            ? { url: payload.url, storageKey: undefined, width: payload.width || 1, height: payload.height || 1, bytes: payload.bytes || 0, mimeType: payload.mimeType || "image/png" }
-            : payload.storageKey
-              ? { url: payload.dataUrl, storageKey: payload.storageKey, width: payload.width || 1, height: payload.height || 1, bytes: payload.bytes || 0, mimeType: payload.mimeType || "image/png" }
-              : await uploadImage(payload.dataUrl);
+        const id = `image-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const title = payload.title.slice(0, 32) || "Generated Image";
+        if (payload.storageKey && !payload.url) {
+            // 素材库里的图片（含创作页转入）：节点按实测像素定比例；仍未知时用默认画框且不写原图尺寸，节点解码后按实际像素校正。
+            const pixels = (await resourceMediaSize(payload.storageKey)) || knownMediaSize(payload.width, payload.height);
+            const size = fitImageNodeSize(pixels?.width || NODE_DEFAULT_SIZE[CanvasNodeType.Image].width, pixels?.height || NODE_DEFAULT_SIZE[CanvasNodeType.Image].height);
+            const metadata = imageMetadata({ url: payload.dataUrl, storageKey: payload.storageKey, width: pixels?.width || 0, height: pixels?.height || 0, bytes: payload.bytes || 0, mimeType: payload.mimeType || "image/png" });
+            return {
+                id,
+                type: CanvasNodeType.Image,
+                title,
+                position: { x: center.x - size.width / 2, y: center.y - size.height / 2 },
+                width: size.width,
+                height: size.height,
+                metadata: { ...metadata, naturalWidth: pixels?.width, naturalHeight: pixels?.height, prompt: payload.title, assetId: payload.assetId },
+            } satisfies CanvasNodeData;
+        }
+        const storedImage = payload.url ? { url: payload.url, storageKey: undefined, width: payload.width || 1, height: payload.height || 1, bytes: payload.bytes || 0, mimeType: payload.mimeType || "image/png" } : await uploadImage(payload.dataUrl);
         const meta = !payload.storageKey && (!payload.width || !payload.height) ? await readImageMeta(storedImage.url) : storedImage;
         const size = fitImageNodeSize(meta.width, meta.height);
-        const id = `image-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const metadata = storedImage.storageKey
             ? imageMetadata({ ...storedImage, storageKey: storedImage.storageKey, width: meta.width, height: meta.height })
             : { content: storedImage.url, status: NODE_STATUS_SUCCESS, naturalWidth: meta.width, naturalHeight: meta.height, bytes: storedImage.bytes, mimeType: storedImage.mimeType };
         return {
             id,
             type: CanvasNodeType.Image,
-            title: payload.title.slice(0, 32) || "Generated Image",
+            title,
             position: { x: center.x - size.width / 2, y: center.y - size.height / 2 },
             width: size.width,
             height: size.height,
@@ -913,14 +967,10 @@ export function useCanvasUpload({ canvasId, domainProjectId, nodesRef, selectedN
     const insertAssetPayloads = useCallback(
         async (payloads: InsertAssetPayload[], origin: Position, successMessage: string, failureMessage: string): Promise<CanvasNodeData[]> => {
             try {
-                const created = await Promise.all(
-                    payloads.map((payload, index) =>
-                        createAssetPayloadNode(payload, {
-                            x: origin.x + (index % BATCH_UPLOAD_COLUMNS) * BATCH_UPLOAD_COLUMN_GAP,
-                            y: origin.y + Math.floor(index / BATCH_UPLOAD_COLUMNS) * BATCH_UPLOAD_ROW_GAP,
-                        }),
-                    ),
-                );
+                const nodes = await Promise.all(payloads.map((payload) => createAssetPayloadNode(payload, origin)));
+                // 节点按真实比例定尺寸后宽高各不相同，按实际宽高排开，固定间距会让大图互相压住。
+                const positions = layoutInsertedNodes(nodes, origin, BATCH_UPLOAD_COLUMNS);
+                const created = nodes.map((node, index) => ({ ...node, position: positions[index] }));
                 setNodes((current) => [...current, ...created]);
                 setSelectedNodeIds(new Set(created.map((node) => node.id)));
                 setSelectedConnectionId(null);

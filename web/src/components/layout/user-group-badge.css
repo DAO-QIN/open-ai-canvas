@@ -1,35 +1,48 @@
-/* 用户分组徽章的组件级 token：只在这里取色，其他位置通过 is-vip / is-svip 引用。 */
-b.user-group-badge,
-.user-group-avatar-ring {
-    --user-group-vip-from: var(--status-warning, #d99a1e);
-    --user-group-vip-to: color-mix(in srgb, var(--status-warning, #d99a1e) 55%, #fff4c2);
-    --user-group-vip-ink: color-mix(in srgb, var(--status-warning, #d99a1e) 35%, #2b1d00);
-    --user-group-svip-from: var(--product-accent-violet, #6b4fc2);
-    --user-group-svip-to: var(--product-accent-pink, #ae4c77);
-    --user-group-svip-ink: #ffffff;
-}
+/* 用户分组徽章（铭牌）与头像框。颜色只取 globals.css Layer 3 的 --user-group-* token：
+   vip 香槟金箔铭牌 + 金属头像环；svip 黑曜石铭牌 + 紫粉极光描边，流光定期扫过，头像环缓慢流转。
+   明暗主题共用同一套材质，投影 / 光晕的差异由 token 在 .dark 下切换。 */
 
 b.user-group-badge {
+    position: relative;
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
     gap: 3px;
+    max-width: 100%;
     height: 18px;
-    padding: 0 6px;
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 700;
+    padding: 0 6px 0 5px;
+    overflow: hidden;
+    border-radius: var(--r-xs);
+    font-family: var(--font-sans);
+    font-size: var(--fs-label);
     font-style: normal;
-    letter-spacing: 0.04em;
+    font-weight: 600;
+    letter-spacing: var(--ls-caps);
     line-height: 1;
     white-space: nowrap;
+    vertical-align: middle;
+    /* 强制色彩模式会去掉渐变与内阴影；透明描边会被系统色补成可见边框，铭牌轮廓不丢。 */
+    outline: 1px solid transparent;
+    outline-offset: -1px;
 }
 
-b.user-group-badge > svg {
-    width: 11px;
-    height: 11px;
+/* 徽章文字最多 16 个字：超出所在行时截断，不撑破侧栏和账户卡片。
+   行高放到 1.25，截断用的 overflow 才不会切掉 p、g 这类下伸笔画。 */
+b.user-group-badge > .user-group-badge-label {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: inherit;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+}
+
+/* 选择器带上 b.user-group-badge：账户卡给内部所有 svg 统一设了 16px 和描边宽度，这里要压过它。 */
+b.user-group-badge > .user-group-badge-glyph {
+    width: 12px;
+    height: 9px;
     flex-shrink: 0;
-    stroke-width: 2.2;
+    fill: currentColor;
+    stroke: none;
 }
 
 b.user-group-badge.is-compact {
@@ -39,77 +52,173 @@ b.user-group-badge.is-compact {
     justify-content: center;
 }
 
-b.user-group-badge.is-compact > svg {
+b.user-group-badge.is-compact > .user-group-badge-glyph {
     width: 10px;
-    height: 10px;
+    height: 7.5px;
 }
 
+/* vip 香槟金箔：斜向两道反光 + 上半部柔光；顶边一线高光、其余三边暗金细线，像压印的金属铭牌。 */
 b.user-group-badge.is-vip {
     color: var(--user-group-vip-ink);
-    background: linear-gradient(135deg, var(--user-group-vip-to), var(--user-group-vip-from));
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--user-group-vip-from) 45%, transparent);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--user-group-vip-highlight) 60%, transparent), transparent 55%),
+        linear-gradient(110deg, var(--user-group-vip-light) 0%, var(--user-group-vip-base) 40%, var(--user-group-vip-light) 64%, var(--user-group-vip-base) 100%);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--user-group-vip-highlight) 80%, transparent),
+        inset 0 0 0 1px color-mix(in srgb, var(--user-group-vip-deep) 40%, transparent),
+        var(--user-group-vip-shadow);
 }
 
+/* svip 黑曜石：padding-box / border-box 双层背景画出 1px 极光描边；文字与钻石取浅紫到浅粉。 */
 b.user-group-badge.is-svip {
-    position: relative;
-    overflow: hidden;
-    color: var(--user-group-svip-ink);
-    background: linear-gradient(135deg, var(--user-group-svip-from), var(--user-group-svip-to));
-    box-shadow: 0 0 10px color-mix(in srgb, var(--user-group-svip-from) 45%, transparent);
+    padding: 0 5px 0 4px;
+    border: 1px solid transparent;
+    color: var(--user-group-svip-ink-violet);
+    background:
+        linear-gradient(180deg, var(--user-group-svip-plate-top), var(--user-group-svip-plate-bottom)) padding-box,
+        linear-gradient(110deg, var(--user-group-svip-violet), var(--user-group-svip-pink) 55%, var(--user-group-svip-violet)) border-box;
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--user-group-svip-sheen) 14%, transparent),
+        var(--user-group-svip-shadow);
 }
 
-/* svip 流光：一条斜向高光周期性扫过徽章。 */
+b.user-group-badge.is-svip.is-compact {
+    padding: 0;
+}
+
+b.user-group-badge.is-svip > .user-group-badge-label {
+    background: linear-gradient(100deg, var(--user-group-svip-ink-violet) 10%, var(--user-group-svip-ink-pink) 90%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+b.user-group-badge.is-svip > .user-group-badge-glyph .is-crown {
+    fill: var(--user-group-svip-ink-violet);
+}
+
+b.user-group-badge.is-svip > .user-group-badge-glyph .is-pavilion {
+    fill: var(--user-group-svip-ink-pink);
+}
+
+b.user-group-badge.is-svip > .user-group-badge-glyph .is-facet {
+    fill: var(--user-group-svip-sheen);
+    opacity: 0.55;
+}
+
+/* svip 流光：一道斜向柔光每 5 秒扫过铭牌一次，其余时间静止，不在侧栏里持续闪动。 */
 b.user-group-badge.is-svip::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.55) 50%, transparent 70%);
-    transform: translateX(-120%);
-    animation: user-group-badge-shine 3.2s ease-in-out infinite;
+    background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--user-group-svip-sheen) 36%, transparent) 50%, transparent 70%);
+    transform: translateX(-110%);
+    animation: user-group-badge-sweep 5s ease-in-out infinite;
     pointer-events: none;
 }
 
-@keyframes user-group-badge-shine {
+@keyframes user-group-badge-sweep {
     0%,
-    55% {
-        transform: translateX(-120%);
+    64% {
+        transform: translateX(-110%);
     }
     100% {
-        transform: translateX(120%);
+        transform: translateX(110%);
     }
 }
 
+/* 头像框：外圈 2px 金属 / 极光环，与头像之间留 1px 透出底色，像镶嵌的戒托。
+   环用遮罩挖空中心，不在头像背后铺色：透明头像、悬停底色都保持原样。 */
 .user-group-avatar-ring {
     position: relative;
     display: inline-grid;
     flex-shrink: 0;
     place-items: center;
-    border-radius: 999px;
+    border-radius: var(--r-full);
 }
 
-.user-group-avatar-ring.is-vip,
-.user-group-avatar-ring.is-svip {
+.user-group-avatar-ring:is(.is-vip, .is-svip) {
+    padding: 3px;
+}
+
+.user-group-avatar-ring:is(.is-vip, .is-svip)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
     padding: 2px;
+    border-radius: inherit;
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+        linear-gradient(#000 0 0) content-box exclude,
+        linear-gradient(#000 0 0);
+    pointer-events: none;
 }
 
-.user-group-avatar-ring.is-vip {
-    background: linear-gradient(135deg, var(--user-group-vip-to), var(--user-group-vip-from));
+/* 头像自带的描边环（如账户卡头像的 hairline）会和会员环叠成双圈，环内统一去掉。 */
+.user-group-avatar-ring:is(.is-vip, .is-svip) > * {
+    box-shadow: none;
+}
+
+/* :where 把特异性压到最低：调用方已有圆角时不覆盖，方形图标兜底才裁成圆形贴合环。 */
+.user-group-avatar-ring:where(.is-vip, .is-svip) > :where(*) {
+    border-radius: var(--r-full);
+}
+
+/* vip：光从左上方来，左上与右下各一道亮面，其余在金与暗金之间过渡。 */
+.user-group-avatar-ring.is-vip::before {
+    background: conic-gradient(
+        var(--user-group-vip-base),
+        var(--user-group-vip-deep) 16%,
+        var(--user-group-vip-base) 30%,
+        var(--user-group-vip-light) 40%,
+        var(--user-group-vip-base) 52%,
+        var(--user-group-vip-deep) 66%,
+        var(--user-group-vip-base) 78%,
+        var(--user-group-vip-light) 88%,
+        var(--user-group-vip-base)
+    );
+}
+
+/* 注册为角度后 conic-gradient 的起点可以插值，极光沿环流转而不是整圈跳变。 */
+@property --user-group-ring-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
 }
 
 .user-group-avatar-ring.is-svip {
-    background: conic-gradient(from 0deg, var(--user-group-svip-from), var(--user-group-svip-to), var(--user-group-svip-from));
-    box-shadow: 0 0 12px color-mix(in srgb, var(--user-group-svip-from) 50%, transparent);
+    box-shadow: var(--user-group-svip-glow);
 }
 
-/* :where 把特异性压到最低：头像自带背景时保留原背景，透明头像才补表面色，避免渐变透出图标底。 */
-.user-group-avatar-ring:where(.is-vip, .is-svip) > :where(*) {
-    border-radius: 999px;
-    background: var(--user-surface, var(--background, #fff));
+.user-group-avatar-ring.is-svip::before {
+    /* 不支持 @property 的浏览器拿不到初始值，没有兜底时整条背景失效、环会消失。 */
+    background: conic-gradient(from var(--user-group-ring-angle, 0deg), var(--user-group-svip-violet), var(--user-group-svip-pink) 30%, var(--user-group-svip-ink-violet) 50%, var(--user-group-svip-pink) 70%, var(--user-group-svip-violet));
+    animation: user-group-ring-flow 10s linear infinite;
+}
+
+@keyframes user-group-ring-flow {
+    to {
+        --user-group-ring-angle: 360deg;
+    }
+}
+
+/* 强制色彩模式会去掉渐变背景，透明文字填充必须还原，否则 svip 文字整段消失。 */
+@media (forced-colors: active) {
+    b.user-group-badge.is-svip > .user-group-badge-label {
+        -webkit-text-fill-color: currentColor;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     b.user-group-badge.is-svip::after {
-        animation: none;
         display: none;
+        animation: none;
+    }
+
+    .user-group-avatar-ring.is-svip::before {
+        animation: none;
     }
 }

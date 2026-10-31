@@ -1,8 +1,8 @@
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "motion/react";
-import { ChevronDown, ChevronUp, Clock3, Coins, ListTodo, LoaderCircle, XCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock3, ListTodo, LoaderCircle, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { formatCredits } from "@/constant/credits";
+import { CreditIcon, formatCredits } from "@/constant/credits";
 import { aceternityMotion } from "@/lib/aceternity-motion";
 import { canCancelGenerationTask, formatTaskKind, generationTaskShowsProgress, generationTaskStageLabel, generationTaskStatusLabel } from "@/lib/generation-task-display";
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -200,7 +200,7 @@ function ActiveTaskCard({
                         </span>
                         {creditsEnabled ? (
                             <span className="inline-flex min-w-0 items-center justify-end gap-1 truncate" title={billingLabel}>
-                                <Coins className="size-3 shrink-0" />
+                                <CreditIcon className="size-3 shrink-0" />
                                 {billingLabel}
                             </span>
                         ) : null}

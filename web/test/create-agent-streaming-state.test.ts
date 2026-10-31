@@ -28,11 +28,14 @@ test("恢复中的活动正文仍是流式，最终事件和终态不被旧快�
     }
 });
 
-test("只使用实际工具结果的固定活动标签，内部思考与工具正文不进入可见回复", () => {
-    const events = [event(1, "reasoning_delta", { text: "私有推理细节" }), event(2, "tool_completed", { toolName: "creation_media_read", text: "私有素材路径与完整工具 JSON" })];
+test("思考只进入可折叠的执行过程，工具只用固定文案，二者都不混入正文", () => {
+    const events = [event(1, "reasoning_delta", { text: "模型返回的思考摘要" }), event(2, "tool_completed", { toolName: "creation_media_read", text: "私有素材路径与完整工具 JSON" })];
     const message = project(events);
     expect(message.content).toBe("");
     expect(message.reasoning).toBeUndefined();
+    expect(message.agentSteps?.map((step) => step.kind)).toEqual(["reasoning", "tool"]);
+    expect(message.agentSteps?.[0]).toMatchObject({ kind: "reasoning", text: "模型返回的思考摘要", streaming: false });
+    expect(JSON.stringify(message.agentSteps)).not.toContain("私有素材路径");
     expect(message.agentTextStreaming).toBe(false);
     expect(message.agentActivity).toBe("已查询创作素材");
     expect(project([...events, event(3, "assistant_message", { text: "素材已处理。" })], { status: "completed" }).agentActivity).toBeUndefined();

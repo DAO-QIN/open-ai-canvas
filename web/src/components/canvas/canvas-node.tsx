@@ -221,11 +221,14 @@ export const CanvasNode = React.memo(function CanvasNode({
                 height: data.height,
                 contain: "layout style",
             }}
-            onMouseEnter={() => {
+            // 悬停只认鼠标和触控笔：触屏轻点后浏览器补发的 mouseenter 会让连接点、缩放把手一直停留在节点上。
+            onPointerEnter={(event) => {
+                if (event.pointerType === "touch") return;
                 setHovered(true);
                 onHoverStart(data.id);
             }}
-            onMouseLeave={() => {
+            onPointerLeave={(event) => {
+                if (event.pointerType === "touch") return;
                 setHovered(false);
                 onHoverEnd(data.id);
             }}

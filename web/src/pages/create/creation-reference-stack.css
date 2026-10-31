@@ -1,0 +1,478 @@
+/* 参考素材卡片堆（creation-reference-stack.tsx，参考即梦）。
+   鼠标设备：提示词左边一摞斜放的 3:4 小卡片，悬停按顺序展开，最后是虚线「+」；收起时「+」缩成右下角的小圆点。
+   触屏：卡片平铺在提示词上方，横向滑动。卡片尺寸、间距和张数由组件写进 --ref-* 变量。 */
+
+/* 有参考素材时输入区的排布：鼠标设备卡片在左、提示词在右；触屏卡片一行在上。 */
+.creation-home .creation-chat-editor.has-reference-stack {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+}
+.creation-home .creation-chat-editor.has-reference-row {
+    display: grid;
+    gap: var(--space-1);
+}
+.creation-home .creation-chat-editor-main {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.creation-home .creation-reference-stack {
+    --ref-pad-x: 8px;
+    --ref-pad-y: 10px;
+    /* 悬停 / 拖动 / 拖入时卡片上浮多少、放大多少；拖动中的位置（组件里的内联样式）也引用 --ref-lift。 */
+    --ref-lift: -8px;
+    --ref-lift-scale: 1.125;
+    --ref-radius: var(--r-xs);
+    --ref-motion: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    --ref-frame: color-mix(in srgb, var(--color-neutral-0) 72%, transparent);
+    --ref-shadow: 0 2px 8px color-mix(in srgb, var(--color-neutral-950) 32%, transparent);
+    --ref-lift-shadow: 0 12px 24px color-mix(in srgb, var(--color-neutral-950) 40%, transparent);
+    position: relative;
+    /* 提示词的可编辑层是 z-10（canvas-resource-mention-textarea）：展开的卡片盖在它上面，
+       指针从一张移到另一张、点开预览、拖放替换时才落在卡片上，而不是落进输入框后把整摞收起。 */
+    z-index: 11;
+    flex: 0 0 auto;
+    width: calc(var(--ref-card-w) + var(--ref-pad-x) * 2);
+    height: calc(var(--ref-card-h) + var(--ref-pad-y) * 2);
+    /* 四周留给斜放和上浮的余量；用负边距抵掉，卡片左上角和提示词第一行对齐。 */
+    margin: calc(var(--ref-pad-y) * -1) 0 calc(var(--ref-pad-y) * -1) calc(var(--ref-pad-x) * -1);
+    user-select: none;
+}
+html:not(.dark) .creation-home .creation-reference-stack {
+    --ref-shadow: 0 2px 8px color-mix(in srgb, var(--color-neutral-950) 14%, transparent);
+    --ref-lift-shadow: 0 12px 24px color-mix(in srgb, var(--color-neutral-950) 18%, transparent);
+}
+
+/* 展开后垫在卡片下面的一层（同即梦：六成不透明、右端淡出、整体模糊）：压暗下面的提示词但不整段遮掉，
+   也让指针经过卡片之间的缝时不会收起。 */
+.creation-home .creation-reference-stack-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(var(--ref-step) * var(--ref-count) + var(--ref-card-w) + var(--ref-pad-x) * 2 + 16px);
+    height: 100%;
+    border-radius: var(--r-lg);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--user-surface) 60%, transparent) 82%, transparent 98%);
+    filter: blur(12px);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        opacity var(--ref-motion),
+        width var(--ref-motion);
+}
+.creation-home .creation-reference-stack.is-expanded.has-fan .creation-reference-stack-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.creation-home .creation-reference-stack-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.creation-home .creation-reference-stack-item {
+    --lift: 0px;
+    --lift-scale: 1;
+    position: absolute;
+    top: var(--ref-pad-y);
+    left: var(--ref-pad-x);
+    z-index: var(--z, 1);
+    width: var(--ref-card-w);
+    height: var(--ref-card-h);
+    list-style: none;
+    translate: calc(var(--slot, 0) * var(--ref-step)) var(--lift);
+    rotate: var(--tilt, 0deg);
+    scale: var(--lift-scale);
+    transition:
+        translate var(--ref-motion),
+        rotate var(--ref-motion),
+        scale var(--ref-motion);
+}
+.creation-home .creation-reference-stack.is-expanded:not(.is-dragging) .creation-reference-stack-item:hover,
+.creation-home .creation-reference-stack-item.is-drop-target {
+    --lift: var(--ref-lift);
+    --lift-scale: var(--ref-lift-scale);
+    z-index: 40;
+}
+.creation-home .creation-reference-stack.is-expanded:not(.is-dragging) .creation-reference-stack-item:active {
+    --lift-scale: 0.98;
+}
+/* 收成一摞时，指针一碰到最上面那张就先浮起来（同即梦），不用等整摞展开才有反馈。 */
+.creation-home .creation-reference-stack.is-collapsed .creation-reference-stack-item:first-child:hover {
+    --lift: var(--ref-lift);
+    --lift-scale: var(--ref-lift-scale);
+}
+.creation-home .creation-reference-stack.is-dragging .creation-reference-stack-item {
+    pointer-events: none;
+}
+.creation-home .creation-reference-stack-item.is-dragged {
+    z-index: 60;
+}
+.creation-home .creation-reference-stack-item.is-entering {
+    animation: creation-reference-pop var(--ref-motion) backwards;
+}
+@keyframes creation-reference-pop {
+    from {
+        opacity: 0;
+        scale: 0.2;
+    }
+}
+
+/* 卡片像一张小照片：细白边、轻投影，圆角很小。 */
+.creation-home .creation-reference-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--ref-radius);
+    background: var(--user-surface-muted);
+    box-shadow: var(--ref-shadow);
+    transition: box-shadow var(--ref-motion);
+}
+.creation-home .creation-reference-card::after {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1.5px var(--ref-frame);
+    content: "";
+    pointer-events: none;
+}
+.creation-home .creation-reference-stack.is-expanded:not(.is-dragging) .creation-reference-stack-item:hover .creation-reference-card,
+.creation-home .creation-reference-stack-item.is-dragged .creation-reference-card,
+.creation-home .creation-reference-stack-item.is-drop-target .creation-reference-card {
+    box-shadow: var(--ref-lift-shadow);
+}
+.creation-home .creation-reference-stack-item.is-drop-target .creation-reference-card::after {
+    box-shadow: inset 0 0 0 2px var(--user-accent);
+}
+.creation-home .creation-reference-card-media {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: inherit;
+}
+.creation-home .creation-reference-card-preview {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    padding: 0;
+    cursor: zoom-in;
+}
+.creation-home .creation-reference-stack.can-reorder.is-expanded .creation-reference-card-preview {
+    cursor: grab;
+}
+.creation-home .creation-reference-card-preview.is-file {
+    display: grid;
+    place-items: center;
+    cursor: default;
+}
+.creation-home .creation-reference-card-preview img,
+.creation-home .creation-reference-card-preview video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    -webkit-user-drag: none;
+}
+.creation-home .creation-reference-card-preview > .cached-resource-image-shell {
+    position: static;
+    display: grid;
+    width: 100%;
+    height: 100%;
+    place-items: center;
+}
+.creation-home .creation-reference-card-preview:focus-visible {
+    outline: var(--stroke-2) solid var(--control-focus-ring);
+    outline-offset: calc(var(--stroke-2) * -1);
+}
+/* 音频、文件卡片只放图标，名字在悬停提示里。 */
+.creation-home .creation-reference-card .creation-chat-file-icon {
+    justify-content: center;
+    height: 100%;
+    padding: 0;
+}
+.creation-home .creation-reference-card .creation-chat-file-icon em {
+    display: none;
+}
+.creation-home .creation-reference-card-label {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 1;
+    overflow: hidden;
+    border-radius: 0 0 var(--ref-radius) var(--ref-radius);
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--color-neutral-950) 64%, transparent));
+    color: var(--color-neutral-0);
+    padding: 10px 2px 3px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 12px;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+    transition: opacity var(--ref-motion);
+}
+/* 收成一摞时几张的编号叠在一起、还被「+」圆点压住：先藏起来，展开再显示。 */
+.creation-home .creation-reference-stack.is-collapsed .creation-reference-card-label {
+    opacity: 0;
+}
+.creation-home .creation-reference-stack.is-stack .creation-reference-card-label {
+    padding: 12px 2px 4px;
+    font-size: 11px;
+    line-height: 14px;
+}
+
+/* 右上角移除、左下角「@」引用：悬停时出现，抵掉卡片的倾斜保持端正。 */
+.creation-home .creation-reference-card-action {
+    position: absolute;
+    z-index: 3;
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: var(--color-neutral-0);
+    padding: 0;
+    opacity: 0;
+    rotate: calc(var(--tilt, 0deg) * -1);
+    cursor: pointer;
+    transition: opacity var(--ref-motion);
+}
+.creation-home .creation-reference-card-action::before {
+    position: absolute;
+    inset: 3px;
+    border: 0.5px solid color-mix(in srgb, var(--color-neutral-0) 28%, transparent);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-neutral-950) 78%, transparent);
+    content: "";
+    transition: background-color var(--motion-dur-fast-calc) ease;
+}
+.creation-home .creation-reference-card-action svg {
+    position: relative;
+    width: 10px;
+    height: 10px;
+}
+.creation-home .creation-reference-card-action.is-remove {
+    top: -9px;
+    right: -9px;
+}
+.creation-home .creation-reference-card-action.is-mention {
+    bottom: -9px;
+    left: -9px;
+}
+.creation-home .creation-reference-stack.is-expanded:not(.is-dragging) .creation-reference-stack-item:hover .creation-reference-card-action,
+.creation-home .creation-reference-card-action:focus-visible {
+    opacity: 1;
+}
+.creation-home .creation-reference-card-action.is-remove:hover::before {
+    background: var(--status-error);
+}
+.creation-home .creation-reference-card-action.is-mention:hover::before {
+    background: var(--color-neutral-950);
+}
+.creation-home .creation-reference-card-action:focus-visible {
+    outline: none;
+}
+.creation-home .creation-reference-card-action:focus-visible::before {
+    box-shadow: 0 0 0 var(--stroke-2) var(--control-focus-ring);
+}
+
+/* 虚线「+」：展开时排在最后一张后面；收成一摞时缩成右下角的小圆点。
+   底色比输入框亮一档、下面写「参考图 / 参考素材」，一眼看得出这里能点（同即梦的上传卡片）。 */
+.creation-home .creation-reference-add-button {
+    --add-x: calc(var(--ref-count) * var(--ref-step));
+    --add-y: 0px;
+    position: absolute;
+    top: var(--ref-pad-y);
+    left: var(--ref-pad-x);
+    z-index: calc(var(--ref-count) + 1);
+    display: flex;
+    width: var(--ref-card-w);
+    height: var(--ref-card-h);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    border: 1px dotted var(--user-border-strong);
+    border-radius: var(--ref-radius);
+    background: var(--user-surface-hover);
+    color: var(--user-ink-soft);
+    padding: 0;
+    translate: var(--add-x) var(--add-y);
+    rotate: var(--add-tilt, -8deg);
+    cursor: pointer;
+    transition:
+        translate var(--ref-motion),
+        rotate var(--ref-motion),
+        scale var(--ref-motion),
+        width var(--ref-motion),
+        height var(--ref-motion),
+        border-radius var(--ref-motion),
+        background-color var(--ref-motion),
+        box-shadow var(--ref-motion),
+        color var(--ref-motion);
+}
+.creation-home .creation-reference-add-button:hover:not(:disabled),
+.creation-home .creation-reference-add-button[aria-expanded="true"] {
+    background: var(--user-control-pressed);
+    color: var(--user-ink);
+}
+/* 悬停或菜单打开时，「+」卡片和参考图一样上浮、放大（同即梦）；按下略缩。小圆点只提亮底色，按下缩一点。 */
+.creation-home .creation-reference-add-button:not(.is-mini):not(:disabled):hover,
+.creation-home .creation-reference-add-button:not(.is-mini)[aria-expanded="true"] {
+    --add-y: var(--ref-lift);
+    scale: var(--ref-lift-scale);
+    box-shadow: var(--ref-lift-shadow);
+}
+.creation-home .creation-reference-add-button:not(.is-mini):not(:disabled):active {
+    scale: 0.98;
+}
+.creation-home .creation-reference-add-button.is-mini:not(:disabled):active {
+    scale: 0.9;
+}
+.creation-home .creation-reference-add-caption {
+    max-width: calc(var(--ref-card-w) - 6px);
+    overflow: hidden;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition:
+        opacity var(--ref-motion),
+        scale var(--ref-motion);
+}
+.creation-home .creation-reference-add-button.is-mini .creation-reference-add-caption {
+    position: absolute;
+    opacity: 0;
+    scale: 0;
+}
+/* 触屏上对话里的卡片只有 36×48，放不下字：靠占位提示说明「+」。 */
+.creation-home .creation-reference-stack.is-tiled.is-thread .creation-reference-add-caption {
+    display: none;
+}
+.creation-home .creation-reference-stack.is-tiled .creation-reference-add-caption {
+    font-size: 10px;
+}
+/* 页面上正在拖图片：「+」换成实线提示这里能放；拖到它上面时浮起。 */
+.creation-home .creation-reference-add-button.is-drop-ready {
+    border-style: solid;
+    border-color: var(--user-accent);
+    color: var(--user-accent);
+}
+.creation-home .creation-reference-add-button.is-drop-target {
+    --add-y: var(--ref-lift);
+    scale: var(--ref-lift-scale);
+    border-style: solid;
+    border-color: var(--user-accent);
+    background: var(--user-accent-soft);
+    color: var(--user-accent);
+}
+.creation-home .creation-reference-add-button.is-mini {
+    --add-x: calc(var(--ref-card-w) - 6px - var(--ref-mini) / 2);
+    --add-y: calc(var(--ref-card-h) - 6px - var(--ref-mini) / 2);
+    z-index: 50;
+    width: var(--ref-mini);
+    height: var(--ref-mini);
+    border: 0.5px solid var(--user-border-strong);
+    border-radius: 50%;
+    background: var(--user-surface-raised);
+    color: var(--user-ink);
+    box-shadow: var(--ref-shadow);
+    rotate: 0deg;
+}
+.creation-home .creation-reference-add-button svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    transition: scale var(--ref-motion);
+}
+.creation-home .creation-reference-stack.is-stack .creation-reference-add-button svg {
+    width: 20px;
+    height: 20px;
+}
+.creation-home .creation-reference-add-button.is-mini svg {
+    scale: 0.8;
+}
+.creation-home .creation-reference-add-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+.creation-home .creation-reference-add-button:focus-visible {
+    outline: var(--stroke-2) solid var(--control-focus-ring);
+    outline-offset: var(--space-half);
+}
+
+/* 触屏：「+」在前，卡片平铺一行横向滑动；没有悬停，移除键常驻，「@」不显示（输入框里打 @ 即可引用）。 */
+.creation-home .creation-reference-stack.is-tiled {
+    display: flex;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 4px 0 2px 4px;
+}
+.creation-home .creation-reference-stack.is-tiled .creation-reference-stack-list {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: var(--space-2);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    margin: -12px 0 -8px -4px;
+    padding: 12px 12px 8px 8px;
+    scrollbar-width: none;
+}
+.creation-home .creation-reference-stack.is-tiled .creation-reference-stack-list::-webkit-scrollbar {
+    display: none;
+}
+.creation-home .creation-reference-stack.is-tiled .creation-reference-stack-item,
+.creation-home .creation-reference-stack.is-tiled .creation-reference-add-button {
+    position: relative;
+    top: auto;
+    left: auto;
+    flex: 0 0 var(--ref-card-w);
+    translate: none;
+}
+.creation-home .creation-reference-stack.is-tiled .creation-reference-add-button {
+    rotate: -8deg;
+}
+.creation-home .creation-reference-stack.is-tiled .creation-reference-card-action {
+    width: 28px;
+    height: 28px;
+}
+.creation-home .creation-reference-stack.is-tiled .creation-reference-card-action::before {
+    inset: 5px;
+}
+.creation-home .creation-reference-stack.is-tiled .creation-reference-card-action.is-remove {
+    top: -12px;
+    right: -12px;
+    opacity: 1;
+}
+.creation-home .creation-reference-stack.is-tiled .creation-reference-card-action.is-mention {
+    display: none;
+}
+
+/* 拖动排序时整页显示抓手，并且不选中文字。 */
+html.creation-reference-grabbing,
+html.creation-reference-grabbing * {
+    cursor: grabbing !important;
+    user-select: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .creation-home .creation-reference-stack-item,
+    .creation-home .creation-reference-add-button,
+    .creation-home .creation-reference-stack-backdrop,
+    .creation-home .creation-reference-card {
+        transition: none;
+        animation: none;
+    }
+}

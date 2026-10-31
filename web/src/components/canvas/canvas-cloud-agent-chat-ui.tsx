@@ -13,6 +13,7 @@ import type { AgentReplyOptions } from "@/lib/canvas/agent-reply-options";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import type { Components } from "streamdown";
 import { agentToolCategory, agentToolCategoryLabel, agentToolErrorClassLabel, agentToolName, agentToolRetryLabel, agentToolStatus, friendlyAgentToolSummary, isAgentCanvasReadTool, type AgentToolCategory } from "@/lib/canvas/agent-tool-presentation";
+import { agentWebHost, agentWebSources } from "@/lib/agent-web-tools";
 import { AgentChevronGlyph, AgentThinkGlyph, agentActivityGlyph } from "./agent-activity-icons";
 import { agentOperationCategory, agentOperationFailed, agentOperationSegmentLabel } from "@/lib/canvas/agent-operation-feed";
 import { agentToolRetry, type AgentToolRetryAttempt } from "@/lib/canvas/agent-tool-retry";
@@ -254,6 +255,8 @@ export function extractCloudAgentQuickActions(text: string): CloudAgentQuickActi
 }
 
 const WORKING_TEXT = "正在处理";
+/** 联网工具行默认列出的来源条数，其余展开查看。 */
+const AGENT_WEB_SOURCES_PREVIEW = 3;
 const AGENT_NODE_LINK_PREFIX = "#agent-node:";
 const AGENT_NODE_TYPE_LABELS: Record<string, string> = {
     image: "图片节点",
@@ -866,13 +869,18 @@ export function AgentToolCard({
     const categoryLabel = agentToolCategoryLabel(toolName, category);
     const summary = friendlyAgentToolSummary(toolName, text, detail);
     const actions = agentCanvasActions(toolName, detail, references);
+    // 联网成功后列出来源：搜索给结果列表，读取网页给这一页（标题已在摘要里，链接只写站点）。
+    const webSources = state.isError ? [] : (agentWebSources(toolName, detail) ?? []);
     const undoTarget = agentCanvasUndoTarget(detail);
     const undoState: AgentCanvasUndoState | undefined = objectField(detail, "undoStatus") === "undone" ? { status: "done" } : undoTarget ? undoStates?.[agentCanvasUndoKey(undoTarget)] : undefined;
     const isNodeRead = toolName === "canvas_get_state" && category === "read";
     const [readExpanded, setReadExpanded] = useState(false);
     const visibleActions = actions.slice(0, isNodeRead && !readExpanded ? 1 : 8);
     const collapsedReadNodeCount = isNodeRead ? Math.max(0, actions.length - visibleActions.length) : 0;
-    const isPlain = !actions.length && !state.isError;
+    // 一次搜索最多 10 个来源：默认列前 3 个，其余展开再看，免得几次搜索就把操作记录撑得很长。
+    const [sourcesExpanded, setSourcesExpanded] = useState(false);
+    const visibleSources = sourcesExpanded ? webSources : webSources.slice(0, AGENT_WEB_SOURCES_PREVIEW);
+    const isPlain = !actions.length && !webSources.length && !state.isError;
     const conciseError = text.length > 180 ? `${text.slice(0, 180)}…` : text;
     const retry = agentToolRetry(detail);
     const categoryIcon = agentToolCategoryIcon(toolName, category, Boolean(retry));
@@ -931,6 +939,20 @@ export function AgentToolCard({
                         {isNodeRead && (collapsedReadNodeCount > 0 || readExpanded) ? (
                             <button type="button" className="agent-tool-more" aria-expanded={readExpanded} onClick={() => setReadExpanded((current) => !current)}>
                                 {readExpanded ? `收起其余 ${Math.max(0, actions.length - 1)} 个节点` : `另有 ${collapsedReadNodeCount} 个节点只是清单（未查看画面），展开查看`}
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
+                {webSources.length ? (
+                    <div className="agent-tool-action-list" role="group" aria-label={toolName === "web_fetch" ? "读取的网页" : "搜索来源"}>
+                        {visibleSources.map((source, index) => (
+                            <a key={`${source.url}-${index}`} className="agent-tool-action-link" href={source.url} target="_blank" rel="noopener noreferrer" title={source.url}>
+                                {toolName === "web_fetch" ? source.siteName || agentWebHost(source.url) || source.url : source.siteName ? `${source.title} · ${source.siteName}` : source.title}
+                            </a>
+                        ))}
+                        {webSources.length > AGENT_WEB_SOURCES_PREVIEW ? (
+                            <button type="button" className="agent-tool-more" aria-expanded={sourcesExpanded} onClick={() => setSourcesExpanded((current) => !current)}>
+                                {sourcesExpanded ? `收起其余 ${webSources.length - AGENT_WEB_SOURCES_PREVIEW} 个来源` : `另有 ${webSources.length - AGENT_WEB_SOURCES_PREVIEW} 个来源，展开查看`}
                             </button>
                         ) : null}
                     </div>
@@ -1071,7 +1093,9 @@ export function AgentWorkingMessage({ theme, label = WORKING_TEXT }: { theme: (t
             <span className="agent-working-signal" aria-hidden="true">
                 <span />
             </span>
-            <span>{label}</span>
+            <span className="agent-working-label" title={label}>
+                {label}
+            </span>
             <span className="agent-working-caption">实时处理中</span>
         </div>
     );

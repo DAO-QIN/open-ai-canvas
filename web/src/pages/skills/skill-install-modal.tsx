@@ -86,9 +86,10 @@ export function SkillInstallModal({ open, onClose, onInstalled, onManualCreate }
             title="安装技能"
             onCancel={onClose}
             footer={(
-                <div className="flex items-center justify-between gap-3">
+                // 窄屏放不下一行时，「从空白创建」单独一行，取消与安装仍并排靠右。
+                <div className="flex flex-wrap items-center justify-between gap-3">
                     <Button type="text" onClick={onManualCreate}>从空白创建单文件技能</Button>
-                    <div className="flex gap-2"><Button onClick={onClose}>取消</Button><Button type="primary" loading={installing} onClick={() => void install()}>安装技能</Button></div>
+                    <div className="ml-auto flex gap-2"><Button onClick={onClose}>取消</Button><Button type="primary" loading={installing} onClick={() => void install()}>安装技能</Button></div>
                 </div>
             )}
         >

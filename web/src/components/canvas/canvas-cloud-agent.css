@@ -1651,6 +1651,8 @@ summary.agent-tool-step:hover {
     line-height: 17px;
     overflow-wrap: anywhere;
     text-align: left;
+    /* 联网来源用 <a> 承载，与定位节点的按钮同一外观。 */
+    text-decoration: none;
     transition:
         background-color 150ms var(--ease-product-enter),
         color 150ms var(--ease-product-enter);
@@ -2101,6 +2103,7 @@ summary.agent-tool-step:hover {
 
 .agent-working-indicator {
     display: inline-flex;
+    max-width: 100%;
     min-height: 28px;
     align-items: center;
     gap: 8px;
@@ -2110,8 +2113,17 @@ summary.agent-tool-step:hover {
     font-size: var(--fs-label);
 }
 
+/* 联网搜索的关键词可能很长：进行中提示只占一行，完整文字留给结束后的工具行。 */
+.agent-working-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .agent-working-signal {
     display: grid;
+    flex: 0 0 auto;
     width: 16px;
     height: 16px;
     place-items: center;
@@ -2128,7 +2140,9 @@ summary.agent-tool-step:hover {
 }
 
 .agent-working-caption {
+    flex: 0 0 auto;
     opacity: 0.5;
+    white-space: nowrap;
 }
 
 .canvas-agent-approval-card {
@@ -2932,6 +2946,11 @@ summary.agent-tool-step:hover {
     gap: var(--space-4);
     padding: var(--space-2) var(--space-6);
     font-size: var(--fs-caption);
+}
+
+.canvas-agent-skill-library-footer-error {
+    min-width: 0;
+    color: var(--destructive);
 }
 
 .canvas-agent-skill-library-tab:focus-visible,

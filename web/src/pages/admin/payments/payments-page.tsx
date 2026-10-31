@@ -57,10 +57,14 @@ type ProductFormValues = {
     name: string;
     description?: string;
     kind: TopupProduct["kind"];
+    /** 只对积分商品生效；自定义金额时售价与积分按“每份”填写。 */
+    pricingMode: TopupProduct["pricingMode"];
     currency: PaymentCurrency;
     /** 售价主单位（元 / 美元），提交时换算为最小单位。 */
     amountYuan: number;
     credits?: number;
+    customMinQuantity?: number;
+    customMaxQuantity?: number;
     storageGB?: number;
     storageDurationMode?: "permanent" | "days";
     storageDurationDays?: number;
@@ -113,6 +117,14 @@ export default function AdminPaymentsPage() {
     const selectedProductKind = Form.useWatch("kind", productForm) || "credits";
     const selectedStorageDurationMode = Form.useWatch("storageDurationMode", productForm) || "permanent";
     const selectedProductCurrency: PaymentCurrency = Form.useWatch("currency", productForm) || defaultCurrency;
+    const selectedPricingMode = Form.useWatch("pricingMode", productForm) || "fixed";
+    const customPricing = selectedProductKind === "credits" && selectedPricingMode === "custom";
+    // 自定义金额的预览：每份售价 / 积分换算成最小单位后乘以份数区间，与后端同一口径。
+    const customUnitFen = Math.round((Form.useWatch("amountYuan", productForm) || 0) * 100);
+    const customUnitMicrocredits = Math.round((Form.useWatch("credits", productForm) || 0) * 1_000_000);
+    const customMinQuantity = Form.useWatch("customMinQuantity", productForm) || 0;
+    const customMaxQuantity = Form.useWatch("customMaxQuantity", productForm) || 0;
+    const customRangeReady = customUnitFen > 0 && customUnitMicrocredits > 0 && customMinQuantity >= 1 && customMaxQuantity >= customMinQuantity;
 
     const [orders, setOrders] = useState<AdminPaymentOrder[]>([]);
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -284,9 +296,12 @@ export default function AdminPaymentsPage() {
                       name: product.name,
                       description: product.description,
                       kind: product.kind || "credits",
+                      pricingMode: product.pricingMode || "fixed",
                       currency: product.currency || "CNY",
                       amountYuan: product.amountFen / 100,
                       credits: product.kind === "storage" ? undefined : product.creditsMicrocredits / 1_000_000,
+                      customMinQuantity: product.customMinQuantity || 10,
+                      customMaxQuantity: product.customMaxQuantity || 10_000,
                       storageGB: product.kind === "storage" ? product.storageBytes / 1024 ** 3 : undefined,
                       storageDurationMode: product.storageDurationDays ? "days" : "permanent",
                       storageDurationDays: product.storageDurationDays || undefined,
@@ -299,7 +314,21 @@ export default function AdminPaymentsPage() {
                       saleStartAt: product.saleStartAt ? dayjs(product.saleStartAt) : undefined,
                       saleEndAt: product.saleEndAt ? dayjs(product.saleEndAt) : undefined,
                   }
-                : { kind: "credits", currency: defaultCurrency, enabled: true, sortOrder: products.length * 10, amountYuan: 10, credits: 10, storageGB: 10, storageDurationMode: "days", storageDurationDays: 30, saleStrategy: "unlimited" },
+                : {
+                      kind: "credits",
+                      pricingMode: "fixed",
+                      currency: defaultCurrency,
+                      enabled: true,
+                      sortOrder: products.length * 10,
+                      amountYuan: 10,
+                      credits: 10,
+                      customMinQuantity: 10,
+                      customMaxQuantity: 10_000,
+                      storageGB: 10,
+                      storageDurationMode: "days",
+                      storageDurationDays: 30,
+                      saleStrategy: "unlimited",
+                  },
         );
         setProductDrawer(product || null);
     };
@@ -308,13 +337,17 @@ export default function AdminPaymentsPage() {
         if (productDrawer === undefined) return;
         const values = await productForm.validateFields();
         const storage = values.kind === "storage";
+        const custom = !storage && values.pricingMode === "custom";
         const input = {
             name: values.name.trim(),
             description: values.description?.trim(),
             kind: values.kind || "credits",
+            pricingMode: custom ? ("custom" as const) : ("fixed" as const),
             amountFen: Math.round(values.amountYuan * 100),
             currency: values.currency || defaultCurrency,
             creditsMicrocredits: storage ? 0 : Math.round((values.credits || 0) * 1_000_000),
+            customMinQuantity: custom ? values.customMinQuantity || 0 : 0,
+            customMaxQuantity: custom ? values.customMaxQuantity || 0 : 0,
             storageBytes: storage ? Math.round(values.storageGB || 0) * 1024 ** 3 : 0,
             storageDurationDays: storage && values.storageDurationMode === "days" ? values.storageDurationDays || 0 : 0,
             enabled: values.enabled,
@@ -487,18 +520,41 @@ export default function AdminPaymentsPage() {
             render: (_, product) => (
                 <div>
                     <div className="font-medium">{product.name}</div>
-                    <div className="mt-0.5 text-xs text-foreground/45">{product.description || "无说明"}</div>
+                    <div className="mt-0.5 text-xs text-foreground/45">
+                        {product.pricingMode === "custom" ? "自定义金额 · " : ""}
+                        {product.description || "无说明"}
+                    </div>
                 </div>
             ),
         },
-        { title: "售价", dataIndex: "amountFen", width: 130, align: "right", render: (value, product) => <span className="font-medium tabular-nums">{formatPaymentAmount(value, product.currency)}</span> },
+        {
+            title: "售价",
+            dataIndex: "amountFen",
+            width: 130,
+            align: "right",
+            render: (value, product) =>
+                product.pricingMode === "custom" ? (
+                    <span className="font-medium tabular-nums">
+                        {formatPaymentAmount(value * (product.customMinQuantity || 0), product.currency)}
+                        <span className="block text-xs font-normal text-foreground/45">至 {formatPaymentAmount(value * (product.customMaxQuantity || 0), product.currency)}</span>
+                    </span>
+                ) : (
+                    <span className="font-medium tabular-nums">{formatPaymentAmount(value, product.currency)}</span>
+                ),
+        },
         {
             title: "权益",
             key: "grant",
             width: 180,
             align: "right",
             render: (_, product) => (
-                <span className="tabular-nums">{product.kind === "storage" ? `+${formatStorageCapacity(product.storageBytes)} · ${formatStorageDuration(product.storageDurationDays)}` : `${formatCredits(product.creditsMicrocredits)} 积分`}</span>
+                <span className="tabular-nums">
+                    {product.kind === "storage"
+                        ? `+${formatStorageCapacity(product.storageBytes)} · ${formatStorageDuration(product.storageDurationDays)}`
+                        : product.pricingMode === "custom"
+                          ? `每份 ${formatPaymentAmount(product.amountFen, product.currency)} = ${formatCredits(product.creditsMicrocredits)} 积分`
+                          : `${formatCredits(product.creditsMicrocredits)} 积分`}
+                </span>
             ),
         },
         { title: "排序", dataIndex: "sortOrder", width: 90, align: "center" },
@@ -1027,9 +1083,17 @@ export default function AdminPaymentsPage() {
                     </Button>
                 }
             >
-                <Form form={productForm} layout="vertical" requiredMark="optional">
+                <Form
+                    form={productForm}
+                    layout="vertical"
+                    requiredMark="optional"
+                    onValuesChange={(changed: Partial<ProductFormValues>) => {
+                        // 新建时切到自定义金额，把仍是默认值的售价改成常见的“每份 1 元”。
+                        if (!productDrawer && changed.pricingMode === "custom" && productForm.getFieldValue("amountYuan") === 10) productForm.setFieldsValue({ amountYuan: 1 });
+                    }}
+                >
                     <Form.Item name="name" label="商品名称" rules={[{ required: true, max: 120 }]}>
-                        <Input placeholder="例如：100 积分 / 50 GB 年包" />
+                        <Input placeholder="例如：100 积分 / 自定义充值 / 50 GB 年包" />
                     </Form.Item>
                     <Form.Item name="description" label="商品说明" rules={[{ max: 500 }]}>
                         <Input.TextArea rows={3} />
@@ -1043,6 +1107,22 @@ export default function AdminPaymentsPage() {
                             ]}
                         />
                     </Form.Item>
+                    {selectedProductKind === "credits" ? (
+                        <Form.Item
+                            name="pricingMode"
+                            label="计价方式"
+                            rules={[{ required: true }]}
+                            extra={productDrawer ? "计价方式创建后不能修改；如需改动请新建商品。" : "自定义金额：用户在积分中心拖动滑块或输入积分，按每份价格自选充值数量。"}
+                        >
+                            <Select
+                                disabled={Boolean(productDrawer)}
+                                options={[
+                                    { value: "fixed", label: "固定套餐" },
+                                    { value: "custom", label: "自定义金额（滑动选择）" },
+                                ]}
+                            />
+                        </Form.Item>
+                    ) : null}
                     <Form.Item name="currency" label="售价货币" rules={[{ required: true }]} extra="支付渠道需支持所选货币；国内支付渠道通常只接受人民币。">
                         <Select
                             options={[
@@ -1052,7 +1132,7 @@ export default function AdminPaymentsPage() {
                         />
                     </Form.Item>
                     <div className="grid grid-cols-2 gap-3">
-                        <Form.Item name="amountYuan" label={selectedProductCurrency === "USD" ? "售价（美元）" : "售价（元）"} rules={[{ required: true }, { type: "number", min: 0.01, max: 1_000_000 }]}>
+                        <Form.Item name="amountYuan" label={`${customPricing ? "每份售价" : "售价"}（${selectedProductCurrency === "USD" ? "美元" : "元"}）`} rules={[{ required: true }, { type: "number", min: 0.01, max: 1_000_000 }]}>
                             <InputNumber min={0.01} max={1_000_000} precision={2} className="w-full" />
                         </Form.Item>
                         {selectedProductKind === "storage" ? (
@@ -1062,7 +1142,7 @@ export default function AdminPaymentsPage() {
                         ) : (
                         <Form.Item
                             name="credits"
-                            label="到账积分"
+                            label={customPricing ? "每份到账积分" : "到账积分"}
                             rules={[
                                 { required: true },
                                 {
@@ -1078,6 +1158,35 @@ export default function AdminPaymentsPage() {
                         </Form.Item>
                         )}
                     </div>
+                    {customPricing ? (
+                        <>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Form.Item name="customMinQuantity" label="最少购买份数" rules={[{ required: true }, { type: "integer", min: 1, max: 100_000_000, message: "请输入 1 及以上的整数" }]}>
+                                    <InputNumber min={1} max={100_000_000} precision={0} className="w-full" />
+                                </Form.Item>
+                                <Form.Item
+                                    name="customMaxQuantity"
+                                    label="最多购买份数"
+                                    dependencies={["customMinQuantity"]}
+                                    rules={[
+                                        { required: true },
+                                        ({ getFieldValue }) => ({
+                                            validator: (_, value) =>
+                                                Number.isInteger(value) && value >= (getFieldValue("customMinQuantity") || 1) && value <= 100_000_000 ? Promise.resolve() : Promise.reject(new Error("需为整数，且不少于最少购买份数")),
+                                        }),
+                                    ]}
+                                >
+                                    <InputNumber min={1} max={100_000_000} precision={0} className="w-full" />
+                                </Form.Item>
+                            </div>
+                            <Callout className="mb-4" tone="info" title="用户可选范围">
+                                {customRangeReady
+                                    ? `每份 ${formatPaymentAmount(customUnitFen, selectedProductCurrency)} = ${formatCredits(customUnitMicrocredits)} 积分；用户可充值 ${formatPaymentAmount(customUnitFen * customMinQuantity, selectedProductCurrency)} 至 ${formatPaymentAmount(customUnitFen * customMaxQuantity, selectedProductCurrency)}，到账 ${formatCredits(customUnitMicrocredits * customMinQuantity)} 至 ${formatCredits(customUnitMicrocredits * customMaxQuantity)} 积分。`
+                                    : "填写每份售价、每份积分与份数区间后，这里显示用户可充值的金额范围。"}
+                                单笔金额不超过 1,000,000，到账积分不超过 10 亿；同币种的固定套餐会在积分中心显示“比自定义充值省”的金额。
+                            </Callout>
+                        </>
+                    ) : null}
                     {selectedProductKind === "storage" ? (
                         <div className="grid grid-cols-2 gap-3">
                             <Form.Item name="storageDurationMode" label="有效期" rules={[{ required: true }]}>

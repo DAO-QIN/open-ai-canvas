@@ -22,15 +22,28 @@ const (
 var creditUsageAgentOperations = []string{cloudAgentOperation, cloudAgentStepOperation, cloudAgentContextCompactionOperation, cloudAgentMemoryCompactOp}
 
 // CreditUsageDay 是一个本地自然日的消耗；只返回有消耗的日期，前端按窗口补零。
+// Models 是当天按 (类型, 模型) 的构成，看板查看单日、单周构成时由前端按日期区间合并。
 type CreditUsageDay struct {
-	Date              string `json:"date"`
+	Date              string                `json:"date"`
+	TotalMicrocredits int64                 `json:"totalMicrocredits"`
+	AgentMicrocredits int64                 `json:"agentMicrocredits"`
+	Count             int64                 `json:"count"`
+	AgentCount        int64                 `json:"agentCount"`
+	Models            []CreditUsageDayModel `json:"models"`
+}
+
+// CreditUsageDayModel 是某个本地自然日内某个模型在某一生成类型下的消耗，键与 CreditUsageModel 相同；
+// 名称只在报告顶层的 Models 里给出，不逐日重复。
+type CreditUsageDayModel struct {
+	Model             string `json:"model"`
+	Capability        string `json:"capability"`
 	TotalMicrocredits int64  `json:"totalMicrocredits"`
 	AgentMicrocredits int64  `json:"agentMicrocredits"`
 	Count             int64  `json:"count"`
 	AgentCount        int64  `json:"agentCount"`
 }
 
-// CreditUsageCategory 是窗口内按生成类型划分的消耗，capability 为 image/video/audio/text/other。
+// CreditUsageCategory 是窗口内按生成类型划分的消耗，capability 为 image/video/audio/text/web_search/other。
 type CreditUsageCategory struct {
 	Capability        string `json:"capability"`
 	TotalMicrocredits int64  `json:"totalMicrocredits"`
@@ -94,6 +107,8 @@ func (s *Service) creditUsageAt(user *model.User, timezoneOffsetMinutes int, now
 	categories := map[string]*CreditUsageCategory{}
 	type modelKey struct{ capability, model string }
 	models := map[modelKey]*CreditUsageModel{}
+	// SQL 按原始能力与编码分组，归一化（未知能力归 other、编码去空白）后同一天可能有多行落到同一个键。
+	dayModels := map[int64]map[modelKey]*CreditUsageDayModel{}
 	for _, row := range rows {
 		// 窗口按时刻过滤，日序号只会落在窗口内；这里再防一次方言换算误差。
 		if row.DayIndex < firstDay || row.DayIndex > today || row.TotalMicrocredits <= 0 {
@@ -130,6 +145,21 @@ func (s *Service) creditUsageAt(user *model.User, timezoneOffsetMinutes int, now
 		usage.AgentMicrocredits += row.AgentMicrocredits
 		usage.Count += row.EntryCount
 		usage.AgentCount += row.AgentEntryCount
+
+		byModel := dayModels[row.DayIndex]
+		if byModel == nil {
+			byModel = map[modelKey]*CreditUsageDayModel{}
+			dayModels[row.DayIndex] = byModel
+		}
+		dayUsage := byModel[mk]
+		if dayUsage == nil {
+			dayUsage = &CreditUsageDayModel{Model: mk.model, Capability: key}
+			byModel[mk] = dayUsage
+		}
+		dayUsage.TotalMicrocredits += row.TotalMicrocredits
+		dayUsage.AgentMicrocredits += row.AgentMicrocredits
+		dayUsage.Count += row.EntryCount
+		dayUsage.AgentCount += row.AgentEntryCount
 	}
 
 	codes := make([]string, 0, len(models))
@@ -153,7 +183,21 @@ func (s *Service) creditUsageAt(user *model.User, timezoneOffsetMinutes int, now
 		Categories:     make([]CreditUsageCategory, 0, len(categories)),
 		Models:         make([]CreditUsageModel, 0, len(models)),
 	}
-	for _, day := range days {
+	for index, day := range days {
+		day.Models = make([]CreditUsageDayModel, 0, len(dayModels[index]))
+		for _, usage := range dayModels[index] {
+			day.Models = append(day.Models, *usage)
+		}
+		sort.Slice(day.Models, func(i, j int) bool {
+			left, right := day.Models[i], day.Models[j]
+			if left.TotalMicrocredits != right.TotalMicrocredits {
+				return left.TotalMicrocredits > right.TotalMicrocredits
+			}
+			if left.Capability != right.Capability {
+				return left.Capability < right.Capability
+			}
+			return left.Model < right.Model
+		})
 		report.Daily = append(report.Daily, *day)
 	}
 	sort.Slice(report.Daily, func(i, j int) bool { return report.Daily[i].Date < report.Daily[j].Date })
@@ -169,6 +213,10 @@ func (s *Service) creditUsageAt(user *model.User, timezoneOffsetMinutes int, now
 	})
 	for _, usage := range models {
 		usage.Name = names[usage.Model]
+		if usage.Name == "" && usage.Model == webSearchBillingCode {
+			// 联网搜索按次订单不对应前台模型，直接给出显示名称。
+			usage.Name = "联网搜索"
+		}
 		report.Models = append(report.Models, *usage)
 	}
 	sort.Slice(report.Models, func(i, j int) bool {
@@ -186,7 +234,7 @@ func (s *Service) creditUsageAt(user *model.User, timezoneOffsetMinutes int, now
 
 func creditUsageCapability(capability string) string {
 	switch capability {
-	case "image", "video", "audio", "text":
+	case "image", "video", "audio", "text", webSearchBillingCode:
 		return capability
 	default:
 		return "other"

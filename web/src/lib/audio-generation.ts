@@ -1,8 +1,11 @@
 import { doubaoAudioVoiceOptions, doubaoDefaultAudioVoice } from "@/lib/doubao-audio-voices";
-import { resolveModelRequestConfig } from "@/stores/use-config-store";
+import { resolveModelRequestConfig, selectableModelsByCapability } from "@/stores/use-config-store";
 import type { AiConfig } from "@/stores/use-config-store";
 import { geminiAudioVoices, geminiDefaultAudioVoice } from "./gemini-audio";
-import { defaultAudioCapabilityConfig, modelCapabilityConfigFor } from "./model-capabilities";
+import { defaultAudioCapabilityConfig, modelCapabilityConfigFor, type AudioCapabilityConfig } from "./model-capabilities";
+
+/** 音频能力下的两类模型：music 是歌曲与纯音乐，speech 是配音、音效等其余音频。 */
+export type AudioGenerationKind = AudioCapabilityConfig["generationType"];
 
 export { doubaoAudioVoiceOptions, doubaoDefaultAudioVoice };
 
@@ -89,8 +92,20 @@ export function isDoubaoAudioConfig(config: AiConfig) {
     return resolveModelRequestConfig(config, config.model || config.audioModel).interfaceType === "doubao-streaming-tts";
 }
 
+/** 能力配置里的生成类型是唯一依据；没有能力配置的旧渠道按协议判断。 */
+export function isMusicAudioModel(config: AiConfig, model: string) {
+    if (!model.trim()) return false;
+    const generationType = modelCapabilityConfigFor(config, model).audio?.generationType;
+    if (generationType) return generationType === "music";
+    return resolveModelRequestConfig(config, model).interfaceType === "kacang-suno";
+}
+
+export function audioModelsOfKind(config: AiConfig, kind: AudioGenerationKind) {
+    return selectableModelsByCapability(config, "audio").filter((model) => isMusicAudioModel(config, model) === (kind === "music"));
+}
+
 export function isMusicAudioConfig(config: AiConfig) {
-    return resolveModelRequestConfig(config, config.model || config.audioModel).interfaceType === "kacang-suno";
+    return isMusicAudioModel(config, config.model || config.audioModel);
 }
 
 export function musicCapabilityForConfig(config: AiConfig) {

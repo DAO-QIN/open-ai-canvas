@@ -35,5 +35,8 @@
   "creation_media_read",
   "commerce_plan_submit",
   "commerce_plan_wait",
-  "generate_image_batch"
+  "generate_image_batch",
+  "web_search",
+  "web_fetch",
+  "compose_video"
 ]

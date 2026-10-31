@@ -61,6 +61,13 @@ type Resource struct {
 	ThumbnailSize     int64  `json:"thumbnailSize"`
 	ThumbnailWidth    int    `json:"thumbnailWidth"`
 	ThumbnailHeight   int    `json:"thumbnailHeight"`
+	// 对话结果图的展示档位（长边 1600）：首次按 variant=display 访问时由后台生成，对象键同样由 ObjectKey 派生。
+	// DisplayStatus：空=未处理、processing、ready、skipped（原图已够小、格式不适合或容量不足）、failed。
+	DisplayStatus   string `json:"displayStatus" gorm:"size:24"`
+	DisplayMimeType string `json:"displayMimeType" gorm:"size:120"`
+	DisplaySize     int64  `json:"displaySize"`
+	DisplayWidth    int    `json:"displayWidth"`
+	DisplayHeight   int    `json:"displayHeight"`
 	// UploadKey 是客户端逻辑上传身份的摘要；NULL 表示不参与幂等约束。
 	UploadKey *string   `json:"-" gorm:"size:64;uniqueIndex:idx_resources_user_upload_key,priority:2"`
 	Error     string    `json:"error"`

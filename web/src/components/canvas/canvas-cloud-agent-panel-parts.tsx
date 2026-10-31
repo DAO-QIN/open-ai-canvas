@@ -420,6 +420,7 @@ export function AgentConversation({
     messages,
     references,
     busy,
+    workingLabel,
     approval,
     approvalTargetGenerating,
     approvalSubmitting,
@@ -444,6 +445,8 @@ export function AgentConversation({
     messages: CloudAgentChatMessage[];
     references: CanvasResourceReference[];
     busy: boolean;
+    /** 正在执行的联网工具（如「正在联网搜索「…」」）；不传时显示"正在思考"。 */
+    workingLabel?: string;
     approval: ApprovalState | null;
     approvalTargetGenerating?: CanvasNodeData;
     approvalSubmitting: boolean;
@@ -569,7 +572,7 @@ export function AgentConversation({
                         onReject={onReject}
                     />
                 ) : null}
-                {busy && !approval ? <AgentWorkingMessage theme={theme} label="正在思考" /> : null}
+                {busy && !approval ? <AgentWorkingMessage theme={theme} label={workingLabel || "正在思考"} /> : null}
             </div>
         </div>
     );
@@ -637,7 +640,8 @@ export function AgentPermissionControl({ mode, onChange, mutedColor, surface = "
         <Dropdown trigger={["click"]} placement="topLeft" menu={{ items: agentPermissionMenuItems(mode, onChange, surface) }}>
             <button
                 type="button"
-                className="grid size-8 shrink-0 place-items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/25"
+                // 创作页输入框里尺寸、圆角和悬停底色跟旁边的幽灵按钮走（creation-product.css），画布面板保持 32px。
+                className={cn("grid shrink-0 place-items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/25", surface === "creation" ? "creation-permission-trigger" : "size-8 rounded-md")}
                 style={{ color: mutedColor || "var(--user-ink-muted)", background: "transparent" }}
                 aria-label={title}
                 title={title}

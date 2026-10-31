@@ -1,12 +1,13 @@
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { Link, useLocation } from "react-router";
+import { Infinity as InfinityIcon, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Link, useLocation, useSearchParams } from "react-router";
 import type { Ref } from "react";
 import { workspaceNavigationTool } from "@/constant/navigation-tools";
 
+import { BrandLogoFrame } from "@/components/brand/brand-logo";
 import { TopbarFeedbackButton } from "@/components/feedback/topbar-feedback-button";
 import { SystemAnnouncementCenter } from "@/components/layout/system-announcement-center";
 import { WorkspaceAccountMenu } from "@/components/layout/workspace-account-menu";
-import { WorkspaceCreditGiftMark } from "@/components/layout/workspace-credit-gift-mark";
+import { WorkspaceCreditMark } from "@/components/layout/workspace-credit-mark";
 import { WorkspaceTopBarExtensionSlot } from "@/components/layout/workspace-top-bar-extension";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -26,10 +27,12 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const { availableMicrocredits } = useWalletBalance(user?.id, creditsEnabled);
     const { pathname } = useLocation();
+    const [searchParams] = useSearchParams();
     const slug = pathname.split("/").filter(Boolean)[0];
     const promotion = usePromotionOverview(user?.id, slug === "promotion");
     const promotionView = promotionDisplay(promotion.data, Boolean(promotion.error));
-    const pageTitle = slug === "promotion" && !promotionView.canInvite ? promotionView.title : workspaceNavigationTool(pathname)?.label || brandName;
+    // 不带 section 的 /settings 是手机底部导航「我的」进入的中心页。
+    const pageTitle = slug === "promotion" && !promotionView.canInvite ? promotionView.title : slug === "settings" && !searchParams.get("section") ? "我的" : workspaceNavigationTool(pathname)?.label || brandName;
     const balance = availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 
     return (
@@ -47,7 +50,14 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
             </button>
             <nav className="app-workspace-topbar-breadcrumb" aria-label="当前位置">
                 <Link to="/" state={{ creationHome: true }} className="truncate font-semibold text-foreground">
-                    {pageTitle}
+                    {/* 手机上侧栏收进抽屉，顶栏左侧补上品牌标志；桌面端由侧栏展示，这里隐藏。 */}
+                    <BrandLogoFrame
+                        className="app-workspace-topbar-brand app-workspace-brand-mark place-items-center"
+                        logoClassName="app-workspace-brand-logo object-contain"
+                        alt=""
+                        fallback={<InfinityIcon className="app-workspace-brand-logo" strokeWidth={2.2} />}
+                    />
+                    <span className="app-workspace-topbar-title">{pageTitle}</span>
                 </Link>
             </nav>
             <WorkspaceTopBarExtensionSlot />
@@ -55,13 +65,13 @@ export function WorkspaceTopBar({ sidebarOpen, onToggleSidebar, sidebarToggleRef
                 {user ? <TopbarFeedbackButton /> : null}
                 {creditsEnabled && !user ? (
                     <Link to="/login" onClick={(event) => interceptLoginLinkClick(event, { description: "登录后即可领取积分，开始创作" })} className="app-workspace-topbar-credit-pill is-guest" aria-label="登录领取积分">
-                        <WorkspaceCreditGiftMark />
+                        <WorkspaceCreditMark />
                         <span>登录领积分</span>
                     </Link>
                 ) : creditsEnabled ? (
                     <button type="button" className="app-workspace-topbar-credit-pill" aria-label={`打开积分中心，可用 ${balance} 积分`} onClick={() => openWorkspaceWallet()}>
-                        <WorkspaceCreditGiftMark />
-                        <span>积分</span>
+                        <WorkspaceCreditMark />
+                        <span className="app-workspace-topbar-credit-label">积分</span>
                         <strong>{balance}</strong>
                     </button>
                 ) : null}

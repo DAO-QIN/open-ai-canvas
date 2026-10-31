@@ -1,6 +1,6 @@
 import { App, Button, Dropdown, Input } from "antd";
 import { ChevronDown, Download, Heart, Import, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { WorkspaceErrorState, WorkspaceLoadingState, WorkspaceState } from "@/components/layout/workspace-state";
 import { SegmentedControl } from "@/components/ui/base/segmented-control";
@@ -101,7 +101,8 @@ export function InspirationHall({ onUse, eager = false }: { onUse: (item: Creati
         const observer = new IntersectionObserver(
             ([entry]) => {
                 if (!entry?.isIntersecting) return;
-                setShouldLoadCatalog(true);
+                // 读目录和铺开卡片都不急：放进过渡分片渲染，滚动和输入照常响应。
+                startTransition(() => setShouldLoadCatalog(true));
                 observer.disconnect();
             },
             { rootMargin: "240px" },
@@ -116,7 +117,8 @@ export function InspirationHall({ onUse, eager = false }: { onUse: (item: Creati
         setLoadError("");
         loadInspirationCatalog()
             .then((loaded) => {
-                if (!cancelled) setCatalog(loaded);
+                // 第一批卡片有几百个节点，分片渲染，不在一个任务里卡住页面。
+                if (!cancelled) startTransition(() => setCatalog(loaded));
             })
             .catch((error) => {
                 if (!cancelled) setLoadError(error instanceof Error ? error.message : "灵感目录加载失败");

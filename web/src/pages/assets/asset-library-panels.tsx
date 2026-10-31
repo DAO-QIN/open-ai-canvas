@@ -269,7 +269,7 @@ export function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Lib
                                     </span>
                                 </div>
                             ) : asset.kind === "video" ? (
-                                <video src={asset.data.url} controls className="asset-archive-preview-media" />
+                                <video src={asset.data.url} controls playsInline className="asset-archive-preview-media" />
                             ) : (
                                 <AssetImageZoom asset={asset} />
                             )}

@@ -45,15 +45,15 @@ function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
 }
 
 function buildNav(features: FeatureAvailability): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
-    // 首页 / 短剧 / 创作 / 灵感，下面是可折叠的「资源与工具」与历史。
+    // 首页 / 创作 / 短剧 / 画布 / 灵感，下面是可折叠的「资源与工具」与历史。
     // 生图、视频工作台仍按后台开关出现在「资源与工具」里。
     const groups: WorkspaceNavGroup[] = [
         {
             items: [
                 toolItem("home", "/"),
+                toolItem("create", "/create"),
                 ...(features.shortDramaEnabled ? [{ ...toolItem("projects", "/projects"), title: "短剧" }] : []),
                 toolItem("canvas", "/canvas"),
-                toolItem("create", "/create"),
                 toolItem("inspirations", "/inspirations"),
             ],
         },
@@ -214,7 +214,7 @@ function NavItem({
             <span className="app-workspace-nav-main flex min-w-0 items-center gap-2">
                 {Icon ? (
                     <span className="app-workspace-nav-icon" aria-hidden>
-                        <Icon className="size-4 shrink-0" strokeWidth={1.8} />
+                        <Icon className="size-4 shrink-0" strokeWidth={isActive ? 2.2 : 1.8} />
                     </span>
                 ) : (
                     <span className="size-1.5 shrink-0 rounded-full bg-current opacity-40" aria-hidden />
@@ -229,11 +229,8 @@ function NavItem({
         </>
     );
 
-    const rowClassName = cn(
-        "app-workspace-nav-link group relative isolate flex min-h-11 w-full items-center justify-between gap-2 rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-body)] transition-[color,transform] duration-200 select-none",
-        collapsed && "is-collapsed",
-        isActive ? "is-active font-medium" : "text-foreground/62 hover:bg-surface-hover hover:text-foreground",
-    );
+    // 行高、内边距、圆角、字号和各状态配色只由 globals.css 的用户端侧栏规则提供，这里只放布局类。
+    const rowClassName = cn("app-workspace-nav-link group relative isolate flex w-full items-center justify-between gap-2 select-none", collapsed && "is-collapsed", isActive && "is-active");
     const activePill = isActive ? <motion.span layoutId="workspace-nav-active-pill" className="app-workspace-nav-active-pill" aria-hidden transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.dock} /> : null;
 
     const handleClick = () => {
@@ -303,8 +300,9 @@ function NavGroup({ group, activeId, onNavigate, onOpenSearch, onLogout, collaps
         if (hasActive) setIsOpen(true);
     }, [hasActive]);
 
+    // 展开态组内行距 2px（行高见 globals.css 的 --workspace-navigation-row）；收起态的图标图块保留 8px。
     const content = (
-        <div className="flex flex-col gap-2">
+        <div className={cn("flex flex-col", collapsed ? "gap-2" : "gap-0.5")}>
             {group.items.map((item) => (
                 <NavItem key={item.id} item={item} activeId={activeId} onSelect={onNavigate} onOpenSearch={onOpenSearch} onLogout={onLogout} collapsed={collapsed} />
             ))}
@@ -378,12 +376,7 @@ export function WorkspaceSidebarNav({ collapsed, onNavigate, onOpenSearch, onExp
                 <div
                     ref={scrollRef}
                     onScroll={handleScroll}
-                    className={cn(
-                        "app-workspace-sidebar-scroll-area flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 pb-3 pt-7",
-                        collapsed && "is-collapsed",
-                        scrollState.hasTopFade && "has-top-fade",
-                        scrollState.hasBottomFade && "has-bottom-fade",
-                    )}
+                    className={cn("app-workspace-sidebar-scroll-area flex min-h-0 flex-1 flex-col overflow-y-auto", collapsed && "is-collapsed", scrollState.hasTopFade && "has-top-fade", scrollState.hasBottomFade && "has-bottom-fade")}
                 >
                     {groups.map((group, index) => (
                         <NavGroup key={index} group={group} activeId={activeId} onNavigate={onNavigate} onOpenSearch={onOpenSearch} onLogout={() => void handleLogout()} collapsed={collapsed} />

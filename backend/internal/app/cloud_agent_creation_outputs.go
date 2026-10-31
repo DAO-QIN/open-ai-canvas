@@ -26,17 +26,30 @@ func cloudAgentCreationSessionTask(repo *repository.Repository, userID string, s
 	if cloudAgentCreationContextAllowsTask(state.Request, task) && (task.Type == "canvas_image" || task.Type == "canvas_video") {
 		return task, nil
 	}
+	// 本会话 Agent 提交的视频合成（timeline_render）也是成品，可以查询、再次合成或作为视频参考。
 	owner, err := repo.CloudAgent(userID, task.AgentRunID)
-	if err != nil || owner.Surface != "creation" || owner.SessionID != state.Request.SessionID || task.ProjectID != "" || (task.Type != "canvas_image" && task.Type != "canvas_video") {
-		return nil, BadAuthRequest("只能读取本会话的图片或视频任务")
+	if err != nil || owner.Surface != "creation" || owner.SessionID != state.Request.SessionID || task.ProjectID != "" || (task.Type != "canvas_image" && task.Type != "canvas_video" && task.Type != model.TaskTypeTimelineRender) {
+		return nil, BadAuthRequest("只能读取本会话的图片、视频或视频合成任务")
 	}
 	return task, nil
+}
+
+// cloudAgentCreationTaskKind 是给模型看的成品类型；合成成片按视频处理。
+func cloudAgentCreationTaskKind(task *model.Task) string {
+	if task.Type == model.TaskTypeTimelineRender {
+		return "video"
+	}
+	return strings.TrimPrefix(task.Type, "canvas_")
 }
 
 func cloudAgentCreationTaskOutputs(task *model.Task) []map[string]any {
 	var result map[string]any
 	if task.Status != model.TaskStatusSucceeded || json.Unmarshal([]byte(task.ResultJSON), &result) != nil {
 		return nil
+	}
+	if task.Type == model.TaskTypeTimelineRender {
+		id := stringField(result, "resourceId")
+		return []map[string]any{{"outputIndex": 1, "resourceId": id, "ready": id != ""}}
 	}
 	media := creationMaps(result["images"])
 	if video, ok := result["video"].(map[string]any); ok {
@@ -165,7 +178,12 @@ func cloudAgentCreationMediaRead(repo *repository.Repository, userID string, sta
 			} `json:"metadata"`
 		}
 		_ = json.Unmarshal([]byte(task.InputJSON), &input)
-		items = append(items, map[string]any{"taskIndex": args.Offset + i + 1, "taskId": task.ID, "runId": task.AgentRunID, "kind": strings.TrimPrefix(task.Type, "canvas_"), "title": input.Metadata.Title, "prompt": truncateRunes(task.Prompt, 1200), "status": task.Status, "outputs": cloudAgentCreationTaskOutputs(task)})
+		item := map[string]any{"taskIndex": args.Offset + i + 1, "taskId": task.ID, "runId": task.AgentRunID, "kind": cloudAgentCreationTaskKind(task), "title": input.Metadata.Title, "prompt": truncateRunes(task.Prompt, 1200), "status": task.Status, "outputs": cloudAgentCreationTaskOutputs(task)}
+		if task.Type == model.TaskTypeTimelineRender {
+			// 合成任务的 prompt 字段就是成片名称。
+			item["title"], item["prompt"], item["composed"] = task.Prompt, "", true
+		}
+		items = append(items, item)
 	}
 	return map[string]any{"items": items, "references": references, "nextOffset": next, "nextBeforeRunId": nextRunID, "guidance": "items 为生成任务，按提交顺序列出；taskIndex 是任务序号，outputIndex 是任务内成品序号。references 为历史上传素材，仅元数据。先按用户意图定位目标：成品传 taskId/outputIndex，历史上传传 resourceId 及目录中的 runId（普通模式历史无 runId）。ready=false 不可选；多个合理候选先澄清。任务用 offset、历史上传用 beforeRunId 分别续页；查看目录不会把素材加入本轮附件或生成参考。"}, nil
 }

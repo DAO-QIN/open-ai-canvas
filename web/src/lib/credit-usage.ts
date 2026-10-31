@@ -1,7 +1,7 @@
 import type { CreditUsageCapability, CreditUsageCategory, CreditUsageModel, CreditUsageReport } from "@/services/api/wallet";
 
 /**
- * 用量看板的纯计算：把服务端的稀疏日数据补成完整窗口，再派生热力图、周汇总、累计曲线与统计卡。
+ * 用量看板的纯计算：把服务端的稀疏日数据补成完整窗口，再派生热力图、周汇总、累计曲线、统计卡与按日期区间的消耗构成。
  * 日期一律按 "YYYY-MM-DD" 的日历日处理（UTC 零点表示），不受浏览器夏令时影响。
  */
 
@@ -62,6 +62,7 @@ export const usageCapabilityLabels: Record<CreditUsageCapability, string> = {
     video: "视频",
     audio: "音频",
     text: "文本",
+    web_search: "联网搜索",
     other: "其他",
 };
 
@@ -212,6 +213,46 @@ export function cumulativeUsage(days: UsageDay[]) {
     return days.map((day) => (running += day.value));
 }
 
+export type UsageBreakdownSource = Pick<CreditUsageReport, "categories" | "models">;
+
+type UsageTotals = Pick<CreditUsageModel, "totalMicrocredits" | "agentMicrocredits" | "count" | "agentCount">;
+
+function addUsageTotals(target: UsageTotals, source: UsageTotals) {
+    target.totalMicrocredits += source.totalMicrocredits;
+    target.agentMicrocredits += source.agentMicrocredits;
+    target.count += source.count;
+    target.agentCount += source.agentCount;
+}
+
+/**
+ * 合并 [start, end]（含首尾的本地日期）内每天的模型构成，得到与报告顶层同结构的类型与模型汇总，
+ * 供消耗构成查看单日、单周或整个窗口；模型名称取顶层同键的模型。
+ */
+export function usageBreakdownBetween(report: Pick<CreditUsageReport, "daily" | "models">, start: string, end: string): UsageBreakdownSource {
+    const names = new Map(report.models.map((item) => [`${item.capability}:${item.model}`, item.name]));
+    const categories = new Map<CreditUsageCapability, CreditUsageCategory>();
+    const models = new Map<string, CreditUsageModel>();
+    for (const day of report.daily) {
+        if (day.date < start || day.date > end) continue;
+        for (const item of day.models ?? []) {
+            const key = `${item.capability}:${item.model}`;
+            let model = models.get(key);
+            if (!model) {
+                model = { model: item.model, name: names.get(key) ?? "", capability: item.capability, totalMicrocredits: 0, agentMicrocredits: 0, count: 0, agentCount: 0 };
+                models.set(key, model);
+            }
+            addUsageTotals(model, item);
+            let category = categories.get(item.capability);
+            if (!category) {
+                category = { capability: item.capability, totalMicrocredits: 0, agentMicrocredits: 0, count: 0, agentCount: 0 };
+                categories.set(item.capability, category);
+            }
+            addUsageTotals(category, item);
+        }
+    }
+    return { categories: [...categories.values()], models: [...models.values()] };
+}
+
 export function usageCategoryShares(categories: CreditUsageCategory[], metric: UsageMetric): UsageCategoryShare[] {
     const items = categories
         .map((category) => ({
@@ -245,7 +286,7 @@ export type UsageModelShare = {
 };
 
 /** 用量看板按模型查看时单独列出的模型数。 */
-export const USAGE_MODEL_LIMIT = 8;
+export const USAGE_MODEL_LIMIT = 12;
 
 /**
  * 按当前口径列出消耗最多的模型；超出 limit 的合并为“其他 N 个模型”，只多出一个时直接列出。

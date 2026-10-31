@@ -1,5 +1,5 @@
 import { commitPublicAppearance, DEFAULT_PUBLIC_APPEARANCE } from "@/stores/use-appearance-store";
-import { DEFAULT_CREATION_TITLE, DEFAULT_CREATION_DESCRIPTION, resolveCreationCopy } from "@/lib/creation-copy";
+import { DEFAULT_CREATION_CANVAS_DESCRIPTION, DEFAULT_CREATION_CANVAS_TITLE, DEFAULT_CREATION_DESCRIPTION, DEFAULT_CREATION_TITLE, resolveCreationCopy } from "@/lib/creation-copy";
 import { deleteAdminResources } from "@/services/api/admin-storage";
 import { AdminStatusBadge, SettingsSectionCard } from "@/pages/admin/components/admin-ui";
 import { AdminPageFrame } from "@/pages/admin/components/admin-shell";
@@ -40,6 +40,8 @@ export default function AppearanceSettingsPage() {
     const [authHeroDescription, setAuthHeroDescription] = useState("");
     const [creationTitle, setCreationTitle] = useState("");
     const [creationDescription, setCreationDescription] = useState("");
+    const [creationCanvasTitle, setCreationCanvasTitle] = useState("");
+    const [creationCanvasDescription, setCreationCanvasDescription] = useState("");
     const [authVideoAutoplay, setAuthVideoAutoplay] = useState(true);
     const [logoFrameEnabled, setLogoFrameEnabled] = useState(true);
     const [skinId, setSkinId] = useState("classic");
@@ -78,6 +80,8 @@ export default function AppearanceSettingsPage() {
             normalizeDraftCopy(authHeroDescription) !== setting?.authHeroDescription ||
             normalizeDraftCopy(creationTitle) !== setting?.creationTitle ||
             normalizeDraftCopy(creationDescription) !== setting?.creationDescription ||
+            normalizeDraftCopy(creationCanvasTitle) !== setting?.creationCanvasTitle ||
+            normalizeDraftCopy(creationCanvasDescription) !== setting?.creationCanvasDescription ||
             authVideoAutoplay !== setting?.authVideoAutoplay ||
             logoFrameEnabled !== setting?.logoFrameEnabled ||
             skinId !== setting?.skinId ||
@@ -106,6 +110,8 @@ export default function AppearanceSettingsPage() {
         setAuthHeroDescription(value.authHeroDescription);
         setCreationTitle(value.creationTitle);
         setCreationDescription(value.creationDescription);
+        setCreationCanvasTitle(value.creationCanvasTitle);
+        setCreationCanvasDescription(value.creationCanvasDescription);
         setAuthVideoAutoplay(value.authVideoAutoplay);
         setLogoFrameEnabled(value.logoFrameEnabled);
         setSkinThemes(themes);
@@ -221,6 +227,8 @@ export default function AppearanceSettingsPage() {
         setAuthHeroDescription(setting.authHeroDescription);
         setCreationTitle(setting.creationTitle);
         setCreationDescription(setting.creationDescription);
+        setCreationCanvasTitle(setting.creationCanvasTitle);
+        setCreationCanvasDescription(setting.creationCanvasDescription);
         setAuthVideoAutoplay(setting.authVideoAutoplay);
         setLogoFrameEnabled(setting.logoFrameEnabled);
         setSkinId(setting.skinId);
@@ -304,6 +312,8 @@ export default function AppearanceSettingsPage() {
         const nextAuthHeroDescription = normalizeDraftCopy(authHeroDescription);
         const nextCreationTitle = normalizeDraftCopy(creationTitle) || DEFAULT_CREATION_TITLE;
         const nextCreationDescription = normalizeDraftCopy(creationDescription);
+        const nextCreationCanvasTitle = normalizeDraftCopy(creationCanvasTitle) || DEFAULT_CREATION_CANVAS_TITLE;
+        const nextCreationCanvasDescription = normalizeDraftCopy(creationCanvasDescription);
         const nextSeoTitle = normalizeSingleLine(seoTitle);
         const nextSeoDescription = normalizeDraftCopy(seoDescription);
         const nextSeoKeywords = normalizeSingleLine(seoKeywords);
@@ -331,8 +341,10 @@ export default function AppearanceSettingsPage() {
             return;
         }
         for (const [value, label, max, tab] of [
-            [nextCreationTitle, "创作首页标题", 80, "creation"],
-            [nextCreationDescription, "创作首页副标题", 160, "creation"],
+            [nextCreationTitle, "「生成」标题", 80, "creation"],
+            [nextCreationDescription, "「生成」副标题", 160, "creation"],
+            [nextCreationCanvasTitle, "「画布」标题", 80, "creation"],
+            [nextCreationCanvasDescription, "「画布」副标题", 160, "creation"],
             [nextSeoTitle, "SEO 标题", 70, "seo"],
             [nextSeoDescription, "SEO 描述", 200, "seo"],
             [nextSeoKeywords, "SEO 关键词", 300, "seo"],
@@ -392,6 +404,8 @@ export default function AppearanceSettingsPage() {
                 authHeroDescription: nextAuthHeroDescription,
                 creationTitle: nextCreationTitle,
                 creationDescription: nextCreationDescription,
+                creationCanvasTitle: nextCreationCanvasTitle,
+                creationCanvasDescription: nextCreationCanvasDescription,
                 logoResourceId: ids.logo,
                 darkLogoResourceId: ids["logo-dark"],
                 logoFrameEnabled,
@@ -436,6 +450,7 @@ export default function AppearanceSettingsPage() {
     const copyCustomized = normalizeDraftCopy(authHeroTitle) !== DEFAULT_PUBLIC_APPEARANCE.authHeroTitle || normalizeDraftCopy(authHeroDescription) !== DEFAULT_PUBLIC_APPEARANCE.authHeroDescription;
     const draftBrandName = brandName.trim() || "站点名称";
     const creationPreview = resolveCreationCopy(draftBrandName, creationTitle, creationDescription);
+    const creationCanvasPreview = resolveCreationCopy(draftBrandName, creationCanvasTitle, creationCanvasDescription, "canvas");
     const selectedSkin = skinThemes.find((skin) => skin.id === skinId) || skinThemes[0] || DEFAULT_CLASSIC_SKIN;
 
     const changeSkin = (next: SkinDefinition) => {
@@ -709,36 +724,75 @@ export default function AppearanceSettingsPage() {
                                 key: "creation",
                                 label: "创作首页",
                                 children: (
-                                    <SettingsSectionCard className="admin-appearance-section" icon={<Type className="size-4" aria-hidden="true" />} title="创作首页文案" description="编辑创作输入框上方的标题与副标题；保存后生效，保持居中布局。">
+                                    <SettingsSectionCard
+                                        className="admin-appearance-section"
+                                        icon={<Type className="size-4" aria-hidden="true" />}
+                                        title="创作首页文案"
+                                        description="创作首页顶部的标题与副标题，「生成」和「画布」（/create?mode=canvas）两面分开设置；保存后生效，保持居中布局。"
+                                    >
                                         <div className="admin-appearance-section-form">
                                             <Form layout="vertical">
-                                                <Form.Item label="创作首页标题" htmlFor="creation-home-title" extra="最多 80 字，可换行；{brandName} 自动替换为品牌名称。留空使用默认标题。">
-                                                    <Input.TextArea id="creation-home-title" value={creationTitle} maxLength={80} showCount autoSize={{ minRows: 2, maxRows: 4 }} onChange={(event) => setCreationTitle(event.target.value)} />
-                                                </Form.Item>
-                                                <Form.Item label="创作首页副标题" htmlFor="creation-home-description" extra="最多 160 字，可换行；支持 {brandName}，留空隐藏副标题。">
-                                                    <Input.TextArea
-                                                        id="creation-home-description"
-                                                        value={creationDescription}
-                                                        maxLength={160}
-                                                        showCount
-                                                        autoSize={{ minRows: 2, maxRows: 5 }}
-                                                        onChange={(event) => setCreationDescription(event.target.value)}
-                                                    />
-                                                </Form.Item>
+                                                <div className="admin-appearance-form-grid">
+                                                    <div>
+                                                        <Form.Item label="「生成」标题" htmlFor="creation-home-title" extra="最多 80 字，可换行；{brandName} 自动替换为品牌名称。留空使用默认标题。">
+                                                            <Input.TextArea id="creation-home-title" value={creationTitle} maxLength={80} showCount autoSize={{ minRows: 2, maxRows: 4 }} onChange={(event) => setCreationTitle(event.target.value)} />
+                                                        </Form.Item>
+                                                        <Form.Item label="「生成」副标题" htmlFor="creation-home-description" extra="最多 160 字，可换行；支持 {brandName}，留空隐藏副标题。">
+                                                            <Input.TextArea
+                                                                id="creation-home-description"
+                                                                value={creationDescription}
+                                                                maxLength={160}
+                                                                showCount
+                                                                autoSize={{ minRows: 2, maxRows: 5 }}
+                                                                onChange={(event) => setCreationDescription(event.target.value)}
+                                                            />
+                                                        </Form.Item>
+                                                        <div className="rounded-lg border border-border bg-background p-6 text-center text-foreground" role="region" aria-label="「生成」文案预览">
+                                                            <div className="mb-3 text-xs text-muted-foreground">生成</div>
+                                                            <div className="whitespace-pre-line break-words text-xl font-semibold">{creationPreview.title}</div>
+                                                            {creationPreview.description ? <p className="mt-2 whitespace-pre-line break-words text-muted-foreground">{creationPreview.description}</p> : null}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <Form.Item label="「画布」标题" htmlFor="creation-canvas-title" extra="切到「画布」时替换上面的标题，规则相同；留空使用默认标题。">
+                                                            <Input.TextArea
+                                                                id="creation-canvas-title"
+                                                                value={creationCanvasTitle}
+                                                                maxLength={80}
+                                                                showCount
+                                                                autoSize={{ minRows: 2, maxRows: 4 }}
+                                                                onChange={(event) => setCreationCanvasTitle(event.target.value)}
+                                                            />
+                                                        </Form.Item>
+                                                        <Form.Item label="「画布」副标题" htmlFor="creation-canvas-description" extra="最多 160 字，可换行；支持 {brandName}，留空隐藏副标题。">
+                                                            <Input.TextArea
+                                                                id="creation-canvas-description"
+                                                                value={creationCanvasDescription}
+                                                                maxLength={160}
+                                                                showCount
+                                                                autoSize={{ minRows: 2, maxRows: 5 }}
+                                                                onChange={(event) => setCreationCanvasDescription(event.target.value)}
+                                                            />
+                                                        </Form.Item>
+                                                        <div className="rounded-lg border border-border bg-background p-6 text-center text-foreground" role="region" aria-label="「画布」文案预览">
+                                                            <div className="mb-3 text-xs text-muted-foreground">画布</div>
+                                                            <div className="whitespace-pre-line break-words text-xl font-semibold">{creationCanvasPreview.title}</div>
+                                                            {creationCanvasPreview.description ? <p className="mt-2 whitespace-pre-line break-words text-muted-foreground">{creationCanvasPreview.description}</p> : null}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </Form>
                                             <Button
                                                 disabled={saving || refreshing || restoring}
                                                 onClick={() => {
                                                     setCreationTitle(DEFAULT_CREATION_TITLE);
                                                     setCreationDescription(DEFAULT_CREATION_DESCRIPTION);
+                                                    setCreationCanvasTitle(DEFAULT_CREATION_CANVAS_TITLE);
+                                                    setCreationCanvasDescription(DEFAULT_CREATION_CANVAS_DESCRIPTION);
                                                 }}
                                             >
                                                 恢复默认文案
                                             </Button>
-                                            <div className="rounded-lg border border-border bg-background p-6 text-center text-foreground" role="region" aria-label="创作首页文案预览">
-                                                <div className="whitespace-pre-line break-words text-xl font-semibold">{creationPreview.title}</div>
-                                                {creationPreview.description ? <p className="mt-2 whitespace-pre-line break-words text-muted-foreground">{creationPreview.description}</p> : null}
-                                            </div>
                                         </div>
                                     </SettingsSectionCard>
                                 ),

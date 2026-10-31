@@ -73,6 +73,12 @@ type CloudAgentRequest struct {
 	// 后者是冻结的长期记忆模式（auto/review/off），决定是否暴露技能读取与记忆写入工具。
 	SkillsEnabled bool   `json:"skillsEnabled,omitempty"`
 	MemoryMode    string `json:"memoryMode,omitempty"`
+	// WebSearchPreference 是用户的「联网搜索」开关（首页「偏好」与画布助手设置共用账号偏好 agent.webSearch）：
+	// off 表示本轮不搜索；其他值一律按管理员配置，建 run 时归一为空串。
+	WebSearchPreference string `json:"webSearch,omitempty"`
+	// WebSearchEnabled 表示管理员已配置联网搜索且用户没有关闭，本轮向模型暴露 web_search（首页与画布入口相同）；
+	// 建 run 时推导并持久化，客户端传入值被覆盖。
+	WebSearchEnabled bool `json:"webSearchEnabled,omitempty"`
 }
 
 type CloudAgentAttachment struct {
@@ -261,6 +267,9 @@ func validateCloudAgentRequest(req *CloudAgentRequest) error {
 	}
 	if req.ReasoningMode != "" && req.ReasoningMode != "off" && req.ReasoningMode != "auto" && req.ReasoningMode != "deep" {
 		return BadAuthRequest("无效的 Agent 推理模式")
+	}
+	if req.WebSearchPreference != "" && req.WebSearchPreference != "off" && req.WebSearchPreference != "auto" {
+		return BadAuthRequest("无效的联网搜索开关")
 	}
 	if req.ProfileRevision != "" {
 		if err := validateCloudAgentID(req.ProfileRevision, "偏好版本", 120); err != nil {
@@ -658,7 +667,11 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 	}
 	req.ProfileRevision = profile.Revision
 	// 下面这些字段由服务端推导，客户端传入值不参与幂等指纹。
-	req.VisionEnabled, req.DramaLinked, req.SkillsEnabled, req.MemoryMode = false, false, false, ""
+	req.VisionEnabled, req.DramaLinked, req.SkillsEnabled, req.MemoryMode, req.WebSearchEnabled = false, false, false, "", false
+	// 联网开关只区分"用户关闭"和"按管理员配置"：auto 与不传等价，先归一再算指纹。
+	if req.WebSearchPreference != "off" {
+		req.WebSearchPreference = ""
+	}
 	id := cloudAgentID(userID, req.IdempotencyKey)
 	if existing, state, lookupErr := s.cloudAgentTask(userID, id); lookupErr == nil {
 		if state.Request.SessionID != "" {
@@ -884,6 +897,8 @@ func (s *Service) CreateCloudAgentRun(userID string, req CloudAgentRequest, pare
 	req.DramaLinked = len(req.ContextScope) != 0 && dramaLinkedCanvas(s.repo, canvas)
 	req.SkillsEnabled = len(skillPool.Versions) > 0
 	req.MemoryMode = memory.Mode
+	// 首页与画布助手都可以联网搜索：管理员开启且配置完整、用户没有关闭时本轮暴露 web_search，之后改配置不影响进行中的运行。
+	req.WebSearchEnabled = req.WebSearchPreference != "off" && s.webSearchConfigured()
 	canvasSummary := ""
 	if len(req.ContextScope) != 0 {
 		canvasSummary, err = cloudAgentCanvasSummaryWithOmitted(canvas, req.FocusNodeOmittedCount, req.FocusNodeIDs...)

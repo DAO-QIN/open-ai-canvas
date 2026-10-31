@@ -1,0 +1,148 @@
+/* 手机「我的」中心页：账户卡片铺满，作品入口四宫格，设置项为整行列表。颜色只用工作台语义 token。 */
+.settings-mobile-hub {
+    width: 100%;
+    padding: var(--space-3) 0 var(--space-8);
+    color: var(--user-ink);
+}
+
+.settings-mobile-hub-shortcuts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-2);
+    border: 1px solid var(--user-border);
+    border-radius: var(--user-radius-card);
+    background: var(--user-surface);
+}
+.settings-mobile-hub-shortcuts > a {
+    display: flex;
+    min-width: 0;
+    min-height: 64px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: var(--user-radius-control);
+    color: var(--user-ink);
+    font-size: 12px;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--user-motion);
+}
+.settings-mobile-hub-shortcuts > a:active {
+    background: var(--user-surface-muted);
+}
+.settings-mobile-hub-shortcuts > a > span:last-child {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.settings-mobile-hub-shortcut-icon {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border-radius: 12px;
+    background: var(--user-surface-muted);
+    color: var(--user-ink);
+}
+.settings-mobile-hub-shortcut-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.8;
+}
+
+.settings-mobile-hub-list {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid var(--user-border);
+    border-radius: var(--user-radius-card);
+    background: var(--user-surface);
+}
+.settings-mobile-hub-list > a {
+    display: flex;
+    min-height: 56px;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+    color: var(--user-ink);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--user-motion);
+}
+.settings-mobile-hub-list > a + a {
+    border-top: 1px solid var(--user-border);
+}
+.settings-mobile-hub-list > a:active {
+    background: var(--user-surface-muted);
+}
+.settings-mobile-hub-list-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: var(--user-ink-muted);
+}
+.settings-mobile-hub-list-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+}
+.settings-mobile-hub-list-copy strong {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 22px;
+}
+.settings-mobile-hub-list-copy small {
+    overflow: hidden;
+    color: var(--user-ink-soft);
+    font-size: 12px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.settings-mobile-hub-list-chevron {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    color: var(--user-ink-soft);
+}
+
+.settings-mobile-hub :is(.settings-mobile-hub-shortcuts, .settings-mobile-hub-list) > a:focus-visible {
+    outline: 2px solid var(--control-focus-ring);
+    outline-offset: -2px;
+}
+
+/* 分区详情顶部的返回行：回到「我的」。 */
+.settings-mobile-back {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 2px;
+    margin: 0 0 var(--space-1) calc(var(--space-2) * -1);
+    padding: 0 var(--space-3) 0 var(--space-1);
+    border: 0;
+    border-radius: var(--user-radius-control);
+    background: transparent;
+    color: var(--user-ink-muted);
+    font-size: 14px;
+    cursor: pointer;
+}
+.settings-mobile-back svg {
+    width: 20px;
+    height: 20px;
+}
+.settings-mobile-back:active {
+    background: var(--user-surface-muted);
+}
+.settings-mobile-back:focus-visible {
+    outline: 2px solid var(--control-focus-ring);
+    outline-offset: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .settings-mobile-hub :is(.settings-mobile-hub-shortcuts, .settings-mobile-hub-list) > a {
+        transition: none;
+    }
+}

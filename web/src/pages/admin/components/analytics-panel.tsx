@@ -8,6 +8,7 @@ import { AlertTriangle, BarChart3, CircleDollarSign, Clock3, Gauge, RefreshCw, U
 import { Area, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import { useSearchParams } from "react-router";
 
+import { CreditIcon } from "@/constant/credits";
 import { ListToolbar, PaginationBar, AdminDataTable, AdminExportButton, AdminFilterChip, AdminStatusBadge, AdminTableEmpty, type AdminStatusTone } from "./admin-ui";
 import { exportAdminAnalytics, getAdminAnalytics, listAdminUsers, type AdminReferenceData, type AdminAnalytics, type AnalyticsFilters } from "@/services/api/auth";
 import { analyticsFinanceColumns, formatCredits, formatFinanceCost, formatFinanceMargin } from "./analytics-finance";
@@ -301,8 +302,8 @@ export default function AnalyticsPanel({ users, channels }: Props) {
                     trend={formatCountDelta(currentTrend?.activeUsers, previousTrend?.activeUsers)}
                     detail={data ? `日 ${formatNumber(data.kpi.dau)} · 周 ${formatNumber(data.kpi.wau)} · 月 ${formatNumber(data.kpi.mau)}` : undefined}
                 />
-                <AnalyticsHealthCard icon={<CircleDollarSign className="size-4" />} label="用户总余额" value={data ? formatCredits(data.kpi.totalBalanceMicrocredits ?? 0) : "--"} detail="当前所有用户可用积分余额" />
-                <AnalyticsHealthCard icon={<CircleDollarSign className="size-4" />} label="范围消耗" value={data ? formatCredits(data.kpi.totalConsumedMicrocredits ?? 0) : "--"} detail="筛选范围内已计费调用" />
+                <AnalyticsHealthCard icon={<CreditIcon className="size-4" />} label="用户总余额" value={data ? formatCredits(data.kpi.totalBalanceMicrocredits ?? 0) : "--"} detail="当前所有用户可用积分余额" />
+                <AnalyticsHealthCard icon={<CreditIcon className="size-4" />} label="范围消耗" value={data ? formatCredits(data.kpi.totalConsumedMicrocredits ?? 0) : "--"} detail="筛选范围内已计费调用" />
                 <AnalyticsHealthCard
                     icon={<Workflow className="size-4" />}
                     label="生成任务"
@@ -321,7 +322,7 @@ export default function AnalyticsPanel({ users, channels }: Props) {
                 <AnalyticsHealthCard icon={<Clock3 className="size-4" />} label="P95 请求耗时" value={data && data.kpi.upstreamRequests > 0 ? formatDuration(data.kpi.p95DurationMs) : "--"} detail="筛选范围内的上游请求" />
                 <AnalyticsHealthCard icon={<Workflow className="size-4" />} label="当前排队" value={data ? formatNumber(data.kpi.currentQueuedTasks) : "--"} detail="实时快照 · 非历史累计" tone={data?.kpi.currentQueuedTasks ? "warning" : "neutral"} />
                 <AnalyticsHealthCard
-                    icon={<CircleDollarSign className="size-4" />}
+                    icon={<CreditIcon className="size-4" />}
                     label="费用统计（积分）"
                     value={
                         finance ? (

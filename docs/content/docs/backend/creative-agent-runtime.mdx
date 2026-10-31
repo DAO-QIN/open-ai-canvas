@@ -57,7 +57,7 @@ description: 首页续轮、任务恢复、历史图片引用及云端 Agent 检
 
 完整 商品视觉设计按商品图片意图读取，Amazon 只是一个适用分支。自动模式仍完成产品事实、母版、逐图设计和报价，但不等待字体、文案对照或事实表审核；请求审批模式才等待整套审批。首页只使用智能创作个人记忆；账号偏好、有限参数纠错与待批准的经验不是递归自学习，不会自动改写技能或把推测的商品事实保存为经验。
 
-首页 Composer 原生集成 Agent（界面叫"自动"）、图片和视频模式。Agent 使用 `surface: creation` 的服务端会话，不借用画布，也不依赖独立“智能创作”插件。保留文本理解模型、图片/视频模型偏好、简洁/详细输出、权限、预算和方案审批；套图按已确认方案中的交付项执行。
+首页 Composer 原生集成 Agent、图片、视频、音乐和音频模式。Agent 使用 `surface: creation` 的服务端会话，不借用画布，也不依赖独立“智能创作”插件。保留文本理解模型、图片/视频模型偏好、简洁/详细输出、权限、预算和方案审批；套图按已确认方案中的交付项执行。
 
 提交入口先读取服务端会话，核对上一轮的归属和真实状态，再决定能否继续。浏览器缓存的 `running` 不能直接拒绝下一轮；服务端仍在执行或等待审批时保留草稿并提示处理当前轮次。请求仍使用持久幂等键，状态不明时先恢复记录，不能自动重复创建收费任务。
 
@@ -169,7 +169,82 @@ SDK 在调用宿主工具前拒绝参数时，以当前模型步骤声明的 `Pi
 
 这次改动升级了 `creation-agent-system-policy`（v16）、`creation-agent-media-policy`（v15）和能力集 `creation-agent-capabilities/v8`。部署前已经暂停在"等待确认 / 等待回答"的运行，会因策略版本变化而失效，用户需要重新发送。
 
-"超出预估再确认"（`request_approval`）下，创作页随请求带 `budget.autoApproveCredits`：发送前预估（当前图片模型出 1 张）× 1.2，服务端截到 `maxCredits`。媒体方案的报价加上本轮已提交的消耗不超过"预授权额度 + 已批准额度"时直接执行，超出才发确认卡；每次批准都把该方案的报价计入已批准额度。确认时如果普通多图批次（`generate_image_batch`）的报价已过期，且刷新后的报价不高于用户看到的报价，服务端自动按新报价执行；涨价、整套商品计划和失败重放的批次只刷新报价，等用户核对后再确认；单项媒体的过期报价仍按原流程刷新后再确认。`auto` 与 `read_only` 不受影响；画布入口或这两种模式带正数 `autoApproveCredits` 时请求直接被拒绝（400），前端只在 `request_approval` 下发送。
+"请求审批"（`request_approval`）下，创作页随请求带 `budget.autoApproveCredits`：发送前预估（当前图片模型出 1 张）× 1.2，服务端截到 `maxCredits`。媒体方案的报价加上本轮已提交的消耗不超过"预授权额度 + 已批准额度"时直接执行，超出才发确认卡；每次批准都把该方案的报价计入已批准额度。确认时如果普通多图批次（`generate_image_batch`）的报价已过期，且刷新后的报价不高于用户看到的报价，服务端自动按新报价执行；涨价、整套商品计划和失败重放的批次只刷新报价，等用户核对后再确认；单项媒体的过期报价仍按原流程刷新后再确认。`auto` 与 `read_only` 不受影响；画布入口或这两种模式带正数 `autoApproveCredits` 时请求直接被拒绝（400），前端只在 `request_approval` 下发送。
+
+## 逐项方案卡
+
+请求审批模式下，待确认的普通多图批次（`generate_image_batch`）和单项生成（`generate_media`）按每项一张卡展示。`approval_requested.preview` 增加 `proposals[]`，每项为 `{ itemId, title, mode, prompt, size?, quality?, durationSeconds?, model?, credits, referenceCount?, taskId?, skipped? }`；另带 `totalCredits`、`editable`、`skippable` 与 `parametersLocked`。`prompt` 是模型写下的原始提示词，执行时服务端仍会在前面补参考素材说明，所以改写不会重复叠加。单项生成的 `itemId` 固定为 `media`。
+
+- 改写：`POST /agent/runs/:id/approvals/:approvalId/decision` 发 `{ decision: "update", items: [{ itemId, prompt?, size?, quality?, durationSeconds? }] }`，每次最多 20 项，提示词最多 8000 字，省略的字段保持原值，空字符串交回模型默认。服务端重新准入与报价，改写待审批调用，换一个新审批 ID（含 `-edit-`），返回 `{ accepted, approvalId }`，并发出新的 `approval_requested`（带 `previousApprovalId` 和 `edited: true`）。不调用模型、不提交任务、不扣费。拿着旧审批 ID 的页面不能批准新价格。
+- 移出：批准时带 `skipItemIds`（最多 20 项，不能与 `mediaSettings`、`reason` 同传）。服务端先去掉这些项、整批报价按剩余项重算（不重新询价），换审批 ID（含 `-trim-`），移出项在卡片里标为 `skipped`，再按批准执行。至少保留一项，都不需要时直接拒绝。
+- 范围：只有普通图片批次可改写和移出，单项图片、视频可改写。整套商品计划只读，继续用"按备注修改方案"；"重试失败项"产生的重放批次不可改写。本轮使用手动参数时 `parametersLocked: true`，只能改提示词。
+- 结果：批准后提交的任务在 `generation_task_created` 上带 `approvalId`，批次项另带 `imageBatchItemId`，前端据此把结果放回对应卡片。模型收到的工具结果附 `userEditedItems`、`userSkippedItems` 与 `userAdjustment`，收尾时按实际提交内容说明，不补做移出的项。
+
+## 工具进行中与创作计划面板
+
+创作入口经 Agent 运行时（Pi）执行工具前先写一条 `tool_started` 事件 `{ toolName, callId, text }`，联网工具另带 `query` 或 `url`（画布入口只为联网工具写，见[联网搜索与网页读取](#联网搜索与网页读取)）。它只用于展示：写入失败只记日志、不阻断工具；重放与恢复路径不会重复发出。前端按 `callId` 把这一行替换为对应的 `tool_completed` / `tool_failed` 结果行，没有结果文案的工具直接移除；本轮停下（结束、等确认或等回答）后仍未结束的进行中行不再显示。
+
+本轮最新的执行计划显示在对话区右上角的浮动面板里，屏幕宽度至少 1440px 时默认展开，可以收起；对应回复里不再重复显示同一份计划。
+
+## 联网搜索与网页读取
+
+联网能力全部在 Go 后端实现：搜索和读取的出站请求要经过 SSRF 校验、每用户频控、每日次数和审计，密钥只在服务端解密。Pi 只负责 Agent 循环，社区里给 Pi 加 `web_search` / `web_fetch` 的扩展（如 pi-web-access）面向单人本机使用，直接从 Node 进程访问外网、在本机保存密钥，不适合多用户的线上服务，因此不接入。
+
+管理员在「平台配置 → 联网搜索」选择搜索服务：
+
+| 服务 | 接口 | 说明 |
+| --- | --- | --- |
+| DeepSeek `deepseek` | `api.deepseek.com/v1/tools/search` | DeepSeek 自研搜索引擎，与 DeepSeek 模型共用 API Key；只按有结果的成功请求计费，没有结果、请求失败或超时不计费，价格以 DeepSeek 文档为准。关键词连同运算符截到 128 字，`freshness` 换成 `after:<日期>` 运算符；结果取给模型读的长摘要 `summary`（缺失时用 `snippet`），`date` 只保留日期。不发送用户原话（`ori_question`）和用户 IP（`localization`） |
+| 博查 `bocha` | `api.bochaai.com/v1/web-search` | 国内直连，中文网页覆盖好，按次计费 |
+| 秘塔 `metaso` | `metaso.cn/api/v1/search` | 中文检索质量高，结果带日期；没有时间范围参数 |
+| 智谱 `zhipu` | `open.bigmodel.cn/api/paas/v4/web_search` | 与智谱模型共用 API Key；`engine` 可选 `search_std`（默认，最便宜）、`search_pro`、`search_pro_sogou`、`search_pro_quark`，关键词截到 70 字 |
+| Tavily `tavily` | `api.tavily.com/search` | 海外，英文结果好 |
+| Serper `serper` | `google.serper.dev/search` | 海外，Google 结果 |
+| SearXNG `searxng` | `<地址>/search?format=json` | 开源自建，免费；需在 `settings.yml` 的 `search.formats` 启用 json；请求带 `safesearch=1` |
+
+接口为 `GET/PATCH /api/admin/settings/web-search` 与 `POST /api/admin/settings/web-search/test`（只测试不保存，每分钟 6 次），字段见 [HTTP API](./http-api#管理端联网搜索配置)。`baseUrl` 留空时用官方地址，填了就按完整接口地址请求。读取只返回 `hasApiKey` / `readerHasApiKey`；服务和地址都不变时留空密钥表示保留原密钥，换服务或地址必须重新填写。
+
+- 首页创作（`surface: creation`）与画布助手（`surface: canvas`，含未进入画布时的平台级对话）规则相同。建 run 时服务端推导 `webSearchEnabled` 并随运行持久化（客户端传入值被覆盖，`webSearch` 的 `auto` 与不传等价，归一后才参与幂等指纹）：管理员已开启且配置完整，并且用户没有关掉「联网搜索」（请求 `webSearch: "off"`）时才向模型暴露 `web_search`；进行中的运行不受之后的配置修改影响。画布入口的工具表来自注册表，`web_search` 的策略是 `RequiresWebSearch`（`agent/tool/policy.go`，由 `Scope.WebSearch` 放行），执行时处理函数再核对一次 `webSearchEnabled`。`/api/auth/session` 返回 `webSearchEnabled` 与 `webSearchPriceMicrocredits`，前端据此在首页「偏好」和画布助手「Agent 设置」里显示「联网搜索」开关（两处是同一个账号偏好 `agent.webSearch`，默认开，取值 `off` / `auto`），收费时在说明下方写出每次搜索的积分。`web_fetch` 在两个入口都总是可用，用户关掉联网后仍能读取自己发的链接。
+- 画布助手只为 `web_search` / `web_fetch` 上报 `tool_started`（首页每个工具都上报），面板据此把对话末尾的"正在思考"换成「正在联网搜索「关键词」」或「正在阅读网页 站点」，结束、失败或本轮终止即恢复；工具行在结束事件到达后才出现，成功时列出来源链接。搜索超出本轮花费上限时，两个入口的提示分别指向「偏好 → 更多设置」和「Agent 设置 → 预算」。画布系统策略 `cloud-agent-system` v20 要求问答遇到实时信息或用户要查资料时使用已暴露的联网工具，未暴露时说明本轮未开启联网搜索，见 [提示词策略](./agent-prompt-policy)。
+- `web_search` 参数 `{ query, count?, freshness? }`，`freshness` 为 `oneDay`、`oneWeek`、`oneMonth`、`oneYear` 或 `noLimit`；返回 `{ query, searchedAt, results: [{ title, url, snippet?, siteName?, publishedAt? }], guidance }`，`searchedAt` 是服务器当天日期，供模型理解"最近"；结果只保留 http(s) 链接并按链接去重。
+- 每个用户每天实际发往搜索服务的次数受 `dailyLimit` 限制（1–10000，默认 100），超出时工具返回 429 和"明天再试"的说明。同一服务、关键词、条数和时间范围的结果在进程内缓存 10 分钟，命中缓存不计次数、不扣积分。
+- 按次扣积分（`app/cloud_agent_web_search_billing.go`）：管理员设 `priceMicrocredits`（每次搜索的微积分，0 为免费，上限 1 万积分），扣费时只叠加用户分组倍率，与统一价模型同一口径；积分功能关闭时不扣。只对真正发往搜索服务的请求计费，顺序是：预检本轮单次花费上限和可用余额 → 占用每日次数 → 冻结积分（订单直接以 `running` 入库）→ 发请求。搜到结果才结算；搜索失败或没有结果全额退回，退款流水备注写明原因；复用缓存结果不扣。余额不足或超出花费上限时不发请求，工具返回错误，本轮继续。结算或退款写失败时订单转为待核对。
+  - 订单的 `capability`、`model`、`scene` 都是 `web_search`，`billing_mode=fixed_request`，`task_id` 是本轮运行 ID（即不计费的 Agent 主任务）。因此它计入本轮花费上限（含重试链）、回复末尾的「本轮消耗」和用量看板的 Agent 口径，不计入「按预估授权」的媒体额度。主任务下可以有多张搜索订单，累计花费按订单逐张计算。
+  - 幂等键 `web_search:<sha256>` 由运行 ID、声明调用的模型步任务 ID、调用 ID 和参数摘要派生：检查点冲突重试或进程重启后重放同一次调用，最多扣一次；上次留下的在途订单由这次接着结算或退回。
+  - `tool_completed` 事件带 `chargedMicrocredits`（本次调用实际扣的微积分），只给界面显示，不写进模型上下文；首页与画布助手的工具行都显示「消耗 N 积分」。`web_fetch` 与网页读取增强不扣积分。
+- `web_fetch` 参数 `{ url, maxChars? }`（500–20000，默认 6000），返回 `{ url, finalUrl, title, siteName, contentType, text, truncated, source, guidance }`。服务端先直接读取（浏览器 User-Agent，正文最多下载 3MB），HTML 按段落密度挑出正文容器，去掉脚本、样式、导航、页脚、侧栏、评论和推荐区，标题与列表保留层级；严格去噪后正文太短时放宽类名规则再取一次。
+- 网页读取增强（可选）：直接读取失败（网络错误、401/403/429/5xx）、不是网页（如 PDF）或正文少于 200 字的页面交给读取服务再读，`source` 为 `reader`；404/410 不重试。读取服务也失败、或读到的正文不比直接读取多时，沿用直接读取的结果或错误。读取结果同样缓存 10 分钟。
+  - `readerProvider: "deepseek"`：`POST <readerBaseUrl>`（默认 `https://api.deepseek.com/v1/tools/fetch`），返回 Markdown 正文。只有读到正文才计费；页面不可用、被站点拦截、格式不受支持或没有正文时上游返回 404，不计费；不支持 PDF 和 Office 文件。没填 `readerApiKey` 时，如果搜索服务也是 DeepSeek，并且两者发往同一服务地址（协议、主机、端口都相同），就沿用搜索服务的密钥；否则保存时要求填写。
+  - `readerProvider: "jina"`：`POST <readerBaseUrl>/`（默认 `https://r.jina.ai`，带 `X-Retain-Images: none`、`X-Retain-Links: text`），能渲染脚本页面和 PDF。不填 Jina API Key 也能用，但整台服务器共享匿名额度（约每分钟 20 次）。
+  - 读取服务与搜索开关无关：不开联网搜索也会用于 `web_fetch`，所以不论是否开启搜索，保存时都校验读取服务的配置。
+- 上游返回 402（余额不足）时，搜索与 DeepSeek 读取都提示需要管理员充值；DeepSeek 搜索与读取按账号分别限速（Fetch 另按目标域名限速），超出返回 429，工具提示稍后重试。
+- 出站请求走统一的 SSRF 校验，重定向逐跳校验；本机、私网和链路本地地址默认拒绝，自建 SearXNG 或读取服务在内网时需把主机加入 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS`。交给读取服务的地址先在后端校验，但自建读取服务会自己再解析一次域名，必须部署在不能访问内网的网络里，避免 DNS 重绑定绕过。两个工具每个用户每分钟合计调用次数受 `perMinuteLimit` 限制（1–600，默认 30，复用缓存结果也计入），超出时工具返回 429 和"稍后再试"的说明，并计入本轮只读工具预算。网页读取不依赖搜索开关，联网搜索配置读不出来时按默认 30 次限流。错误信息不包含密钥或上游原文。
+- 返回内容是外部数据，不是指令：工具说明要求模型只引用相关事实，并在句末用 Markdown 链接标注来源，链接只能来自工具结果。前端在工具行显示关键词与来源数，可展开来源列表；读取网页的标题直接是链接；本轮结束后回复末尾显示「参考了 N 个网页」，展开列出全部来源。链接在新标签页打开。
+
+### 开源自建（不需要搜索 API Key）
+
+搜索用 SearXNG，网页读取用 Jina Reader 开源版，两者都可以和后端放在同一台服务器：
+
+```bash
+# SearXNG：settings.yml 里把 search.formats 设为 [html, json]，并设置 server.secret_key
+docker run -d --name searxng -p 8888:8080 -v ./searxng:/etc/searxng searxng/searxng
+
+# Jina Reader 开源版（带无头浏览器和中文字体），8081 是 HTTP/1.1 端口
+docker run -d --name reader -p 8889:8081 ghcr.io/jina-ai/reader:oss
+```
+
+然后在「联网搜索」页选择 SearXNG 填 `http://<主机>:8888`，网页读取增强选 Jina Reader 填 `http://<主机>:8889`，并把这两个主机加入 `CANVAS_ALLOWED_PRIVATE_UPSTREAM_HOSTS`。SearXNG 的结果来自它聚合的公共搜索引擎，访问量大时可能被上游限流；面向大量用户时建议用 DeepSeek、博查、秘塔或智谱等商用服务。
+
+## 视频合成
+
+`compose_video` 把本会话已完成的视频或图片按顺序拼成一条成片，可叠加用户上传的音频、添加字幕。本机 ffmpeg 渲染（视频片段另用 PATH 中的 ffprobe 探测音轨），不经模型路由、不计费，因此不走媒体审批；只读模式不暴露。
+
+- 参数：`clips[]`（1–30 段，每段二选一：`taskId` + `outputIndex` 指本会话成品，或 `resourceId` 指本轮已授权素材；可带 `durationSeconds`（0.5–120）、`startSeconds`、`volume`（0–2，0 为静音））、`audio[]`（最多 4 段，`resourceId` 必须是本轮上传或已精读的历史上传音频，可带 `startSeconds`、`volume`）、`subtitles[]`（最多 200 条，`{ text, startSeconds, endSeconds }`，单条最多 120 字）、`aspectRatio`（16:9、9:16、1:1、4:3、3:4，省略时按第一个片段的方向）、`transition`（`none` 或 `fade` 约 0.3 秒黑场淡入淡出）、`burnSubtitles`（默认 true）。
+- 时长：图片默认 3 秒；视频默认截到素材结尾，素材没有记录时长时按 5 秒截取，素材更短时定格最后一帧补足。成片最长 10 分钟。音频超出成片长度的部分截掉，与片段原声混合。
+- 素材边界与生成工具一致：`taskId` 只认本会话 Agent 任务（含之前的合成成片）和本轮普通创作上下文带入的图片、视频任务，`resourceId` 只认本轮附件、已精读的历史上传和已精读的成品。成品必须已就绪，还在生成的先等结果。
+- 受理即返回 `{ phase: "accepted", taskId, status, title, taskSubmitted: true, charged: false, clipCount, audioCount, subtitleCount, durationSeconds, width, height, burnSubtitles, instruction }`，本轮结束。任务 ID 由运行与调用 ID 派生，同一调用重放复用原任务；与时间线渲染接口共用每用户的频控。前端按这条 `tool_completed` 的 `result.taskId` 建"视频合成"卡并订阅任务，完成后显示成片。
+- 任务是 `timeline_render`：`project_id` 为空、`agent_run_id` 指向本轮运行，结果 `{ resourceId, fileName, size, durationMs, subtitleSrt?, subtitlesBurned? }`。`creation_media_read` 目录、`task_get` 和"当前可见成品"都会把它当作视频成品（目录项带 `composed: true`），可以再次合成或作为视频参考。用户停止本轮时，已受理的合成和已受理的生成一样继续完成。合成失败不走"重试失败项"，在对话里让 Agent 按新要求重新合成。
+- 字幕烧录用 ffmpeg `subtitles` 滤镜，依赖 libass 与中文字体；后端镜像安装 `fontconfig` 和 `font-wqy-zenhei`。字号按输出短边计算，竖屏不会撑满画面。烧录失败（如本机 ffmpeg 不带 libass）时自动改为不烧录再渲染一次，`subtitlesBurned` 为 false，SRT 仍在结果里。合成卡片有「字幕 SRT」下载（UTF-8 带 BOM）；回执要求烧录（`burnSubtitles: true`）而结果未烧录时，卡片说明字幕没能烧录进画面。
 
 ## 验收边界
 

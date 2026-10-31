@@ -11,6 +11,10 @@ const creationModelKeys = new Set<string>(["textModel", "imageModel", "videoMode
 
 export type CreationAgentPreferences = {
     permissionMode: "read_only" | "request_approval" | "auto";
+    /** 「偏好」里的思考：auto 先推理再执行，off 直接执行；只影响之后新发起的轮次。 */
+    reasoningMode: "off" | "auto";
+    /** 联网搜索（首页「偏好」与画布助手「Agent 设置」共用）：auto 按平台配置在需要时搜索，off 本轮不搜索（用户发的链接仍可读取）。 */
+    webSearch: "off" | "auto";
     imageSelectionMode: "preferred" | "fixed";
     videoSelectionMode: "preferred" | "fixed";
     imageParameterMode: "auto" | "manual";
@@ -22,6 +26,8 @@ export type CreationAgentPreferences = {
 
 export const defaultCreationAgentPreferences: CreationAgentPreferences = {
     permissionMode: "request_approval",
+    reasoningMode: "auto",
+    webSearch: "auto",
     imageParameterMode: "auto",
     videoParameterMode: "auto",
     imageSelectionMode: "preferred",
@@ -130,6 +136,8 @@ function normalizeCreationAgentPreferences(value: unknown): CreationAgentPrefere
     const string = (value: unknown, fallback: string) => (typeof value === "string" && value.length <= 256 ? value : fallback);
     return {
         permissionMode: ["auto", "read_only", "request_approval"].includes(raw.permissionMode || "") ? raw.permissionMode! : defaults.permissionMode,
+        reasoningMode: raw.reasoningMode === "off" ? "off" : "auto",
+        webSearch: raw.webSearch === "off" ? "off" : "auto",
         imageSelectionMode: raw.imageSelectionMode === "fixed" ? "fixed" : "preferred",
         videoSelectionMode: raw.videoSelectionMode === "fixed" ? "fixed" : "preferred",
         imageParameterMode: raw.imageParameterMode === "manual" ? "manual" : "auto",
@@ -184,6 +192,10 @@ export function useCreationAgentPreferences() {
     return {
         agentPermissionMode: agent.permissionMode,
         setAgentPermissionMode: (value: CreationAgentPreferences["permissionMode"]) => update("permissionMode", value),
+        agentReasoningMode: agent.reasoningMode,
+        setAgentReasoningMode: (value: CreationAgentPreferences["reasoningMode"]) => update("reasoningMode", value),
+        agentWebSearch: agent.webSearch,
+        setAgentWebSearch: (value: CreationAgentPreferences["webSearch"]) => update("webSearch", value),
         agentImageParameterMode: agent.imageParameterMode,
         setAgentImageParameterMode: (value: CreationAgentPreferences["imageParameterMode"]) => update("imageParameterMode", value),
         agentVideoParameterMode: agent.videoParameterMode,

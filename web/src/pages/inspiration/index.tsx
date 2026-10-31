@@ -12,7 +12,7 @@ import type { LibTVFeaturedItem, LibTVGalleryItem } from "@/types/libtv-gallery"
 import "@/pages/home/home.css";
 
 /**
- * 「全部画布」：只展示服务端精选的一小批画布（节点多、可复制、封面无 LibTV 水印），不再铺开整个公开作品流。
+ * 「全部画布」：展示服务端收录的全部精选画布（节点多、复制不丢节点、封面无水印），不铺开未经复核的整个公开作品流。
  * 作品弹窗状态挂在地址栏上：打开压一条历史（返回键只关弹窗），关闭用替换，作品链接也能直接分享。
  */
 export default function InspirationGalleryPage() {

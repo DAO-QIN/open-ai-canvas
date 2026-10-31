@@ -156,27 +156,27 @@ describe("credit usage dashboard math", () => {
     });
 
     test("lists the top models and folds the long tail, unless only one model would be folded", () => {
-        // 11 个模型，消耗 11、10 … 1 积分，合计 66 积分。
-        const models: CreditUsageModel[] = Array.from({ length: 11 }, (_, index) => ({
+        // 15 个模型，消耗 15、14 … 1 积分，合计 120 积分。
+        const models: CreditUsageModel[] = Array.from({ length: 15 }, (_, index) => ({
             model: `model-${index + 1}`,
             name: `模型 ${index + 1}`,
             capability: "image",
-            totalMicrocredits: (11 - index) * 1_000_000,
+            totalMicrocredits: (15 - index) * 1_000_000,
             agentMicrocredits: 0,
-            count: 11 - index,
+            count: 15 - index,
             agentCount: 0,
         }));
-        expect(USAGE_MODEL_LIMIT).toBe(8);
+        expect(USAGE_MODEL_LIMIT).toBe(12);
         const folded = usageModelShares(models, "total");
-        expect(folded.map((item) => item.label)).toEqual(["模型 1", "模型 2", "模型 3", "模型 4", "模型 5", "模型 6", "模型 7", "模型 8", "其他 3 个模型"]);
-        expect(folded[8]).toMatchObject({ key: "other-models", code: "", capability: null, value: 6_000_000, count: 6, merged: 3, average: 1_000_000 });
-        expect(folded[8].share).toBeCloseTo(6 / 66);
+        expect(folded.map((item) => item.label)).toEqual([...Array.from({ length: 12 }, (_, index) => `模型 ${index + 1}`), "其他 3 个模型"]);
+        expect(folded[12]).toMatchObject({ key: "other-models", code: "", capability: null, value: 6_000_000, count: 6, merged: 3, average: 1_000_000 });
+        expect(folded[12].share).toBeCloseTo(6 / 120);
         expect(folded.reduce((sum, item) => sum + item.share, 0)).toBeCloseTo(1);
         // 恰好多出一个时直接列出，不显示“其他 1 个模型”。
-        const nine = usageModelShares(models.slice(0, 9), "total");
-        expect(nine).toHaveLength(9);
-        expect(nine[8].label).toBe("模型 9");
-        expect(usageModelShares(models, "total", 2).map((item) => item.label)).toEqual(["模型 1", "模型 2", "其他 9 个模型"]);
+        const thirteen = usageModelShares(models.slice(0, 13), "total");
+        expect(thirteen).toHaveLength(13);
+        expect(thirteen[12].label).toBe("模型 13");
+        expect(usageModelShares(models, "total", 2).map((item) => item.label)).toEqual(["模型 1", "模型 2", "其他 13 个模型"]);
     });
 
     test("formats credits compactly for cards and precisely for tooltips", () => {

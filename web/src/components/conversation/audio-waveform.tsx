@@ -1,69 +1,35 @@
-﻿import { useMemo } from "react";
+﻿import type { CSSProperties } from "react";
+
+import { cn } from "@/lib/utils";
+
+/**
+ * useVoiceRecording 的频段每段约 750Hz，人声能量集中在最前面几段。
+ * 最强的低频段放中间、较弱的放两侧，说话时音量条呈山形起伏。
+ */
+const BAND_ORDER = [3, 1, 0, 2, 4];
+/** 安静环境的底噪大约落在 0.15 以下，扣掉后音量条才有起伏 */
+const NOISE_FLOOR = 0.15;
+const GAIN = 1.6;
 
 type AudioWaveformProps = {
+    /** useVoiceRecording 输出的 0-1 频段能量 */
     waveform: number[];
-    /** 波形颜色，默认使用 CSS 变量 */
-    color?: string;
-    /** 波形高度（像素），默认 48 */
-    height?: number;
-    /** 波形宽度（像素），默认 200 */
-    width?: number;
-    /** 是否动画，默认 true */
-    animated?: boolean;
+    /** 是否跟随音量起伏；未开始录音时保持最低高度 */
+    active?: boolean;
+    className?: string;
 };
 
 /**
- * 音频波形可视化组件
- * 使用 SVG 绘制实时波形
+ * 紧凑音量条：5 根竖条跟随麦克风实时音量起伏，用在输入行内的语音录制胶囊里。
+ * 尺寸和颜色由 voice-recording.css 决定；减少动态效果时保持静止。
  */
-export function AudioWaveform({
-    waveform,
-    color = "var(--cn-accent, #3b82f6)",
-    height = 48,
-    width = 200,
-    animated = true,
-}: AudioWaveformProps) {
-    // 如果没有波形数据，显示占位波形
-    const displayWaveform = useMemo(() => {
-        if (waveform.length === 0) {
-            // 生成静态占位波形
-            return Array.from({ length: 32 }, (_, i) => {
-                const x = i / 31;
-                return 0.3 + 0.2 * Math.sin(x * Math.PI * 2);
-            });
-        }
-        return waveform;
-    }, [waveform]);
-
-    const barWidth = width / displayWaveform.length;
-    const gap = Math.max(1, barWidth * 0.2);
-    const actualBarWidth = barWidth - gap;
-
+export function AudioWaveform({ waveform, active = true, className }: AudioWaveformProps) {
     return (
-        <svg
-            width={width}
-            height={height}
-            viewBox={`0 0 ${width} ${height}`}
-            className={animated ? "animate-pulse" : ""}
-            style={{ overflow: "visible" }}
-        >
-            {displayWaveform.map((value, index) => {
-                const barHeight = Math.max(2, value * height * 0.8);
-                const x = index * barWidth + gap / 2;
-                const y = (height - barHeight) / 2;
-                return (
-                    <rect
-                        key={index}
-                        x={x}
-                        y={y}
-                        width={actualBarWidth}
-                        height={barHeight}
-                        fill={color}
-                        rx={actualBarWidth / 2}
-                        opacity={0.6 + value * 0.4}
-                    />
-                );
+        <span className={cn("voice-level-bars", className)} aria-hidden="true">
+            {BAND_ORDER.map((band) => {
+                const level = active ? Math.min(1, Math.max(0, ((waveform[band] ?? 0) - NOISE_FLOOR) * GAIN)) : 0;
+                return <span key={band} style={{ "--voice-level": level.toFixed(3) } as CSSProperties} />;
             })}
-        </svg>
+        </span>
     );
 }

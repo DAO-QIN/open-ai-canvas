@@ -375,7 +375,8 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
     if (useRichEditor) {
         return (
             <div ref={containerRef} data-canvas-no-zoom className={`relative w-full min-h-0 overflow-hidden ${containerClassName || "h-full"}`}>
-                {!value && props.placeholder ? (
+                {/* 打字再删光、Shift+Enter 后再删时，Chrome 会在可编辑区里留一个 <br>，序列化成 "\n"：只剩空白也算空，照样显示占位提示。 */}
+                {!value.trim() && props.placeholder ? (
                     <div aria-hidden className={`${className || ""} pointer-events-none absolute inset-0 z-0`} style={{ ...style, color: style?.color || theme.node.text, opacity: 0.4 }}>
                         {props.placeholder}
                     </div>

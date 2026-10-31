@@ -88,7 +88,8 @@ func (s *Service) cloudAgentExecutionOutput(task *model.Task, initial cloudAgent
 		skill.Files = nil
 		out.Skills = append(out.Skills, skill)
 	}
-	orders, err := s.repo.BillingOrdersByTaskIDs(task.UserID, state.TaskIDs)
+	// 主任务（task.ID）本身不计费，但本轮联网搜索的按次订单挂在它下面，可能有多张，逐张累计。
+	orders, err := s.repo.BillingOrdersForTasks(task.UserID, append([]string{task.ID}, state.TaskIDs...))
 	if err != nil {
 		return nil, err
 	}

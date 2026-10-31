@@ -1,8 +1,9 @@
 import { Alert, Button } from "antd";
 import dayjs from "dayjs";
-import { Bot, Clapperboard, Clock3, Coins, Image as ImageIcon, RefreshCw, Sparkles } from "lucide-react";
+import { Bot, Clapperboard, Clock3, Image as ImageIcon, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { CreditIcon } from "@/constant/credits";
 import { getCreationMetrics, type CreationLatency, type CreationMetrics, type CreationMetricsWindow, type CreationTaskMetrics } from "@/services/api/creation-metrics";
 import { formatNumber } from "./analytics-trend-delta";
 
@@ -142,7 +143,7 @@ export function CreationMetricsView({
                     ]}
                 />
                 <CreationMetricCard
-                    icon={<Coins className="size-4" />}
+                    icon={<CreditIcon className="size-4" />}
                     label="积分退回"
                     value={refunds ? `${formatNumber(refunds.stuckFrozen)} 笔仍冻结` : "--"}
                     tone={toneFor("auto_refund_stuck")}

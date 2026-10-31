@@ -1,5 +1,5 @@
 import { buildSkillMentionReferences } from "@/services/skill-runtime";
-import { canvasResourceMentionToken, type CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
+import { canvasResourceMentionToken, canvasSkillMentionToken, type CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import type { Skill } from "@/services/api/skills";
 import { creationAttachmentKind, type CreationAttachment } from "./creation-assets";
 
@@ -12,6 +12,13 @@ export type CreationReferenceLimits = {
     maxVideos: number;
     maxAudios: number;
 };
+
+// @名称 后面必须是结尾、空白或标点，免得「@图片1」误伤「@图片12」。
+const MENTION_BOUNDARY = "(?=$|\\s|[,.!?;:，。！？；：、)\\]}】）])";
+
+function escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 export function buildCreationMentionReferences(skills: Skill[], attachments: CreationAttachment[] = [], snapshots: CreationReference[] = []) {
     const counts = { image: 0, video: 0, audio: 0, file: 0 };
@@ -63,6 +70,17 @@ export function removeCreationReferenceTokens(value: string, references: Creatio
     return references.reduce((current, reference) => current.split(canvasResourceMentionToken(reference)).join("").split(`@${reference.label}`).join(""), value);
 }
 
+/** 技能选择器：把技能令牌接在提示词末尾，和输入 @ 选中技能的写法一致，输入框里显示为技能标签。 */
+export function appendCreationSkillMention(prompt: string, skillId: string) {
+    return `${prompt}${prompt && !/\s$/.test(prompt) ? " " : ""}${canvasSkillMentionToken(skillId)} `;
+}
+
+/** 取消选择：去掉这个技能的令牌和 @名称、/名称 写法（resolveSkillMentions 认的就是这三种），连同后面一个空格。 */
+export function removeCreationSkillMention(prompt: string, skill: Pick<Skill, "skillId" | "skillName">) {
+    const natural = skill.skillName ? `|[@/]${escapeRegExp(skill.skillName)}${MENTION_BOUNDARY}` : "";
+    return prompt.replace(new RegExp(`(?:${escapeRegExp(canvasSkillMentionToken(skill.skillId))}${natural})[ \\t]?`, "gu"), "");
+}
+
 export function replaceCreationAttachmentReference(prompt: string, attachments: CreationAttachment[], targetAttachmentId: string, replacement: CreationAttachment) {
     const targetIndex = attachments.findIndex((attachment) => attachment.id === targetAttachmentId);
     if (targetIndex < 0) throw new Error("要替换的参考内容不存在");
@@ -93,6 +111,11 @@ export function replaceCreationAttachmentReference(prompt: string, attachments: 
 
 export function displayCreationPrompt(prompt: string, references: CreationReference[]) {
     return references.reduce((value, reference) => value.split(canvasResourceMentionToken(reference)).join(`@${reference.label}`), prompt);
+}
+
+/** displayCreationPrompt 的反向：把用户看到的 @图片1、@技能名 换回令牌，和输入框发出的提示词同一格式。 */
+export function restoreCreationPromptTokens(prompt: string, references: CreationReference[]) {
+    return references.reduce((value, reference) => replaceVisibleReferenceLabel(value, reference.label, canvasResourceMentionToken(reference)), prompt);
 }
 
 export function expandCreationPrompt(prompt: string, references: CreationReference[], attachments: CreationAttachment[] = []) {
@@ -133,6 +156,5 @@ function attachmentReference(attachment: CreationAttachment, index: number): Cre
 }
 
 function replaceVisibleReferenceLabel(value: string, label: string, replacementToken: string) {
-    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return value.replace(new RegExp(`@${escapedLabel}(?=$|\\s|[,.!?;:，。！？；：、)\\]}】）])`, "gu"), replacementToken);
+    return value.replace(new RegExp(`@${escapeRegExp(label)}${MENTION_BOUNDARY}`, "gu"), replacementToken);
 }

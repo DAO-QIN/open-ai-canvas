@@ -5,6 +5,30 @@ description: 影策后端核心持久化表与状态边界
 
 # 后端数据库
 
+## 结果图展示档位（Schema 85）
+
+版本 85 `resource_display_variant` 为 `resources` 补 5 列，记录创作对话结果图的展示档位（`variant=display`，长边 1600）。迁移只加列，不改写既有资源行；旧行这些列为 NULL，按“未处理”对待。
+
+| 列 | 说明 | 关键边界 |
+| --- | --- | --- |
+| `display_status` | 空（含 NULL）=未处理、`processing`、`ready`、`skipped`、`failed`；列宽 24 | 首次按展示档位访问时后台认领生成：只有未处理、或 `processing` 且 `updated_at` 早于 10 分钟（进程中途退出）的行能认领，多实例只有一个成功；`skipped` / `failed` 之后直接用原图，不再重试 |
+| `display_mime_type` / `display_size` / `display_width` / `display_height` | 展示图的类型（`image/jpeg` 或 `image/png`）、字节数和像素 | 对象键固定为原件 `object_key` 加 `.display`，不单独持久化；登记时在账号存储锁内复核容量，超出时删掉对象并记为 `skipped` |
+
+- 账号存储用量按物理对象去重后累加 `thumbnail_size` 与 `display_size`（各自状态为 `ready` 时）；展示图不占当日上传额度。
+- 删除资源时，展示图为 `ready` 或 `processing` 会多排一条 `<object_key>.display` 的物理删除任务；本地兜底文件补传到对象存储时清空这 5 列，并删除本地展示图，之后按新位置重新生成。
+
+## 自定义金额充值（Schema 84）
+
+版本 84 `topup_custom_pricing` 为 `topup_products` 补 3 列、为 `payment_orders` 补 1 列，旧商品和旧订单的含义不变：
+
+| 列 | 说明 | 关键边界 |
+| --- | --- | --- |
+| `topup_products.pricing_mode` | `fixed`（默认，固定套餐）或 `custom`（自定义金额）；列宽 16、非空 | 创建后不能修改；`custom` 只允许积分商品。`custom` 时 `amount_fen` / `credits_microcredits` 表示“每份”的售价与积分 |
+| `topup_products.custom_min_quantity` / `custom_max_quantity` | 用户可选的最少 / 最多份数，固定套餐为 0 | 最少 ≥ 1、最多 ≥ 最少；最多份数 × 每份售价 ≤ 1,000,000 主单位，最多份数 × 每份积分 ≤ 10 亿积分（保存时用除法校验，不会溢出） |
+| `payment_orders.quantity` | 下单份数，非空默认 1 | 固定套餐恒为 1；`amount_fen` 与 `credits_microcredits` 已是份数 × 每份值的快照，入账、对账、关单只读订单快照 |
+
+下单时服务端按商品当前配置计算份数、金额与积分（整数倍，不舍入），客户端只提交份数；同一幂等键必须对应相同的商品、渠道与份数。
+
 ## Agent 记忆文件列补齐（Schema 83）
 
 版本 83 `agent_memory_document_columns` 只做补列：确保 `agent_memory_documents.next_entry_seq` 与 `agent_memory_document_revisions.call_id` 存在，并把空值回填为 `0` / 空串。它也修复早期记忆文件表可能缺列的情况；新库由版本 82 一次建全，版本 83 是空操作，不改写既有记忆内容。既有迁移 1–80 的名称和校验和保持不变。
@@ -209,6 +233,12 @@ SQLite → PostgreSQL 工具同时迁移四张新增表（会话、回执、偏�
 
 运行策略 JSON 的 `resource.conversationRetentionDays` 默认为 0（长期保留）。启用后按会话及关联任务最后活动时间清理已结束的 creation 索引，不取消任务或删除账务、媒体；读取和重复同步不延长保留期。普通历史追加合并，目录查询不载入正文，本次复用已有字段，无新增数值迁移。
 
+联网搜索与视频合成没有新增表、列或迁移：
+
+- `system_settings` 的 `web_search` 键保存 `{ enabled, provider, baseUrl, apiKey, maxResults, engine?, dailyLimit?, perMinuteLimit?, priceMicrocredits?, readerProvider?, readerBaseUrl?, readerApiKey? }`；`perMinuteLimit` 是每人每分钟联网调用次数，缺省按 30；`priceMicrocredits` 是每次搜索扣用户的微积分，缺省为 0（免费），旧配置读出来仍是免费。`apiKey` 与 `readerApiKey` 与其他系统设置密钥一样用 `.settings-key` 加密后入库，管理端读取只返回 `hasApiKey` / `readerHasApiKey`；修改写入 `admin_audit_events`（`web_search_settings.update`，不记录密钥）。没有这条记录时视为未启用；缺 `dailyLimit` 时按每人每天 100 次。`provider` 新增 `deepseek`，`readerProvider` 取空、`deepseek` 或 `jina`；DeepSeek 读取可以不存 `readerApiKey`，运行时沿用同一服务地址的搜索密钥，结构没有变化。每日次数计在运行时协调器（Redis 或单机内存）的 `agent-web-search-day:<用户>:<日期>` 键上，每分钟次数计在 `agent-web:<用户>` 键上，都不入库。
+- 联网搜索的按次扣费复用 `billing_orders` 与 `credit_ledger_entries`：订单 `capability`、`model`、`scene` 均为 `web_search`，`billing_mode=fixed_request`，`task_id` 为本轮 Agent 运行 ID（不计费的主任务），`idempotency_key` 为 `web_search:<sha256>`（由运行、模型步、调用 ID 和参数派生，沿用 `(user_id, idempotency_key)` 唯一索引防重复扣费），`unit_price_microcredits` 为配置价格、`multiplier_basis_points` 为分组倍率，`charge_limit_microcredits` 等于冻结金额。订单直接以 `running` 入库；流水照常写 `reserve`，结算写 `consume`，没有结果或失败写 `refund`（`note` 为原因）。同一主任务下可能有多张搜索订单。
+- 创作 Agent 的 `compose_video` 写一条普通 `tasks` 记录：`type=timeline_render`、`project_id` 为空、`agent_run_id` 指向本轮运行，任务 ID 由运行 ID 与工具调用 ID 派生（同一调用重放复用原任务）。`input_json` 是时间线快照（可带 `burnSubtitles`），`result_json` 为 `{ resourceId, fileName, size, durationMs, subtitleSrt?, subtitlesBurned? }`，成片作为普通 `resources` 记录保存。
+
 ## 画布多端协作（Schema 60）
 
 迁移 `canvas_multi_session_sync` 新增 `canvas_edit_leases`，以 `(user_id, canvas_id, node_id)` 为主键，记录浏览器会话、随机租约凭据与到期时间。服务端在画布事务锁内裁决占用和写入，租约有效期 30 秒；读取状态不返回凭据，浏览器计时不能代替服务端授权。
@@ -235,7 +265,7 @@ Schema 45 新增 `upload_reservations`：`id`、`user_id`、`size`、`day`、`ex
 
 ## 更新公告配置
 
-外观设置 `appearance` 的 JSON 新增 `creationTitle`、`creationDescription`，保存创作首页标题模板和副标题文本，继续使用合同版本 10。缺失字段在内存读取时采用原首页文案；管理员保存时写回，不新增表或结构迁移。标题空白回退默认，副标题空白表示隐藏；局部恢复文案不删除外观设置或影响其他配置。
+外观设置 `appearance` 的 JSON 新增 `creationTitle`、`creationDescription`，保存创作首页标题模板和副标题文本，继续使用合同版本 10。缺失字段在内存读取时采用原首页文案；管理员保存时写回，不新增表或结构迁移。标题空白回退默认，副标题空白表示隐藏；局部恢复文案不删除外观设置或影响其他配置。之后又新增 `creationCanvasTitle`、`creationCanvasDescription`，保存创作首页「画布」面（`/create?mode=canvas`）的标题与副标题，规则相同，缺失时取画布面默认文案，合同版本仍为 11。
 
 外观 JSON 合同版本 10 新增 `updates`：`enabled`、`currentVersion`、`releases`。每个版本保存 `id/version/title/date/blocks`，内容块保存 `id/type/text/resourceId/caption/layout`；公共媒体 URL 由服务端按当前引用生成，不保存客户端 URL。关闭开关保留公告和资源引用，只关闭公共展示。不增加数据库表或 schema 迁移。
 
@@ -489,7 +519,7 @@ docker compose -f docker-compose.deploy.yml up -d backend web
 | -------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
 | `topup_products`                                               | 保存服务端维护的充值商品、金额和积分快照               | 客户端只能提交商品 ID；金额和积分由 service 读取，不能由请求覆盖                                         |
 | ---                                                            | ---                                                    | ---                                                                                                      |
-| `topup_products`                                               | 保存服务端维护的充值商品、金额，以及积分或存储空间权益 | 客户端只能提交商品 ID；金额和权益由 service 读取，不能由请求覆盖                                         |
+| `topup_products`                                               | 保存服务端维护的充值商品、金额，以及积分或存储空间权益 | 客户端只能提交商品 ID（自定义金额商品另交份数）；金额和权益由 service 读取并计算，不能由请求覆盖           |
 | `payment_provider_configs`                                     | 保存支付插件某个渠道配置的不可变版本                   | `provider_id + version` 唯一；密钥只保存加密密文；`plugin_id` / `plugin_version` 记录配置对应的插件版本  |
 | `payment_orders`                                               | 保存充值订单、幂等键、渠道交易号、权益快照和入账状态   | 创建订单时固定 `plugin_id`、`plugin_version`、配置 ID 与配置版本；回调、查单、关单必须使用同一运行时版本 |
 | `payment_notifications`                                        | 保存已验签的支付通知收件箱                             | 以渠道事件 ID 幂等；只保存用于异步入账的标准化证据，重复通知不会重复发放积分                             |

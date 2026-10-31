@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * 下滑加载：列表数据已在本地，只是分批渲染。哨兵元素进入视口（含滚动容器裁剪）前 600px 时再多显示一批。
@@ -22,7 +22,8 @@ export function useIncrementalReveal(total: number, step: number, resetKey: unkn
         }
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries.some((entry) => entry.isIntersecting)) setCount((current) => Math.min(totalRef.current, current + step));
+                // 下一批在滚动中途渲染：放进过渡分片，滚动和点击不被一整批卡片卡住。
+                if (entries.some((entry) => entry.isIntersecting)) startTransition(() => setCount((current) => Math.min(totalRef.current, current + step)));
             },
             { rootMargin: "0px 0px 600px 0px" },
         );

@@ -18,6 +18,15 @@ export type UseVoiceRecordingReturn = {
     reset: () => void;
 };
 
+/** getUserMedia 的失败原因转成中文；浏览器原始英文信息不直接展示给用户。 */
+function microphoneErrorMessage(error: unknown): string {
+    const name = error instanceof DOMException ? error.name : "";
+    if (name === "NotAllowedError" || name === "SecurityError") return "麦克风权限被拒绝，请在浏览器设置中允许访问麦克风";
+    if (name === "NotFoundError" || name === "OverconstrainedError") return "没有检测到麦克风，请连接后重试";
+    if (name === "NotReadableError" || name === "AbortError") return "麦克风被其他应用占用，请关闭后重试";
+    return "无法访问麦克风，请检查设备和浏览器权限";
+}
+
 /**
  * 语音录制 Hook
  * 使用 MediaRecorder API 录制音频，AnalyserNode 获取实时波形数据
@@ -37,9 +46,12 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}): UseVo
     const animationFrameRef = useRef<number | null>(null);
     const timerRef = useRef<number | null>(null);
     const startTimeRef = useRef<number>(0);
+    // 每次 start / 清理都换一代：授权弹窗还没点完就已取消或卸载时，迟到的麦克风流要立即释放。
+    const sessionRef = useRef(0);
 
     // 清理资源
     const cleanup = useCallback(() => {
+        sessionRef.current += 1;
         if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
             animationFrameRef.current = null;
@@ -86,13 +98,24 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}): UseVo
 
     // 开始录制
     const start = useCallback(async () => {
+        const session = ++sessionRef.current;
         setError(null);
         setWaveform([]);
         setDuration(0);
         chunksRef.current = [];
 
+        // 非 HTTPS 页面（localhost 除外）浏览器不提供 mediaDevices
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setError("当前页面无法使用麦克风，请通过 HTTPS 访问");
+            return;
+        }
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (session !== sessionRef.current) {
+                stream.getTracks().forEach((track) => track.stop());
+                return;
+            }
             streamRef.current = stream;
 
             const audioContext = new AudioContext();
@@ -124,14 +147,18 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}): UseVo
             timerRef.current = window.setInterval(() => {
                 const elapsed = (Date.now() - startTimeRef.current) / 1000;
                 setDuration(elapsed);
-                if (elapsed >= maxDuration) {
-                    // 达到最大时长，自动停止
+                if (elapsed >= maxDuration && mediaRecorder.state !== "inactive") {
+                    // 达到最大时长，自动停止并回到 idle，由调用方接着转写
+                    mediaRecorder.onstop = () => {
+                        cleanup();
+                        setState("idle");
+                    };
                     mediaRecorder.stop();
                 }
             }, 100);
         } catch (err) {
-            const message = err instanceof Error ? err.message : "无法访问麦克风";
-            setError(message);
+            if (session !== sessionRef.current) return;
+            setError(microphoneErrorMessage(err));
             setState("idle");
             cleanup();
         }

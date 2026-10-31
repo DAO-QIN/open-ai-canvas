@@ -47,6 +47,32 @@ export function layoutCanvasNodes(nodes: CanvasNodeData[], mode: CanvasLayoutMod
     return result;
 }
 
+/**
+ * 一次插入的多个节点：按各自宽高逐行排开（每行最多 columns 个，行高取本行最高），整组以落点为中心。
+ * 只有一个节点时就是以落点为中心，与单个插入一致。返回的左上角坐标与输入顺序一一对应。
+ */
+export function layoutInsertedNodes(sizes: ReadonlyArray<{ width: number; height: number }>, center: Position, columns = 3): Position[] {
+    if (!sizes.length) return [];
+    const perRow = Math.max(1, Math.floor(columns));
+    const rows: Array<Array<{ width: number; height: number }>> = [];
+    for (let start = 0; start < sizes.length; start += perRow) rows.push(sizes.slice(start, start + perRow));
+    const rowHeights = rows.map((row) => Math.max(...row.map((item) => item.height)));
+    const blockWidth = Math.max(...rows.map((row) => row.reduce((sum, item) => sum + item.width, 0) + GRID_NODE_GAP * (row.length - 1)));
+    const blockHeight = rowHeights.reduce((sum, height) => sum + height, 0) + GRID_NODE_GAP * (rows.length - 1);
+    const left = center.x - blockWidth / 2;
+    let top = center.y - blockHeight / 2;
+    const positions: Position[] = [];
+    rows.forEach((row, rowIndex) => {
+        let x = left;
+        row.forEach((item) => {
+            positions.push({ x, y: top });
+            x += item.width + GRID_NODE_GAP;
+        });
+        top += rowHeights[rowIndex] + GRID_NODE_GAP;
+    });
+    return positions;
+}
+
 type LayoutBlock = { positions: Map<string, Position>; width: number; height: number; anchor: Position };
 type LayoutRect = { left: number; top: number; right: number; bottom: number };
 

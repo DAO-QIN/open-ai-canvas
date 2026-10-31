@@ -95,6 +95,11 @@ export async function downloadCreationImage(image: CreationImageDownload) {
     saveAs(blob, creationImageDownloadName(image, blob));
 }
 
+/** 视频合成随成片返回的 SRT 字幕；带 UTF-8 BOM，部分剪辑软件靠它识别中文编码。 */
+export function downloadCreationSubtitle(title: string, srt: string) {
+    saveAs(new Blob([srt], { type: "text/plain;charset=utf-8" }), `${safeDownloadName(title).slice(0, 60) || "视频合成"}.srt`, { autoBom: true });
+}
+
 function safeDownloadName(value: string) {
     return value
         .trim()

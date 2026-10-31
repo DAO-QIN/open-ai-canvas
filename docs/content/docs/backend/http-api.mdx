@@ -12,8 +12,8 @@ description: 信封、错误码与 OpenAPI
 `GET /api/wallet/usage?tzOffset=480` 返回当前登录账号截至今天（含）最近 365 个自然日的积分消耗，需积分功能开启，私有且 `Cache-Control: private, no-store`，每用户每分钟 30 次。`tzOffset` 是浏览器的 UTC 偏移分钟数（东八区为 480，范围 -720 到 840，缺省为 0），服务端按它划分自然日；非整数或越界返回 400。
 
 - `data = { from, to, days, timezoneOffset, daily, categories, models }`。`from`/`to` 为含首尾的本地日期 `YYYY-MM-DD`，`days` 固定 365。
-- `daily` 只含有消耗的日期，按日期升序，项为 `{ date, totalMicrocredits, agentMicrocredits, count, agentCount }`；前端按窗口补零。
-- `categories` 按账单能力汇总窗口内消耗，`capability` 为 `image|video|audio|text|other`（无账单或未知能力归入 other），按消耗降序。
+- `daily` 只含有消耗的日期，按日期升序，项为 `{ date, totalMicrocredits, agentMicrocredits, count, agentCount, models }`；前端按窗口补零。`models` 是当天按 `(capability, model)` 的构成，项为 `{ model, capability, totalMicrocredits, agentMicrocredits, count, agentCount }`，按消耗降序；键与顶层 `models` 相同，名称只在顶层给出。看板查看单日、单周构成时由前端按日期区间合并，整个窗口合并后与顶层 `categories`、`models` 一致。
+- `categories` 按账单能力汇总窗口内消耗，`capability` 为 `image|video|audio|text|web_search|other`（`web_search` 是首页创作与画布助手联网搜索的按次消耗；无账单或未知能力归入 other），按消耗降序。`models` 里 `model=web_search` 的项 `name` 固定为「联网搜索」。
 - `models` 按 `(capability, model)` 汇总窗口内消耗，项为 `{ model, name, capability, totalMicrocredits, agentMicrocredits, count, agentCount }`，按消耗降序且不截断。`model` 是流水上记录的前台模型编码（与积分明细显示的一致，流水为空时取账单上的值；没有记录时为空串），不含供应渠道或线路；`name` 是该编码当前的前台模型名称（同编码优先未归档模型，查不到时为空串，由前端显示编码）。
 - 口径与钱包流水一致：只统计 `type = consume` 且金额为负的流水（结算后的最终扣费），按流水时间（结算时刻）计入当天；冻结、预授权差额与失败退款、管理员调整、充值和赠送都不计入。金额为整数微积分。
 - Agent 用量为关联任务带 `agent_run_id`（云端 Agent 子任务）、带 `creation_submission_id`（首页智能创作提交），或操作名为 `cloud_agent`、`cloud_agent_step`、`cloud_agent_context_compaction`、`agent_memory_compact` 的消耗。系统代理调用等没有任务的消耗只计入总量。
@@ -24,6 +24,19 @@ description: 信封、错误码与 OpenAPI
 `POST /api/admin/channels/:id/models/test` 仅管理员可调用，沿用模型协议与能力配置请求，可选 `prompt`（最多 8000 字符），留空使用通用测试内容。视频使用能力画像中的默认时长、比例与分辨率。测试不要求模型已启用或已有价格规格，不保存模型配置，不创建用户任务或站内计费订单，但会真实调用上游并可能产生费用。
 
 成功返回 `{durationMs,videoUrl?,resourceId?}`。视频经现有生成资源存储及额度校验保存到当前管理员账号，预览地址沿用资源接口的归属校验，不向浏览器返回上游密钥。下载使用 `resourceId` 请求已有的 download purpose 合同，不将预览地址当作下载链接。视频保存失败会提示不要重复提交，避免再次付费。接口保留每分钟 5 次限流和 10 分钟请求超时。
+
+## 管理端联网搜索配置
+
+`GET /api/admin/settings/web-search` 与 `PATCH /api/admin/settings/web-search` 仅管理员可调用（匿名 401、普通用户 403，权限在 service 校验），返回 `{ setting: { enabled, provider, baseUrl, hasApiKey, maxResults, engine, dailyLimit, perMinuteLimit, priceMicrocredits, readerProvider, readerBaseUrl, readerHasApiKey, updatedBy, createdAt, updatedAt } }`。PATCH 请求体 `{ enabled, provider, baseUrl, apiKey, maxResults, engine, dailyLimit, perMinuteLimit, priceMicrocredits, readerProvider, readerBaseUrl, readerApiKey }`，上限 16KB：
+
+- `provider` 为 `deepseek`、`bocha`、`metaso`、`zhipu`、`tavily`、`serper` 或 `searxng`；`maxResults` 为 1–10，缺省 5；`engine` 只对智谱生效（`search_std` 缺省、`search_pro`、`search_pro_sogou`、`search_pro_quark`，其他值返回 400）；`dailyLimit` 是每人每天的搜索次数，1–10000，缺省 100；`perMinuteLimit` 是每人每分钟的联网调用次数（搜索与网页读取合计，复用缓存结果也计入），1–600，缺省 30，越界返回 400。
+- `priceMicrocredits` 是每次搜索扣用户的积分（整数微积分，0–10000000000 即 0–1 万积分，0 表示免费），越界返回 400，不夹到边界值。实际扣费再乘用户分组倍率；只对搜到结果的搜索扣，失败、没有结果或复用缓存结果不扣，积分功能关闭时不扣。规则见 [首页创作 Agent](./creative-agent-runtime#联网搜索与网页读取)。
+- `readerProvider` 为空（只用服务端直接读取）、`deepseek` 或 `jina`，其他值返回 400；`readerBaseUrl` 留空时分别用 `https://api.deepseek.com/v1/tools/fetch`（DeepSeek 填完整接口地址）和 `https://r.jina.ai`（Jina 填服务根地址）。Jina 的 `readerApiKey` 可选；DeepSeek 必须有密钥，留空时只在搜索服务也是 DeepSeek 且两者地址的协议、主机、端口都相同时沿用 `apiKey`，否则返回 400。读取服务不论是否开启搜索都会校验。
+- `apiKey` / `readerApiKey` 留空、且对应的服务和地址都没变时保留原密钥；换服务或地址必须重新填写。响应不回显密钥。启用时要求配置完整（SearXNG 需要地址，其他服务需要密钥），`baseUrl` 与 `readerBaseUrl` 须通过出站地址校验。修改写入管理员审计 `web_search_settings.update`（记录服务、读取服务、每日次数、每分钟次数、每次搜索价格和密钥是否变更，不记录密钥），审计失败时返回错误。
+
+`POST /api/admin/settings/web-search/test` 接收同样字段加 `query`（留空用默认词），用表单配置实际搜索一次并返回 `{ provider, results: [{ title, url, snippet?, siteName?, publishedAt? }] }`，最多 3 条。带 `target: "reader"` 和 `url`（留空读 `https://example.com`）时改为用表单里的读取服务读一次网页，返回 `{ provider, results: [], reader: { title, url, excerpt, chars } }`，`excerpt` 为正文前 300 字。两者都不保存配置、不扣积分（请求里的 `priceMicrocredits` 被忽略），每位管理员每分钟合计 6 次。上游拒绝鉴权或返回无法识别的内容时返回 502，上游限流返回 429，超时返回 504，消息不含密钥或上游原文。创作 Agent 如何使用见 [首页创作 Agent](./creative-agent-runtime#联网搜索与网页读取)。
+
+`GET /api/auth/session` 的响应带 `webSearchEnabled`（管理员已开启且配置完整），创作页「偏好」和画布助手「Agent 设置」据此显示「联网搜索」开关，两处共用账号偏好 `agent.webSearch`。开启时另带 `webSearchPriceMicrocredits`：当前账号每次搜索实际扣的微积分（已乘分组倍率；积分功能关闭或免费时为 0），分组配置缺失等原因算不出价格时省略该字段，不影响会话读取。首页创作与画布助手建轮次（`POST /agent/runs`、`POST /agent/runs/:id/messages`）时请求体可带 `webSearch: "off"`，表示用户关闭了联网搜索；只接受空、`auto` 或 `off`，其他值返回 400，`auto` 与不传等价。
 
 ## 宠物形象库与个人偏好
 
@@ -79,7 +92,7 @@ description: 信封、错误码与 OpenAPI
 | 接口 | 用途 |
 | --- | --- |
 | `GET /api/libtv/gallery` | 分页作品列表，支持 `page`、`pageSize`、`keyword`、`tagId`、`requestId`；后续分页复用首次响应的查询标识 |
-| `GET /api/libtv/featured` | 精选画布（最多 60 个，服务启动即预热）：LibTV「精选画布」标签中节点 ≥100、可导入、有成片且封面无 LibTV 水印的作品，按点赞排序；服务端缓存 30 分钟，上游失败时返回上一份结果 |
+| `GET /api/libtv/featured` | 精选画布（不设数量上限，服务启动即预热，首次构建先返回排在最前的约 20 个）：LibTV「精选画布」标签与公开作品流中节点 ≥100、复制不丢节点 / 连线 / 媒体结果、复制后画布不超过 3MB、有成片、横版封面且人工复核无水印的作品；精选标签在前，各自按点赞排序。作品复核结论按快照版本缓存，列表缓存 30 分钟，上游失败或没读全时返回上一份结果 |
 | `GET /api/libtv/works/:uuid` | 作品、制作步骤、公开提示词、媒体及导入警告 |
 | `POST /api/canvas-projects/:id/import/libtv-template` | 请求体 `{"uuid":"作品模板 UUID"}`；校验画布归属后返回转换预览，用户确认后由前端通过现有画布保存流程写入 |
 
@@ -269,7 +282,8 @@ handle 放错端点、格式错误或行 ID 不存在时，工具错误回执提
 
 资源展示、播放、下载、复制地址和模型输入统一消费资源访问合同，不在客户端通过 `direct=1`、`proxy=1` 或存储厂商规则选择出口。
 
-- `POST /api/resources/access` 要求登录，请求体为 1–100 项 `{ resourceId, purpose?, variant? }`。`purpose` 支持 `display`、`copy`、`download`、`browser-process`、`provider-input`；`variant` 支持 `original`、`playback`、`thumbnail`（缩略图未生成前回落原件，`fallbackReason` 为 `thumbnail_not_ready`）。每项独立返回 `access` 或结构化 `error`。
+- `POST /api/resources/access` 要求登录，请求体为 1–100 项 `{ resourceId, purpose?, variant? }`。`purpose` 支持 `display`、`copy`、`download`、`browser-process`、`provider-input`；`variant` 支持 `original`、`playback`、`thumbnail`（缩略图未生成前回落原件，`fallbackReason` 为 `thumbnail_not_ready`）、`display`。每项独立返回 `access` 或结构化 `error`。
+- `variant=display` 是创作对话结果图的展示档位：长边 1600 像素，不透明图为 JPEG（原图带 RGB 色彩配置时原样带上），带透明像素的为 PNG。首次按此档位访问图片时服务端回落原件（`fallbackReason` 为 `display_not_ready`），并在后台生成，之后的访问返回 `actualVariant: display`，`originalWidth` / `originalHeight` 为原图像素。原图长边不超过 1600、格式不是 PNG/JPEG/WebP、JPEG 带 EXIF 方向标记或非 RGB 色彩配置（含 CMYK）、PNG/WebP 带色彩配置或 EXIF、是动图，或缩完体积省不到两成时不生成，`fallbackReason` 为 `display_not_needed`；生成失败为 `display_failed`。`download`、`copy`、`provider-input` 始终交付原件。展示图字节计入账号存储用量，不占当日上传额度；账号容量不足时不生成。
 - `access.delivery` 为 `cdn`、`origin`、`platform-local` 或 `platform-proxy`。媒体配置了可用 CDN 时返回 CDN 地址；OSS 源站签名是源站直连，不等于 CDN。媒体的 `requireCDN` 开启且 CDN 鉴权不完整时失败，不静默回源。浏览器媒体的展示、复制、下载和本地处理不使用 `platform-proxy`，正文由 OSS/CDN 直接发送；`allowPrivateProxy` 允许服务端在 `provider-input` 场景读取私有媒体源站。非媒体附件始终通过平台控制响应头，不受上述媒体直连规则影响。
 - `expiresAt` / `refreshAt` 只描述当前授权有效期。有效期来自后台「资源与请求策略」（`provider-input` 与其余签名访问分别配置，默认均为 4 小时）；公开 CDN 可没有 `expiresAt`。签名地址不写入画布或服务端持久化内容。
 - `display`、`copy`、`browser-process` 的源站签名把签名起始时间对齐到有效期 1/4 的时间窗（按 Unix 纪元对齐），过期时间为窗口起点加有效期：同一窗口内重复签发得到逐字节相同的 URL，刷新画布或多实例签发都能命中浏览器 HTTP 缓存；签名同时携带 `response-cache-control=private, max-age=<有效期>, immutable`，由对象存储回写缓存头。`download` 与 `provider-input` 仍按当前时间签发，不带缓存覆盖。
@@ -360,7 +374,7 @@ CANVAS_BACKEND_DATA_DIR=/明确的数据目录 ./migrate-schema repair-canvas-re
 
 ### 画布配置、更新公告、状态动画包与 Live2D（外观合同版本 11）
 
-创作首页文案复用外观设置：管理员通过 `PATCH /admin/settings/appearance` 保存 `creationTitle`（最多 80 字，空白回退默认标题）与 `creationDescription`（最多 160 字，空白隐藏副标题）；管理员及公共外观接口返回这两个字段。两段支持换行及 `{brandName}` 占位符，前端以纯文本显示并替换当前品牌名。缺失字段使用原首页文案；不增加数据库迁移。后台“创作首页”支持预览和局部恢复默认，恢复按钮只修改草稿，点击“保存修改”后生效。
+创作首页文案复用外观设置：管理员通过 `PATCH /admin/settings/appearance` 保存「生成」面的 `creationTitle`（最多 80 字，空白回退默认标题）与 `creationDescription`（最多 160 字，空白隐藏副标题），以及「画布」面（`/create?mode=canvas`）的 `creationCanvasTitle`（最多 80 字，空白回退「从一张画布，展开你的灵感」）与 `creationCanvasDescription`（最多 160 字，空白隐藏副标题）；管理员及公共外观接口返回这四个字段。各段支持换行及 `{brandName}` 占位符，前端以纯文本显示并替换当前品牌名。缺失字段使用各面的默认文案；外观合同版本仍为 11，不增加数据库迁移。旧后端会忽略画布面的两个字段，需和前端一起部署。后台“创作首页”分两列编辑和预览两面文案，支持局部恢复默认，恢复按钮只修改草稿，点击“保存修改”后生效。
 
 外观设置新增 `updates: { enabled, currentVersion, releases }`，由管理员通过 `PATCH /admin/settings/appearance` 保存；关闭开关保留草稿，但 `GET /public/appearance` 返回关闭状态与空公告列表，前端恢复内置更新日志。开启时公开版本与内容块，当前版本须对应公告版本。媒体上传、管理员预览、公开引用读取及限制详见 [自定义更新公告](/docs/backend/update-announcements)。JSON 请求上限为 512KB；无数据表迁移。
 
@@ -455,6 +469,19 @@ Token 报价的 `estimated` 为 `true`，`quantity` 是预留 Token 数。参考
 渠道模型创建与更新增加 `priceCurrency`：`credits`（默认）/ `USD` / `CNY`。省略时更新保留原值、新建为 `credits`。货币计价时价格档售价字段表示百万分之一货币单位，例如 `unitPriceMicrocredits: 40000` 表示每次 0.04 USD；成本价仍是微积分。渠道导出文件携带 `priceCurrency`。
 
 充值商品增加 `currency`（`CNY` / `USD`），`amountFen` 表示该货币最小单位（分 / 美分）；新建未传 `currency` 时使用默认充值货币，更新未传时保留原值。支付订单 `currency` 取自商品，支付插件按该货币下单和校验。默认充值货币接口：`GET /api/payments/settings`（登录用户）、`GET/PUT /api/admin/payments/settings`（`{ defaultCurrency: "CNY" | "USD" }`）；用户端 `/payments/products` 把默认货币的商品排在前面，切换默认货币不改写已有商品价格。
+
+## 自定义金额充值
+
+充值商品增加 `pricingMode`：`fixed`（默认，固定套餐）或 `custom`（自定义金额，只支持积分商品，创建后不能修改）。`custom` 商品的 `amountFen` / `creditsMicrocredits` 表示每份售价与每份积分，`customMinQuantity` / `customMaxQuantity` 是用户可选的份数区间；管理端 `POST/PUT /api/admin/payments/products` 用同名字段写入，最多份数 × 每份售价不超过 1,000,000 主单位、× 每份积分不超过 10 亿积分。
+
+`POST /api/payments/orders` 增加可选字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `quantity` | 购买份数。固定套餐省略或为 1；自定义商品必须落在份数区间内，否则 400 |
+| `expectedAmountFen` / `expectedCreditsMicrocredits` | 用户确认时看到的应付金额与到账积分。服务端按商品当前配置重新计算，任一不一致返回 409、`reason=topup_quote_changed`，不建单；省略则不比对 |
+
+订单金额与积分 = 份数 × 每份值，在下单时快照，回调、查单、对账只比对订单快照。同一 `idempotencyKey` 重放时商品、渠道和份数都必须一致，否则 409。积分中心的结算栏、套餐卡“比自定义充值省”金额与滑块报价由 `web/src/lib/topup-pricing.ts` 按同一算法计算，只用于展示。
 
 ## 管理员积分成本
 
@@ -564,7 +591,7 @@ operations 的结构化配额在提交事务内实时统计账号的素材/画�
 - 创建和追加消息可选择 `reasoningMode`，默认 `off`；`auto`/`deep` 为服务端行为策略与模型推理配置的选择，不等于允许暴露内部思维链。供应商能力由后端校验；声明式 Agent 渠道不支持时明确报错。推理可能增加耗时和费用。
 - Cloud Agent 与首页创造的规划请求使用自动工具选择。OpenAI Chat Completion 兼容协议会把显式 `auto` 归一化为省略 `tool_choice`，沿用协议默认的自动选择语义；显式开启思考模式时还会在首个上游请求前移除 `required` 或指定函数对象。非思考模式仍保留艺术点评、提示词优化等结构化任务的强制函数选择。若上游隐式开启思考而本地未声明，仍按 `required` → `auto` → 省略字段做兼容重试。
 - `GET /agent/profile?scope=user|project|canvas&projectId=...&canvasId=...` 按作用域读取生效的用户 → 项目 → 画布偏好；`PATCH /agent/profile` 用 `{ scope, projectId?, canvasId?, content, revision }` 更新单层（首次 revision 为 0，冲突返回 409）。读取返回各层独立数字 revision，以及合并文档的 `revision`/`hash`；新轮次携带合并 `profileRevision`，发生变化拒绝创建，已运行轮次仍用提交时固定的快照。system prompt 只包含层级、revision、hash 和长度清单，正文保存在运行快照中；本轮快照有层时才提供 `agent_profile_read`，只读清单中存在的层。没有偏好层时工具清单不含该工具。偏好仅是非授权数据，不能扩展工具、节点或预算，不能绕过审批；最多 12000 字符/层。
-- 行为规则唯一来源是编译进后端的 `agent-system-policy.md` v19；不再 embed 旧操作合同或独立媒体策略。媒体 ID/版本/哈希从同一系统合同派生，仅服务于冻结校验。画布能力和工具 Policy 仍由代码强制执行；新生成模式还须接入共享任务适配器。用户目标、画布内容和长期记忆以动态消息提供，不写入稳定 system 前缀。
+- 行为规则唯一来源是编译进后端的 `agent-system-policy.md` v20；不再 embed 旧操作合同或独立媒体策略。媒体 ID/版本/哈希从同一系统合同派生，仅服务于冻结校验。画布能力和工具 Policy 仍由代码强制执行；新生成模式还须接入共享任务适配器。用户目标、画布内容和长期记忆以动态消息提供，不写入稳定 system 前缀。
 - 技能自动发现：创建运行时，服务端把用户已安装、`agentMode` 不是 `manual` 的技能（最多 1000 个）编成「已安装技能目录」放进 system，排在执行上下文 JSON 之后。目录最多占本轮模型输入预算的 5%（至少 1000 token）：先按 Agent 实际读取次数、排序权重和安装时间选出“名称 [skillId]：60 字简介”，用到预算 70% 后只列名称，再放不下的只报数量并提示用 `skill_search`；入选条目按分类和名称稳定排序，使用次数变化不打乱顺序。`pinnedSkillIds` 中的技能和关键词预筛出的候选（最多 3 个）放在当前用户消息前的「技能提示」数据消息里（`agentContextSource: "skill_hints"`），点名的技能要求先读 `SKILL.md`。
 - 运行只冻结每个可读技能的版本号，不预存正文或文件清单。`skill_read_file` 按需读取 `SKILL.md` 或必要引用，支持字符偏移 `offset`（默认 0），每页最多 12000 字符，返回 `hasMore` / `nextOffset`。读取时重新验证用户权限、启用状态和冻结版本；技能更新后拒绝混读，需新开一轮。成功读取会递增该技能的 `agent_use_count`，只用于目录排序。技能是不可信数据，不能创造工具、改变权限或覆盖系统规则。
 - Agent 按实际文本模型的 `contextWindowTokens` 与 `maxOutputTokens` 计算输入预算，并在达到该模型预算的压缩阈值时移除较早工具结果中可重新读取的正文，保留工具调用/结果配对、用户原始要求、生成回执及最近完整工具轮次，并允许重新读取。此机制是确定性正文卸载，不是 LLM 语义摘要；运行 checkpoint 的持久化上限与模型上下文窗口独立。技能读取事件只保存回执，不复制正文，正文页只进入模型对话。
@@ -601,13 +628,13 @@ operations 的结构化配额在提交事务内实时统计账号的素材/画�
 - `read_only` 只允许读取；`request_approval` 对写画布和媒体生成暂停为 `waiting_approval`；`auto` 可在预算内执行已授权画布操作，但图片 / 视频生成始终独立审批，不能绕过。`maxGenerationTasks` / `maxVideoSeconds` 为非负整数，0 表示该项不设业务上限，正数按本轮累计执行；不再固定 8 次模型调用、8 个生成任务或 120 秒视频。积分上限仍必填且大于 0，实际报价在任务创建与预留积分前校验，时长必须符合所选模型的实际能力。失败事件保留具体错误和已有任务的 `taskId`、`nodeId`、`status`；媒体结果的 `phase` 区分 `admission` 与 `completion`，`taskSubmitted` 表达是否已提交。已提交的收费生成失败作为工具错误交回模型，整轮保持可继续，不得自动重试收费生成；只有生成结果无法回写画布时才把整轮标为 `failed`。模型应报告错误，不能自行删减提示词。 `budget.maxSteps=0` 表示不设固定模型步数上限，正数按本轮累计且有效上限为 9999；Pi 与 Go 共用此值，权限投影不能仅凭画布归属开启写入。
 - 使用画布工具时必须绑定当前用户已保存的画布；平台级对话不注入画布目录。首轮目录是独立动态消息，最多 120 个节点、约 24 KiB；全局项只含 ID、类型、截断标题及能力标记。明确选中的最多 8 个焦点先列入，附带至多 240 个 Unicode 字符的正文/提示词摘要、已记录的媒体/任务状态与一跳邻居；另选中但未附带的数量以 `omittedFocusCount` 说明。摘要不等于资源就绪证明，正文和资源事实仍需语义工具读取。Pi 不再额外注入 CanvasIntelligence 的聚类、情感、建议或任意 metadata。`canvas_get_state` 支持分页、最多 8 个节点精读及关联子图，保留真实 ID、结构化行和截断标记；名称不等于视觉识别。
 - `canvas_get_state` 接受 `offset`、`connectionOffset`、`storyboardOffset`、`nodeIds`、`focusNodeIds`、`depth`、`includeRelated`；分页偏移非负，两个 ID 数组互斥且最多 8 项。`depth`（0–3，默认 1）和 `includeRelated` 仅随焦点使用且互斥。读取目录可传 `{}`，精读用返回的真实 ID；画布由运行绑定，不接受额外 `canvasId`、`limit` 或 `page`。JSON 非对象、多对象、未知字段和类型错误按现有参数纠错回执拒绝，不静默丢字段。
-- `GET /agent/runs/:id` 返回运行信息；`POST /agent/runs/:id/cancel` 取消当前运行及活动子任务；`POST /agent/runs/:id/approvals/:approvalId/decision` 接受 `{"decision":"approve"|"reject","reason":"..."}`，审批决定幂等且服务端校验归属。
+- `GET /agent/runs/:id` 返回运行信息；`POST /agent/runs/:id/cancel` 取消当前运行及活动子任务；`POST /agent/runs/:id/approvals/:approvalId/decision` 接受 `{"decision":"approve"|"reject"|"refresh"|"update","reason":"..."}`，审批决定幂等且服务端校验归属，请求体上限 256KB 且只能是一个 JSON 对象。创作页方案卡另有两种调整：`decision: "update"` 必须带 `items`（最多 20 项，改写提示词与参数，重新报价并返回新的 `approvalId`），批准时可带 `skipItemIds`（最多 20 项，移出后按剩余项执行，不能与 `mediaSettings`、`reason` 同传）；其他组合返回 400。字段与范围见 [首页创作 Agent](./creative-agent-runtime#逐项方案卡)。
 - `GET /agent/skills/usage` 需要登录，只聚合当前用户最近最多 200 次 Agent 运行的日志；返回技能启用次数、检索命中、成功/失败读取、总纲/卡片读取和最多 5 条最常读卡片路径，不返回技能正文。损坏的日志会返回错误而非静默给出不完整统计。
 - 运行详情的事件**分页**：事件全量在 `cloud_agent_event_records`（append-only，主键 `run_id` + `sequence`），运行详情默认只返回**尾部一窗**（最新 40 条），并同时给出四个位置字段：`eventSeqBase`（本次返回的首条事件之前已入库的条数，不变量是 `events[i].seq == eventSeqBase + i + 1`）、`eventCount`（该轮次累计事件条数）、`latestSeq`（本次返回的最后一条序号，可直接作为下次 `sinceSeq`）、`eventsTruncated`（还有更早的记录没随本次返回）。不返回事件时 `eventsTruncated` 为 false，`eventSeqBase` 退回内存窗口在整条日志里的偏移。
 - 运行详情查询参数：`?sinceSeq=<seq>` 只返回该序号**之后**的事件（增量 / 断线重连，单次最多 500 条，按 seq 升序）；`?eventLimit=<n>` 覆盖默认页大小，取值 1–500，大于窗口时由服务端从事件表往前补页。两个参数都必须是整数，越界或非法返回 400；游标追平或越界时返回空 `events` 而不是报错。读取一律走 `(run_id, sequence)` 的 keyset 分页（`sequence > ? ORDER BY sequence LIMIT ?`），不用 offset，也不会为这些字段载入整条日志。升级前把事件放在 `state_json` 里的旧轮次在事件表中没有行，读取回退到内存窗口，行为与升级前一致。
 - 首次通过取消接口取消运行时记录一次 `run_cancelled` 事件，`source: user_request` 表示来自用户取消 API，并携带当时的 `activeTaskId` / `mediaTaskId`；此事件表示取消请求已接收，关联任务最终状态以任务查询及收尾状态为准。运行记录损坏或超限时优先保证取消和后台收尾，事件无法保存会记录服务端告警；旧导出日志不能据此追溯取消发起来源。
 - `GET /agent/runs/:id/events` 返回 `agent_event` 和首次 / 状态版本变化时的紧凑 `run_snapshot` SSE；无变化时只发送 heartbeat。事件 `Seq` 在运行内递增；支持 `?after=` / `Last-Event-ID`，游标不是运行 ID，服务端把它作为运行详情的 `sinceSeq`，因此断线重连只读该游标之后的增量。同一后端进程内，运行修订号提交后由进程内变化信号立即唤醒事件流重读（连续变化时两次读库至少间隔 100ms）；其他实例写入或信号丢失时由 250ms 兜底轮询按数据库修订号追上，推送内容始终以数据库为准。`cleanupPending: true` 时即使运行已进入终态也会继续推送，直到后台收尾完成。前端应以快照恢复状态，代理只对这一精确路径关闭缓冲。
-- `generation_task_created` 携带 `canvasId`、`nodeId`、`taskId`、`title`、`mode`、`referenceNodeIds`。草稿、提交、画布工具写入，以及媒体成功 / 失败 / 取消的真实节点变更，均在画布写入与运行检查点的同一事务持久化 `canvas_updated`。节点已删除或换任务时不伪造更新；`run_failed` 本身不代表节点媒体任务失败。
+- `generation_task_created` 携带 `canvasId`、`nodeId`、`taskId`、`title`、`mode`、`referenceNodeIds`；普通多图批次的任务另带 `imageBatchId`、`imageBatchTotal`、`imageBatchItemId`，经用户批准后提交的任务另带 `approvalId`。经 Agent 运行时执行工具前还会写一条 `tool_started`（`toolName`、`callId`，联网工具另带 `query` 或 `url`）：创作入口每个工具都写，画布入口只为 `web_search` / `web_fetch` 写。它只用于显示进行中，不代表执行结果。草稿、提交、画布工具写入，以及媒体成功 / 失败 / 取消的真实节点变更，均在画布写入与运行检查点的同一事务持久化 `canvas_updated`。节点已删除或换任务时不伪造更新；`run_failed` 本身不代表节点媒体任务失败。
 - 未注册 Agent 能力的节点不阻断整张画布读取：摘要和 `canvas_get_state` 仅返回基础信息，并标记 `agentSupported: false` 与原因；不暴露任意 metadata，不授予该类型的创建、修改、连线或媒体引用能力。
 - `approval.preview` 和 `canvas_updated.actions` 是服务端根据同一解析、快照与 Capability 规划流程生成的解释信息，不是授权凭证。审批卡片明确列出新增/修改节点、节点类型、修改字段、名称变化和连线两端；执行事件保存同样的可读信息，供历史消息显示和点击定位。实际写入仍重新校验用户归属、`snapshotHash`、Capability、节点锁、预算和审批 `callHash`。
 - 可纠正且尚未产生副作用的工具参数错误会在 `tool_failed` 的顶层及 `result.retry` 返回 `{ groupId, attempt, maxAttempts, status }`。`status=retrying` 表示 Agent 可按字段、schema 和示例自动纠正；同一工具累计三次仍失败时返回 `status=exhausted`，随后才产生 `run_failed(reason=tool_retry_exhausted)`。纠正成功的 `tool_completed` 返回同一 `groupId` 和 `status=recovered`。前端应按 `groupId` 折叠中间失败，不能将其显示为独立红色错误。权限、安全、存储错误以及已提交的收费生成任务不进入该重试流程。
@@ -708,6 +735,9 @@ Agent 已不再注入、召回或写入下列经验条目，记忆设置页只�
 | `GET /api/skills/recommendations` | 按行业分组的内置推荐技能：`{ industries: [{ industryId, name, description, icon, skills: [{ skillId, skillName, description, tag, reason, isAdded }], installedCount }], installedTotal }`；已删除或停用的技能不出现，`installedTotal` 供前端决定是否主动提示 |
 | `POST /api/skills/recommendations/:industryId/install` | `{ skillIds }`，为空时安装该行业全部推荐，一次最多 12 个；不在该行业推荐里、已安装或不可用的技能计入 `skipped`，返回 `{ industryId, installed, skipped }` |
 | `PATCH /api/skills/:id/agent-mode` | `{ mode: "auto" \| "manual" }`，只能改自己已安装或自建的技能；`manual` 的技能不进 Agent 的自动发现目录，只在点名或为对话固定时使用。返回 `{ skill }` |
+| `GET /api/skills/added` | 当前用户已安装或自建的启用技能：`{ skills: [{ skillId, skillName, description, versionId, version, tag, isLike, isAdded, isOwner, agentMode?, agentSurfaces }] }`。`agentSurfaces` 是用户主动选择（固定、点名）这个技能时能用的 Agent 入口（`creation` 首页创作、`canvas` 画布助手）：`SKILL.md` 元数据没声明 `agentSurfaces` 时为 `["creation", "canvas"]`，声明了按声明，声明不合法时为 `[]`（任何入口都不能使用）；首页电商种子包的原始内置版本按声明了 `["creation"]` 处理。与 Agent 准入使用同一份解析（`internal/skills/skill_surfaces.go`） |
+
+创作页「技能」菜单和 Agent 模式的 @ 菜单只列 `agentSurfaces` 含 `creation` 的技能。首页 Agent 请求（`surface: "creation"`）的 `skillIds` 由前端从提示词推出：`@[skill:ID]` 令牌、`@技能名`、`/技能名` 都算，只保留 `agentSurfaces` 含 `creation` 的已安装技能，最多 16 个；服务端把它们作为本轮固定技能，固定了声明里没有首页入口的技能时拒绝整轮。没有固定时，首页 Agent 的自动发现只收 `SKILL.md` 声明了 `creation` 的技能，没声明入口的技能只在用户选择时使用（画布助手的自动发现不按入口筛选，读取时仍按入口校验）。
 
 推荐目录随后端发布（`backend/internal/skills/seed/recommendations.json`），启动时校验只引用内置技能。安装只写用户技能库，不会替用户把技能固定到对话。
 
@@ -758,6 +788,7 @@ Agent 已不再注入、召回或写入下列经验条目，记忆设置页只�
 | 40301 | 403  | `quota_exceeded`        | 账号配额用尽（不自动重试）                                        |
 | 400 | 400 | `drama_budget_exhausted` | 关联短剧的精修画布上创建生成任务时，作品已达到预算上限（预算含画布精修花费）；在短剧设置里提高预算后再生成 |
 | 409 | 409 | `drama_segment_changed` | 把画布视频采用为剧情段视频时，段版本与 `expectedRevision` 不符或刚被并发修改；刷新单集详情后重新采用 |
+| 409 | 409 | `topup_quote_changed` | 创建支付订单时 `expectedAmountFen` / `expectedCreditsMicrocredits` 与商品当前报价不一致，未建单；刷新商品后让用户按新价格重新确认 |
 | 429 | 429 | `rate_limited` | 限流（未细分） |
 | 500 | 500 | `internal` | 内部错误 |
 | 502 | 502 | `bad_gateway` | 上游失败 |

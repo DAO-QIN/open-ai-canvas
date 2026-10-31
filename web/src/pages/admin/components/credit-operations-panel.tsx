@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { App, Button, Drawer, Form, Input, InputNumber, Modal } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { BadgeCheck, Coins, Plus, RefreshCw, Search, Trash2, Undo2 } from "lucide-react";
+import { BadgeCheck, Plus, RefreshCw, Search, Trash2, Undo2 } from "lucide-react";
 
 import { PaginationBar } from "@/pages/admin/components/admin-ui";
-import { formatCredits } from "@/constant/credits";
+import { CreditIcon, formatCredits } from "@/constant/credits";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { listAdminUsers, type AdminReferenceData, type AdminUser } from "@/services/api/auth";
 import { adjustAdminUserCredits, getAdminCreditPolicy, listAdminBillingOrders, resolveAdminBillingOrder, resolveAdminBillingOrders, updateAdminCreditPolicy, type BillingOrder } from "@/services/api/wallet";
@@ -642,7 +642,7 @@ export default function CreditOperationsPanel({ users, activeOperation, onOperat
                                 },
                             ]}
                         >
-                            <InputNumber className="w-full" precision={6} prefix={<Coins className="size-3.5 text-foreground/45" />} placeholder="例如 10 或 -2" />
+                            <InputNumber className="w-full" precision={6} prefix={<CreditIcon className="size-3.5 text-foreground/45" />} placeholder="例如 10 或 -2" />
                         </Form.Item>
                         <Form.Item name="note" label="调整原因" rules={[{ required: true, whitespace: true, message: "请填写工单号或处理依据" }]}>
                             <Input.TextArea rows={4} maxLength={500} showCount placeholder="例如：工单 YC-20260828，补偿失败任务费用" />

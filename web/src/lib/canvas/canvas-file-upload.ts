@@ -51,10 +51,19 @@ export async function createFileUploadPlaceholder(id: string, file: File, positi
 
 async function readUploadVideoSize(file: File): Promise<[number, number]> {
     const url = URL.createObjectURL(file);
+    try {
+        return await readVideoSourceSize(url);
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+}
+
+/** 只读视频元数据里的画面像素；超时或无法解析时拒绝，不用默认画幅冒充。 */
+export async function readVideoSourceSize(source: string, timeoutMs = 15000): Promise<[number, number]> {
     const video = document.createElement("video");
     try {
         return await new Promise((resolve, reject) => {
-            const timer = window.setTimeout(() => reject(new Error("视频尺寸读取超时，请确认文件可播放")), 15000);
+            const timer = window.setTimeout(() => reject(new Error("视频尺寸读取超时，请确认文件可播放")), timeoutMs);
             video.onloadedmetadata = () => {
                 window.clearTimeout(timer);
                 if (video.videoWidth && video.videoHeight) resolve([video.videoWidth, video.videoHeight]);
@@ -65,14 +74,13 @@ async function readUploadVideoSize(file: File): Promise<[number, number]> {
                 reject(new Error("无法读取视频，请确认格式受浏览器支持"));
             };
             video.preload = "metadata";
-            video.src = url;
+            video.src = source;
         });
     } finally {
         video.onloadedmetadata = null;
         video.onerror = null;
         video.removeAttribute("src");
         video.load();
-        URL.revokeObjectURL(url);
     }
 }
 

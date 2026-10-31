@@ -1,4 +1,6 @@
-import { Blocks, House, CircleDollarSign, Clapperboard, Gift, History, Image, Images, LibraryBig, Lightbulb, PanelsTopLeft, Settings, Video, WandSparkles, ListTodo, PenTool } from "lucide-react";
+import { Blocks, House, Clapperboard, Gift, History, Image, Images, LibraryBig, Lightbulb, PanelsTopLeft, Settings, Video, WandSparkles, ListTodo, PenTool } from "lucide-react";
+
+import { CreditIcon } from "@/constant/credits";
 
 
 export const navigationTools = [
@@ -95,7 +97,7 @@ export const navigationTools = [
         label: "积分",
         fullLabel: "积分中心",
         keywords: ["钱包"],
-        icon: CircleDollarSign,
+        icon: CreditIcon,
         section: "工作台管理",
     },
     {

@@ -16,6 +16,14 @@ const (
 	TopupProductKindStorage TopupProductKind = "storage"
 )
 
+// TopupPricingMode 决定商品售价的来源：fixed 是固定套餐；custom 由用户在区间内自选购买份数。
+type TopupPricingMode string
+
+const (
+	TopupPricingFixed  TopupPricingMode = "fixed"
+	TopupPricingCustom TopupPricingMode = "custom"
+)
+
 const (
 	TopupSaleStrategyUnlimited TopupSaleStrategy = "unlimited"
 	TopupSaleStrategyPeriodic  TopupSaleStrategy = "periodic"
@@ -50,6 +58,8 @@ const (
 
 // TopupProduct is the server-owned price and credit snapshot source. Clients
 // select a product ID and can never submit their own payable amount or credits.
+// Custom-priced products only accept a quantity inside the server-owned range;
+// the payable amount and credits are still computed by the server.
 type TopupProduct struct {
 	ID          string           `json:"id" gorm:"primaryKey;size:36"`
 	Name        string           `json:"name" gorm:"size:120"`
@@ -60,8 +70,13 @@ type TopupProduct struct {
 	Currency            string `json:"currency" gorm:"size:8;not null;default:CNY"`
 	CreditsMicrocredits int64  `json:"creditsMicrocredits"`
 	// StorageBytes / StorageDurationDays 只对 storage 商品有效；天数为 0 表示永久扩容。
-	StorageBytes        int64             `json:"storageBytes" gorm:"not null;default:0"`
-	StorageDurationDays int               `json:"storageDurationDays" gorm:"not null;default:0"`
+	StorageBytes        int64 `json:"storageBytes" gorm:"not null;default:0"`
+	StorageDurationDays int   `json:"storageDurationDays" gorm:"not null;default:0"`
+	// PricingMode 为 custom 时，AmountFen / CreditsMicrocredits 是“每份”的售价与积分，
+	// 用户在 [CustomMinQuantity, CustomMaxQuantity] 内自选份数；固定套餐两者为 0。
+	PricingMode         TopupPricingMode  `json:"pricingMode" gorm:"size:16;not null;default:fixed"`
+	CustomMinQuantity   int64             `json:"customMinQuantity,omitempty" gorm:"not null;default:0"`
+	CustomMaxQuantity   int64             `json:"customMaxQuantity,omitempty" gorm:"not null;default:0"`
 	Enabled             bool              `json:"enabled" gorm:"index"`
 	SortOrder           int               `json:"sortOrder" gorm:"index"`
 	SaleStrategy        TopupSaleStrategy `json:"saleStrategy" gorm:"size:24;index"`
@@ -129,6 +144,8 @@ type PaymentOrder struct {
 	LastError             string                    `json:"lastError,omitempty" gorm:"size:1000"`
 	CreatedAt             time.Time                 `json:"createdAt" gorm:"index"`
 	UpdatedAt             time.Time                 `json:"updatedAt"`
+	// Quantity 是下单份数：固定套餐为 1，自定义充值为用户所选份数；金额与积分已按份数快照。
+	Quantity int64 `json:"quantity" gorm:"not null;default:1"`
 }
 
 // PaymentNotification is a durable, verified inbox. NormalizedJSON contains

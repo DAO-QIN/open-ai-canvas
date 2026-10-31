@@ -44,6 +44,8 @@ func validateCreationPreferenceFields(value map[string]any, prefix string) error
 			options = "concise,detailed"
 		case "agent.permissionMode":
 			options = "read_only,request_approval,auto"
+		case "agent.reasoningMode", "agent.webSearch":
+			options = "off,auto"
 		case "agent.imageParameterMode", "agent.videoParameterMode":
 			options = "auto,manual"
 		case "agent.imageSelectionMode", "agent.videoSelectionMode":

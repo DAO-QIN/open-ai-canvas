@@ -1,3 +1,4 @@
+import { agentWebToolDetail, agentWebToolRunningLabel } from "@/lib/agent-web-tools";
 import { agentToolRetry, type AgentToolRetry } from "./agent-tool-retry";
 
 /**
@@ -37,6 +38,8 @@ export const AGENT_TOOL_NAMES = [
     "skill_recommend",
     "skill_search",
     "task_get",
+    "web_fetch",
+    "web_search",
 ] as const;
 
 export type AgentToolSummaryContext = { pending: boolean; detail?: unknown; text: string };
@@ -100,12 +103,25 @@ export const AGENT_TOOL_METADATA: Record<string, AgentToolMetadataEntry> = {
         failureMessage: "技能市场查找失败",
     },
     skill_recommend: { summary: ({ pending }) => (pending ? "准备推荐安装技能" : "已推荐安装技能，由你决定是否安装"), failureMessage: "技能推荐未显示" },
+    // 联网工具与首页共用口径（lib/agent-web-tools）：搜索写关键词、来源数和本次扣的积分，读取网页写标题或站点。
+    web_search: {
+        summary: ({ pending, detail }) => (pending ? (agentWebToolRunningLabel("web_search", toolArguments(detail)) ?? "正在联网搜索") : `已联网搜索 · ${agentWebToolDetail("web_search", detail) ?? "未找到相关资料"}`),
+        failureMessage: "联网搜索未完成",
+    },
+    web_fetch: {
+        summary: ({ pending, detail }) => {
+            if (pending) return agentWebToolRunningLabel("web_fetch", toolArguments(detail)) ?? "正在阅读网页";
+            const page = agentWebToolDetail("web_fetch", detail);
+            return page ? `已阅读网页 · ${page}` : "已阅读网页";
+        },
+        failureMessage: "阅读网页未完成",
+    },
 };
 
 /** 画布上"读到清单"的只读工具：无像素，chip 必须是存在式。 */
 const AGENT_CANVAS_READ_TOOLS = new Set(["canvas_get_state", "canvas_list_node_types", "canvas_read_storyboard", "canvas_read_batch_table"]);
-/** 非画布信息的只读工具（模型、任务、技能、偏好）。`skills_load` 是历史事件名，保留兼容。 */
-const AGENT_INFO_READ_TOOLS = new Set(["model_list", "task_get", "skill_search", "skill_market_search", "skill_read_file", "skills_load", "agent_profile_read", "drama_get_context"]);
+/** 非画布信息的只读工具（模型、任务、技能、偏好、公开网页）。`skills_load` 是历史事件名，保留兼容。 */
+const AGENT_INFO_READ_TOOLS = new Set(["model_list", "task_get", "skill_search", "skill_market_search", "skill_read_file", "skills_load", "agent_profile_read", "drama_get_context", "web_search", "web_fetch"]);
 const AGENT_VISION_TOOLS = new Set(["canvas_inspect_image"]);
 const AGENT_CREATE_TOOLS = new Set(["generate_media", "canvas_create_storyboard", "canvas_create_character", "image_annotation_render"]);
 const AGENT_OPERATE_TOOLS = new Set(["canvas_apply_ops", "canvas_arrange_nodes", "canvas_edit_storyboard", "canvas_edit_batch_table", "image_layer_split", "image_text_detect"]);

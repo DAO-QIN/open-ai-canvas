@@ -38,7 +38,7 @@
 - `base/segmented-control/` — SegmentedControl（分段单选，thumb 滑动，泛型 + block/size）
 - `base/checkbox/` — Checkbox + CheckboxGroup（原生 input + 自绘 glyph，checked/indeterminate/bare）
 - `base/select/` — Select（RAC 单选壳，value/options/allowClear；多选/搜索 ComboBox 待建）
-- `base/tooltip/` — Tooltip（RAC 浮层，AntD 8 向 placement 映射，title 空不渲染）
+- `base/tooltip/` — Tooltip（RAC 浮层，AntD 8 向 placement 映射，title 空不渲染；挂在 `[data-tooltip-layer]` 定位层里，抵消桌面端 90% 整体缩放）
 - `base/switch/` — Switch（button role=switch + data-state，checkedChildren 文本轨、loading、Form.Item 注入）
 - `product/empty-state/` — EmptyState（空态占位）
 - `product/callout/` — Callout

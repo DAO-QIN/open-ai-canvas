@@ -1,12 +1,21 @@
-import type { CreateAgentRunInput, AgentCreationAttachment, AgentMediaChoice, AgentModelSelection, AgentOutputPreference, AgentPermissionMode } from "@/services/api/agent";
+import type { CreateAgentRunInput, AgentCreationAttachment, AgentMediaChoice, AgentModelSelection, AgentOutputPreference, AgentPermissionMode, AgentReasoningMode } from "@/services/api/agent";
 import { logicalModelIDForConfig, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import { modelCapabilityConfigFor } from "@/lib/model-capabilities";
+import type { Skill } from "@/services/api/skills";
+import { resolveSkillMentions } from "@/services/skill-runtime";
 import { creationAgentDirectContext } from "./creation-agent-context";
 import type { CreationConversation } from "./creation-types";
 
 type InputAttachment = { name: string; type: string; storageKey?: string; role?: "product" | "reference" | "competitor" | "style" | "source" | "person" };
 type MediaParameters = Partial<Omit<AgentMediaChoice, "selection">>;
 export const defaultCreationAgentBudget = { maxCredits: 200, maxGenerationTasks: 0, maxVideoSeconds: 30 };
+/** 与服务端 cloudAgentSkillPinnedMax 一致：一轮最多固定 16 个技能。 */
+const creationAgentPinnedSkillMax = 16;
+
+/** 首页 Agent 能选用的已安装技能：没声明入口的和画布助手一样可以选，作者声明只给画布用的不行（固定了服务端会拒绝整轮）。 */
+export function creationAgentSkills(skills: Skill[]) {
+    return skills.filter((skill) => skill.isAdded && skill.agentSurfaces?.includes("creation"));
+}
 
 export function creationAgentAttachmentSelection(attachments: InputAttachment[]) {
     return {
@@ -46,6 +55,10 @@ export type CreationAgentRequestOptions = {
     sessionId?: string;
     permissionMode: AgentPermissionMode;
     outputPreference?: AgentOutputPreference;
+    /** 思考模式随本轮固定在服务端策略快照里；不传时沿用服务端默认（关闭）。 */
+    reasoningMode?: AgentReasoningMode;
+    /** false 表示用户关闭了「联网」开关；其他情况按平台配置决定是否联网搜索。 */
+    webSearch?: boolean;
     textSelection: AgentModelSelection;
     imageSelection?: AgentModelSelection;
     videoSelection?: AgentModelSelection;
@@ -56,7 +69,8 @@ export type CreationAgentRequestOptions = {
     budget?: { maxCredits: number; maxGenerationTasks: number; maxVideoSeconds: number };
     /** 点发送即同意的额度（发送前预估 × 1.2）。只在需要确认的模式下随请求发送。 */
     preauthorizedCredits?: number;
-    skillIds?: string[];
+    /** 用户技能库；提示词里 @ 或技能选择插入的技能会固定到本轮。 */
+    skills?: Skill[];
 };
 
 function managedAttachment(item: InputAttachment): AgentCreationAttachment {
@@ -83,6 +97,9 @@ export function buildCreationAgentRunInput(input: CreationAgentRequestOptions): 
                   ...(parameters?.parameterMode === "manual" ? { size: parameters.size, quality: parameters.quality, durationSeconds: parameters.durationSeconds, count: parameters.count } : {}),
               }
             : undefined;
+    const skillIds = resolveSkillMentions(input.prompt, creationAgentSkills(input.skills || []))
+        .slice(0, creationAgentPinnedSkillMax)
+        .map((skill) => skill.skillId);
     return {
         surface: "creation",
         ...(input.retry ? { retry: input.retry } : {}),
@@ -94,6 +111,8 @@ export function buildCreationAgentRunInput(input: CreationAgentRequestOptions): 
         ...input.textSelection,
         permissionMode: input.permissionMode,
         ...(input.outputPreference ? { outputPreference: input.outputPreference } : {}),
+        ...(input.reasoningMode ? { reasoningMode: input.reasoningMode } : {}),
+        ...(input.webSearch === false ? { webSearch: "off" as const } : {}),
         contextScope: [],
         contextSelection: { surface: "creation", scopes: [] },
         budget: {
@@ -108,6 +127,6 @@ export function buildCreationAgentRunInput(input: CreationAgentRequestOptions): 
             ...(mediaChoice(input.imageSelection, input.imageParameters) ? { image: mediaChoice(input.imageSelection, input.imageParameters) } : {}),
             ...(mediaChoice(input.videoSelection, input.videoParameters) ? { video: mediaChoice(input.videoSelection, input.videoParameters) } : {}),
         },
-        ...(input.skillIds?.length ? { skillIds: input.skillIds } : {}),
+        ...(skillIds.length ? { skillIds } : {}),
     };
 }

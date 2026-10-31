@@ -4,10 +4,15 @@
 .app-workspace-sidebar-mobile-close {
     display: none;
 }
+/* 顶栏品牌标志只在手机上出现（侧栏收进抽屉后补位），桌面端由侧栏展示。 */
+.app-workspace-topbar .app-workspace-topbar-brand {
+    display: none;
+}
 @media (max-width: 1023px) {
+    /* 关闭键随品牌行下移，并与标志竖向居中对齐（品牌行内容区高度即顶栏高度）。 */
     .app-user-workspace .app-workspace-sidebar-mobile-close {
         position: absolute;
-        top: var(--space-3);
+        top: calc(var(--workspace-navigation-brand-offset) + (var(--workspace-reference-topbar) - 44px) / 2);
         right: var(--space-2);
         z-index: 1;
         display: grid;
@@ -30,6 +35,11 @@
     }
 }
 @media (max-width: 720px) {
+    /* 底部导航高度：上内边距 4 + 标签 50 + 上边线 1 + 下内边距（至少 4，iPhone 取底部安全区）。
+       模型引导卡等贴底浮层据此停在导航上方。 */
+    :root {
+        --app-mobile-nav-height: calc(55px + max(var(--space-1), env(safe-area-inset-bottom)));
+    }
     .app-user-workspace .app-workspace-shell {
         padding-top: env(safe-area-inset-top);
     }
@@ -44,21 +54,27 @@
         border-top: 1px solid var(--user-border);
         background: var(--user-surface);
     }
+    /* 选中只靠墨色、字重和加粗的图标描边表达，不再铺整块底色。 */
     .app-workspace-mobile-nav a {
         display: flex;
         align-items: center;
         justify-content: center;
         flex-direction: column;
-        gap: var(--space-1);
-        min-height: 52px;
+        gap: 3px;
+        min-height: 50px;
         border-radius: var(--user-radius-control);
-        color: var(--user-ink-muted);
+        color: var(--user-ink-soft);
         font-size: 11px;
+        font-weight: 500;
         text-decoration: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: color var(--user-motion), background-color var(--user-motion);
+    }
+    .app-workspace-mobile-nav a:active {
+        background: var(--user-surface-muted);
     }
     .app-workspace-mobile-nav a[aria-current="page"] {
-        color: var(--user-accent);
-        background: var(--user-accent-soft);
+        color: var(--user-ink);
         font-weight: 600;
     }
     .app-workspace-mobile-nav a:focus-visible {
@@ -66,40 +82,73 @@
         outline-offset: -2px;
     }
     .app-workspace-mobile-nav svg {
-        width: 20px;
-        height: 20px;
-        stroke-width: 1.8;
+        width: 22px;
+        height: 22px;
+        stroke-width: 1.7;
+    }
+    .app-workspace-mobile-nav a[aria-current="page"] svg {
+        stroke-width: 2.2;
     }
     .app-user-workspace .app-workspace-topbar-icon-button {
         min-width: 44px;
         min-height: 44px;
     }
-    .app-user-workspace .app-workspace-topbar-credit-pill {
-        min-height: 44px;
+    /* 顶栏：菜单 + 品牌标志 + 当前页标题；积分只留数字，反馈、头像收进底部导航「我的」。 */
+    .app-user-workspace .app-workspace-topbar .app-workspace-topbar-brand {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        flex: 0 0 auto;
+        border-radius: 8px;
+    }
+    .app-user-workspace .app-workspace-topbar .app-workspace-topbar-brand .app-workspace-brand-logo {
+        width: 28px;
+        height: 28px;
+    }
+    .app-user-workspace .app-workspace-topbar-breadcrumb > a {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: var(--space-2);
+        font-size: 16px;
+        line-height: 24px;
+    }
+    .app-user-workspace .app-workspace-topbar-title {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .app-user-workspace .app-workspace-topbar :is(.app-workspace-topbar-feedback-pill, .app-workspace-topbar-credit-pill.is-guest, .app-workspace-account-trigger, .app-workspace-account-theme-toggle, .app-workspace-topbar-credit-label) {
+        display: none;
+    }
+    .app-user-workspace .app-workspace-topbar .app-workspace-topbar-credit-pill {
+        min-height: 40px;
         max-width: 140px;
+        padding-inline: 10px 12px;
     }
     .app-user-workspace .app-workspace-topbar-credit-pill strong {
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .app-user-workspace .app-workspace-account-theme-toggle {
-        display: none;
-    }
+    /* 对话页：第一行菜单、标题与积分，第二行镜头时间线与新建 / 历史。 */
     .app-user-workspace .app-workspace-topbar:has(.creation-thread-toolbar) {
         height: auto !important;
-        min-height: 112px;
+        min-height: calc(var(--workspace-reference-topbar) + 40px) !important;
         flex-wrap: wrap;
-        padding-block: var(--space-2) !important;
+        align-content: center;
+        padding-block: var(--space-1) !important;
         row-gap: 0;
     }
     .app-user-workspace .app-workspace-topbar:has(.creation-thread-toolbar) .app-workspace-topbar-breadcrumb {
         flex: 1;
+        min-height: 48px;
     }
     .app-user-workspace .app-workspace-topbar:has(.creation-thread-toolbar) .app-workspace-topbar-actions {
         order: 2;
         margin-left: auto;
     }
-    .app-user-workspace .app-workspace-topbar-extension:has(.creation-thread-toolbar) {
+    .app-user-workspace .app-workspace-topbar .app-workspace-topbar-extension:has(.creation-thread-toolbar) {
         order: 3;
         flex: 1 0 100%;
         min-height: 44px;
@@ -107,10 +156,12 @@
     .app-user-workspace .app-workspace-topbar-extension .creation-thread-toolbar {
         gap: var(--space-2);
     }
-    .app-user-workspace .creation-rail-trigger > span {
+    /* 「画布中继续」进入的是桌面节点编辑器，手机上不放在常驻工具条里。 */
+    .app-user-workspace .creation-toolbar-actions > .ant-btn,
+    .app-user-workspace .creation-rail-trigger-label {
         display: none;
     }
-    .app-user-workspace :is(.creation-rail-trigger, .creation-toolbar-action, .creation-toolbar-actions > .ant-btn) {
+    .app-user-workspace :is(.creation-rail-trigger, .creation-toolbar-action) {
         min-width: 44px;
         min-height: 44px;
         white-space: nowrap;
@@ -118,8 +169,9 @@
     .app-user-workspace .creation-rail-trigger {
         justify-content: center;
     }
-    .app-user-overlays:has(.creation-thread-composer) .pet-personal-launcher {
-        display: none;
+    /* 创作页本身就是 Agent 对话，手机上不再叠一个浮动 Agent 入口压住输入框和发送键。 */
+    .app-user-overlays:has(.creation-home) :is(.canvas-agent-launcher, .canvas-agent-launcher-toggle) {
+        display: none !important;
     }
     .canvas-focus-mode-bar {
         top: max(var(--space-2), env(safe-area-inset-top));
@@ -128,14 +180,39 @@
         min-width: 44px;
         min-height: 44px;
     }
-    .app-product-overlays :is(input.ant-input, textarea.ant-input),
-    .app-product-workspace :is(input.ant-input, textarea.ant-input) {
+    /* iOS 聚焦字号小于 16px 的输入框会放大整页：手机上所有可输入的框统一 16px，
+       包括选择器搜索框、数字框、日期框和画布编辑器里的输入（body 上的 app-user-overlays 覆盖弹窗与画布）。 */
+    .app-user-overlays :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="button"], [type="submit"], [type="reset"], [type="image"], [type="hidden"]), textarea, select) {
         font-size: 16px;
     }
-    .app-product-overlays:has([aria-modal="true"]) .pet-personal-launcher,
-    .app-user-overlays:has([aria-modal="true"]) .pet-personal-launcher {
+    /* 弹窗和抽屉打开时收起 Agent 入口，避免它盖住弹窗底部的按钮。 */
+    .app-product-overlays:has([aria-modal="true"]) :is(.canvas-agent-launcher, .canvas-agent-launcher-toggle),
+    .app-user-overlays:has([aria-modal="true"]) :is(.canvas-agent-launcher, .canvas-agent-launcher-toggle) {
         visibility: hidden;
         pointer-events: none;
+    }
+    /* 新用户的模型引导卡：横向铺满并停在底部导航上方，关闭键给足触控面积。 */
+    .app-user-workspace .model-setup-guide {
+        right: var(--space-3);
+        left: var(--space-3);
+        width: auto;
+    }
+    .app-user-workspace:has(.app-workspace-mobile-nav:not([hidden])) .model-setup-guide {
+        bottom: calc(var(--app-mobile-nav-height) + var(--space-3));
+    }
+    /* 抽屉、弹窗打开时引导卡让开，不盖住抽屉底部的账户区和弹窗按钮。 */
+    .app-user-overlays:has([aria-modal="true"]) .model-setup-guide {
+        visibility: hidden;
+        pointer-events: none;
+    }
+    .app-user-workspace .model-setup-guide-close {
+        width: 40px;
+        height: 40px;
+        margin: -6px -6px 0 0;
+    }
+    /* 抽屉里只留创作相关入口；插件中心面向桌面工作流。 */
+    .app-user-workspace .app-workspace-sidebar [data-nav-id="plugins"] {
+        display: none;
     }
     .app-product-workspace .creation-start-heading {
         position: relative;
@@ -994,8 +1071,26 @@
     .app-product-workspace .library-page > div {
         width: calc(100% - 32px);
     }
+    /* 手机上页头随内容滚走，不再半透明吸顶压住下面的卡片；需要吸顶的筛选条由页面自己声明。
+       页头说明文字和导入画布包（zip）这类桌面操作不占手机首屏。 */
+    .app-user-workspace.app-product-workspace .app-page-header {
+        position: static;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+    .app-user-workspace.app-product-workspace :is(.library-page, .studio-collection-page) .app-page-header {
+        min-height: 0;
+    }
+    .app-user-workspace.app-product-workspace :is(.library-page, .studio-collection-page) .app-page-header p,
+    .app-user-workspace .studio-collection-page .canvas-collection-import {
+        display: none;
+    }
     .app-product-workspace .assets-library-page .assets-library-grid {
         gap: var(--space-3);
+    }
+    /* 每页条数与跳页是桌面端的精细控制，手机上只留翻页。 */
+    .app-product-workspace :is(.app-pagination-size, .app-pagination-jump) {
+        display: none;
     }
     .app-product-workspace .app-pagination-bar {
         justify-content: center;
@@ -1073,6 +1168,44 @@
         opacity: 1;
     }
 }
+@media (pointer: coarse) {
+    /* 卡片角上的小按钮放大到便于手指点按的尺寸。 */
+    .canvas-project-actions button,
+    .assets-cover-more {
+        width: 32px;
+        height: 32px;
+    }
+    .canvas-project-select {
+        width: 28px;
+        height: 28px;
+    }
+    .assets-select-check {
+        width: 28px;
+        height: 28px;
+    }
+    .assets-select-check::after {
+        top: 3px;
+        left: 9px;
+        width: 7px;
+        height: 14px;
+    }
+}
+@media (hover: none) {
+    /* 触屏没有悬停：画布卡片的多选框、重命名与「更多」，素材卡的多选框与「更多」，
+       创作历史列表行的「查看 / 重试」都常驻显示（以前只在 640px 以下或悬停时出现，平板和横屏手机点不到）。 */
+    :is(.canvas-project-select, .canvas-project-actions, .assets-select-check, .assets-cover-more, .task-record-actions) {
+        opacity: 1;
+        transform: none;
+    }
+    /* 触屏没有悬停：创作历史网格卡的「查看 / 重试」常驻在缩略图右下角，不再盖住整张图。 */
+    .task-grid-card .task-grid-overlay {
+        inset: auto var(--space-2) var(--space-2) auto;
+        opacity: 1;
+        background: transparent;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
 @media (prefers-reduced-motion: reduce) {
     .app-user-workspace .product-collection-card,
     .product-icon-button,
@@ -1140,10 +1273,10 @@
     padding-bottom: 44px;
 }
 
+/* 纵向对齐交给 PageHeader 自身（≥640px 横排居中）；这里写死 center 会让手机上竖排的标题和按钮整体居中。 */
 .app-product-workspace .library-page .app-page-header,
 .app-product-workspace .studio-collection-page .app-page-header {
     min-height: 64px;
-    align-items: center;
     gap: 16px;
     padding: 0 0 16px;
 }
@@ -1855,6 +1988,106 @@
         opacity: 1;
     }
 }
+@media (max-width: 720px) {
+    /* 手机：参考 LibTV 技能页——范围是一排文字标签，分类一行横滑，二者吸顶；下面是整行搜索和单列卡片。
+       安装、行业推荐、排序、分类管理、「我创建的」和卡片上的编辑 / 更多面向创作者，留给桌面端。
+       顶栏已显示「技能」，页头和结果区标题不再重复。 */
+    .skills-library-page .app-page-header,
+    .skills-results-header .skills-results-title,
+    .skills-results-header .collection-toolbar-actions,
+    .skills-results-header .collection-toolbar-controls > .ant-select,
+    .skills-rail-scopes [data-scope="created"],
+    .skills-rail-heading,
+    .skills-rail .skills-rail-delete,
+    .skill-tile .skill-tile-actions,
+    .skill-tile .skill-tile-chip.is-picker {
+        display: none;
+    }
+    .skills-browser {
+        gap: var(--space-3);
+        margin-top: 0;
+    }
+    .skills-rail {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        gap: var(--space-3);
+        padding: var(--space-2) 0 var(--space-3);
+        background: var(--user-page-bg);
+    }
+    .skills-rail-scopes {
+        gap: var(--space-5);
+    }
+    .skills-rail-scopes .skills-rail-item {
+        height: 32px;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--user-ink-soft);
+        font-size: 17px;
+        font-weight: 600;
+    }
+    .skills-rail-scopes .skills-rail-item:hover,
+    .skills-rail-scopes .skills-rail-item[aria-pressed="true"] {
+        background: transparent;
+        color: var(--user-ink);
+    }
+    .skills-rail-scopes .skills-rail-item :is(svg, .skills-rail-count) {
+        display: none;
+    }
+    .skills-rail-section .skills-rail-group {
+        gap: var(--space-2);
+    }
+    .skills-rail-section .skills-rail-item {
+        height: 34px;
+        padding: 0 14px;
+        border: 1px solid var(--user-border);
+        border-radius: 999px;
+        font-size: 13px;
+    }
+    .skills-rail-section .skills-rail-item svg {
+        display: none;
+    }
+    .skills-rail-section .skills-rail-item[aria-pressed="true"] {
+        border-color: transparent;
+        background: var(--control-selected-bg);
+        color: var(--control-selected-fg, var(--user-ink));
+    }
+    .skills-results-header {
+        margin-bottom: var(--space-3);
+    }
+    .skill-tile-grid {
+        gap: var(--space-2);
+    }
+    .skill-tile {
+        padding: var(--space-3) var(--space-4);
+    }
+    .skill-tile:has(> .skill-tile-corner) .skill-tile-head {
+        padding-right: 84px;
+    }
+    /* 「加入」是手机上的主操作：实心按钮、32px 高，已加入退为浅底。 */
+    .skill-tile .skill-tile-add {
+        height: 32px;
+        padding: 0 14px;
+        border-color: transparent;
+        background: var(--user-ink);
+        color: var(--user-surface);
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .skill-tile .skill-tile-add:hover:not(:disabled) {
+        border-color: transparent;
+        background: var(--user-ink);
+        opacity: 0.88;
+    }
+    .skill-tile .skill-tile-add[aria-pressed="true"] {
+        background: var(--user-surface-muted);
+        color: var(--user-ink-muted);
+    }
+    .skill-tile .skill-tile-stat.is-like {
+        height: 32px;
+    }
+}
 @media (prefers-reduced-motion: reduce) {
     .skill-tile-skeleton {
         animation: none;
@@ -2130,6 +2363,23 @@
     font-weight: 500;
     font-variant-numeric: tabular-nums;
 }
+@media (max-width: 640px) {
+    /* 创作历史的四个状态在窄屏上铺满整行，放不下时在轨道内横向滑动，不再撑出页面。 */
+    .app-product-workspace .collection-toolbar .task-status-filter {
+        width: 100%;
+    }
+    .app-product-workspace .collection-toolbar .task-status-filter .app-segmented {
+        width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .app-product-workspace .collection-toolbar .task-status-filter .app-segmented::-webkit-scrollbar {
+        display: none;
+    }
+    .app-product-workspace .collection-toolbar .task-status-filter .app-segmented-item {
+        flex: 1 0 auto;
+    }
+}
 
 .app-product-workspace .task-record-list,
 .app-product-workspace .task-group-list {
@@ -2229,12 +2479,14 @@
     position: relative;
     isolation: isolate;
 }
+/* 当前页用「普通选中」底色：明暗主题下都比悬停底色（--user-surface-hover）更明显，
+   导航文字不再用颜色区分选中时，仍能一眼认出当前页。 */
 .app-user-workspace .app-workspace-nav-active-pill {
     position: absolute;
     inset: 0;
     z-index: 0;
     border-radius: inherit;
-    background: var(--user-surface-muted);
+    background: var(--control-selected-bg);
     pointer-events: none;
 }
 .app-user-workspace .app-workspace-nav-link > :not(.app-workspace-nav-active-pill) {
@@ -2479,7 +2731,7 @@
 .creation-model-picker-surface .creation-model-picker-menu.is-model-list .canvas-model-picker-brand { width: 100%; }
 .creation-model-picker-surface .creation-model-picker-menu.is-model-list .canvas-model-picker-model-pane { border: 0; margin: 0; padding: 0; }
 
-@media (max-width: 720px) { .creation-floating-prompt { top: 8px; width: calc(100% - 24px); min-height: 60px; gap: 8px; padding: 8px 8px 8px 16px; border-radius: 16px; } .creation-floating-prompt input { font-size: 14px; } .creation-floating-prompt button { width: 40px; height: 40px; flex-basis: 40px; } .creation-model-picker-surface .creation-model-picker-menu.is-model-list .canvas-model-picker-two-pane { grid-template-columns: minmax(0, 1fr); min-height: 0; } .creation-model-picker-surface .creation-model-picker-menu.is-model-list .canvas-model-picker-brand-rail { display: none; } .app-user-workspace .creation-chat-composer.is-thread .creation-chat-dock .creation-mode-tabs { height: 30px; } .app-user-workspace .creation-chat-composer.is-thread .creation-chat-dock .creation-mode-button { height: 26px; min-height: 26px; padding: 0 8px; font-size: 11px; } }
+@media (max-width: 720px) { .creation-floating-prompt { top: 8px; width: calc(100% - 24px); min-height: 60px; gap: 8px; padding: 8px 8px 8px 16px; border-radius: 16px; } .creation-floating-prompt input { font-size: 16px; } .creation-floating-prompt button { width: 40px; height: 40px; flex-basis: 40px; } .creation-model-picker-surface .creation-model-picker-menu.is-model-list .canvas-model-picker-two-pane { grid-template-columns: minmax(0, 1fr); min-height: 0; } .creation-model-picker-surface .creation-model-picker-menu.is-model-list .canvas-model-picker-brand-rail { display: none; } .app-user-workspace .creation-chat-composer.is-thread .creation-chat-dock .creation-mode-tabs { height: 30px; } .app-user-workspace .creation-chat-composer.is-thread .creation-chat-dock .creation-mode-button { height: 26px; min-height: 26px; padding: 0 8px; font-size: 11px; } }
 
 /* Shared controls: one size system and one state vocabulary. */
 .app-product-workspace :where(.ant-btn, .ant-input-affix-wrapper, .ant-select-selector, .ant-picker, .ant-input-number),
@@ -2538,6 +2790,16 @@
 .app-product-overlays button:has(> svg):not(:has(> span)):focus-visible {
     outline: 2px solid var(--product-focus-ring);
     outline-offset: 2px;
+}
+
+/* 语音录制胶囊自带浅底：取消键悬停换成胶囊上一层的底色，完成键保持实心主色。 */
+.app-product-workspace .voice-recording-inline button:has(> svg):not(:has(> span)):not(:disabled):hover {
+    color: var(--voice-pill-ink) !important;
+    background: var(--voice-action-hover-bg) !important;
+}
+.app-product-workspace .voice-recording-inline button.is-primary:has(> svg):not(:has(> span)):not(:disabled):hover {
+    color: var(--button-primary-fg) !important;
+    background: var(--button-primary-hover-bg) !important;
 }
 
 /* 侧栏自绘图标按钮（收起/展开切换等）不套用浮层 accent 光晕，悬浮表现与导航菜单保持一致。 */
@@ -2864,7 +3126,7 @@
 @media (max-width: 640px) {
     .app-user-workspace .app-workspace-topbar-auth-label { display: none; }
     .app-user-workspace .app-workspace-topbar-auth-short { display: inline; }
-    .app-user-workspace .app-workspace-topbar-credit-pill.is-guest > span:not(.app-workspace-credit-gift) { display: none; }
+    .app-user-workspace .app-workspace-topbar-credit-pill.is-guest > span:not(.app-workspace-credit-mark) { display: none; }
     .app-user-workspace .app-workspace-topbar-credit-pill.is-guest { padding: 0 6px; }
 }
 @media (prefers-reduced-motion: reduce) {

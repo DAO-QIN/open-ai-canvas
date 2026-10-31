@@ -4,6 +4,7 @@ import * as agentApi from "../src/services/api/agent";
 import * as interjectionHelpers from "../src/pages/create/creation-agent-interjection";
 import { creationConversationMode } from "../src/pages/create/creation-conversations";
 import { buildCreationAgentRunInput } from "../src/pages/create/creation-agent-request";
+import { selectedCreationReferences } from "../src/pages/create/creation-references";
 import { creationAgentPreauthorizedCredits } from "../src/pages/create/creation-agent-estimate";
 import { createCreationSubmitGate } from "../src/pages/create/creation-submit-gate";
 import { ApiError } from "../src/services/api/request";
@@ -134,6 +135,8 @@ function fixture(followup = false) {
             config: { textModel: model },
             creationManagedModelSelection: (_config: unknown, value: string) => ({ logicalModelId: value }),
             agentPermissionMode: "request_approval",
+            agentReasoningMode: "auto",
+            agentWebSearch: "auto",
             agentImageSelectionMode: "preferred",
             agentVideoSelectionMode: "preferred",
             agentImageParameterMode: "auto",
@@ -146,6 +149,8 @@ function fixture(followup = false) {
             creationAgentPreauthorizedCredits,
             attachments: draftAttachments,
             draftReferences: [],
+            selectedCreationReferences,
+            mentionReferences: [],
             agentAttachmentSelection: { attachmentMode: "inherit" },
             agentOutputPreference: "concise",
             addedSkills: [],

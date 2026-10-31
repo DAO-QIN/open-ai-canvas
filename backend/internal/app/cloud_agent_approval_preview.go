@@ -25,6 +25,31 @@ type cloudAgentApprovalPreview struct {
 	Title       string                          `json:"title"`
 	Description string                          `json:"description"`
 	Items       []cloudAgentApprovalPreviewItem `json:"items"`
+	// Proposals 是创作页逐项方案卡：每个生成项的提示词、参数与该项报价。
+	// Editable 允许用户改提示词和参数后重新报价；Skippable 允许确认时移出单项。
+	Proposals    []cloudAgentApprovalProposal `json:"proposals,omitempty"`
+	TotalCredits float64                      `json:"totalCredits,omitempty"`
+	Editable     bool                         `json:"editable,omitempty"`
+	Skippable    bool                         `json:"skippable,omitempty"`
+	// ParametersLocked 表示本轮使用手动参数：画幅、质量和时长由用户设置固定，卡片只允许改提示词。
+	ParametersLocked bool `json:"parametersLocked,omitempty"`
+}
+
+// cloudAgentApprovalProposal 只用于展示和编辑入口；执行仍以服务端准备态、报价和批准哈希为准。
+type cloudAgentApprovalProposal struct {
+	ItemID          string  `json:"itemId"`
+	Title           string  `json:"title"`
+	Mode            string  `json:"mode"`
+	Prompt          string  `json:"prompt"`
+	Size            string  `json:"size,omitempty"`
+	Quality         string  `json:"quality,omitempty"`
+	DurationSeconds int     `json:"durationSeconds,omitempty"`
+	Model           string  `json:"model,omitempty"`
+	Credits         float64 `json:"credits"`
+	ReferenceCount  int     `json:"referenceCount,omitempty"`
+	TaskID          string  `json:"taskId,omitempty"`
+	// Skipped 表示用户确认时移出了这一项，不再生成。
+	Skipped bool `json:"skipped,omitempty"`
 }
 
 type cloudAgentApprovalPreviewItem struct {

@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Button, Checkbox, Input } from "antd";
 import { ArrowLeft, BookMarked, Check, ChevronRight, Cpu, Gauge, LockKeyhole, PlugZap, Search, ShieldCheck, Sparkles, Wrench, Blocks, CirclePlay } from "lucide-react";
 
 import { ModelPicker } from "@/components/model-picker";
 import { Switch } from "@/components/ui/base/switch";
+import { formatCredits } from "@/constant/credits";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import AgentMemoryPane from "@/pages/settings/agent-memory-pane";
 import type { AgentPermissionMode, AgentProfileLayer, AgentProfileScope, AgentProfileView, AgentReasoningMode } from "@/services/api/agent";
@@ -23,6 +24,13 @@ type AgentSettingsProps = {
     permissionMode: AgentPermissionMode;
     reasoningMode: AgentReasoningMode;
     onReasoningModeChange: (value: AgentReasoningMode) => void;
+    /** 平台已开启联网搜索（管理员配置完整）；没开时不显示开关。 */
+    webSearchAvailable: boolean;
+    /** 账号偏好 agent.webSearch，与首页「偏好」里的「联网搜索」是同一个开关。 */
+    webSearch: "off" | "auto";
+    /** 当前账号每次搜索扣的微积分；免费或积分功能关闭时不传。 */
+    webSearchPriceMicrocredits?: number;
+    onWebSearchChange: (value: "off" | "auto") => void;
     profileView: AgentProfileView | null;
     profileLoading: boolean;
     profileSaving: boolean;
@@ -94,7 +102,7 @@ export function CanvasCloudAgentSettings(props: AgentSettingsProps) {
             {section === "profile" ? <ProfileWorkspace props={props} theme={theme} /> : null}
             {section === "memories" ? <MemoriesWorkspace /> : null}
             {section === "skills" ? <SkillsWorkspace props={props} theme={theme} tab={skillTab} onTabChange={setSkillTab} /> : null}
-            {section === "mcp" ? <McpWorkspace theme={theme} /> : null}
+            {section === "mcp" ? <McpWorkspace theme={theme} webSearch={webSearchActive(props)} /> : null}
             {section === "context" ? <ContextWorkspace props={props} theme={theme} /> : null}
             {section === "budget" ? <BudgetWorkspace props={props} theme={theme} /> : null}
         </div>
@@ -102,6 +110,7 @@ export function CanvasCloudAgentSettings(props: AgentSettingsProps) {
 }
 
 function SettingsHome({ props, theme, onOpen }: { props: AgentSettingsProps; theme: CanvasTheme; onOpen: (section: SettingsSection) => void }) {
+    const webSearchHintId = useId();
     return (
         <div className="canvas-agent-settings-scroll thin-scrollbar min-h-0 flex-1 space-y-6 overflow-y-auto p-4">
             <section>
@@ -109,6 +118,18 @@ function SettingsHome({ props, theme, onOpen }: { props: AgentSettingsProps; the
                 <div className="grid grid-cols-3 gap-2">{reasoningOptions.map((option) => <button key={option.value} type="button" aria-pressed={props.reasoningMode === option.value} onClick={() => props.onReasoningModeChange(option.value)} className="rounded-xl p-3 text-left" style={{ background: props.reasoningMode === option.value ? theme.toolbar.itemHover : theme.node.fill, border: `1px solid ${props.reasoningMode === option.value ? theme.accent.primary : 'transparent'}` }}><div className="text-xs font-semibold">{option.label}</div><div className="mt-1 text-[var(--fs-label)] opacity-50">{option.description}</div></button>)}</div>
                 <p className="mt-2 text-xs leading-5" style={{ color: theme.node.muted }}>推理只用于目标拆解、缺口判断和下一步工具选择，不会把内部思考过程展示给用户。</p>
             </section>
+            {props.webSearchAvailable ? (
+                <section>
+                    <SettingLabel label="联网搜索" hint="新运行生效" />
+                    <div className="flex items-start gap-3 rounded-xl p-3" style={{ background: theme.node.fill }}>
+                        <div id={webSearchHintId} className="min-w-0 flex-1 space-y-1 text-xs leading-5" style={{ color: theme.node.muted }}>
+                            <p>查热点和最新资料时自动上网，并附上来源；关掉后仍能读取你发的链接。与首页创作「偏好」里的联网搜索是同一个开关。</p>
+                            {props.webSearchPriceMicrocredits ? <p>每次搜索 {formatCredits(props.webSearchPriceMicrocredits)} 积分，没搜到结果不扣；读取网页不扣积分</p> : null}
+                        </div>
+                        <Switch size="sm" className="mt-0.5" checked={props.webSearch !== "off"} onChange={(checked) => props.onWebSearchChange(checked ? "auto" : "off")} aria-label="联网搜索" aria-describedby={webSearchHintId} />
+                    </div>
+                </section>
+            ) : null}
             <section>
                 <SettingLabel label="对话模型" hint="新运行生效" />
                 <div className="min-w-0 rounded-xl px-2 py-2" style={{ background: theme.node.fill }}>
@@ -138,7 +159,7 @@ function SettingsHome({ props, theme, onOpen }: { props: AgentSettingsProps; the
                     <SettingRow theme={theme} icon={<BookMarked className="size-4" />} title="长期偏好" summary={profileSummary(props.profileView)} onClick={() => onOpen("profile")} />
                     <SettingRow theme={theme} icon={<BookMarked className="size-4" />} title="个人记忆" summary="Agent 在对话中自己记住和改写，可随时撤销；只属于你" onClick={() => onOpen("memories")} />
                     <SettingRow theme={theme} icon={<Blocks className="size-4" />} title="Skills · 用户技能库" summary={skillsSummary(props.installedSkills, props.selectedSkillIds)} onClick={() => onOpen("skills")} />
-                    <SettingRow theme={theme} icon={<Wrench className="size-4" />} title="工具与连接" summary="画布、技能参考文件、生成任务" onClick={() => onOpen("mcp")} />
+                    <SettingRow theme={theme} icon={<Wrench className="size-4" />} title="工具与连接" summary={`画布、技能参考文件、生成任务、${webSearchActive(props) ? "联网搜索" : "网页读取"}`} onClick={() => onOpen("mcp")} />
                     <SettingRow theme={theme} icon={<Gauge className="size-4" />} title="预算" summary={`每轮最多 ${props.maxCredits || "未设置"} 积分 · 固定计价模型`} onClick={() => onOpen("budget")} />
                 </div>
             </section>
@@ -364,7 +385,13 @@ function SkillRow({ skill, theme, pinned, pinDisabled, installed, installedView,
     );
 }
 
-function McpWorkspace({ theme }: { theme: CanvasTheme }) {
+/** 下一轮能否联网搜索：平台开启且用户没有关闭（以发送时后端的判定为准）。 */
+function webSearchActive(props: AgentSettingsProps) {
+    return props.webSearchAvailable && props.webSearch !== "off";
+}
+
+function McpWorkspace({ theme, webSearch }: { theme: CanvasTheme; webSearch: boolean }) {
+    const tools = ["已保存画布读取", "技能参考文件（固定版本）", "文本 / Markdown 节点写入", "系统模型媒体生成与任务查询", webSearch ? "联网搜索与公开网页读取" : "公开网页读取"];
     return (
         <div className="canvas-agent-settings-scroll thin-scrollbar min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
             <div className="rounded-xl p-4" style={{ background: theme.node.fill }}>
@@ -373,7 +400,13 @@ function McpWorkspace({ theme }: { theme: CanvasTheme }) {
             </div>
             <section>
                 <SettingLabel label="工具范围" />
-                {["已保存画布读取", "技能参考文件（固定版本）", "文本 / Markdown 节点写入", "系统模型媒体生成与任务查询"].map((tool) => <div key={tool} className="flex items-center gap-3 py-3 text-xs"><Wrench className="size-4 shrink-0" style={{ color: theme.node.muted }} /><span className="flex-1">{tool}</span><span style={{ color: theme.node.muted }}>受权限约束</span></div>)}
+                {tools.map((tool) => (
+                    <div key={tool} className="flex items-center gap-3 py-3 text-xs">
+                        <Wrench className="size-4 shrink-0" style={{ color: theme.node.muted }} />
+                        <span className="flex-1">{tool}</span>
+                        <span style={{ color: theme.node.muted }}>受权限约束</span>
+                    </div>
+                ))}
             </section>
             <p className="text-xs leading-5" style={{ color: theme.node.muted }}>自定义 MCP 暂未开放。实际工具权限、密钥和调用配额需由 Agent 后端校验，不能在浏览器中假设已启用。</p>
         </div>
@@ -396,11 +429,11 @@ function sectionTitle(section: SettingsSection) { return section === "profile" ?
 function sectionSubtitle(section: SettingsSection) { return section === "profile" ? "用户、项目和画布的长期行为偏好" : section === "memories" ? "只属于你；Agent 自动整理，可撤销" : section === "skills" ? "已安装的技能 Agent 会按任务自动选用" : section === "mcp" ? "云端工具与连接状态" : section === "context" ? "控制 Agent 能读取的范围" : "控制本轮积分与生成消耗"; }
 
 export type AgentPermissionSurface = "canvas" | "creation";
-// 创作页面向 C 端用户：不出现"审批""执行权限"，按"点发送即同意预估 × 1.2"的实际行为描述。
+// 创作页的名称与画布一致；悬停说明按创作页的实际行为写（点发送即同意预估 × 1.2）。
 const creationPermissionCopy: Record<AgentPermissionMode, { label: string; description: string }> = {
-    read_only: { label: "只聊不生成", description: "只分析和建议，不出图" },
-    request_approval: { label: "超出预估再确认", description: "发送时显示预估，超出 1.2 倍才确认" },
-    auto: { label: "预算内直接生成", description: "不再确认，按本轮积分上限执行" },
+    read_only: { label: "只读", description: "只分析和建议，不出图" },
+    request_approval: { label: "请求审批", description: "发送时显示预估，超出 1.2 倍才确认" },
+    auto: { label: "自动执行", description: "不再确认，按本轮积分上限执行" },
 };
 export function agentPermissionLabel(mode: AgentPermissionMode, surface: AgentPermissionSurface = "canvas") { if (surface === "creation") return creationPermissionCopy[mode]?.label || creationPermissionCopy.request_approval.label; return permissionOptions.find((option) => option.value === mode)?.label || "请求审批"; }
 export function agentPermissionVisual(mode: AgentPermissionMode) { const option = permissionOptions.find((item) => item.value === mode) || permissionOptions[0]; return { color: option.color, soft: `${option.color}1f`, icon: option.icon }; }

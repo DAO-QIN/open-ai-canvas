@@ -420,7 +420,7 @@ export default function CanvasPage() {
                             <Button type="primary" disabled={!hydrated} icon={<Plus />} onClick={createAndEnter}>
                                 新建画布
                             </Button>
-                            <Button disabled={!hydrated} icon={<FileUp />} onClick={() => inputRef.current?.click()}>
+                            <Button className="canvas-collection-import" disabled={!hydrated} icon={<FileUp />} onClick={() => inputRef.current?.click()}>
                                 导入
                             </Button>
                         </div>

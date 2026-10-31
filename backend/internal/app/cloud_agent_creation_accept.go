@@ -58,7 +58,8 @@ func cloudAgentRunCommittedMicrocredits(repo *repository.Repository, userID stri
 			return 0, err
 		}
 		for _, order := range orders {
-			if order.Capability == "text" {
+			// 预授权只和媒体消耗比：文本模型调用和联网搜索（挂在主任务下）都不计入。
+			if order.Capability == "text" || order.Capability == webSearchBillingCode {
 				continue
 			}
 			cost := max(order.AmountMicrocredits, order.ReservedAmountMicrocredits, order.ActualAmountMicrocredits)

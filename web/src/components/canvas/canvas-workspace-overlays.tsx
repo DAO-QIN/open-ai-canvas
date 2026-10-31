@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, 
 import { Clapperboard, Image as ImageIcon, List, Music2, Pencil, Table2, Video, Workflow as WorkflowIcon, ArrowRightLeft } from "lucide-react";
 
 import { useCanvasOverlayLayer } from "@/components/canvas/canvas-overlay-layer";
+import { PHONE_LAYOUT_QUERY, useMediaQuery } from "@/hooks/use-media-query";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { aceternityMotion } from "@/lib/aceternity-motion";
 import { canvasOverlayBounds, observeCanvasOverlayBounds, placeCanvasNodePanel, updateCanvasNodePanelBounds } from "@/lib/canvas/canvas-overlay-layout";
@@ -123,6 +124,8 @@ export function CanvasNodePanelOverlay({
     const panelRef = useRef<HTMLDivElement>(null);
     const resizeMotion = useCanvasNodeResizeMotion();
     const { bringToFront, zIndex } = useCanvasOverlayLayer(`node-panel:${node.id}`, "var(--z-modal-overlay)");
+    // 手机屏幕放不下跟随节点的 680px 面板：改成贴底抽屉（位置见 canvas-phone.css），节点由页面平移到抽屉上方。
+    const phoneSheet = useMediaQuery(PHONE_LAYOUT_QUERY);
     const initialWidth = resolveNodePanelWidth(node, viewport, panelWidth);
     const initialPosition = getNodePanelPosition(node, viewport, { width: containerRef.current?.clientWidth || 0, height: containerRef.current?.clientHeight || 0 }, initialWidth, panelHeight, dragOffset);
 
@@ -133,7 +136,27 @@ export function CanvasNodePanelOverlay({
     useLayoutEffect(() => {
         const container = containerRef.current;
         const panel = panelRef.current;
-        if (!container || !panel) return;
+        if (!container || !panel || !phoneSheet) return;
+        // 抽屉不跟随节点，只发布自己的矩形，节点工具条据此避让。
+        const publish = () => {
+            const origin = container.getBoundingClientRect();
+            const rect = panel.getBoundingClientRect();
+            updateCanvasNodePanelBounds(container, panel, { left: rect.left - origin.left, top: rect.top - origin.top, right: rect.right - origin.left, bottom: rect.bottom - origin.top });
+        };
+        publish();
+        const resizeObserver = new ResizeObserver(publish);
+        resizeObserver.observe(panel);
+        resizeObserver.observe(container);
+        return () => {
+            resizeObserver.disconnect();
+            updateCanvasNodePanelBounds(container, panel, null);
+        };
+    }, [containerRef, phoneSheet]);
+
+    useLayoutEffect(() => {
+        const container = containerRef.current;
+        const panel = panelRef.current;
+        if (!container || !panel || phoneSheet) return;
         let liveViewport = viewport;
         let liveDragOffset = dragOffset;
         let availableBounds = canvasOverlayBounds({ width: container.clientWidth, height: container.clientHeight });
@@ -177,7 +200,28 @@ export function CanvasNodePanelOverlay({
             unsubscribeDrag();
             updateCanvasNodePanelBounds(container, panel, null);
         };
-    }, [allowOverflow, containerRef, dragOffset?.x, dragOffset?.y, isDragging, node.height, node.id, node.position.x, node.position.y, node.width, panelHeight, panelWidth, resizeMotion, viewport]);
+    }, [allowOverflow, containerRef, dragOffset?.x, dragOffset?.y, isDragging, node.height, node.id, node.position.x, node.position.y, node.width, panelHeight, panelWidth, phoneSheet, resizeMotion, viewport]);
+
+    if (phoneSheet) {
+        return (
+            <div
+                ref={panelRef}
+                data-canvas-no-zoom
+                data-canvas-node-panel
+                data-popover-anchor-container
+                data-canvas-wheel-scroll
+                className="canvas-node-panel-sheet thin-scrollbar absolute overflow-y-auto overscroll-contain"
+                style={{ zIndex }}
+                onMouseDown={(event) => event.stopPropagation()}
+                onPointerDownCapture={bringToFront}
+                onFocusCapture={bringToFront}
+                onPointerDown={(event) => event.stopPropagation()}
+                onWheel={(event) => event.stopPropagation()}
+            >
+                {children}
+            </div>
+        );
+    }
 
     return (
         <div

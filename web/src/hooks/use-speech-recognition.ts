@@ -149,7 +149,10 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}):
         const recognition = recognitionRef.current;
         recognitionRef.current = null;
         if (recognition) {
+            // abort() 之后浏览器还会补发 aborted 错误；已取消的会话不再回写错误和文本
             recognition.onend = null;
+            recognition.onerror = null;
+            recognition.onresult = null;
             try {
                 recognition.abort();
             } catch { /* ignore */ }

@@ -1,0 +1,72 @@
+/* 画布编辑器的手机布局（≤720px，与 PHONE_LAYOUT_QUERY 一致）：安全区、贴底的节点面板抽屉和浮层让位。
+   顶栏、底部工具条和缩放条保留哪些按钮，在各自组件里按 PHONE_LAYOUT_QUERY 决定。 */
+@media (max-width: 720px) {
+    #canvas-main {
+        --canvas-topbar-h: calc(56px + env(safe-area-inset-top, 0px));
+        --canvas-inset-x: 12px;
+        --canvas-inset-y: max(12px, env(safe-area-inset-bottom, 0px));
+        /* 触屏底部工具条高 58px（40px 按钮加内边距），弹出的添加节点、外观面板留 6px 间隙。 */
+        --canvas-dock-popover-offset: 64px;
+    }
+    #canvas-main .canvas-topbar {
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+    #canvas-main .canvas-topbar-credits {
+        min-width: 0;
+    }
+    /* 名称与铅笔之间留出间隙，窄屏截断名称时铅笔不会压在最后一个字上。 */
+    #canvas-main .canvas-topbar-title-row {
+        gap: var(--space-1);
+    }
+    /* 新用户的模型引导卡停在底部工具条上方，不盖住添加节点和撤销。 */
+    .app-user-workspace:has(#canvas-main) .model-setup-guide {
+        bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 66px);
+    }
+}
+
+/* 触屏：节点里的 overflow 滚动区（文本、分镜表格等）会让浏览器把手指拖动当作原生滚动并发出 pointercancel，
+   画布的平移、拖动节点和长按随即中断。画布世界层里只有输入框保留原生触屏行为。只影响触屏和触控笔。 */
+[data-canvas-world-layer] :where(*:not(input, textarea, select, [contenteditable="true"])) {
+    touch-action: none;
+}
+
+@media (max-width: 720px) {
+    /* 菜单和弹层打开时浮动 Agent 入口让开，它的层级高于这些浮层，会盖住菜单底部的选项。 */
+    .app-user-overlays:has(:is(.canvas-dock-popover, .canvas-context-menu, [data-connection-create-menu])) :is(.canvas-agent-launcher, .canvas-agent-launcher-toggle) {
+        visibility: hidden;
+        pointer-events: none;
+    }
+}
+
+@media (pointer: coarse) {
+    /* 触屏没有键盘快捷键，菜单里不显示 ⌘C 这类提示。 */
+    .canvas-context-menu .canvas-menu-item kbd {
+        display: none;
+    }
+}
+
+/* 节点面板抽屉：贴底铺满宽度，最高约三分之二屏，内容在抽屉里滚动。只在手机上渲染。 */
+.canvas-node-panel-sheet {
+    left: var(--space-2);
+    right: var(--space-2);
+    bottom: max(var(--space-2), env(safe-area-inset-bottom, 0px));
+    max-height: min(64dvh, calc(100% - var(--canvas-topbar-offset) - var(--space-2)));
+}
+/* 底栏换行：模型独占一行，参数与生成按钮排在下一行，生成按钮不会被挤出屏幕。 */
+.canvas-node-panel-sheet .canvas-node-composer-footer {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+}
+.canvas-node-panel-sheet .canvas-node-composer-model {
+    flex: 1 1 100%;
+    max-width: none;
+}
+/* iOS 聚焦字号小于 16px 的输入框会放大整页。 */
+.canvas-node-panel-sheet :is(textarea, input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]), [contenteditable="true"]) {
+    font-size: 16px !important;
+}
+/* 抽屉打开时浮动 Agent 入口让开，不压住生成按钮。 */
+.app-user-overlays:has(.canvas-node-panel-sheet) :is(.canvas-agent-launcher, .canvas-agent-launcher-toggle) {
+    visibility: hidden;
+    pointer-events: none;
+}

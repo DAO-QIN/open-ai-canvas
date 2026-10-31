@@ -1,0 +1,148 @@
+/* -------------------------------------------------------------------------
+   语音录制胶囊（VoiceRecordingInline）
+   在麦克风按钮原位展开：高度与按钮一致，只放取消、音量条、时长和完成，不另起一行。
+   颜色只取 button token，明暗自动切换；页面通过 --voice-pill-* 对齐自己的输入行控件。
+   ------------------------------------------------------------------------- */
+.voice-recording-inline {
+    /* 默认对齐 VoiceRecordingButton 的 h-8 圆形按钮 */
+    --voice-pill-height: 32px;
+    --voice-pill-bg: var(--button-tonal-bg);
+    --voice-pill-fg: var(--button-ghost-fg);
+    --voice-pill-ink: var(--button-ghost-hover-fg);
+    --voice-action-hover-bg: var(--button-ghost-hover-bg);
+    --voice-action-size: calc(var(--voice-pill-height) - 8px);
+    /* 两个按钮 + 音量条和时长；识别中保持同宽，相邻控件不跳动 */
+    --voice-pill-min-width: calc(var(--voice-action-size) * 2 + 76px);
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: var(--voice-pill-min-width);
+    height: var(--voice-pill-height);
+    padding: 0 4px;
+    border-radius: var(--r-full);
+    background: var(--voice-pill-bg);
+    color: var(--voice-pill-fg);
+    font-size: var(--fs-caption);
+    line-height: 1;
+    white-space: nowrap;
+    animation: voice-pill-enter var(--motion-dur-fast) var(--motion-ease-out);
+}
+
+.voice-recording-inline[data-phase="transcribing"] {
+    justify-content: center;
+}
+
+@keyframes voice-pill-enter {
+    from {
+        opacity: 0;
+        transform: scale(0.94);
+    }
+}
+
+.voice-recording-action {
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: var(--voice-action-size);
+    height: var(--voice-action-size);
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    transition:
+        background-color var(--button-motion),
+        color var(--button-motion);
+}
+
+.voice-recording-action > svg {
+    width: var(--button-icon-size-sm);
+    height: var(--button-icon-size-sm);
+}
+
+.voice-recording-action:hover {
+    background: var(--voice-action-hover-bg);
+    color: var(--voice-pill-ink);
+}
+
+/* 完成是胶囊里唯一的主操作，和发送键同一套实心墨色 */
+.voice-recording-action.is-primary {
+    background: var(--button-primary-bg);
+    color: var(--button-primary-fg);
+    box-shadow: var(--button-primary-shadow);
+}
+
+.voice-recording-action.is-primary:hover {
+    background: var(--button-primary-hover-bg);
+    color: var(--button-primary-fg);
+}
+
+.voice-recording-action.is-primary:active {
+    background: var(--button-primary-active-bg);
+    box-shadow: var(--button-primary-active-shadow);
+}
+
+.voice-recording-action:focus-visible {
+    outline: 2px solid var(--control-focus-ring);
+    outline-offset: 2px;
+}
+
+.voice-recording-time {
+    min-width: 3.5ch;
+    color: var(--voice-pill-fg);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.voice-recording-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--voice-pill-fg);
+}
+
+.voice-recording-status > svg {
+    width: var(--button-icon-size-sm);
+    height: var(--button-icon-size-sm);
+}
+
+/* 音量条：5 根 3px 竖条，--voice-level（0-1）由 AudioWaveform 按实时音量写入 */
+.voice-level-bars {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    height: 16px;
+    color: var(--voice-pill-ink);
+}
+
+.voice-level-bars > span {
+    width: 3px;
+    height: calc(4px + var(--voice-level, 0) * 12px);
+    border-radius: var(--r-full);
+    background: currentColor;
+    transition: height var(--motion-dur-instant) var(--motion-ease-linear);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .voice-recording-inline {
+        animation: none;
+    }
+
+    .voice-level-bars > span {
+        height: 8px;
+        transition: none;
+    }
+}
+
+.no-motion .voice-recording-inline {
+    animation: none;
+}
+
+.no-motion .voice-level-bars > span {
+    height: 8px;
+    transition: none;
+}

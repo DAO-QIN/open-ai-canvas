@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useQueryClient } from "@tanstack/react-query";
 import { App, Button, Skeleton } from "antd";
 import { Switch } from "@/pages/admin/ui/controls";
-import { AlertTriangle, Clapperboard, Coins, Gift, ListChecks, MonitorCog, PlugZap, RadioTower, RefreshCw, ShieldCheck, Boxes, ImageIcon, Quote } from "lucide-react";
+import { AlertTriangle, Clapperboard, Gift, ListChecks, MonitorCog, PlugZap, RadioTower, RefreshCw, ShieldCheck, Boxes, ImageIcon, Quote } from "lucide-react";
 
+import { CreditIcon } from "@/constant/credits";
 import { cn } from "@/lib/utils";
 import { getAdminFeatureAvailability, updateAdminFeatureAvailability } from "@/services/api/auth";
 import { getAdminPromotionPolicy, updatePromotionPolicy, type PromotionPolicy } from "@/services/api/promotion";
@@ -52,7 +53,7 @@ const workspaceFeatureRows: FeatureRow[] = [
         key: "creditsEnabled",
         title: "积分计费",
         description: "控制积分中心弹窗及新任务的积分预授权与结算。",
-        icon: <Coins className="size-4" aria-hidden="true" />,
+        icon: <CreditIcon className="size-4" aria-hidden="true" />,
     },
     {
         key: "customChannelsEnabled",

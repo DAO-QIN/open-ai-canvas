@@ -4,9 +4,22 @@ import { AppModal } from "@/components/ui/product/app-modal";
 import { resolveCropPixels, type ImageCropRect } from "@/lib/canvas/image-operation-plan";
 import { centeredAspectSelection, resizeSelection, selectAspect, translateSelection, type CropGrip } from "@/lib/canvas/image-crop-selection";
 import { useImageToolSource } from "@/hooks/use-image-tool-source";
+import { cn } from "@/lib/utils";
 
 export type { ImageCropRect } from "@/lib/canvas/image-operation-plan";
-export type ImageCropDialogProps = { dataUrl: string; open: boolean; onClose: () => void; onConfirm: (crop: ImageCropRect) => void; fixedAspect?: number; title?: string; confirmLoading?: boolean };
+export type ImageCropDialogProps = {
+    dataUrl: string;
+    open: boolean;
+    onClose: () => void;
+    onConfirm: (crop: ImageCropRect) => void;
+    fixedAspect?: number;
+    title?: string;
+    confirmLoading?: boolean;
+    /** 结果按圆形展示（头像）：选区画成圆形并压暗圆外区域，配合 fixedAspect={1} 使用。 */
+    circular?: boolean;
+    /** 调用方导出时的最长边上限；“输出”尺寸按它显示，与实际文件一致。 */
+    maxOutputSide?: number;
+};
 const initialSelection: ImageCropRect = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
 const grips: { name: string; vector: CropGrip }[] = [
     { name: "nw", vector: [-1, -1] },
@@ -18,13 +31,15 @@ const grips: { name: string; vector: CropGrip }[] = [
     { name: "s", vector: [0, 1] },
     { name: "se", vector: [1, 1] },
 ];
+// 圆形选区只保留落在圆上的四个边中点手柄；四角手柄会悬在压暗区里，像是还能裁出方角。
+const edgeGrips = grips.filter(({ vector }) => vector[0] === 0 || vector[1] === 0);
 type Gesture = { pointer: number; origin: [number, number]; display: [number, number]; selection: ImageCropRect; grip: CropGrip | null };
 
 export function ImageCropDialog(props: ImageCropDialogProps) {
     return props.open && props.dataUrl ? <CropEditor key={`${props.dataUrl}:${props.fixedAspect ?? "free"}`} {...props} /> : null;
 }
 
-function CropEditor({ dataUrl, onClose, onConfirm, fixedAspect, title = "裁剪图片", confirmLoading = false }: ImageCropDialogProps) {
+function CropEditor({ dataUrl, onClose, onConfirm, fixedAspect, title = "裁剪图片", confirmLoading = false, circular = false, maxOutputSide }: ImageCropDialogProps) {
     const { size, error } = useImageToolSource(dataUrl);
     const [selected, setSelection] = useState<ImageCropRect | null>(null);
     const selection = selected ?? (size && fixedAspect !== undefined ? centeredAspectSelection(size, fixedAspect) : initialSelection);
@@ -34,7 +49,9 @@ function CropEditor({ dataUrl, onClose, onConfirm, fixedAspect, title = "裁剪�
     const stage = useRef<HTMLDivElement>(null);
     const gesture = useRef<Gesture | null>(null);
     const output = size ? resolveCropPixels(size, selection) : null;
-    const outputLabel = output && fixedAspect === 1 ? `输出 ${Math.min(output.width, output.height)} × ${Math.min(output.width, output.height)} px` : output ? `输出 ${output.width} × ${output.height} px` : error || "正在读取图片…";
+    const pixels = output && fixedAspect === 1 ? { width: Math.min(output.width, output.height), height: Math.min(output.width, output.height) } : output;
+    const outputScale = pixels && maxOutputSide ? Math.min(1, maxOutputSide / Math.max(pixels.width, pixels.height)) : 1;
+    const outputLabel = pixels ? `输出 ${Math.round(pixels.width * outputScale)} × ${Math.round(pixels.height * outputScale)} px` : error || "正在读取图片…";
     const begin = (event: PointerEvent<HTMLElement>, grip: CropGrip | null) => {
         if (confirmLoading || event.button !== 0 || gesture.current || !stage.current || !size) return;
         const bounds = stage.current.getBoundingClientRect();
@@ -104,7 +121,7 @@ function CropEditor({ dataUrl, onClose, onConfirm, fixedAspect, title = "裁剪�
                                 role="group"
                                 aria-label="裁剪区域"
                                 tabIndex={0}
-                                className="absolute cursor-move border border-white outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                className={cn("absolute cursor-move border border-white outline-none focus-visible:ring-2 focus-visible:ring-primary", circular && "rounded-full")}
                                 style={{ left: `${selection.x * 100}%`, top: `${selection.y * 100}%`, width: `${selection.width * 100}%`, height: `${selection.height * 100}%`, boxShadow: "0 0 0 100vmax rgb(0 0 0 / 55%)" }}
                                 onPointerDown={(event) => begin(event, null)}
                                 onKeyDown={(event) => {
@@ -117,10 +134,10 @@ function CropEditor({ dataUrl, onClose, onConfirm, fixedAspect, title = "裁剪�
                                     setSelection((box) => translateSelection(box ?? selection, (direction[0] * step) / size.width, (direction[1] * step) / size.height));
                                 }}
                             >
-                                <svg viewBox="0 0 3 3" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+                                <svg viewBox="0 0 3 3" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" style={circular ? { clipPath: "circle(50%)" } : undefined} aria-hidden="true">
                                     <path d="M1 0V3M2 0V3M0 1H3M0 2H3" stroke="white" strokeOpacity={0.5} strokeWidth={1} vectorEffect="non-scaling-stroke" />
                                 </svg>
-                                {grips.map(({ name, vector }) => (
+                                {(circular ? edgeGrips : grips).map(({ name, vector }) => (
                                     <button
                                         type="button"
                                         key={name}

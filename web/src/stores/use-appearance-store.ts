@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { DEFAULT_CREATION_TITLE, DEFAULT_CREATION_DESCRIPTION } from "@/lib/creation-copy";
+import { DEFAULT_CREATION_CANVAS_DESCRIPTION, DEFAULT_CREATION_CANVAS_TITLE, DEFAULT_CREATION_DESCRIPTION, DEFAULT_CREATION_TITLE } from "@/lib/creation-copy";
 import { DEFAULT_CANVAS_APPEARANCE } from "@/lib/canvas/agent-appearance";
 import { DEFAULT_UPDATE_ANNOUNCEMENT, normalizeUpdateAnnouncement } from "@/lib/update-announcement";
 
@@ -19,6 +19,8 @@ export const DEFAULT_PUBLIC_APPEARANCE: PublicAppearance = {
     authHeroDescription: "",
     creationTitle: DEFAULT_CREATION_TITLE,
     creationDescription: DEFAULT_CREATION_DESCRIPTION,
+    creationCanvasTitle: DEFAULT_CREATION_CANVAS_TITLE,
+    creationCanvasDescription: DEFAULT_CREATION_CANVAS_DESCRIPTION,
     logoUrl: "/logo.svg",
     darkLogoUrl: "/logo.svg",
     faviconUrl: `${apiBaseURL.replace(/\/$/, "")}/public/appearance/icon/favicon.ico`,
@@ -85,6 +87,8 @@ export function normalizePublicAppearance(value?: Partial<PublicAppearance> | nu
         authHeroDescription,
         creationTitle: normalizeAppearanceCopy(value?.creationTitle, DEFAULT_CREATION_TITLE),
         creationDescription: normalizeAppearanceCopy(value?.creationDescription, DEFAULT_CREATION_DESCRIPTION, true),
+        creationCanvasTitle: normalizeAppearanceCopy(value?.creationCanvasTitle, DEFAULT_CREATION_CANVAS_TITLE),
+        creationCanvasDescription: normalizeAppearanceCopy(value?.creationCanvasDescription, DEFAULT_CREATION_CANVAS_DESCRIPTION, true),
         logoUrl,
         darkLogoUrl,
         faviconUrl: safeAppearanceURL(value?.faviconUrl, DEFAULT_PUBLIC_APPEARANCE.faviconUrl),

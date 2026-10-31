@@ -5,14 +5,22 @@ import { MAX_UPSCALE_LONG_EDGE, resolveUpscaleSize, type ImageUpscaleAlgorithm, 
 import { useImageToolSource } from "./use-image-tool-source";
 
 export type CanvasImageUpscaleParams = ImageUpscaleParams;
-type UpscaleDialogProps = { dataUrl: string; open: boolean; onClose: () => void; onConfirm: (params: CanvasImageUpscaleParams) => void };
+type UpscaleDialogProps = {
+    dataUrl: string;
+    open: boolean;
+    onClose: () => void;
+    onConfirm: (params: CanvasImageUpscaleParams) => void;
+    /** 结果去向不同（画布另存为节点、创作页直接下载）时由调用方改写说明和按钮文案。 */
+    description?: string;
+    okText?: string;
+};
 const pixelTargets = [1024, 2048, MAX_UPSCALE_LONG_EDGE];
 
 export function CanvasNodeUpscaleDialog(props: UpscaleDialogProps) {
     return props.open && props.dataUrl ? <ResizeEditor key={props.dataUrl} {...props} /> : null;
 }
 
-function ResizeEditor({ dataUrl, onClose, onConfirm }: UpscaleDialogProps) {
+function ResizeEditor({ dataUrl, onClose, onConfirm, description = "插值放大并另存为新图片，原图保留。此操作不生成新的真实细节。", okText = "生成放大图" }: UpscaleDialogProps) {
     const { size, error } = useImageToolSource(dataUrl);
     const [chosen, setChosen] = useState<number | null>(null);
     const [algorithm, setAlgorithm] = useState<ImageUpscaleAlgorithm>("high");
@@ -21,8 +29,8 @@ function ResizeEditor({ dataUrl, onClose, onConfirm }: UpscaleDialogProps) {
     const output = size ? resolveUpscaleSize(size.width, size.height, target) : null;
     const ready = Boolean(size && target > edge);
     return (
-        <AppModal open centered title="调整图片尺寸" width={760} onCancel={onClose} okText="生成放大图" okButtonProps={{ disabled: !ready }} onOk={() => ready && onConfirm({ targetLongEdge: target, algorithm })}>
-            <p className="mb-4 text-sm text-muted-foreground">插值放大并另存为新图片，原图保留。此操作不生成新的真实细节。</p>
+        <AppModal open centered title="调整图片尺寸" width={760} onCancel={onClose} okText={okText} okButtonProps={{ disabled: !ready }} onOk={() => ready && onConfirm({ targetLongEdge: target, algorithm })}>
+            <p className="mb-4 text-sm text-muted-foreground">{description}</p>
             <div className="grid gap-5 md:grid-cols-2">
                 <figure className="m-0 flex flex-col items-center justify-center gap-3 rounded-lg border border-border bg-surface-active p-3">
                     <img alt="待调整尺寸的图片" src={dataUrl} draggable={false} className="max-h-[320px] max-w-full object-contain" />

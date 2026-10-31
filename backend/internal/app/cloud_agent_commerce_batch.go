@@ -24,6 +24,9 @@ type cloudAgentCommerceBatch struct {
 	CompletedTaskIDs   []string                      `json:"completedTaskIds,omitempty"`
 	PlanItemIDs        []string                      `json:"planItemIds,omitempty"`
 	WaitingForCapacity bool                          `json:"waitingForCapacity,omitempty"`
+	// UserEdited / UserSkipped 记录用户在方案卡上改写或移出的项（标题），随工具结果告诉 Agent。
+	UserEdited  []string `json:"userEdited,omitempty"`
+	UserSkipped []string `json:"userSkipped,omitempty"`
 }
 
 type cloudAgentCommerceBatchItem struct {
@@ -208,7 +211,7 @@ func (s *Service) advanceCloudAgentCommercePlan(run *model.CloudAgentExecution, 
 		if executeDirectly {
 			state.CommerceBatch = batch
 		} else {
-			preview := cloudAgentCommerceBatchPreview(plan, batch, state.Request.Budget.MaxCredits)
+			preview := s.cloudAgentCommerceBatchApprovalPreview(plan, batch, state.Request.Budget.MaxCredits)
 			state.Approval = &cloudAgentApproval{ID: fmt.Sprintf("%s-%d-%d", run.ID, state.Step, state.CallIndex), Call: call, CallHash: cloudAgentApprovalCallHash(call), Preview: preview, Batch: batch}
 			if err := leaseCloudAgentCommerceBatch(repo, run.UserID, run.ID, state.Approval.ID, batch); err != nil {
 				return err

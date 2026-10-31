@@ -9,6 +9,7 @@
     --usage-video: #7c5cf0;
     --usage-audio: #db8a1f;
     --usage-text: #14a07a;
+    --usage-web-search: #d2558a;
     --usage-other: color-mix(in srgb, var(--user-ink) 32%, transparent);
     --usage-tooltip-bg: var(--user-surface-raised);
     --usage-gap: 3px;
@@ -27,6 +28,7 @@
     --usage-video: #a58fff;
     --usage-audio: #f0b061;
     --usage-text: #4fcda4;
+    --usage-web-search: #f08bb6;
     --usage-tooltip-bg: var(--user-surface-hover);
 }
 
@@ -57,9 +59,15 @@
     width: 36px;
     height: 36px;
     flex-shrink: 0;
-    border-radius: 10px;
+    border-radius: 50%;
     background: var(--user-surface-muted);
     color: var(--user-ink-muted);
+}
+
+/* 没有头像图片时，图标缩在圆内（与侧栏头像同比例），旧版图标的边角不会被圆形裁掉。 */
+.usage-scope-avatar svg {
+    width: 20px;
+    height: 20px;
 }
 
 .usage-scope-identity strong {
@@ -312,9 +320,20 @@
     background: transparent;
 }
 
+/* 选中的一天（消耗构成正在展示）常驻实色描边；悬停经过的格子用浅一级描边，两者同时出现时仍分得清。 */
 .usage-cell[data-active="true"] {
+    outline: 2px solid color-mix(in srgb, var(--user-ink) 45%, transparent);
+    outline-offset: 1px;
+}
+
+.usage-cell[data-selected="true"] {
     outline: 2px solid var(--user-ink);
     outline-offset: 1px;
+}
+
+.usage-chart[data-selectable="true"][data-view="daily"] .usage-cell[data-day],
+.usage-chart[data-selectable="true"][data-view="weekly"] .usage-bar-slot {
+    cursor: pointer;
 }
 
 .usage-chart[data-view="weekly"] .usage-heatmap,
@@ -340,6 +359,11 @@
 
 .usage-bar-slot[data-active="true"] {
     background: color-mix(in srgb, var(--user-ink) 5%, transparent);
+}
+
+.usage-bar-slot[data-selected="true"] {
+    background: color-mix(in srgb, var(--user-ink) 8%, transparent);
+    outline: 1px solid color-mix(in srgb, var(--user-ink) 28%, transparent);
 }
 
 .usage-bar {
@@ -655,6 +679,10 @@
 
 :is(.usage-breakdown-segment, .usage-breakdown-dot, .usage-model-bar i)[data-capability="text"] {
     background: var(--usage-text);
+}
+
+:is(.usage-breakdown-segment, .usage-breakdown-dot, .usage-model-bar i)[data-capability="web_search"] {
+    background: var(--usage-web-search);
 }
 
 .usage-empty-note {

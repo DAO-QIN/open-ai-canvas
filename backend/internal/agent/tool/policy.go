@@ -55,6 +55,8 @@ type Policy struct {
 	RequiresSkills    bool
 	RequiresWriteMode bool
 	RequiresCreation  bool
+	// RequiresWebSearch 只在本轮开启联网搜索时暴露（管理员已配置且用户没有关闭），首页与画布入口相同。
+	RequiresWebSearch bool
 	// RequiresMemory 只在用户没有关闭长期记忆时暴露。
 	RequiresMemory bool
 	// RequiresDrama 只在画布关联了当前用户的短剧作品时暴露。
@@ -73,6 +75,8 @@ type Scope struct {
 	ReadOnly       bool
 	IncludeProfile bool
 	Creation       bool
+	// WebSearch 表示本轮可以联网搜索，由服务端建 run 时按管理员配置与用户开关推导并持久化。
+	WebSearch bool
 	// Drama 表示本轮画布关联了当前用户的短剧作品，由服务端建 run 时推导。
 	Drama bool
 	// Memory 表示本轮长期记忆处于开启状态（自动生效或需确认），由服务端建 run 时冻结。
@@ -82,6 +86,7 @@ type Scope struct {
 func (p Policy) Allowed(scope Scope) bool {
 	return p.Name != "" &&
 		(!p.RequiresCreation || scope.Creation) &&
+		(!p.RequiresWebSearch || scope.WebSearch) &&
 		(!p.RequiresCanvas || scope.Canvas) &&
 		(!p.RequiresSkills || scope.Skills) &&
 		(!p.RequiresMemory || scope.Memory) &&
@@ -164,6 +169,11 @@ func policies() []Policy {
 		{Name: "commerce_plan_submit", Kind: KindWrite, RequiresCreation: true},
 		{Name: "commerce_plan_wait", Kind: KindRead, RequiresCreation: true, RequiresWriteMode: true},
 		{Name: "generate_image_batch", Kind: KindMedia, RequiresCreation: true},
+		// 联网读取在检查点事务外发出出站请求，首页与画布入口共用：搜索要本轮开启联网，读取网页不依赖搜索开关，
+		// 用户关掉联网后仍能读取自己发的链接。视频合成是本地 ffmpeg 渲染，不收费也不改画布。
+		{Name: "web_search", Kind: KindRead, RequiresWebSearch: true, OutsideTransaction: true},
+		{Name: "web_fetch", Kind: KindRead, OutsideTransaction: true},
+		{Name: "compose_video", Kind: KindPrepare, RequiresCreation: true, RequiresWriteMode: true, OutsideTransaction: true},
 		{Name: AgentProfileRead, Kind: KindRead, Cacheable: true},
 		{Name: PlanUpdate, Kind: KindControl},
 		{Name: AskUser, Kind: KindControl},

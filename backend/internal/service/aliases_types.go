@@ -23,6 +23,7 @@ type (
 	CloudAgentSessionDetail                = app.CloudAgentSessionDetail
 	CloudAgentRunViewOptions               = app.CloudAgentRunViewOptions
 	CloudAgentMediaSettings                = app.CloudAgentMediaSettings
+	CloudAgentApprovalItemEdit             = app.CloudAgentApprovalItemEdit
 	CloudAgentCapabilitySet                = app.CloudAgentCapabilitySet
 	AgentProfileRequest                    = app.AgentProfileRequest
 	AgentProfileView                       = app.AgentProfileView
@@ -160,6 +161,7 @@ type (
 	CreateTaskRequest                      = app.CreateTaskRequest
 	CreditUsageCategory                    = app.CreditUsageCategory
 	CreditUsageDay                         = app.CreditUsageDay
+	CreditUsageDayModel                    = app.CreditUsageDayModel
 	CreditUsageModel                       = app.CreditUsageModel
 	CreditUsageReport                      = app.CreditUsageReport
 	CreationCanvasOp                       = app.CreationCanvasOp
@@ -405,6 +407,11 @@ type (
 	VideoReferenceConfig                   = app.VideoReferenceConfig
 	VoiceProfileSummary                    = app.VoiceProfileSummary
 	WalletSummary                          = app.WalletSummary
+	WebSearchSettingRequest                = app.WebSearchSettingRequest
+	WebSearchTestRequest                   = app.WebSearchTestRequest
+	WebSearchTestResult                    = app.WebSearchTestResult
+	WebReaderTestResult                    = app.WebReaderTestResult
+	PublicWebSearchSetting                 = app.PublicWebSearchSetting
 	WorkflowField                          = app.WorkflowField
 )
 

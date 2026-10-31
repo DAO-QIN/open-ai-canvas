@@ -17,7 +17,11 @@ export function WorkspaceAccountMenu() {
     const [menuOpen, setMenuOpen] = useState(false);
 
     if (!hydrated) {
-        return <span className="size-9 animate-pulse rounded-[var(--r-md)] bg-foreground/[.06]" aria-hidden />;
+        return (
+            <span className="grid size-9 place-items-center" aria-hidden>
+                <span className="size-6 animate-pulse rounded-full bg-foreground/[.06]" />
+            </span>
+        );
     }
 
     return user ? (

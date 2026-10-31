@@ -23,6 +23,8 @@ const (
 	VariantPlayback ResourceVariant = "playback"
 	// VariantThumbnail 是画布展示档位；缩略图未生成前回落原件，保证请求不会因变体失败而退回平台重定向。
 	VariantThumbnail ResourceVariant = "thumbnail"
+	// VariantDisplay 是对话结果图的展示档位（长边 1600）；未生成、无需生成时同样回落原件。
+	VariantDisplay   ResourceVariant = "display"
 	DeliveryCDN      DeliveryMode    = "cdn"
 	DeliveryOrigin   DeliveryMode    = "origin"
 	DeliveryLocal    DeliveryMode    = "platform-local"
@@ -81,7 +83,7 @@ func NormalizeAccessOptions(options AccessOptions, allowProvider bool) (AccessOp
 	default:
 		return options, kernel.BadAuthRequest("资源访问用途无效")
 	}
-	if options.Variant != VariantOriginal && options.Variant != VariantPlayback && options.Variant != VariantThumbnail {
+	if options.Variant != VariantOriginal && options.Variant != VariantPlayback && options.Variant != VariantThumbnail && options.Variant != VariantDisplay {
 		return options, kernel.BadAuthRequest("资源变体无效")
 	}
 	if options.Purpose == PurposeCopy || options.Purpose == PurposeDownload || options.Purpose == PurposeProvider {
@@ -151,6 +153,22 @@ func ResolveAccess(resource *model.Resource, setting storage.Settings, options A
 			access.FallbackReason = "thumbnail_not_ready"
 		}
 	}
+	if options.Variant == VariantDisplay {
+		switch {
+		case resource.DisplayStatus == "ready" && resource.DisplaySize > 0:
+			access.ActualVariant = VariantDisplay
+			access.OriginalWidth, access.OriginalHeight = resource.Width, resource.Height
+			access.Revision += ":display-ready"
+			resource = DisplayResource(resource)
+		case resource.DisplayStatus == "failed":
+			access.FallbackReason = "display_failed"
+		case resource.DisplayStatus == "skipped" || !DisplayEligible(resource):
+			// 原图已经够小或不适合生成展示档位：原件就是展示图，客户端可以照常缓存。
+			access.FallbackReason = "display_not_needed"
+		default:
+			access.FallbackReason = "display_not_ready"
+		}
+	}
 	if resource.Provider == "local" {
 		access.Delivery = DeliveryLocal
 	} else if !InlineMediaType(resource.MimeType) {
@@ -213,6 +231,32 @@ func ResolveAccess(resource *model.Resource, setting storage.Settings, options A
 		}
 	}
 	return access, nil
+}
+
+// DisplayMaxEdge 是展示档位的长边像素：对话里单图最宽约 680px，按 2 倍屏留足清晰度；原图不超过它时直接展示原图。
+const DisplayMaxEdge = 1600
+
+// DisplayEligible 判断资源是否可能需要展示档位：只处理服务端能解码的静态图片，已知尺寸不超过长边上限的直接用原图。
+func DisplayEligible(resource *model.Resource) bool {
+	if resource == nil || resource.Kind != "image" || resource.TransferPending {
+		return false
+	}
+	switch resource.MimeType {
+	case "image/png", "image/jpeg", "image/webp":
+	default:
+		return false
+	}
+	return resource.Width <= 0 || resource.Height <= 0 || max(resource.Width, resource.Height) > DisplayMaxEdge
+}
+
+func DisplayObjectKey(original string) string { return original + ".display" }
+
+func DisplayResource(original *model.Resource) *model.Resource {
+	display := *original
+	display.ObjectKey = DisplayObjectKey(original.ObjectKey)
+	display.MimeType, display.Size = original.DisplayMimeType, original.DisplaySize
+	display.Width, display.Height = original.DisplayWidth, original.DisplayHeight
+	return &display
 }
 
 func ThumbnailObjectKey(original string) string { return original + ".thumbnail" }

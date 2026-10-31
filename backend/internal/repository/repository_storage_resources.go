@@ -130,7 +130,7 @@ func (r *Repository) UserStoredFileBytes(userID string) (int64, error) {
 			COALESCE((
 				SELECT SUM(physical_resources.size)
 				FROM (
-					SELECT MAX(size + CASE WHEN thumbnail_status = 'ready' THEN thumbnail_size ELSE 0 END) AS size
+					SELECT MAX(size + CASE WHEN thumbnail_status = 'ready' THEN thumbnail_size ELSE 0 END + CASE WHEN display_status = 'ready' THEN display_size ELSE 0 END) AS size
 					FROM resources
 					WHERE user_id = ? AND status = ?
 					GROUP BY COALESCE(NULLIF(provider, ''), 'local'), endpoint, bucket, object_key
@@ -170,6 +170,52 @@ func (r *Repository) UpdateResourceThumbnail(userID string, id string, values ma
 		Where("id = ? AND user_id = ? AND status = ?", id, userID, model.ResourceStatusReady).
 		Updates(values)
 	return result.RowsAffected == 1, result.Error
+}
+
+// ClaimResourceDisplay 原子认领展示档位的生成：未处理（含迁移前的 NULL）或认领已超时的 processing 才能认领，多实例只有一个成功。
+func (r *Repository) ClaimResourceDisplay(userID, id string, staleBefore time.Time) (bool, error) {
+	result := r.db.Model(&model.Resource{}).
+		Where("id = ? AND user_id = ? AND status = ? AND transfer_pending = ?", id, userID, model.ResourceStatusReady, false).
+		Where("(display_status = '' OR display_status IS NULL OR (display_status = ? AND updated_at < ?))", "processing", staleBefore).
+		Updates(map[string]any{"display_status": "processing", "updated_at": time.Now()})
+	return result.RowsAffected == 1, result.Error
+}
+
+// SettleResourceDisplay 把仍在生成中的展示档位记为 skipped 或 failed，之后的访问直接用原图。
+func (r *Repository) SettleResourceDisplay(userID, id, status string) error {
+	return r.db.Model(&model.Resource{}).
+		Where("id = ? AND user_id = ? AND display_status = ?", id, userID, "processing").
+		Updates(map[string]any{"display_status": status, "updated_at": time.Now()}).Error
+}
+
+// PublishResourceDisplay 在账号存储锁内登记展示图并复核容量：只更新仍就绪、仍在生成中的记录，超出容量时整体回滚。
+func (r *Repository) PublishResourceDisplay(userID, id string, values map[string]any, storedLimit int64) (bool, error) {
+	published := false
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockUploadStorage(tx, userID); err != nil {
+			return err
+		}
+		result := tx.Model(&model.Resource{}).
+			Where("id = ? AND user_id = ? AND status = ? AND display_status = ?", id, userID, model.ResourceStatusReady, "processing").
+			Updates(values)
+		if result.Error != nil || result.RowsAffected != 1 {
+			return result.Error
+		}
+		stored, err := New(tx).UserStoredFileBytes(userID)
+		if err != nil {
+			return err
+		}
+		var pending int64
+		if err := tx.Model(&model.UploadReservation{}).Select("COALESCE(SUM(size),0)").Where("user_id = ? AND expires_at > ?", userID, time.Now()).Scan(&pending).Error; err != nil {
+			return err
+		}
+		if stored >= storedLimit || pending >= storedLimit-stored {
+			return ErrUploadStorageLimit
+		}
+		published = true
+		return nil
+	})
+	return published && err == nil, err
 }
 
 func (r *Repository) ResourceByUploadKey(userID string, uploadKey string) (*model.Resource, error) {

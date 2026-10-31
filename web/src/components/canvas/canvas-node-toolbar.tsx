@@ -16,6 +16,7 @@ import type { ImageSplitParams } from "@/lib/canvas/canvas-image-data";
 import { formatBytes, getDataUrlByteSize } from "@/lib/image-utils";
 import { generationErrorMessage } from "@/lib/generation-error";
 import { useCopyText } from "@/hooks/use-copy-text";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { producedModelLabel } from "@/lib/canvas/produced-model";
 import { nodeGenerationPrompt } from "@/lib/canvas/generation-contract";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
@@ -468,9 +469,11 @@ export function CanvasNodeToolbar({
 }
 
 function NodeDockToolButton({ tool, iconOnly = false }: { tool: ToolbarTool; iconOnly?: boolean }) {
+    // 触屏轻点时补发的 mouseenter 会弹出提示盖住画布；没有悬停的设备只保留 aria-label。
+    const canHover = useMediaQuery("(hover: hover)");
     return (
         // 默认 250px 宽度会把“名称：说明”折成两行，放宽到 360px 让常见说明单行显示。
-        <Tooltip title={tool.description ? `${tool.label}：${tool.description}` : tool.label} styles={{ root: { maxWidth: 360 } }}>
+        <Tooltip open={canHover ? undefined : false} title={tool.description ? `${tool.label}：${tool.description}` : tool.label} styles={{ root: { maxWidth: 360 } }}>
             <button
                 type="button"
                 className={`aceternity-dock-command is-labeled pointer-events-auto inline-flex h-8 shrink-0 items-center justify-center gap-2 rounded-[var(--dock-item-radius)] outline-none ${iconOnly ? "w-8 px-0" : "px-2"} ${tool.active ? "is-active" : ""} ${tool.danger ? "is-danger" : ""}`}

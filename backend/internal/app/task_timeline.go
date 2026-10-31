@@ -258,11 +258,25 @@ type timelineRenderResult struct {
 	Size        int64  `json:"size"`
 	DurationMs  int64  `json:"durationMs"`
 	SubtitleSRT string `json:"subtitleSrt,omitempty"`
+	// SubtitlesBurned 表示字幕已烧录进画面；请求了烧录但 ffmpeg 不支持时为 false。
+	SubtitlesBurned bool `json:"subtitlesBurned,omitempty"`
 }
 
 // CreateTimelineRenderTask 创建时间线渲染任务：本地 ffmpeg 合成，不经模型
 // 路由与计费；创建时校验快照至少包含一个可渲染媒体片段。
 func (s *Service) CreateTimelineRenderTask(userID string, req TimelineRenderCreateRequest) (*model.Task, error) {
+	return s.createTimelineRenderTask(userID, req, timelineRenderTaskOptions{})
+}
+
+// timelineRenderTaskOptions 只供服务端内部使用：Agent 合成用调用派生的稳定任务 ID 保证幂等，
+// 并记录所属运行，便于在创作会话里查询；HTTP 入口不能设置这些字段。
+type timelineRenderTaskOptions struct {
+	TaskID     string
+	AgentRunID string
+	Prompt     string
+}
+
+func (s *Service) createTimelineRenderTask(userID string, req TimelineRenderCreateRequest, options timelineRenderTaskOptions) (*model.Task, error) {
 	if s.IsDraining() {
 		return nil, &AppError{Status: 503, Code: 503, Message: "服务正在维护，暂不接受新的生成任务", Retryable: true}
 	}
@@ -276,10 +290,17 @@ func (s *Service) CreateTimelineRenderTask(userID string, req TimelineRenderCrea
 	}
 	input := timelineRenderInput{ProjectID: strings.TrimSpace(req.ProjectID), Timeline: req.Timeline}
 	inputJSON, _ := json.Marshal(input)
+	taskID, prompt := newID(), "时间线渲染"
+	if options.TaskID != "" {
+		taskID = options.TaskID
+	}
+	if strings.TrimSpace(options.Prompt) != "" {
+		prompt = truncateRunes(strings.TrimSpace(options.Prompt), 200)
+	}
 	task := model.Task{
-		ID: newID(), UserID: userID, ProjectID: strings.TrimSpace(req.ProjectID),
+		ID: taskID, UserID: userID, ProjectID: strings.TrimSpace(req.ProjectID), AgentRunID: options.AgentRunID,
 		Type: model.TaskTypeTimelineRender, Status: model.TaskStatusQueued,
-		Stage: "等待队列调度", Progress: 5, Prompt: "时间线渲染",
+		Stage: "等待队列调度", Progress: 5, Prompt: prompt,
 		Provider: "local", Model: "ffmpeg", InputJSON: string(inputJSON),
 	}
 	if err := s.createTaskWithinStorageQuota(&task, nil, policy); err != nil {

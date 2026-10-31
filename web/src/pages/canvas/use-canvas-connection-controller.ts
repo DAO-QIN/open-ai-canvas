@@ -606,7 +606,7 @@ export function useCanvasConnectionController({
     );
 
     const handleBatchConnectionTargetClick = useCallback(
-        (event: ReactPointerEvent | ReactMouseEvent) => {
+        (event: ReactPointerEvent | ReactMouseEvent | PointerEvent) => {
             if (!batchConnectionPreviewRef.current) return false;
             const completed = finishBatchConnection(event.clientX, event.clientY);
             if (!completed) message.warning("请点击目标节点的输入端");

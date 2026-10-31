@@ -230,6 +230,12 @@ func resourceDeletionJobs(userID string, physicalObjects map[string]*model.Resou
 			job.ID, job.ObjectKey = newID(), assets.ThumbnailObjectKey(resource.ObjectKey)
 			jobs = append(jobs, job)
 		}
+		// 展示图生成中也排一条：删除和生成同时发生时，进程中途退出留下的展示图由这里清掉。
+		if resource.DisplayStatus == "ready" || resource.DisplayStatus == "processing" {
+			job := jobs[len(jobs)-1]
+			job.ID, job.ObjectKey = newID(), assets.DisplayObjectKey(resource.ObjectKey)
+			jobs = append(jobs, job)
+		}
 	}
 	return jobs
 }

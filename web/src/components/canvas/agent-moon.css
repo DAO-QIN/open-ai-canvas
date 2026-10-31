@@ -1,4 +1,8 @@
-/* 渐变满月：12 道条纹共用一条“下流并变细”的关键帧，按序号错开时间，连起来就是一轮由粗到细、缓缓下流的满月。 */
+/*
+ * 渐变满月：13 道条纹共用一条“下流并变细”的关键帧，按序号错开一个间距，连起来就是一轮由粗到细、缓缓下流的满月。
+ * 条纹从圆顶上方滑入、流出圆底后才回到起点，换行总在圆外完成，圆顶不会缺一块再突然补上。
+ * --agent-moon-duration 是一道条纹从圆顶流到圆底（12 个间距）的时间；一圈 13 个间距。
+ */
 .agent-moon {
     --agent-moon-duration: 40s;
     --agent-moon-glow-level: 0.22;
@@ -24,7 +28,11 @@
 }
 
 .agent-moon-stripe {
-    animation: agent-moon-flow var(--agent-moon-duration) linear infinite;
+    /*
+     * SVG 里的变换动画不能交给合成线程，每一帧都要在主线程重绘遮罩、重新分层。条纹走得极慢（空闲时约 0.3px 走一格），
+     * 按 30 格一段分步推进：看起来仍是连续下流，空闲时每秒只重绘几次，入口常驻在每个页面上也不再持续占满主线程。
+     */
+    animation: agent-moon-flow calc(var(--agent-moon-duration) * 13 / 12) steps(30) infinite;
     animation-delay: calc(var(--agent-moon-stripe) * var(--agent-moon-duration) / -12);
 }
 
@@ -147,34 +155,43 @@
     }
 }
 
-/* 取样 agentMoonStripeThickness(progress) / AGENT_MOON_BAR：progress 每 1/8 一帧。 */
+/*
+ * translateY 即条纹中心的 y：从 0（圆顶上方）走到 95.333（圆底下方，一圈 13 个间距），百分比 = y / 95.333。
+ * 圆内（y 6 → 94）每 1/8 取样 agentMoonStripeThickness / AGENT_MOON_BAR；圆外两段保持端点粗细。
+ */
 @keyframes agent-moon-flow {
     0% {
         transform: translateY(0) scaleY(1);
     }
-    12.5% {
-        transform: translateY(11px) scaleY(0.863);
+    6.294% {
+        transform: translateY(6px) scaleY(1);
     }
-    25% {
-        transform: translateY(22px) scaleY(0.732);
+    17.832% {
+        transform: translateY(17px) scaleY(0.863);
     }
-    37.5% {
-        transform: translateY(33px) scaleY(0.608);
+    29.371% {
+        transform: translateY(28px) scaleY(0.732);
     }
-    50% {
-        transform: translateY(44px) scaleY(0.49);
+    40.909% {
+        transform: translateY(39px) scaleY(0.608);
     }
-    62.5% {
-        transform: translateY(55px) scaleY(0.382);
+    52.448% {
+        transform: translateY(50px) scaleY(0.49);
     }
-    75% {
-        transform: translateY(66px) scaleY(0.283);
+    63.986% {
+        transform: translateY(61px) scaleY(0.382);
     }
-    87.5% {
-        transform: translateY(77px) scaleY(0.199);
+    75.524% {
+        transform: translateY(72px) scaleY(0.283);
+    }
+    87.063% {
+        transform: translateY(83px) scaleY(0.199);
+    }
+    98.601% {
+        transform: translateY(94px) scaleY(0.142);
     }
     100% {
-        transform: translateY(88px) scaleY(0.142);
+        transform: translateY(95.333px) scaleY(0.142);
     }
 }
 

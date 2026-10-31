@@ -8,6 +8,8 @@ import { getLibTVFeatured } from "@/services/api/libtv-gallery";
 import type { LibTVFeaturedItem } from "@/types/libtv-gallery";
 
 import { HomeFeaturedCanvasDialog } from "./home-featured-canvas-dialog";
+// 创作页「画布」面也渲染这一块，样式随组件带上，不依赖首页先加载过。
+import "./home.css";
 
 const FEATURED_COUNT = 5;
 
@@ -15,7 +17,7 @@ export function featuredCanvasBadge(item: Pick<LibTVFeaturedItem, "nodeCount">) 
     return item.nodeCount > 0 ? `可编辑画布 · ${item.nodeCount} 节点` : "可编辑画布";
 }
 
-/** 首页「精选画布」：服务端精选列表（节点多、可复制、无 LibTV 水印）的前 5 个，点卡片打开精简弹窗，复制仍需用户确认。 */
+/** 「精选画布」（首页与创作页「画布」面共用）：服务端精选列表（节点多、复制不丢节点、封面无水印）的前 5 个，点卡片打开精简弹窗，复制仍需用户确认。 */
 export function HomeFeaturedCanvases() {
     const [active, setActive] = useState<LibTVFeaturedItem>();
     const { data, isLoading, isError, isFetching, refetch } = useQuery({ queryKey: ["libtv-featured"], queryFn: getLibTVFeatured, staleTime: 5 * 60_000 });
@@ -40,7 +42,7 @@ export function HomeFeaturedCanvases() {
                     </button>
                 </div>
             ) : (
-                <ul className="home-card-grid" aria-busy={isLoading}>
+                <ul className="home-card-grid is-featured-canvases" aria-busy={isLoading}>
                     {isLoading
                         ? Array.from({ length: FEATURED_COUNT }, (_, index) => (
                               <li key={index} className="home-card is-placeholder" aria-label="正在读取精选画布">

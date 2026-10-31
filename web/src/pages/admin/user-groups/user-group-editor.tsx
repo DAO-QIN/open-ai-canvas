@@ -2,8 +2,10 @@ import { App, Button, Drawer, Form, Input, InputNumber, Select } from "antd";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { UserGroupBadge } from "@/components/layout/user-group-badge";
+import { UserAvatar } from "@/components/layout/user-avatar";
+import { UserGroupAvatarRing, UserGroupBadge } from "@/components/layout/user-group-badge";
 import { createAdminUserGroup, updateAdminUserGroup, type UserGroup } from "@/services/api/user-groups";
+import { useUserStore } from "@/stores/use-user-store";
 import { useAdminContext } from "../admin-context";
 import { Callout, Switch } from "../ui/controls";
 import { emptyUserGroupForm, userGroupFormValues, userGroupInput, type UserGroupFormValues } from "./user-group-form";
@@ -18,6 +20,7 @@ const badgeStyleOptions = [
 export function UserGroupEditor({ open, group, onClose, onSaved }: { open: boolean; group: UserGroup | null; onClose: () => void; onSaved: (group: UserGroup) => void }) {
     const { message, modal } = App.useApp();
     const { references } = useAdminContext();
+    const currentUser = useUserStore((state) => state.user);
     const [form] = Form.useForm<UserGroupFormValues>();
     const [saving, setSaving] = useState(false);
     const creating = !group;
@@ -123,7 +126,21 @@ export function UserGroupEditor({ open, group, onClose, onSaved }: { open: boole
                         <Input maxLength={16} placeholder="VIP" />
                     </Form.Item>
                     <Form.Item label="预览">
-                        <div className="flex h-8 items-center">{badgeStyle === "none" ? <span className="text-xs text-foreground/45">不展示</span> : <UserGroupBadge group={{ name, badgeLabel, badgeStyle }} />}</div>
+                        {/* 头像框和徽章一起预览；头像借用当前管理员的，只用来展示外框效果。 */}
+                        <div className="flex h-8 items-center gap-2">
+                            {badgeStyle === "vip" || badgeStyle === "svip" ? (
+                                <>
+                                    {currentUser ? (
+                                        <UserGroupAvatarRing group={{ badgeStyle }}>
+                                            <UserAvatar user={currentUser} className="size-6 rounded-full bg-foreground/[.06] text-foreground/55" />
+                                        </UserGroupAvatarRing>
+                                    ) : null}
+                                    <UserGroupBadge group={{ name, badgeLabel, badgeStyle }} />
+                                </>
+                            ) : (
+                                <span className="text-xs text-foreground/45">不展示</span>
+                            )}
+                        </div>
                     </Form.Item>
                 </div>
 

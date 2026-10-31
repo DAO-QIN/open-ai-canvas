@@ -10,11 +10,11 @@ import { blankCanvasPath, type CanvasStartNode } from "@/lib/canvas/canvas-start
 
 export type { CanvasStartNode };
 
-// 首页多个入口（最近画布、工具入口）共用一把锁，避免连点两个入口时建出两个空画布。
+// 首页多个入口（新建画布、工具入口）共用一把锁，避免连点两个入口时建出两个空画布。
 let creatingLock = false;
 
 /**
- * 首页「创建画布」与工具入口共用：游客先登录；同一时间只创建一个画布；
+ * 首页「新建画布创作」与工具入口共用：游客先登录；同一时间只创建一个画布；
  * 切换账号后不再跳转到上一位用户的画布。
  */
 export function useCreateBlankCanvas(onRequireLogin: () => void) {

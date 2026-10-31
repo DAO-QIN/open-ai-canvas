@@ -85,14 +85,10 @@ describe("首页布局（参考 leyi.my）", () => {
         expect(page).toContain("openLoginModal(");
     });
 
-    test("创作页不再重复首页的工具入口与精选画布，最近画布复用同一创建逻辑", () => {
+    test("创作页不再重复首页的工具入口，也不再放独立的「最近画布」区块", () => {
         const create = source("../src/pages/create/index.tsx");
-        for (const tag of ["<CreationToolEntries", "<CreationFeaturedCanvases", "<HomeToolEntries"]) expect(create).not.toContain(tag);
-        expect(create).toContain("<CreationRecentCanvases");
+        for (const tag of ["<CreationToolEntries", "<HomeToolEntries", "<CreationRecentCanvases"]) expect(create).not.toContain(tag);
         expect(create).not.toContain('navigate("/", {');
-        const recentSource = source("../src/pages/create/creation-recent-canvases.tsx");
-        expect(recentSource).toContain("useCreateBlankCanvas(onRequireLogin)");
-        expect(recentSource).not.toContain("createCanvasProjectWithRemoteSync");
     });
 
     test("游客可以浏览首页、创作页与两个灵感页", () => {
@@ -110,11 +106,11 @@ describe("首页布局（参考 leyi.my）", () => {
         expect(css).toContain(".home-new-canvas-ripple { animation: none; opacity: 0; }");
     });
 
-    test("未登录顶栏与登录后同一套胶囊样式：礼盒积分胶囊 + 注册 / 登录按钮", () => {
+    test("未登录顶栏与登录后同一套胶囊样式：积分胶囊 + 注册 / 登录按钮", () => {
         const bar = source("../src/components/layout/workspace-top-bar.tsx");
         const guestPill = bar.slice(bar.indexOf("creditsEnabled && !user ?"), bar.indexOf(") : creditsEnabled ?"));
         expect(guestPill).toContain('className="app-workspace-topbar-credit-pill is-guest"');
-        expect(guestPill).toContain("<WorkspaceCreditGiftMark />");
+        expect(guestPill).toContain("<WorkspaceCreditMark />");
         const menu = source("../src/components/layout/workspace-account-menu.tsx");
         expect(menu).toContain('className="app-workspace-topbar-auth-pill"');
         expect(menu).toContain("注册 / 登录");
@@ -202,10 +198,16 @@ describe("灵感库（/inspirations 与创作页灵感区共用）", () => {
         expect(hook).toContain('if (typeof IntersectionObserver === "undefined") {');
     });
 
-    test("创作页灵感区与灵感库同一组件，创作页不放精选画布", () => {
+    test("创作页灵感区与灵感库同一组件；「画布」面（?mode=canvas）换成首页同一套精选画布", () => {
         const create = source("../src/pages/create/index.tsx");
         expect(create).toContain('const InspirationHall = lazy(() => import("@/pages/inspirations"));');
-        expect(create).not.toContain("FeaturedCanvases");
+        expect(create).toContain('const creationSurface: CreationSurface = searchParams.get("mode") === "canvas" ? "canvas" : "generate";');
+        expect(create).toContain('lazy(() => import("@/pages/home/home-featured-canvases").then((module) => ({ default: module.HomeFeaturedCanvases })))');
+        const canvasStart = create.indexOf('{creationSurface === "canvas" ? (');
+        const canvasSurface = create.slice(canvasStart, create.indexOf(") : (", canvasStart));
+        expect(canvasStart).toBeGreaterThan(0);
+        expect(canvasSurface).toContain("<CreationFeaturedCanvases />");
+        expect(canvasSurface).not.toContain("InspirationHall");
         expect(source("../src/pages/inspirations/page.tsx")).toContain("<InspirationHall eager onUse=");
         expect(hall()).toContain("const [shouldLoadCatalog, setShouldLoadCatalog] = useState(eager);");
     });

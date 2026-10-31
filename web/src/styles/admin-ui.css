@@ -4459,6 +4459,109 @@
     min-width: 0;
 }
 
+/* 联网搜索设置页沿用方舟素材库的布局，只补测试区。 */
+.admin-web-search-test {
+    display: grid;
+    gap: 12px;
+    padding: 16px 20px;
+}
+
+.admin-web-search-test-row {
+    display: flex;
+    gap: 8px;
+}
+
+.admin-web-search-results {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.admin-web-search-results li {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    border-bottom: 1px solid var(--admin-divider);
+    padding-bottom: 10px;
+}
+
+.admin-web-search-results li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.admin-web-search-results a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    color: var(--admin-text-primary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.admin-web-search-results a:hover {
+    text-decoration: underline;
+}
+
+.admin-web-search-results span,
+.admin-web-search-empty {
+    color: var(--admin-text-muted);
+    font-size: 11px;
+}
+
+.admin-web-search-results p {
+    margin: 2px 0 0;
+    color: var(--admin-text-secondary);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+/* 搜索服务说明后面跟申请密钥或部署文档的链接。 */
+.admin-web-search-hint a {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 6px;
+    color: var(--admin-text-primary);
+    white-space: nowrap;
+}
+
+.admin-web-search-hint a:hover {
+    text-decoration: underline;
+}
+
+/* 网页读取测试结果：标题、读到的字数和正文开头。 */
+.admin-web-search-reader {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.admin-web-search-reader strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--admin-text-primary);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-web-search-reader span {
+    color: var(--admin-text-muted);
+    font-size: 11px;
+}
+
+.admin-web-search-reader p {
+    margin: 2px 0 0;
+    color: var(--admin-text-secondary);
+    font-size: 12px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
 .admin-ark-footer-note {
     min-width: 0;
     gap: 8px;

@@ -76,17 +76,18 @@ export function CanvasShareModal({ projectId, open, onClose, beforeCreate }: { p
                     </p>
                     {share.enabled && shareUrl ? (
                         <div className="space-y-4">
-                            <Input value={shareUrl} readOnly suffix={<Button type="text" className="!h-7 !w-7 !min-w-7 !p-0" icon={<Copy className="size-3.5" />} onClick={() => void copy()} aria-label="复制分享链接" />} />
+                            <Input value={shareUrl} readOnly suffix={<Button type="text" className="!h-7 !w-7 !min-w-7 !p-0 pointer-coarse:!h-8 pointer-coarse:!w-8 pointer-coarse:!min-w-8" icon={<Copy className="size-3.5" />} onClick={() => void copy()} aria-label="复制分享链接" />} />
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <span className="text-xs" style={{ color: theme.node.muted }}>{share.expiresAt ? `有效至 ${new Date(share.expiresAt).toLocaleString("zh-CN")}` : "长期有效，直至手动停止分享"}</span>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     <Button icon={<RefreshCw className="size-3.5" />} loading={submitting} onClick={() => void create(true)}>重新生成链接</Button>
                                     <Button danger icon={<Unlink className="size-3.5" />} onClick={revoke}>停止分享</Button>
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2">
+                        // 窄屏（≤375px）放不下有效期与按钮一行时换行，按钮不再被挤出弹窗。
+                        <div className="flex flex-wrap items-center gap-2">
                             <Select value={expiresDays} onChange={setExpiresDays} className="min-w-40" options={[{ value: 0, label: "长期有效" }, { value: 7, label: "7 天有效" }, { value: 30, label: "30 天有效" }]} />
                             <Button type="primary" icon={<Link2 className="size-4" />} loading={submitting} onClick={() => void create(false)}>创建并复制链接</Button>
                         </div>

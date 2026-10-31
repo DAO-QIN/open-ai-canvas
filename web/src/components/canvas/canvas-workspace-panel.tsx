@@ -149,7 +149,21 @@ export function CanvasWorkspacePanel({
             </div>
             {open && !screens.lg ? (
                 <AppDrawer flush open placement="left" title={null} closable={false} size={320} onClose={onClose}>
-                    {content}
+                    {/* 抽屉打开时左侧菜单在遮罩下面（手机上不显示），分类切换和关闭放在抽屉顶部。 */}
+                    <div className="canvas-workspace-drawer flex h-full min-h-0 flex-col">
+                        <nav className="canvas-workspace-drawer-tabs" aria-label="工作区分类" style={{ ...canvasDockStyle(theme), background: "transparent" } as CSSProperties}>
+                            {entries.map(({ id, label, icon: Icon }) => (
+                                <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)}>
+                                    <Icon aria-hidden />
+                                    <span>{label}</span>
+                                </button>
+                            ))}
+                            <button type="button" className="canvas-workspace-drawer-close" aria-label="关闭工作区" onClick={onClose}>
+                                <X aria-hidden />
+                            </button>
+                        </nav>
+                        <div className="min-h-0 flex-1">{content}</div>
+                    </div>
                 </AppDrawer>
             ) : null}
         </>

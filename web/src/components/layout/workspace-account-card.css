@@ -120,10 +120,10 @@
     color: var(--user-ink-muted);
     font-size: 12px;
 }
+/* 闪电与"可用积分"同色，不随皮肤主色单独上色。 */
 .workspace-account-card-wallet-head > span svg {
     width: 14px;
     height: 14px;
-    color: var(--user-accent);
 }
 .workspace-account-card-refresh {
     display: inline-grid;
@@ -340,3 +340,41 @@
 }
 
 .workspace-account-card-name { display:flex; align-items:center; gap:6px; }
+
+/* 手机「我的」页（variant="page"）：卡片铺满页面，行高放大到 48px 方便手指点按。 */
+.workspace-account-card.is-page {
+    --account-row-height: 48px;
+    width: 100%;
+    gap: var(--space-3);
+    padding: 0;
+}
+.workspace-account-card.is-page .workspace-account-card-identity {
+    padding: var(--space-2) var(--space-1);
+}
+.workspace-account-card.is-page .workspace-account-card-avatar {
+    width: 56px;
+    height: 56px;
+}
+.workspace-account-card.is-page .workspace-account-card-identity-copy > strong {
+    font-size: 18px;
+    line-height: 24px;
+}
+.workspace-account-card.is-page :is(.workspace-account-card-actions > a, .workspace-account-card-changelog, .workspace-account-card-theme, .workspace-account-card-logout) {
+    padding-inline: 12px;
+    font-size: 15px;
+}
+.workspace-account-card.is-page .workspace-account-card-actions:empty {
+    display: none;
+}
+.workspace-account-card.is-page .workspace-account-card-refresh {
+    width: 36px;
+    height: 36px;
+}
+.workspace-account-card.is-page .workspace-account-card-topup {
+    height: 40px;
+    font-size: 14px;
+}
+.workspace-account-card.is-page .workspace-account-card-segmented > button {
+    height: 32px;
+    padding-inline: 12px;
+}

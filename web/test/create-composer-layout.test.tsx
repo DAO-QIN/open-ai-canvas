@@ -24,13 +24,16 @@ const props: ComponentProps<typeof CreationComposer> = {
     maxReferences: 9,
     references: [],
     onRemoveAttachment: noop,
-    onClearAttachments: noop,
     onClearComposer: noop,
+    onUploadFiles: noop,
+    onBeforeUpload: () => true,
+    referenceSignInRequired: false,
     onReorderAttachments: noop,
     onReplaceAttachment: noop,
     onReplaceReferenceFiles: noop,
     onPasteFiles: noop,
     onOpenLibrary: noop,
+    onDropResultImage: noop,
     onModeChange: noop,
     model: "",
     modelRequirements: {},
@@ -154,6 +157,9 @@ test("画布未指定高度的引用输入仍填充固定容器", () => {
         expect(editor.style.overflowY).toBe("auto");
     }
     window.close();
+    // 打字再删光后，Chrome 在可编辑区里留下一个 <br>（序列化成 "\n"）：只剩空白时占位提示照样显示。
+    for (const value of ["", "\n", " \n "]) expect(renderToStaticMarkup(<CanvasResourceMentionTextarea value={value} references={[imageReference]} placeholder="占位提示" onChange={noop} />)).toContain("占位提示");
+    expect(renderToStaticMarkup(<CanvasResourceMentionTextarea value="提示词" references={[imageReference]} placeholder="占位提示" onChange={noop} />)).not.toContain("占位提示");
 });
 
 test("运行中发送与停止独立，纯文字可插话，空草稿也能停止", () => {
@@ -209,19 +215,24 @@ test("自动模式主栏固定对话模型，不再显示二级模型类型选�
     expect(html).toContain(">偏好</span>");
 });
 
-test("输入框去掉流光描边和聚光；类型按钮与发送键用创作页自绘图标；占位文字不超过 14 个字", () => {
+test("输入框去掉流光描边和聚光；类型按钮与发送键用创作页自绘图标；占位文字点明「+」和 @ 怎么用", () => {
     const html = renderToStaticMarkup(<CreationComposer {...props} />);
-    expect(html).toContain('aria-label="创作类型：自动"');
-    expect(html).toContain('data-icon="auto"');
+    expect(html).toContain('aria-label="创作类型：Agent 模式"');
+    expect(html).toContain("<span>Agent 模式</span>");
+    expect(html).toContain('data-icon="agent"');
     expect(html).toContain('data-icon="send"');
     expect(html).not.toContain("group/spotlight");
-    for (const [variant, mode, text] of [
-        ["empty", "agent", "描述画面，或拖入一张图"],
-        ["thread", "agent", "接着改，或 @ 某一张"],
-        ["empty", "video", "描述镜头，或拖入一张首帧"],
+    // 服务端渲染没有 matchMedia，按触屏（平铺）布局取短句；对话里的输入框只有一行高，手机上不超过 14 个字。
+    for (const [variant, mode, maxReferences, text] of [
+        ["empty", "agent", 9, "说说你的想法或剧本，点「+」加参考素材，输入 @ 引用素材或技能"],
+        ["thread", "agent", 9, "接着改，或点「+」加参考素材"],
+        ["empty", "video", 9, "描述镜头和动作，点「+」上传首帧或参考素材"],
+        ["empty", "video", 0, "描述镜头、动作和运镜"],
     ] as const) {
-        expect(renderToStaticMarkup(<CreationComposer {...props} prompt="" variant={variant} mode={mode} />)).toContain(text);
-        expect(text.length).toBeLessThanOrEqual(14);
+        expect(renderToStaticMarkup(<CreationComposer {...props} prompt="" variant={variant} mode={mode} maxReferences={maxReferences} />)).toContain(text);
+        expect(text.length).toBeLessThanOrEqual(variant === "thread" ? 14 : 32);
+        // 没有「+」的时候不提它。
+        if (!maxReferences) expect(text).not.toContain("「+」");
     }
 });
 

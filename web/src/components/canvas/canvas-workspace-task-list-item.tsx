@@ -1,8 +1,8 @@
 import { memo, useEffect, useState } from "react";
-import { CheckCircle2, ChevronDown, ChevronUp, Clock3, Coins, LoaderCircle, MoreHorizontal, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Clock3, LoaderCircle, MoreHorizontal, XCircle } from "lucide-react";
 import { Dropdown, type MenuProps } from "antd";
 
-import { formatCredits } from "@/constant/credits";
+import { CreditIcon, formatCredits } from "@/constant/credits";
 import { canCancelGenerationTask, formatTaskKind, generationTaskShowsProgress, generationTaskStageLabel, generationTaskStatusLabel } from "@/lib/generation-task-display";
 import type { GenerationTask } from "@/services/api/task-center";
 import { useUserStore } from "@/stores/use-user-store";
@@ -96,7 +96,7 @@ export const TaskListItem = memo(function TaskListItem({ task, onCancelTask }: {
                     {creditsEnabled && task.billing ? (
                         <div className="mt-1 flex items-center justify-between gap-2">
                             <span className="inline-flex items-center gap-1">
-                                <Coins className="size-2.5" />
+                                <CreditIcon className="size-2.5" />
                                 计费
                             </span>
                             <span className="text-foreground/70">{billingLabel}</span>
