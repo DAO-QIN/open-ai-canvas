@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const CurrentSchemaVersion int64 = 83
+const CurrentSchemaVersion int64 = 85
 
 const baselineSchemaChecksum = "sha256:open-ai-canvas-schema-v1-20260830"
 const schemaMigrationAppliedAtIndexChecksum = "sha256:schema-migrations-applied-at-index-v2-20260830"
@@ -295,6 +295,45 @@ var schemaMigrations = []migration{
 	{version: 81, name: "user_groups_pricing_currency", checksum: "sha256:user-groups-pricing-currency-v81-20261028", apply: migrateUserGroupsPricingCurrency},
 	{version: 82, name: "agent_memory_document_skill_discovery", checksum: "sha256:agent-memory-document-skill-discovery-v82-20261028", apply: migrateAgentMemoryDocumentSkillDiscovery},
 	{version: 83, name: "agent_memory_document_columns", checksum: "sha256:agent-memory-document-columns-v83-20261028", apply: migrateAgentMemoryDocumentColumns},
+	{version: 84, name: "topup_custom_pricing", checksum: "sha256:topup-custom-pricing-v84-20261030", apply: migrateTopupCustomPricing},
+	{version: 85, name: "resource_display_variant", checksum: "sha256:resource-display-variant-v85-20261031", apply: migrateResourceDisplayVariant},
+}
+
+// migrateResourceDisplayVariant 为资源增加对话结果图的展示档位。旧行这些列为 NULL，按「未处理」对待，
+// 首次按展示档位访问时由后台生成，不在迁移里批量改写资源表。
+func migrateResourceDisplayVariant(tx *gorm.DB) error {
+	for _, field := range []string{"DisplayStatus", "DisplayMimeType", "DisplaySize", "DisplayWidth", "DisplayHeight"} {
+		if tx.Migrator().HasColumn(&model.Resource{}, field) {
+			continue
+		}
+		if err := tx.Migrator().AddColumn(&model.Resource{}, field); err != nil {
+			return fmt.Errorf("为资源增加展示档位列 %s：%w", field, err)
+		}
+	}
+	return nil
+}
+
+// migrateTopupCustomPricing 为充值商品增加自定义金额计价，为支付订单记录下单份数。
+// 旧商品按固定套餐出售（pricing_mode 默认 fixed、份数区间为 0），旧订单份数为 1，金额与积分快照不变。
+func migrateTopupCustomPricing(tx *gorm.DB) error {
+	columns := []struct {
+		model any
+		field string
+	}{
+		{&model.TopupProduct{}, "PricingMode"},
+		{&model.TopupProduct{}, "CustomMinQuantity"},
+		{&model.TopupProduct{}, "CustomMaxQuantity"},
+		{&model.PaymentOrder{}, "Quantity"},
+	}
+	for _, column := range columns {
+		if tx.Migrator().HasColumn(column.model, column.field) {
+			continue
+		}
+		if err := tx.Migrator().AddColumn(column.model, column.field); err != nil {
+			return fmt.Errorf("增加充值计价列 %s：%w", column.field, err)
+		}
+	}
+	return nil
 }
 
 // migrateAgentMemoryDocumentColumns 补齐记忆文件的条目序号与修订的工具调用 ID。
