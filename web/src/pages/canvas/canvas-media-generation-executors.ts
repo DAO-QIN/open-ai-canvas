@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
 import { canGenerateMediaInPlace } from "@/lib/canvas/canvas-generation-layout";
+import { buildGenerationNodeTitle } from "@/lib/canvas/canvas-generation-title";
 import { nodeSizeFromRatio } from "@/lib/canvas/canvas-node-size";
 import { nextCanvasVersionLabel } from "@/lib/canvas/canvas-layout";
 import { buildAudioGenerationMetadata, buildVideoGenerationMetadata, generationReferenceUrls, resetGenerationTaskMetadata, runCanvasGenerationTaskToConsumer } from "@/lib/canvas/canvas-project-generation";
@@ -48,7 +49,7 @@ export async function executeVideoGeneration({
     const videoNode: CanvasNodeData = {
         id: videoId,
         type: CanvasNodeType.Video,
-        title: effectivePrompt.slice(0, 32) || "Generated Video",
+        title: buildGenerationNodeTitle(effectivePrompt, "Generated Video"),
         position: reuseSourceNode ? sourceNode!.position : { x: parent.x + (sourceNode?.width || spec.width) + 96, y: parent.y },
         width: reuseSourceNode ? sourceNode!.width : spec.width,
         height: reuseSourceNode ? sourceNode!.height : spec.height,
@@ -87,7 +88,16 @@ export async function executeVideoGeneration({
         return [
             ...current.map((node) => {
                 if ((node.metadata?.versionOfNodeId || node.id) !== rootId) return node;
-                return { ...node, metadata: { ...node.metadata, versionOfNodeId: rootId, versionLabel: node.metadata?.versionLabel || "A", versionPrimary: node.metadata?.versionPrimary || (!hasPrimaryVersion && node.id === sourceNode.id), status: node.id === nodeId ? NODE_STATUS_SUCCESS : node.metadata?.status } };
+                return {
+                    ...node,
+                    metadata: {
+                        ...node.metadata,
+                        versionOfNodeId: rootId,
+                        versionLabel: node.metadata?.versionLabel || "A",
+                        versionPrimary: node.metadata?.versionPrimary || (!hasPrimaryVersion && node.id === sourceNode.id),
+                        status: node.id === nodeId ? NODE_STATUS_SUCCESS : node.metadata?.status,
+                    },
+                };
             }),
             { ...videoNode, metadata: { ...videoNode.metadata, versionOfNodeId: rootId, versionLabel: nextLabel, versionPrimary: false } },
         ];
@@ -165,7 +175,7 @@ export async function executeAudioGeneration({
     const audioNode: CanvasNodeData = {
         id: audioId,
         type: CanvasNodeType.Audio,
-        title: effectivePrompt.slice(0, 32) || "Generated Audio",
+        title: buildGenerationNodeTitle(effectivePrompt, "Generated Audio"),
         position: reuseSourceNode ? sourceNode!.position : { x: parent.x + (sourceNode?.width || spec.width) + 96, y: parent.y + ((sourceNode?.height || spec.height) - spec.height) / 2 },
         width: reuseSourceNode ? sourceNode!.width : spec.width,
         height: reuseSourceNode ? sourceNode!.height : spec.height,
@@ -211,7 +221,11 @@ export async function executeAudioGeneration({
 function doubaoAudioPrompt(config: CanvasGenerationExecution["generationConfig"], prompt: string, audioCount: number, imageCount: number) {
     if (!isDoubaoAudioConfig(config)) return prompt;
     // 参考图片模式的 text_prompt 只保留要合成的文本，图片走 references。
-    if (imageCount > 0) return prompt.replace(/@(图片|音频|视频|绘图|角色|文本)\d+/g, " ").replace(/[ \t]{2,}/g, " ").trim();
+    if (imageCount > 0)
+        return prompt
+            .replace(/@(图片|音频|视频|绘图|角色|文本)\d+/g, " ")
+            .replace(/[ \t]{2,}/g, " ")
+            .trim();
     if (audioCount <= 0) return prompt;
     // 官方参考音频用 @Audio1、@Audio2，和 references 的顺序一致。画布里的 @音频N 只是编辑器槽位。
     const next = prompt.replace(/@音频(\d+)/g, "@Audio$1");

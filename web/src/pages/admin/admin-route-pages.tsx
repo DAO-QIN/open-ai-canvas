@@ -66,11 +66,7 @@ export function BannerAnnouncementsPage() {
             title="常驻通知"
             description="配置首页顶部常驻展示的通知，支持标题、状态与有效期"
             actions={
-                <Button
-                    type="primary"
-                    icon={<Plus className="size-4" />}
-                    onClick={() => setCreateOpen(true)}
-                >
+                <Button type="primary" icon={<Plus className="size-4" />} onClick={() => setCreateOpen(true)}>
                     新增常驻通知
                 </Button>
             }
@@ -130,7 +126,7 @@ export function FeatureAvailabilityPage() {
 
 export function StorageResourcesPage() {
     return (
-        <AdminPageFrame title="存储资源" description="只读查看资源记录、容量分布与文件预览" scroll>
+        <AdminPageFrame title="存储资源" description="查看资源记录、容量分布与文件预览，可删除单个或批量资源" scroll>
             <StorageResourcesPanel />
         </AdminPageFrame>
     );

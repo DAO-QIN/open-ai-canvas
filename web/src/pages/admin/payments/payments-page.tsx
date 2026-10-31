@@ -1,6 +1,6 @@
 import { PaymentBrandIcon } from "@/components/payment-brand-icons";
 import { Callout } from "@/pages/admin/ui/controls";
-import { App, Button, DatePicker, Descriptions, Drawer, Form, Input, InputNumber, Tabs, Typography } from "antd";
+import { App, Button, DatePicker, Descriptions, Form, Input, InputNumber, Tabs, Typography } from "antd";
 import { AdminDrawer } from "@/pages/admin/ui/overlays";
 import { Switch } from "@/pages/admin/ui/controls";
 import type { ColumnsType } from "antd/es/table";
@@ -680,13 +680,13 @@ export default function AdminPaymentsPage() {
         {
             title: "操作",
             key: "actions",
-            width: 150,
+            width: 220,
             fixed: "right",
             align: "center",
+            // 只显示当前状态下能执行的操作：已到账或已关闭的订单只剩“详情”，不再出现一排禁用按钮或“更多”。
             render: (_, order) => (
                 <AdminRowActions
                     primary={{ label: "详情", icon: <Eye className="size-3.5" />, onClick: () => setSelectedOrder(order) }}
-                    visibleActionCount={0}
                     actions={[
                         {
                             key: "sync",
@@ -1024,7 +1024,7 @@ export default function AdminPaymentsPage() {
             </AdminDrawer>
             <AdminUserDetailDrawer userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
 
-            <Drawer
+            <AdminDrawer
                 title={providerDrawer ? `配置 ${providerDrawer.name}` : "配置支付渠道"}
                 width={620}
                 open={Boolean(providerDrawer)}
@@ -1069,9 +1069,9 @@ export default function AdminPaymentsPage() {
                         })}
                     </Form>
                 ) : null}
-            </Drawer>
+            </AdminDrawer>
 
-            <Drawer
+            <AdminDrawer
                 title={productDrawer ? "编辑商品" : "新增商品"}
                 width={520}
                 open={productDrawer !== undefined}
@@ -1108,12 +1108,7 @@ export default function AdminPaymentsPage() {
                         />
                     </Form.Item>
                     {selectedProductKind === "credits" ? (
-                        <Form.Item
-                            name="pricingMode"
-                            label="计价方式"
-                            rules={[{ required: true }]}
-                            extra={productDrawer ? "计价方式创建后不能修改；如需改动请新建商品。" : "自定义金额：用户在积分中心拖动滑块或输入积分，按每份价格自选充值数量。"}
-                        >
+                        <Form.Item name="pricingMode" label="计价方式" rules={[{ required: true }]} extra={productDrawer ? "计价方式创建后不能修改；如需改动请新建商品。" : "自定义金额：用户在积分中心拖动滑块或输入积分，按每份价格自选充值数量。"}>
                             <Select
                                 disabled={Boolean(productDrawer)}
                                 options={[
@@ -1140,22 +1135,22 @@ export default function AdminPaymentsPage() {
                                 <InputNumber min={1} max={100_000} precision={0} className="w-full" />
                             </Form.Item>
                         ) : (
-                        <Form.Item
-                            name="credits"
-                            label={customPricing ? "每份到账积分" : "到账积分"}
-                            rules={[
-                                { required: true },
-                                {
-                                    validator: (_, value) => {
-                                        const credits = Number(value);
-                                        const microcredits = Math.round(credits * 1_000_000);
-                                        return Number.isFinite(credits) && credits > 0 && credits <= 1_000_000_000 && Number.isSafeInteger(microcredits) ? Promise.resolve() : Promise.reject(new Error("请输入 0.000001 至 10 亿之间且可安全处理的积分"));
+                            <Form.Item
+                                name="credits"
+                                label={customPricing ? "每份到账积分" : "到账积分"}
+                                rules={[
+                                    { required: true },
+                                    {
+                                        validator: (_, value) => {
+                                            const credits = Number(value);
+                                            const microcredits = Math.round(credits * 1_000_000);
+                                            return Number.isFinite(credits) && credits > 0 && credits <= 1_000_000_000 && Number.isSafeInteger(microcredits) ? Promise.resolve() : Promise.reject(new Error("请输入 0.000001 至 10 亿之间且可安全处理的积分"));
+                                        },
                                     },
-                                },
-                            ]}
-                        >
-                            <InputNumber min={0.000001} max={1_000_000_000} precision={6} className="w-full" />
-                        </Form.Item>
+                                ]}
+                            >
+                                <InputNumber min={0.000001} max={1_000_000_000} precision={6} className="w-full" />
+                            </Form.Item>
                         )}
                     </div>
                     {customPricing ? (
@@ -1171,8 +1166,7 @@ export default function AdminPaymentsPage() {
                                     rules={[
                                         { required: true },
                                         ({ getFieldValue }) => ({
-                                            validator: (_, value) =>
-                                                Number.isInteger(value) && value >= (getFieldValue("customMinQuantity") || 1) && value <= 100_000_000 ? Promise.resolve() : Promise.reject(new Error("需为整数，且不少于最少购买份数")),
+                                            validator: (_, value) => (Number.isInteger(value) && value >= (getFieldValue("customMinQuantity") || 1) && value <= 100_000_000 ? Promise.resolve() : Promise.reject(new Error("需为整数，且不少于最少购买份数"))),
                                         }),
                                     ]}
                                 >
@@ -1246,9 +1240,9 @@ export default function AdminPaymentsPage() {
                         <Switch />
                     </Form.Item>
                 </Form>
-            </Drawer>
+            </AdminDrawer>
 
-            <Drawer
+            <AdminDrawer
                 title={detailRun ? `${providerNames[detailRun.providerId] || detailRun.providerId} · ${detailRun.billDate} 对账明细` : "对账明细"}
                 width="min(1080px, 94vw)"
                 open={Boolean(detailRun)}
@@ -1297,7 +1291,7 @@ export default function AdminPaymentsPage() {
                     empty={<AdminTableEmpty title={detailRun?.status === "failed" ? "本次对账未生成明细" : "账单没有交易记录"} />}
                     footer={<PaginationBar alwaysShow current={detailPage} pageSize={detailPageSize} total={detailTotal} onChange={(page, size) => detailRun && void openRunDetails(detailRun, size !== detailPageSize ? 1 : page, size, detailResult)} />}
                 />
-            </Drawer>
+            </AdminDrawer>
         </AdminPageFrame>
     );
 }

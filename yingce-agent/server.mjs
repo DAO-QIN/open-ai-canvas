@@ -187,6 +187,7 @@ function clientGone(request, response) {
 }
 
 function acquire(request, response) {
+  if (clientGone(request, response)) return Promise.reject(new Error("Agent request cancelled while queued"));
   if (active < maxSessions) {
     active += 1;
     return Promise.resolve();
@@ -301,8 +302,13 @@ const server = createServer(async (request, response) => {
   try {
     await acquire(request, response);
   } catch (error) {
+    if (response.destroyed) return;
     response.writeHead(499, { "content-type": "application/json" });
     response.end(JSON.stringify({ error: error instanceof Error ? error.message : "cancelled" }));
+    return;
+  }
+  if (response.destroyed) {
+    release();
     return;
   }
 

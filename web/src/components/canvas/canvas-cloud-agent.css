@@ -595,8 +595,12 @@
     height: 52px;
     margin-bottom: var(--space-5);
     border-radius: 50%;
-    background: radial-gradient(circle at 32% 24%, var(--color-neutral-0), transparent 36%), radial-gradient(circle at 70% 80%, var(--palette-node-audio), transparent 64%), radial-gradient(circle at 35% 65%, color-mix(in srgb, var(--agent-accent) 65%, var(--color-neutral-0)), var(--agent-accent));
-    box-shadow: inset -4px -6px 14px color-mix(in srgb, var(--agent-accent) 28%, transparent), 0 8px 32px color-mix(in srgb, var(--agent-accent) 14%, transparent);
+    background:
+        radial-gradient(circle at 32% 24%, var(--color-neutral-0), transparent 36%), radial-gradient(circle at 70% 80%, var(--palette-node-audio), transparent 64%),
+        radial-gradient(circle at 35% 65%, color-mix(in srgb, var(--agent-accent) 65%, var(--color-neutral-0)), var(--agent-accent));
+    box-shadow:
+        inset -4px -6px 14px color-mix(in srgb, var(--agent-accent) 28%, transparent),
+        0 8px 32px color-mix(in srgb, var(--agent-accent) 14%, transparent);
 }
 
 .agent-welcome-intro h2 {
@@ -1995,6 +1999,24 @@ summary.agent-tool-step:hover {
     transform: scale(1.18);
 }
 
+/* 大形象外框不接收指针，透明处的点击落到页面按钮上；拖拽与点击由身体热区承接，内缩比例见组件。 */
+.canvas-agent-launcher.is-body-hit {
+    pointer-events: none;
+}
+
+.canvas-agent-launcher-hit {
+    position: absolute;
+    z-index: 2;
+    border-radius: 32%;
+    pointer-events: auto;
+    touch-action: none;
+}
+
+.canvas-agent-launcher.is-body-hit .canvas-agent-launcher-label,
+.canvas-agent-launcher.is-body-hit .canvas-agent-launcher-badge {
+    pointer-events: auto;
+}
+
 .canvas-agent-keyed-video {
     position: absolute;
     inset: 0;
@@ -2056,7 +2078,7 @@ summary.agent-tool-step:hover {
     right: 2px;
 }
 
-/* 收起 / 展开形象的小按钮：悬停入口或聚焦时出现，触屏设备常驻。 */
+/* 收起 / 展开形象的小按钮：常驻半透明，悬停入口或聚焦时完全显示。 */
 .canvas-agent-launcher-toggle {
     display: grid;
     width: 22px;
@@ -2067,7 +2089,7 @@ summary.agent-tool-step:hover {
     background: color-mix(in srgb, var(--background) 94%, transparent);
     box-shadow: 0 4px 12px color-mix(in srgb, var(--foreground) 12%, transparent);
     cursor: pointer;
-    opacity: 0;
+    opacity: 0.55;
     transition: opacity 0.16s ease;
     backdrop-filter: blur(10px);
 }

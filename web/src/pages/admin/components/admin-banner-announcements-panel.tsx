@@ -1,26 +1,13 @@
-import { App, Button, DatePicker, Form, Input, InputNumber, Modal, Popconfirm, Switch } from "antd";
+import { App, Button, DatePicker, Form, Input, InputNumber, Popconfirm, Switch } from "antd";
+import { AdminModal } from "@/pages/admin/ui/overlays";
 import type { ColumnsType } from "antd/es/table";
 import { Trash2, Edit3, Search } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import {
-    createAdminBanner,
-    deleteAdminBanner,
-    listAdminBanners,
-    updateAdminBanner,
-    type AdminBannerPayload,
-    type BannerAnnouncement,
-} from "@/services/api/announcements";
-import {
-    BANNER_CTA_MAX_CHARS,
-    BANNER_NOTICE_DEFAULT_TYPE,
-    bannerCtaLabel,
-    bannerNoticeTypeLabel,
-    normalizeBannerNoticeType,
-    type BannerNoticeType,
-} from "@/lib/announcements/banner-notice";
+import { createAdminBanner, deleteAdminBanner, listAdminBanners, updateAdminBanner, type AdminBannerPayload, type BannerAnnouncement } from "@/services/api/announcements";
+import { BANNER_CTA_MAX_CHARS, BANNER_NOTICE_DEFAULT_TYPE, bannerCtaLabel, bannerNoticeTypeLabel, normalizeBannerNoticeType, type BannerNoticeType } from "@/lib/announcements/banner-notice";
 import { bannerAnnouncementBarStyle } from "@/components/layout/banner-announcement-content";
 import { BANNER_EDGE_SHAPE_DEFAULT, BANNER_EDGE_WAVE_DEFAULT, normalizeBannerEdgeShape, normalizeBannerEdgeWave } from "@/lib/announcements/banner-edge";
 import { BANNER_EFFECT_DEFAULT, bannerColorHex, bannerHasCustomTheme, normalizeBannerEffect, readBannerPresetColors } from "@/lib/announcements/banner-theme";
@@ -81,13 +68,7 @@ function bannerPayload(banner: BannerAnnouncement, patch: Partial<AdminBannerPay
     };
 }
 
-export default function AdminBannerAnnouncementsPanel({
-    createOpen,
-    onCreateOpenChange,
-}: {
-    createOpen: boolean;
-    onCreateOpenChange: (open: boolean) => void;
-}) {
+export default function AdminBannerAnnouncementsPanel({ createOpen, onCreateOpenChange }: { createOpen: boolean; onCreateOpenChange: (open: boolean) => void }) {
     const { message, modal } = App.useApp();
     const queryClient = useQueryClient();
     const [form] = Form.useForm<FormValues>();
@@ -293,20 +274,11 @@ export default function AdminBannerAnnouncementsPanel({
                 const preset = custom ? readBannerPresetColors(record.noticeType) : null;
                 return (
                     <span className="inline-flex items-center gap-1.5">
-                        <span
-                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[var(--fs-micro)] font-semibold text-white"
-                            style={bannerAnnouncementBarStyle(record.noticeType)}
-                        >
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[var(--fs-micro)] font-semibold text-white" style={bannerAnnouncementBarStyle(record.noticeType)}>
                             {bannerNoticeTypeLabel(record.noticeType)}
                         </span>
                         {preset ? (
-                            <span
-                                className="admin-banner-theme-swatch"
-                                style={bannerThemeSwatchStyle(bannerColorHex(record.bgColor) || preset.base, bannerColorHex(record.glowColor) || preset.glow)}
-                                title="自定义配色"
-                                aria-label="自定义配色"
-                                role="img"
-                            />
+                            <span className="admin-banner-theme-swatch" style={bannerThemeSwatchStyle(bannerColorHex(record.bgColor) || preset.base, bannerColorHex(record.glowColor) || preset.glow)} title="自定义配色" aria-label="自定义配色" role="img" />
                         ) : null}
                     </span>
                 );
@@ -317,13 +289,7 @@ export default function AdminBannerAnnouncementsPanel({
             dataIndex: "status",
             key: "status",
             width: 110,
-            render: (value: string, record) => (
-                <Switch
-                    size="small"
-                    checked={value === "active"}
-                    onChange={(checked) => void handleToggleStatus(record, checked)}
-                />
-            ),
+            render: (value: string, record) => <Switch size="small" checked={value === "active"} onChange={(checked) => void handleToggleStatus(record, checked)} />,
         },
         {
             title: "有效期",
@@ -434,7 +400,7 @@ export default function AdminBannerAnnouncementsPanel({
                 }}
             />
 
-            <Modal
+            <AdminModal
                 title={dialog?.mode === "edit" ? "编辑常驻通知" : "新建常驻通知"}
                 open={Boolean(dialog)}
                 onCancel={requestClose}
@@ -443,7 +409,6 @@ export default function AdminBannerAnnouncementsPanel({
                 centered
                 destroyOnHidden
                 width="min(880px, calc(100vw - 32px))"
-                rootClassName="admin-modal-root"
             >
                 <Form
                     form={form}
@@ -489,13 +454,7 @@ export default function AdminBannerAnnouncementsPanel({
                         label="通知标题"
                         required
                         validateStatus={titleMissing || titleTooLong ? "error" : undefined}
-                        help={
-                            titleMissing
-                                ? "请输入常驻通知标题"
-                                : titleTooLong
-                                  ? `已超出 ${BANNER_TITLE_MAX_CHARS} 个字符上限`
-                                  : "支持按选区设置字号、字重、字体与颜色，用「图标」插入 emoji 素材；标题在通知条内固定单行展示"
-                        }
+                        help={titleMissing ? "请输入常驻通知标题" : titleTooLong ? `已超出 ${BANNER_TITLE_MAX_CHARS} 个字符上限` : "支持按选区设置字号、字重、字体与颜色，用「图标」插入 emoji 素材；标题在通知条内固定单行展示"}
                     >
                         <BannerTitleEditor
                             key={dialog?.mode === "edit" ? dialog.banner.id : "create"}
@@ -510,22 +469,10 @@ export default function AdminBannerAnnouncementsPanel({
                     {/* 预览放在 Form 内但不用 Form.Item：避免 AntD 向非表单控件注入 value/onChange/ref。 */}
                     <div className="mb-6">
                         <div className="mb-2 text-sm text-foreground/85">前台效果预览</div>
-                        <BannerNoticePreview
-                            runs={titleRuns}
-                            hasLink={Boolean(linkValue?.trim())}
-                            noticeType={noticeType}
-                            ctaText={ctaValue}
-                            countdownEndsAt={countdownValue && dateRangeValue?.[1] ? dateRangeValue[1].valueOf() : null}
-                            theme={theme}
-                        />
+                        <BannerNoticePreview runs={titleRuns} hasLink={Boolean(linkValue?.trim())} noticeType={noticeType} ctaText={ctaValue} countdownEndsAt={countdownValue && dateRangeValue?.[1] ? dateRangeValue[1].valueOf() : null} theme={theme} />
                     </div>
 
-                    <Form.Item
-                        name="link"
-                        label="跳转链接（可选）"
-                        extra="支持 https:// 外链或以 / 开头的站内路径（如 /projects）；留空表示不可点击，也不显示按钮"
-                        rules={[{ max: 500, message: "链接最多 500 字符" }]}
-                    >
+                    <Form.Item name="link" label="跳转链接（可选）" extra="支持 https:// 外链或以 / 开头的站内路径（如 /projects）；留空表示不可点击，也不显示按钮" rules={[{ max: 500, message: "链接最多 500 字符" }]}>
                         <Input maxLength={500} placeholder="https://… 或 /projects" />
                     </Form.Item>
 
@@ -557,15 +504,14 @@ export default function AdminBannerAnnouncementsPanel({
                         extra="在标题前显示距结束还剩多久，适合限时活动；需要先设置有效期结束时间"
                         rules={[
                             ({ getFieldValue }) => ({
-                                validator: (_, value) =>
-                                    value && !getFieldValue("dateRange")?.[1] ? Promise.reject(new Error("开启倒计时需要设置有效期结束时间")) : Promise.resolve(),
+                                validator: (_, value) => (value && !getFieldValue("dateRange")?.[1] ? Promise.reject(new Error("开启倒计时需要设置有效期结束时间")) : Promise.resolve()),
                             }),
                         ]}
                     >
                         <Switch checkedChildren="显示" unCheckedChildren="不显示" />
                     </Form.Item>
                 </Form>
-            </Modal>
+            </AdminModal>
         </div>
     );
 }

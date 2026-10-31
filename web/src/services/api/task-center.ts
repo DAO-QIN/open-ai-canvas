@@ -67,14 +67,23 @@ export type GenerationTask = {
     completedAt?: string;
     createdAt: string;
     updatedAt: string;
+    /** 计费摘要：冻结额与实收分列，只有已结算订单才有 chargedMicrocredits。 */
     billing?: {
+        /** 下单时的冻结额（预授权），不是实际扣费；与 reservedMicrocredits 相同。 */
         amountMicrocredits: number;
+        reservedMicrocredits: number;
+        /** 已结算（settled）时的实收，已扣除差额退回；其余状态不返回。 */
+        chargedMicrocredits?: number;
+        /** 已退回金额：结算时的差额退回，或失败后整笔退回。 */
+        refundedMicrocredits: number;
         status: TaskBillingStatus;
     };
     clientContext?: {
         conversationId?: string;
         messageId?: string;
         nodeId?: string;
+        /** 工作台一次提交拆出的多个任务共用的批次 ID；batchIndex 为 0 时后端省略该字段。 */
+        batchId?: string;
         batchIndex?: number;
         batchCount?: number;
         domainProjectId?: string;
@@ -133,10 +142,10 @@ export type CreateTaskInput = {
     operation?: string;
     prompt: string;
     provider?: string;
-	model?: string;
-	logicalModelId?: string;
-	idempotencyKey?: string;
-	input?: Record<string, unknown>;
+    model?: string;
+    logicalModelId?: string;
+    idempotencyKey?: string;
+    input?: Record<string, unknown>;
 };
 export function createGenerationTask(input: CreateTaskInput) {
     return http.post<GenerationTask>("/tasks", input).then((task) => {
@@ -265,19 +274,21 @@ export function createGenerationTaskSubscriptionService(dependencies: Generation
                 },
             });
             publish(entry, terminal);
-        })().catch((error) => {
-            if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError") || entry.scope !== getActiveUserScope() || !entry.listeners.size) return;
-            console.warn("生成任务观察中断，将重连原任务", { taskId: id, error });
-            if (!entry.latest || !isTerminalGenerationTask(entry.latest)) {
-                for (const listener of entry.errorListeners) listener(id, error);
-            }
-        }).finally(() => {
-            entry.observation = undefined;
-            if (controller.signal.aborted || !entry.listeners.size || entry.scope !== getActiveUserScope()) return;
-            if (entry.latest && ["succeeded", "failed", "cancelled"].includes(entry.latest.status)) return;
-            const delayMs = Math.min(30_000, (dependencies.reconnectDelayMs ?? 2_000) * 2 ** Math.min(entry.failures++, 4));
-            entry.retry = setTimeout(() => observe(id, entry), delayMs);
-        });
+        })()
+            .catch((error) => {
+                if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError") || entry.scope !== getActiveUserScope() || !entry.listeners.size) return;
+                console.warn("生成任务观察中断，将重连原任务", { taskId: id, error });
+                if (!entry.latest || !isTerminalGenerationTask(entry.latest)) {
+                    for (const listener of entry.errorListeners) listener(id, error);
+                }
+            })
+            .finally(() => {
+                entry.observation = undefined;
+                if (controller.signal.aborted || !entry.listeners.size || entry.scope !== getActiveUserScope()) return;
+                if (entry.latest && ["succeeded", "failed", "cancelled"].includes(entry.latest.status)) return;
+                const delayMs = Math.min(30_000, (dependencies.reconnectDelayMs ?? 2_000) * 2 ** Math.min(entry.failures++, 4));
+                entry.retry = setTimeout(() => observe(id, entry), delayMs);
+            });
     };
     const reconnect = () => {
         for (const [id, entry] of entries) observe(id, entry);

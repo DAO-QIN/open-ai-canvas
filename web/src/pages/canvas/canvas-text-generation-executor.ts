@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 
 import { NODE_DEFAULT_SIZE } from "@/constant/canvas";
+import { buildGenerationNodeTitle } from "@/lib/canvas/canvas-generation-title";
 import { getGenerationCount, runCanvasGenerationTaskToConsumer } from "@/lib/canvas/canvas-project-generation";
 import { canvasGenerationPromptMetadata } from "@/lib/canvas/canvas-generation-submission";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
@@ -45,7 +46,7 @@ export async function executeTextGeneration({
         const childNodes: CanvasNodeData[] = childIds.map((id, index) => ({
             id,
             type: CanvasNodeType.Text,
-            title: effectivePrompt.slice(0, 32) || "Generated Text",
+            title: buildGenerationNodeTitle(effectivePrompt, "Generated Text"),
             position: {
                 x: parentPosition.x + parentConfig.width + 96,
                 y: parentPosition.y + parentConfig.height / 2 - textConfig.height / 2 + (index - (childIds.length - 1) / 2) * (textConfig.height + 36),
@@ -54,7 +55,10 @@ export async function executeTextGeneration({
             height: textConfig.height,
             metadata: { ...canvasGenerationPromptMetadata(prompt, effectivePrompt), status: NODE_STATUS_LOADING, fontSize: 14, ...skillMetadata },
         }));
-        setNodes((current) => [...current.map((node) => (node.id === nodeId && isConfigNode ? { ...node, metadata: { ...node.metadata, ...canvasGenerationPromptMetadata(prompt, effectivePrompt), status: NODE_STATUS_LOADING, errorDetails: undefined } } : node)), ...childNodes]);
+        setNodes((current) => [
+            ...current.map((node) => (node.id === nodeId && isConfigNode ? { ...node, metadata: { ...node.metadata, ...canvasGenerationPromptMetadata(prompt, effectivePrompt), status: NODE_STATUS_LOADING, errorDetails: undefined } } : node)),
+            ...childNodes,
+        ]);
         setConnections((current) => [...current, ...childIds.map((childId) => ({ id: nanoid(), fromNodeId: nodeId, toNodeId: childId }))]);
     }
 
@@ -87,6 +91,10 @@ export async function executeTextGeneration({
     if (controller.signal.aborted) return;
     void answers;
     if (isConfigNode) {
-        setNodes((current) => current.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined, generationErrorCode: undefined, resourceReloadAvailable: undefined, failedPromptFingerprint: undefined } } : node)));
+        setNodes((current) =>
+            current.map((node) =>
+                node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined, generationErrorCode: undefined, resourceReloadAvailable: undefined, failedPromptFingerprint: undefined } } : node,
+            ),
+        );
     }
 }

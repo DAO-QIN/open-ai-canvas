@@ -1,4 +1,3 @@
-
 .admin-runtime-policy-index-links small {
     margin-top: 3px;
     color: var(--admin-text-muted);
@@ -719,12 +718,16 @@
     background: color-mix(in srgb, var(--foreground) 3%, var(--admin-layer-1));
 }
 
-:is(.admin-storage-mode-section, .admin-email-delivery-section, .admin-access-registration-section, .admin-access-linuxdo-section, .admin-access-agreement-section, .admin-intercept-policy-section, .admin-third-party-credential-section) > .admin-settings-section-summary h2 {
+:is(.admin-storage-mode-section, .admin-email-delivery-section, .admin-access-registration-section, .admin-access-linuxdo-section, .admin-access-agreement-section, .admin-intercept-policy-section, .admin-third-party-credential-section)
+    > .admin-settings-section-summary
+    h2 {
     font-size: 16px;
     letter-spacing: -0.01em;
 }
 
-:is(.admin-storage-mode-section, .admin-email-delivery-section, .admin-access-registration-section, .admin-access-linuxdo-section, .admin-access-agreement-section, .admin-intercept-policy-section, .admin-third-party-credential-section) > .admin-settings-section-summary p {
+:is(.admin-storage-mode-section, .admin-email-delivery-section, .admin-access-registration-section, .admin-access-linuxdo-section, .admin-access-agreement-section, .admin-intercept-policy-section, .admin-third-party-credential-section)
+    > .admin-settings-section-summary
+    p {
     max-width: 760px;
     margin-top: 5px;
     font-size: 12px;
@@ -882,6 +885,21 @@
     margin-top: 6px;
     color: var(--admin-text-muted);
     font-size: 10px;
+}
+
+.admin-feature-board-row-name > .admin-feature-board-row-link {
+    display: inline-block;
+    margin-top: 6px;
+    color: var(--admin-text-primary);
+    font-size: 11px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.admin-feature-board-row-name > .admin-feature-board-row-link:focus-visible {
+    border-radius: 4px;
+    outline: 2px solid var(--admin-focus);
+    outline-offset: 2px;
 }
 
 .admin-feature-board-row-name > em.is-warning {

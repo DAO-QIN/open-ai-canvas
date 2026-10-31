@@ -15,6 +15,7 @@ import { AgentMoon } from "./agent-moon";
 import { useAgentLauncherPosition } from "./use-agent-launcher-position";
 import { layoutViewport } from "@/lib/ui-scale";
 import { hasWorkspaceShellChrome, isCanvasEditorPath } from "@/lib/workspace-routes";
+import { resolveAgentLauncherAvatarHeight } from "@/lib/canvas/agent-launcher-position";
 
 export function AgentLauncher({
     theme,
@@ -96,13 +97,16 @@ export function AgentLauncher({
     // 收起后只留小圆球入口：不加载 Live2D / 动画，也不挡画布。位置以右下角为锚点，收起展开不跳位。
     const keepsAvatarSize = largeAvatar && !collapsed;
     const idleSize = moon ? moonSize : 76;
-    const height = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.max(40, Math.min(compact ? Math.min(appearance.avatarHeight, 96) : appearance.avatarHeight, viewport.height - 60, (viewport.width - 40) / aspectRatio)) : idleSize;
+    const { pathname } = useLocation();
+    const height = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? resolveAgentLauncherAvatarHeight(compact ? Math.min(appearance.avatarHeight, 96) : appearance.avatarHeight, aspectRatio, viewport, isCanvasEditorPath(pathname)) : idleSize;
     const width = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.round(height * aspectRatio) : idleSize;
     // 手机上把入口（连同下方的名称标签）抬到底部导航（工作台页面）或画布底部工具条（画布编辑器，
     // 58px 高、离底 12px）上方，并加上 iPhone 底部安全区；后台没有底部栏，入口贴底。
-    const { pathname } = useLocation();
     const bottomInset = compact && (hasWorkspaceShellChrome(pathname) || isCanvasEditorPath(pathname)) ? 72 : 0;
     const { position, dragging, handlers } = useAgentLauncherPosition(onOpen, width, height + bottomInset);
+    const { onClick, onKeyDown, onDoubleClick, ...pointerHandlers } = handlers;
+    const bodyHitOnly = keepsAvatarSize && (live || media);
+    const hitInset = bodyHitOnly ? { top: 0.15, side: 0.22, bottom: 0.04 } : null;
     const bottomOffset = (extra: number) => (bottomInset ? `calc(${position.bottom + bottomInset + extra}px + env(safe-area-inset-bottom, 0px))` : position.bottom + extra);
     const showToggle = !hidden && (largeAvatar || collapsed);
     return (
@@ -112,9 +116,10 @@ export function AgentLauncher({
                 aria-label={`打开${appearance.agentName}`}
                 title={live && live2DError ? live2DError : `${approvalPending ? "Agent 等待你的审批" : "打开 Agent 助手"} · 拖动可调整位置，聚焦后可用方向键移动`}
                 className={cn(
-                    "canvas-agent-launcher fixed z-[calc(var(--z-toast)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35",
+                    "canvas-agent-launcher fixed z-[var(--z-panel-floating)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35",
                     dragging && "is-dragging",
                     collapsed && "is-collapsed",
+                    bodyHitOnly && "is-body-hit",
                     keepsAvatarSize && live && "canvas-agent-launcher-live2d",
                     keepsAvatarSize && media && "canvas-agent-launcher-media",
                     moon && "canvas-agent-launcher-moon",
@@ -124,11 +129,15 @@ export function AgentLauncher({
                 tabIndex={hidden ? -1 : undefined}
                 data-canvas-no-zoom
                 onDragStart={(event) => event.preventDefault()}
-                {...handlers}
+                {...(bodyHitOnly ? null : pointerHandlers)}
+                onClick={onClick}
+                onKeyDown={onKeyDown}
+                onDoubleClick={onDoubleClick}
                 whileHover={reducedMotion || dragging ? undefined : { scale: 1.035 }}
                 whileTap={reducedMotion || dragging ? undefined : { scale: 0.96 }}
                 transition={{ duration: reducedMotion ? 0 : 0.18 }}
             >
+                {hitInset ? <span className="canvas-agent-launcher-hit" aria-hidden="true" style={{ inset: `${hitInset.top * 100}% ${hitInset.side * 100}% ${hitInset.bottom * 100}%` }} {...pointerHandlers} /> : null}
                 {collapsed ? (
                     moon ? (
                         <AgentMoon size={40} state={avatarState} reducedMotion={reducedMotion} paused={hidden} />
@@ -169,8 +178,8 @@ export function AgentLauncher({
             {showToggle ? (
                 <button
                     type="button"
-                    className="canvas-agent-launcher-toggle fixed z-[calc(var(--z-toast)+2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35"
-                    style={{ right: position.right + width - 14, bottom: bottomOffset(height - 14), color: theme.node.text } as CSSProperties}
+                    className="canvas-agent-launcher-toggle fixed z-[calc(var(--z-panel-floating)+1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35"
+                    style={{ right: position.right + width * (1 - (hitInset?.side ?? 0)) - 14, bottom: bottomOffset(height * (1 - (hitInset?.top ?? 0)) - 14), color: theme.node.text } as CSSProperties}
                     aria-label={collapsed ? `展开${appearance.agentName}形象` : `收起${appearance.agentName}形象`}
                     aria-pressed={collapsed}
                     title={collapsed ? "展开形象" : "收起形象，只保留小入口"}
@@ -198,4 +207,3 @@ function readAgentLauncherCollapsed() {
         return false;
     }
 }
-

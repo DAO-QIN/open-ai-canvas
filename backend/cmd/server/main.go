@@ -144,6 +144,8 @@ func run(ctx context.Context) error {
 	go svc.BackfillPlaybackTranscodes()
 	// 首页精选画布要逐个读取 LibTV 详情：启动后先在后台准备好，首个访客不用等。
 	go svc.PrewarmLibTVFeatured()
+	// 启动后为本地存储中尺寸未知的存量视频补探测宽高（有界、幂等；对象存储视频在短剧投送时按需修复）。
+	go svc.BackfillVideoResourceDimensions(ctx)
 	status.markStarted()
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- httpServer.Serve(listener) }()
