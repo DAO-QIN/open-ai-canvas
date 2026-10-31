@@ -222,7 +222,13 @@ export function CanvasTopBar({
                                     ],
                                 }}
                             >
-                                <Button type="text" className="canvas-topbar-action canvas-topbar-import-button !h-10 !rounded-xl !px-2 !font-medium" style={{ color: theme.node.text }} icon={<CloudDownload className="size-4" />} aria-label="导入第三方画布">
+                                <Button
+                                    type="text"
+                                    className="canvas-topbar-action canvas-topbar-import-button !h-10 !rounded-xl !px-2 !font-medium"
+                                    style={{ color: theme.node.text }}
+                                    icon={<CloudDownload className="size-4" />}
+                                    aria-label="导入第三方画布"
+                                >
                                     <span className="hidden lg:inline">导入第三方画布</span>
                                 </Button>
                             </Dropdown>

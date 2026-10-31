@@ -62,7 +62,7 @@ function stopStep(value: number) {
  */
 export function customTopupStops(min: number, max: number) {
     const stops: number[] = [];
-    for (let value = min; value < max; ) {
+    for (let value = min; value < max;) {
         stops.push(value);
         const step = stopStep(value);
         value = (Math.floor(value / step) + 1) * step;

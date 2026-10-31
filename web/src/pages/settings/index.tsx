@@ -258,14 +258,7 @@ export default function SettingsPage() {
                             {items.map((item) => {
                                 const selected = item.key === activeTab;
                                 return (
-                                    <button
-                                        key={item.key}
-                                        type="button"
-                                        className={`settings-nav-item${selected ? " is-active" : ""}`}
-                                        title={item.description}
-                                        onClick={() => selectSection(item.key)}
-                                        aria-current={selected ? "page" : undefined}
-                                    >
+                                    <button key={item.key} type="button" className={`settings-nav-item${selected ? " is-active" : ""}`} title={item.description} onClick={() => selectSection(item.key)} aria-current={selected ? "page" : undefined}>
                                         <span className="settings-nav-item-icon" aria-hidden="true">
                                             {item.icon}
                                         </span>

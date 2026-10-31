@@ -289,13 +289,7 @@ export function WorkspaceWalletModal({
                                         )}
                                     </strong>
                                     <small>
-                                        {storageMeter.state === "read_only"
-                                            ? "已超额 · 只读"
-                                            : storageMeter.state === "grace"
-                                              ? "已超额 · 暂停上传"
-                                              : storageMeter.purchasedLabel
-                                                ? `存储空间 · 含已购 ${storageMeter.purchasedLabel}`
-                                                : "存储空间"}
+                                        {storageMeter.state === "read_only" ? "已超额 · 只读" : storageMeter.state === "grace" ? "已超额 · 暂停上传" : storageMeter.purchasedLabel ? `存储空间 · 含已购 ${storageMeter.purchasedLabel}` : "存储空间"}
                                     </small>
                                 </span>
                             </button>

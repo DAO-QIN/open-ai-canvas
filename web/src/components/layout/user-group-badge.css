@@ -147,9 +147,13 @@ b.user-group-badge.is-svip::after {
     inset: 0;
     padding: 2px;
     border-radius: inherit;
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
-    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    mask:
+        linear-gradient(#000 0 0) content-box exclude,
+        linear-gradient(#000 0 0);
     pointer-events: none;
 }
 
@@ -191,14 +195,7 @@ b.user-group-badge.is-svip::after {
 
 .user-group-avatar-ring.is-svip::before {
     /* 不支持 @property 的浏览器拿不到初始值，没有兜底时整条背景失效、环会消失。 */
-    background: conic-gradient(
-        from var(--user-group-ring-angle, 0deg),
-        var(--user-group-svip-violet),
-        var(--user-group-svip-pink) 30%,
-        var(--user-group-svip-ink-violet) 50%,
-        var(--user-group-svip-pink) 70%,
-        var(--user-group-svip-violet)
-    );
+    background: conic-gradient(from var(--user-group-ring-angle, 0deg), var(--user-group-svip-violet), var(--user-group-svip-pink) 30%, var(--user-group-svip-ink-violet) 50%, var(--user-group-svip-pink) 70%, var(--user-group-svip-violet));
     animation: user-group-ring-flow 10s linear infinite;
 }
 

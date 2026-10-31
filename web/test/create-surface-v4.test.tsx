@@ -101,7 +101,16 @@ test("结果图上的操作条：变体、高清、局部重绘、扩图、消�
         expect(group?.getAttribute("role")).toBe("group");
         const buttons = Array.from(group?.querySelectorAll("button") || []);
         expect(buttons.map((button) => button.getAttribute("title"))).toEqual(["变体", "高清", "局部重绘", "扩图", "消除", "转视频", "作为参考", "更多工具"]);
-        expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual(["用这张图做变体", "把这张图重绘成高清版", "涂抹这张图的局部来重绘", "把这张图向四周扩展", "涂抹并消除这张图里的物体", "用这张图做视频", "把这张图作为参考", "更多图片工具"]);
+        expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
+            "用这张图做变体",
+            "把这张图重绘成高清版",
+            "涂抹这张图的局部来重绘",
+            "把这张图向四周扩展",
+            "涂抹并消除这张图里的物体",
+            "用这张图做视频",
+            "把这张图作为参考",
+            "更多图片工具",
+        ]);
         expect(buttons.map((button) => button.querySelector("svg")?.getAttribute("data-icon"))).toEqual(["variant", "hd", "inpaint", "expand", "erase", "toVideo", "reference", "more"]);
         // 「更多」是菜单按钮，菜单本身挂在 body 上，不渲染在结果卡里。
         expect(buttons[buttons.length - 1]?.getAttribute("aria-haspopup")).toBe("menu");

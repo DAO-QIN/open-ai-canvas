@@ -74,10 +74,7 @@ export const creationImagePrimaryActions: CreationImagePrimaryAction[] = [
 ];
 
 /** 输入框是 Agent 时用：结果图多半要交回给 Agent 接着改，「作为参考」排第一，其余顺序不变。 */
-export const creationImagePrimaryActionsReferenceFirst: CreationImagePrimaryAction[] = [
-    ...creationImagePrimaryActions.filter((action) => action.intent === "reference"),
-    ...creationImagePrimaryActions.filter((action) => action.intent !== "reference"),
-];
+export const creationImagePrimaryActionsReferenceFirst: CreationImagePrimaryAction[] = [...creationImagePrimaryActions.filter((action) => action.intent === "reference"), ...creationImagePrimaryActions.filter((action) => action.intent !== "reference")];
 
 export type CreationImageMenuItem = { intent: CreationImageToolId; icon: LucideIcon };
 

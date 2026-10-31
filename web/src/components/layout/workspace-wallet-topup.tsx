@@ -405,16 +405,7 @@ export function WalletTopupPanel({
                     {storageProducts.length ? (
                         <div className="wallet-topup-grid">
                             {storageProducts.map((product) => (
-                                <ProductCard
-                                    key={product.id}
-                                    product={product}
-                                    selected={selectedId === product.id}
-                                    featured={false}
-                                    savingsFen={0}
-                                    bonusMicrocredits={0}
-                                    reserveSaving={false}
-                                    onSelect={() => onSelectProduct(product.id)}
-                                />
+                                <ProductCard key={product.id} product={product} selected={selectedId === product.id} featured={false} savingsFen={0} bonusMicrocredits={0} reserveSaving={false} onSelect={() => onSelectProduct(product.id)} />
                             ))}
                         </div>
                     ) : (

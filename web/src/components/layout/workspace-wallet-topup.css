@@ -129,9 +129,7 @@
 /* 每元到账积分最多的套餐：冰川青描边 + 自左上角斜向褪去的同色光。写在选中态之前，选中描边优先。 */
 .wallet-topup-card.is-featured {
     border-color: var(--wallet-accent-border);
-    background:
-        linear-gradient(145deg, var(--wallet-accent-wash), transparent 62%),
-        var(--wallet-card-bg);
+    background: linear-gradient(145deg, var(--wallet-accent-wash), transparent 62%), var(--wallet-card-bg);
 }
 
 .wallet-topup-card.is-featured:hover:not(:disabled) {
