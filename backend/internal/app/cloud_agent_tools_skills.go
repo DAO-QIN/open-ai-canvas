@@ -9,7 +9,6 @@
 package app
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"slices"
@@ -19,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	agenttool "yingce/backend/internal/agent/tool"
+	"yingce/backend/internal/skills"
 )
 
 type cloudAgentSkill struct {
@@ -33,48 +33,6 @@ type cloudAgentSkill struct {
 }
 
 const cloudAgentSkillEntryPath = "SKILL.md"
-
-// Skills predate the homepage surface. An undeclared package retains its
-// original canvas scope; sharing a method requires an explicit package contract.
-func cloudAgentSkillSurfaces(instruction string) ([]string, error) {
-	lines := strings.Split(strings.ReplaceAll(strings.TrimSpace(instruction), "\r\n", "\n"), "\n")
-	if len(lines) == 0 || lines[0] != "---" {
-		return []string{cloudAgentDefaultSurface}, nil
-	}
-	var surfaces []string
-	declared, closed := false, false
-	for _, line := range lines[1:] {
-		if strings.TrimSpace(line) == "---" {
-			closed = true
-			break
-		}
-		if line != strings.TrimLeft(line, " \t") {
-			continue
-		}
-		key, value, ok := strings.Cut(line, ":")
-		if !ok || strings.TrimSpace(key) != "agentSurfaces" {
-			continue
-		}
-		if declared || json.Unmarshal([]byte(strings.TrimSpace(value)), &surfaces) != nil {
-			return nil, BadAuthRequest("技能 agentSurfaces 必须是入口名称的 JSON 数组")
-		}
-		declared = true
-	}
-	if !declared {
-		return []string{cloudAgentDefaultSurface}, nil
-	}
-	if !closed || len(surfaces) == 0 {
-		return nil, BadAuthRequest("技能 agentSurfaces 必须在完整元数据中声明至少一个入口")
-	}
-	seen := map[string]bool{}
-	for _, surface := range surfaces {
-		if (surface != "creation" && surface != "canvas") || seen[surface] {
-			return nil, BadAuthRequest("技能 agentSurfaces 只允许不重复的 creation、canvas")
-		}
-		seen[surface] = true
-	}
-	return surfaces, nil
-}
 
 func validateCloudAgentSkillSurface(skill cloudAgentSkill, surface string) error {
 	surface = firstNonEmpty(surface, cloudAgentDefaultSurface)
@@ -531,8 +489,9 @@ func (s *Service) cloudAgentSkills(userID string, ids []string, surfaces ...stri
 		surface = surfaces[0]
 	}
 	// With no explicit selection, the homepage exposes only this user's installed,
-	// enabled creation methods as a searchable index. The model chooses whether
-	// to read one; an installed canvas method never enters the run snapshot.
+	// enabled methods that declare the creation surface as a searchable index. The
+	// model chooses whether to read one; an undeclared or canvas method enters the
+	// run snapshot only when the user selects it, as in the canvas assistant.
 	if surface == "creation" && len(ids) == 0 {
 		added, err := s.AddedSkills(userID)
 		if err != nil {
@@ -546,20 +505,8 @@ func (s *Service) cloudAgentSkills(userID string, ids []string, surfaces ...stri
 			if err != nil || !candidate.IsAdded || candidate.Status != 1 {
 				continue
 			}
-			surfaces, err := cloudAgentSkillSurfaces(candidate.Instruction)
-			if err != nil {
-				continue
-			}
-			compatible := false
-			for _, allowed := range surfaces {
-				compatible = compatible || allowed == "creation"
-			}
-			if !compatible && item.SkillID == "电商创作" && candidate.SourceType == "builtin" &&
-				candidate.ContentHash == "c0bd4e3bbd549a84f3b684ac4b57c82ab65326b6794e08a4d135db2d95d60b37" &&
-				hashContentSHA256(candidate.Instruction) == "cff3ef37363b078f8db045c399d6d4cc8c3780974cd42e509a67960428b94915" {
-				compatible = true
-			}
-			if compatible {
+			declared, err := skills.AgentSurfaces(item.SkillID, candidate.SourceType, candidate.ContentHash, candidate.Instruction)
+			if err == nil && slices.Contains(declared, "creation") {
 				ids = append(ids, item.SkillID)
 			}
 			if len(ids) >= 20 {
@@ -580,19 +527,11 @@ func (s *Service) cloudAgentSkills(userID string, ids []string, surfaces ...stri
 		// skill_read_file; keep the run context to stable metadata and paths.
 		// The description is public metadata (market listing) and lets the
 		// model route between activated skills without reading any body.
-		allowedSurfaces, err := cloudAgentSkillSurfaces(skill.Instruction)
+		declared, err := skills.AgentSurfaces(id, skill.SourceType, skill.ContentHash, skill.Instruction)
 		if err != nil {
 			return nil, err
 		}
-		// The original homepage commerce seed shipped before surface metadata.
-		// Preserve that exact installed package without rewriting versions or
-		// granting the same exception to edited packages or similarly named skills.
-		if id == "电商创作" && skill.SourceType == "builtin" &&
-			skill.ContentHash == "c0bd4e3bbd549a84f3b684ac4b57c82ab65326b6794e08a4d135db2d95d60b37" &&
-			hashContentSHA256(skill.Instruction) == "cff3ef37363b078f8db045c399d6d4cc8c3780974cd42e509a67960428b94915" {
-			allowedSurfaces = []string{"creation"}
-		}
-		snapshot := cloudAgentSkill{ID: id, Name: skill.SkillName, Description: skill.Description, Version: skill.VersionID, Hash: skill.ContentHash, Surfaces: allowedSurfaces, Files: map[string]string{cloudAgentSkillEntryPath: ""}}
+		snapshot := cloudAgentSkill{ID: id, Name: skill.SkillName, Description: skill.Description, Version: skill.VersionID, Hash: skill.ContentHash, Surfaces: skills.SelectableAgentSurfaces(declared), Files: map[string]string{cloudAgentSkillEntryPath: ""}}
 		if err := validateCloudAgentSkillSurface(snapshot, surface); err != nil {
 			return nil, err
 		}

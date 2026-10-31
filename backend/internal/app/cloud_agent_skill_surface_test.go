@@ -53,20 +53,43 @@ func TestCreationBuiltinDesignSkillIsDiscoveredWithoutInliningAndReadsCompletePa
 	}
 }
 
-func TestCreationAdmissionRejectsLegacyCanvasSkill(t *testing.T) {
+// 没声明入口的技能和画布助手一样由用户选择后使用：首页不会自己找来用，选中（固定）后才进入本轮；
+// 作者声明只给画布用的技能，首页选了也不收。
+func TestCreationUsesUndeclaredSkillOnlyWhenSelected(t *testing.T) {
 	s, db, _, _ := creationTestService(t)
+	undeclared := surfaceSkillForTest(t, s, "")
+	discovered, err := s.cloudAgentSkills("user", nil, "creation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, skill := range discovered {
+		if skill.ID == undeclared {
+			t.Fatal("homepage auto-discovered a skill that does not declare the creation surface")
+		}
+	}
 	req := creationAgentRequest()
-	req.SkillIDs = []string{surfaceSkillForTest(t, s, "")}
-	_, err := s.CreateCloudAgentRun("user", req, "")
+	req.SkillIDs = []string{undeclared}
+	run, err := s.CreateCloudAgentRun("user", req, "")
+	if err != nil {
+		t.Fatalf("homepage rejected an undeclared skill the user selected: %v", err)
+	}
+	if _, admitted, err := s.cloudAgentTask("user", run.ID); err != nil || len(admitted.Skills) != 1 || admitted.Skills[0].ID != undeclared {
+		t.Fatalf("selected undeclared skill was not pinned: %+v, %v", admitted.Skills, err)
+	}
+
+	req = creationAgentRequest()
+	req.IdempotencyKey = "canvas-only-skill"
+	req.SkillIDs = []string{surfaceSkillForTest(t, s, "agentSurfaces: [\"canvas\"]\n")}
+	_, err = s.CreateCloudAgentRun("user", req, "")
 	if err == nil || !strings.Contains(err.Error(), "首页创作") || !strings.Contains(err.Error(), "入口边界测试技能") {
-		t.Fatalf("homepage must explain the selected skill is unavailable before admitting a run: %v", err)
+		t.Fatalf("homepage must explain the selected canvas-only skill is unavailable before admitting a run: %v", err)
 	}
 	var count int64
 	if err := db.Table("cloud_agent_executions").Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 0 {
-		t.Fatalf("unsupported skill admitted %d runs", count)
+	if count != 1 {
+		t.Fatalf("canvas-only skill admitted a run: %d runs", count)
 	}
 }
 
@@ -193,7 +216,12 @@ func TestCreationAcceptsUnmodifiedLegacyCommerceBuiltinWithoutRewritingPackage(t
 	}
 
 	// Only the exact builtin qualifies, not edited content, a changed package,
-	// or an imported copy with the same name and unchanged body.
+	// or an imported copy with the same name and unchanged body. Without the
+	// overlay the package is an undeclared skill: the homepage no longer finds
+	// it by itself, and only uses it when the user selects it.
+	if discovered, err := s.cloudAgentSkills("user", nil, "creation"); err != nil || len(discovered) != 1 || discovered[0].ID != skill.ID {
+		t.Fatalf("unchanged commerce builtin must be discovered on the homepage: %+v, %v", discovered, err)
+	}
 	for _, change := range []struct{ field, value string }{
 		{"instruction", string(content) + "\nCUSTOM_CANVAS_WORKFLOW"},
 		{"content_hash", strings.Repeat("0", 64)},
@@ -205,9 +233,12 @@ func TestCreationAcceptsUnmodifiedLegacyCommerceBuiltinWithoutRewritingPackage(t
 		}).Error; err != nil {
 			t.Fatal(err)
 		}
-		req.IdempotencyKey = "modified-commerce-" + change.field
-		if _, err := s.CreateCloudAgentRun("user", req, ""); err == nil {
-			t.Fatalf("commerce skill with changed %s inherited the trusted builtin overlay", change.field)
+		discovered, err := s.cloudAgentSkills("user", nil, "creation")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(discovered) != 0 {
+			t.Fatalf("commerce skill with changed %s inherited the trusted builtin overlay: %+v", change.field, discovered)
 		}
 	}
 }

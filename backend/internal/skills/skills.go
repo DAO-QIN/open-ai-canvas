@@ -103,6 +103,9 @@ type AddedSkillReference struct {
 	IsAdded     bool   `json:"isAdded"`
 	IsOwner     bool   `json:"isOwner"`
 	AgentMode   string `json:"agentMode,omitempty"`
+	// AgentSurfaces 是用户主动选择这个技能时能用的 Agent 入口：没声明入口的两个都能用，
+	// 声明了的按声明；声明不合法时为空数组，任何入口都不能使用。
+	AgentSurfaces []string `json:"agentSurfaces"`
 }
 
 type SkillCategory struct {
@@ -208,11 +211,19 @@ func (s *Service) AddedSkills(userID string) ([]AddedSkillReference, error) {
 		return nil, err
 	}
 	references := make([]AddedSkillReference, 0, len(items))
-	for _, item := range items {
+	for index, item := range items {
+		// skillItems 与 rows 一一对应且不返回正文，入口声明从同一行的 SKILL.md 读取。
+		row := rows[index]
+		declared, surfaceErr := AgentSurfaces(row.ID, row.SourceType, row.ContentHash, row.Instruction)
+		surfaces := SelectableAgentSurfaces(declared)
+		if surfaceErr != nil {
+			surfaces = []string{}
+		}
 		references = append(references, AddedSkillReference{
 			SkillID: item.SkillID, SkillName: item.SkillName, Description: item.Description,
 			VersionID: item.VersionID, Version: item.Version, Tag: item.Tag,
 			IsLike: item.IsLike, IsAdded: item.IsAdded, IsOwner: item.IsOwner, AgentMode: item.AgentMode,
+			AgentSurfaces: surfaces,
 		})
 	}
 	return references, nil
