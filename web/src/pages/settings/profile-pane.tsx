@@ -13,7 +13,7 @@ import { ImageCropDialog, type ImageCropRect } from "@/components/image-crop-dia
 import { AppModal } from "@/components/ui/product/app-modal";
 import { Callout } from "@/components/ui/product/callout";
 import { ProfileAvatarPicker } from "./profile-avatar-picker";
-import { cropProfileAvatar } from "@/services/profile-avatar";
+import { cropProfileAvatar, MAX_AVATAR_SIDE } from "@/services/profile-avatar";
 import { loadProfileSession } from "@/services/profile-session";
 import { applyUserSession } from "@/lib/user-session";
 import { invalidateAuthSessionCache, type LocalUser } from "@/services/api/auth";
@@ -686,6 +686,8 @@ export function ProfilePane({ onOpenUsage }: { onOpenUsage?: () => void } = {}) 
                     open
                     title="裁剪头像"
                     fixedAspect={1}
+                    circular
+                    maxOutputSide={MAX_AVATAR_SIDE}
                     confirmLoading={pending === "crop-avatar"}
                     onClose={() => {
                         if (!pendingRef.current) setCropSource(null);

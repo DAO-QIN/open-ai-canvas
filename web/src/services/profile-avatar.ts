@@ -2,7 +2,8 @@ import { assertPixelSize, resolveCropPixels, type ImageCropRect, type PixelSize 
 import { loadRasterImage } from "@/lib/image-raster";
 
 const MAX_AVATAR_PIXELS = 16_000_000;
-const MAX_AVATAR_SIDE = 512;
+/** 头像导出的最长边，与后端 maxProfileAvatarSide 一致。 */
+export const MAX_AVATAR_SIDE = 512;
 
 export function planProfileAvatarCrop(size: PixelSize, crop: ImageCropRect): { source: ImageCropRect; outputSide: number } {
     assertPixelSize(size);

@@ -27,11 +27,14 @@ export function UserAvatar({ user, className, iconClassName, loading }: { user: 
     const [failedUrl, setFailedUrl] = useState("");
     const spirit = user.avatarMode === "default" ? getSpiritAvatar(user.avatarPreset) : undefined;
     const avatarUrl = userAvatarImageURL(user);
+    const showImage = !!avatarUrl && avatarUrl !== failedUrl;
     const DefaultAvatarIcon = defaultAvatarIcons[isLegacyUserAvatarID(user.avatarPreset) ? user.avatarPreset : "person"];
 
     return (
-        <span data-avatar-kind={spirit ? "spirit" : undefined} className={cn("grid shrink-0 place-items-center overflow-hidden", className, spirit && "rounded-full")}>
-            {avatarUrl && avatarUrl !== failedUrl ? (
+        // 图片头像（上传或精灵预设）一律圆形，排在 className 之后以压过调用方的圆角类；
+        // 图标兜底的外形仍由调用方决定：旧版图标铺满方框，整体裁圆会切掉边角。
+        <span data-avatar-kind={spirit ? "spirit" : undefined} className={cn("grid shrink-0 place-items-center overflow-hidden", className, showImage && "rounded-full")}>
+            {showImage ? (
                 <img src={avatarUrl} alt="" referrerPolicy="no-referrer" className="size-full object-cover" decoding="async" loading={loading} onError={() => setFailedUrl(avatarUrl)} />
             ) : (
                 <DefaultAvatarIcon className={cn("size-full", iconClassName)} aria-hidden />
