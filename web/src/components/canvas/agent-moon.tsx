@@ -8,6 +8,7 @@ import "./agent-moon.css";
  * 渐变满月：横条纹由粗到细拼成一个圆，没有底座和外圈，条纹缓缓向下流动。
  * 条纹只是遮罩，底下固定一块自上而下渐暗的金属圆，所以条纹流动时明暗不跟着跑；
  * 颜色跟随 currentColor（深色主题白、浅色主题黑），缝隙里透出很淡的白光。
+ * 条纹从圆顶上方滑入、流出圆底后才回到起点，换行总在圆外，圆顶始终完整。
  * 各状态只改条纹的流速、粗细与节奏，不靠整体变暗表达，任何状态下都保持清楚。
  */
 export function AgentMoon({
@@ -53,7 +54,8 @@ export function AgentMoon({
                 <mask id={`${id}-stripes`} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
                     {Array.from({ length: AGENT_MOON_STRIPES }, (_, index) => (
                         <g key={index} className="agent-moon-stripe" style={{ "--agent-moon-stripe": index } as CSSProperties}>
-                            <rect className="agent-moon-bar" x="0" y={AGENT_MOON_TOP - AGENT_MOON_BAR / 2} width="100" height={AGENT_MOON_BAR} fill="#fff" />
+                            {/* 条纹中心在 y=0，由 agent-moon-flow 的 translateY 直接给出中心位置。 */}
+                            <rect className="agent-moon-bar" x="0" y={-AGENT_MOON_BAR / 2} width="100" height={AGENT_MOON_BAR} fill="#fff" />
                         </g>
                     ))}
                 </mask>
