@@ -1,13 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Input, Skeleton } from "antd";
-import { BarChart3, ChevronLeft, ChevronRight, CircleAlert, Coins, CreditCard, HardDrive, History, RefreshCw, TicketCheck, WalletCards } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, CircleAlert, CreditCard, HardDrive, History, RefreshCw, TicketCheck, WalletCards } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
+import { WorkspaceCreditMark } from "@/components/layout/workspace-credit-mark";
 import { WalletTopupPanel, type TopupCategory } from "@/components/layout/workspace-wallet-topup";
 import { usePaymentOrderFlow } from "@/components/payment/use-payment-order-flow";
 import { AppModal } from "@/components/ui/product/app-modal";
-import { formatCredits } from "@/constant/credits";
+import { CreditIcon, formatCredits } from "@/constant/credits";
 import { useAccountFileStorageUsage } from "@/hooks/use-account-file-storage-usage";
 import { accountFileStorageUsageQueryKey, accountStorageMeter } from "@/lib/account-storage-usage";
 import { generationErrorMessage } from "@/lib/generation-error";
@@ -15,6 +16,7 @@ import { settingsPath } from "@/lib/settings-navigation";
 import { listPaymentProviders, listTopupProducts, type PaymentOrder, type PaymentProvider, type TopupProduct, type TopupProductKind } from "@/services/api/payments";
 import { listMyStorageGrants } from "@/services/api/storage-grants";
 import { getWallet, redeemCredits, type CreditLedgerEntry, type WalletSummary } from "@/services/api/wallet";
+import { defaultTopupQuantity, isCustomTopup, quoteTopup } from "@/lib/topup-pricing";
 import { cn } from "@/lib/utils";
 import { openWorkspaceWallet, WORKSPACE_WALLET_OPEN_EVENT, type WorkspaceWalletOpenDetail } from "@/lib/workspace-wallet";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
@@ -106,6 +108,7 @@ export function WorkspaceWalletModal({
     const [paymentsLoading, setPaymentsLoading] = useState(false);
     const [selectedProductId, setSelectedProductId] = useState("");
     const [selectedProviderId, setSelectedProviderId] = useState("");
+    const [customQuantities, setCustomQuantities] = useState<Record<string, number>>({});
     const [code, setCode] = useState("");
     const [redeeming, setRedeeming] = useState(false);
     const requestSequence = useRef(0);
@@ -115,6 +118,11 @@ export function WorkspaceWalletModal({
 
     const selectedProduct = useMemo(() => products.find((item) => item.id === selectedProductId), [products, selectedProductId]);
     const selectedProvider = useMemo(() => providers.find((item) => item.id === selectedProviderId), [providers, selectedProviderId]);
+    // 结算栏与下单共用同一份报价：自定义充值按所选份数，固定套餐恒为 1 份。
+    const selectedQuote = useMemo(
+        () => (selectedProduct ? quoteTopup(selectedProduct, isCustomTopup(selectedProduct) ? (customQuantities[selectedProduct.id] ?? defaultTopupQuantity(selectedProduct)) : 1) : undefined),
+        [selectedProduct, customQuantities],
+    );
     const activeTab: WalletModalTab = creditsEnabled ? tab : "topup";
 
     const reloadWallet = async (targetPage = page) => {
@@ -132,28 +140,34 @@ export function WorkspaceWalletModal({
         }
     };
 
+    /** 读取商品与支付渠道；preferredCategory 为空时保留仍在售的当前选择。 */
+    const loadPayments = (preferredCategory?: TopupCategory) => {
+        setPaymentsLoading(true);
+        return Promise.all([listTopupProducts(), listPaymentProviders()])
+            .then(([productResult, providerResult]) => {
+                const enabledProducts = productResult.products.filter((item) => item.enabled);
+                const usableProviders = providerResult.providers.filter((item) => item.enabled && item.pluginEnabled && item.configured);
+                setProducts(enabledProducts);
+                setProviders(usableProviders);
+                // 从容量入口进入时优先选中存储空间套餐；默认选中固定套餐，自定义充值在用户拖动或输入时才选中。
+                const preferred = enabledProducts.filter((item) => !preferredCategory || preferredCategory === "all" || item.kind === preferredCategory);
+                const firstPurchasable = (items: TopupProduct[]) => items.find((item) => item.canPurchase && !isCustomTopup(item))?.id || items.find((item) => item.canPurchase)?.id;
+                setSelectedProductId((current) => (current && enabledProducts.some((item) => item.id === current) && !preferredCategory ? current : firstPurchasable(preferred) || firstPurchasable(enabledProducts) || ""));
+                setSelectedProviderId((current) => current || usableProviders[0]?.id || "");
+            })
+            .catch((error) => {
+                message.error(error instanceof Error ? error.message : "读取充值配置失败");
+            })
+            .finally(() => setPaymentsLoading(false));
+    };
+
     useEffect(() => {
         if (!open) return;
         setTab(initialTab || "topup");
         setFocusKind(initialCategory && initialCategory !== "all" ? initialCategory : undefined);
         setPage(1);
         void reloadWallet(1);
-        setPaymentsLoading(true);
-        Promise.all([listTopupProducts(), listPaymentProviders()])
-            .then(([productResult, providerResult]) => {
-                const enabledProducts = productResult.products.filter((item) => item.enabled);
-                const usableProviders = providerResult.providers.filter((item) => item.enabled && item.pluginEnabled && item.configured);
-                setProducts(enabledProducts);
-                setProviders(usableProviders);
-                // 从容量入口进入时优先选中存储空间套餐。
-                const preferred = enabledProducts.filter((item) => !initialCategory || initialCategory === "all" || item.kind === initialCategory);
-                setSelectedProductId((current) =>
-                    current && enabledProducts.some((item) => item.id === current) && !initialCategory ? current : preferred.find((item) => item.canPurchase)?.id || enabledProducts.find((item) => item.canPurchase)?.id || "",
-                );
-                setSelectedProviderId((current) => current || usableProviders[0]?.id || "");
-            })
-            .catch((error) => message.error(error instanceof Error ? error.message : "读取充值配置失败"))
-            .finally(() => setPaymentsLoading(false));
+        void loadPayments(initialCategory);
     }, [open]);
 
     useEffect(() => {
@@ -175,11 +189,12 @@ export function WorkspaceWalletModal({
         await announceWalletUpdated();
     };
 
-    const payment = usePaymentOrderFlow({ onGranted: announceGranted });
+    // 报价过期时重新读取商品：自定义份数保留，金额按新价格重算，用户确认后再付。
+    const payment = usePaymentOrderFlow({ onGranted: announceGranted, onQuoteChanged: () => loadPayments() });
 
     useEffect(() => {
         payment.resetIdempotency();
-    }, [selectedProductId, selectedProviderId]);
+    }, [selectedProductId, selectedProviderId, selectedQuote?.quantity]);
 
     useEffect(() => {
         if (!open || !pendingPaymentOrderId) return;
@@ -206,7 +221,7 @@ export function WorkspaceWalletModal({
     };
 
     const startPayment = async () => {
-        if (!selectedProduct || !selectedProvider) {
+        if (!selectedProduct || !selectedQuote || !selectedProvider) {
             message.error("请选择套餐和支付方式");
             return;
         }
@@ -214,7 +229,13 @@ export function WorkspaceWalletModal({
             message.error("该套餐当前不可购买，请刷新后重试");
             return;
         }
-        await payment.start(selectedProduct.id, selectedProvider.id);
+        await payment.start({
+            productId: selectedProduct.id,
+            providerId: selectedProvider.id,
+            quantity: selectedQuote.quantity,
+            expectedAmountFen: selectedQuote.amountFen,
+            expectedCreditsMicrocredits: selectedQuote.creditsMicrocredits,
+        });
     };
 
     // 定位到某类套餐：滚动到分组，并在当前选中项不属于该类时改选该类第一个可买套餐。
@@ -228,66 +249,77 @@ export function WorkspaceWalletModal({
     };
 
     const available = wallet?.account.availableMicrocredits ?? 0;
+    const reserved = wallet?.account.reservedMicrocredits ?? 0;
     const totalPages = Math.max(1, Math.ceil((wallet?.total || 0) / 20));
 
     return (
         <>
-            <AppModal flush open={open} title={null} footer={null} centered width="min(920px, calc(100vw - 28px))" onCancel={onClose} rootClassName="workspace-wallet-modal">
+            <AppModal flush open={open} title={null} footer={null} centered width="min(1040px, calc(100vw - 28px))" onCancel={onClose} rootClassName="workspace-wallet-modal">
                 <div className="workspace-wallet-shell">
+                    {/* 页头：左侧余额与容量两枚摘要（与顶栏积分入口同一标识），中间一级标签，右上角留给关闭按钮。 */}
                     <header className="workspace-wallet-header">
-                        <div>
-                            <span className="workspace-wallet-kicker">
-                                <Coins />
-                                {creditsEnabled ? "积分中心" : "充值中心"}
-                            </span>
-                            <h2>{creditsEnabled ? "充值、兑换与消费记录" : "购买存储空间"}</h2>
-                            <p>{creditsEnabled ? "补充积分或扩充存储空间，随时查看每一笔收支。" : "扩充素材文件与 Agent 会话附件的总容量。"}</p>
-                        </div>
                         <div className="workspace-wallet-stats">
                             {creditsEnabled ? (
                                 <div className="workspace-wallet-balance">
-                                    <span>可用积分</span>
-                                    <strong>{wallet ? formatCredits(available, 6) : "--"}</strong>
-                                    <small>冻结 {wallet ? formatCredits(wallet.account.reservedMicrocredits, 6) : "--"}</small>
+                                    <WorkspaceCreditMark className="workspace-wallet-balance-mark" />
+                                    <span className="workspace-wallet-balance-text">
+                                        <strong>{wallet ? formatCredits(available, 6) : "--"}</strong>
+                                        <small>{reserved > 0 ? `可用积分 · 冻结 ${formatCredits(reserved, 6)}` : "可用积分"}</small>
+                                    </span>
                                 </div>
                             ) : null}
-                            <button type="button" className="workspace-wallet-balance is-storage" aria-label="查看存储空间套餐" onClick={() => focusProducts("storage")}>
-                                <span>
-                                    <HardDrive className="inline size-3 align-[-1px]" aria-hidden="true" /> 存储空间
+                            <button
+                                type="button"
+                                className={cn("workspace-wallet-balance is-storage", storageMeter.state !== "ok" && "is-alert")}
+                                aria-label={storageQuery.data ? `存储空间已用 ${storageMeter.usedLabel}，共 ${storageMeter.totalLabel}，查看扩容套餐` : "查看存储空间套餐"}
+                                onClick={() => focusProducts("storage")}
+                            >
+                                <span className="workspace-wallet-balance-icon" aria-hidden="true">
+                                    <HardDrive />
                                 </span>
-                                <strong>{storageQuery.data ? `${storageMeter.usedLabel} / ${storageMeter.totalLabel}` : "--"}</strong>
-                                <span className="wallet-topup-storage-track" aria-hidden="true">
-                                    <span style={{ width: `${storageMeter.percent}%` }} />
+                                <span className="workspace-wallet-balance-text">
+                                    <strong>
+                                        {storageQuery.data ? (
+                                            <>
+                                                {storageMeter.usedLabel}
+                                                <span> / {storageMeter.totalLabel}</span>
+                                            </>
+                                        ) : (
+                                            "--"
+                                        )}
+                                    </strong>
+                                    <small>
+                                        {storageMeter.state === "read_only"
+                                            ? "已超额 · 只读"
+                                            : storageMeter.state === "grace"
+                                              ? "已超额 · 暂停上传"
+                                              : storageMeter.purchasedLabel
+                                                ? `存储空间 · 含已购 ${storageMeter.purchasedLabel}`
+                                                : "存储空间"}
+                                    </small>
                                 </span>
-                                <small>
-                                    {storageMeter.state === "read_only"
-                                        ? "已超额 · 只读"
-                                        : storageMeter.state === "grace"
-                                          ? "已超额 · 暂停上传"
-                                          : storageMeter.purchasedLabel
-                                            ? `含已购 ${storageMeter.purchasedLabel}`
-                                            : `剩余 ${storageMeter.remainingLabel}`}
-                                </small>
                             </button>
                         </div>
-                    </header>
 
-                    {creditsEnabled ? (
-                        <div className="workspace-wallet-tabs" role="tablist" aria-label="积分中心">
-                            <button type="button" role="tab" aria-selected={activeTab === "topup"} onClick={() => setTab("topup")}>
-                                <WalletCards />
-                                充值
-                            </button>
-                            <button type="button" role="tab" aria-selected={activeTab === "redeem"} onClick={() => setTab("redeem")}>
-                                <TicketCheck />
-                                兑换
-                            </button>
-                            <button type="button" role="tab" aria-selected={activeTab === "history"} onClick={() => setTab("history")}>
-                                <History />
-                                积分消耗历史
-                            </button>
-                        </div>
-                    ) : null}
+                        {creditsEnabled ? (
+                            <div className="workspace-wallet-tabs" role="tablist" aria-label="积分中心">
+                                <button type="button" role="tab" aria-selected={activeTab === "topup"} onClick={() => setTab("topup")}>
+                                    <WalletCards />
+                                    充值
+                                </button>
+                                <button type="button" role="tab" aria-selected={activeTab === "redeem"} onClick={() => setTab("redeem")}>
+                                    <TicketCheck />
+                                    兑换
+                                </button>
+                                <button type="button" role="tab" aria-selected={activeTab === "history"} onClick={() => setTab("history")}>
+                                    <History />
+                                    积分消耗历史
+                                </button>
+                            </div>
+                        ) : (
+                            <h2 className="workspace-wallet-title">购买存储空间</h2>
+                        )}
+                    </header>
 
                     {activeTab === "topup" ? (
                         <WalletTopupPanel
@@ -297,7 +329,10 @@ export function WorkspaceWalletModal({
                             focusKind={focusKind}
                             focusToken={focusToken}
                             selectedProduct={selectedProduct}
+                            selectedQuote={selectedQuote}
                             onSelectProduct={setSelectedProductId}
+                            customQuantities={customQuantities}
+                            onCustomQuantityChange={(productId, quantity) => setCustomQuantities((current) => (current[productId] === quantity ? current : { ...current, [productId]: quantity }))}
                             selectedProviderId={selectedProviderId}
                             onSelectProvider={setSelectedProviderId}
                             creating={payment.creating}
@@ -425,14 +460,29 @@ export function WorkspaceWalletModal({
 function WalletLedgerRow({ entry }: { entry: CreditLedgerEntry }) {
     const positive = entry.amountMicrocredits > 0;
     const note = entry.note ? generationErrorMessage(entry.note) : "";
+    // 创作 Agent 联网搜索的按次账单：模型和场景都是内部编码 web_search，换成用户看得懂的说法。
+    const webSearch = entry.model === "web_search";
     const title =
-        entry.type === "consume" ? "模型调用" : entry.type === "refund" ? "消费退款" : entry.type === "payment_topup" ? "在线充值" : entry.type === "promotion_transfer" ? "邀请奖励领取" : entry.type === "redeem" ? "兑换码充值" : note || "积分调整";
+        entry.type === "consume"
+            ? webSearch
+                ? "联网搜索"
+                : "模型调用"
+            : entry.type === "refund"
+              ? "消费退款"
+              : entry.type === "payment_topup"
+                ? "在线充值"
+                : entry.type === "promotion_transfer"
+                  ? "邀请奖励领取"
+                  : entry.type === "redeem"
+                    ? "兑换码充值"
+                    : note || "积分调整";
+    const detail = webSearch ? [entry.type === "consume" ? "创作 Agent 按次搜索" : "联网搜索", note] : [entry.scene, entry.model, note];
     return (
         <article className="workspace-wallet-ledger-row">
-            <span className={cn("workspace-wallet-ledger-icon", positive ? "is-income" : "is-consume")}>{positive ? <Coins /> : <CreditCard />}</span>
+            <span className={cn("workspace-wallet-ledger-icon", positive ? "is-income" : "is-consume")}>{positive ? <CreditIcon /> : <CreditCard />}</span>
             <div>
                 <strong>{title}</strong>
-                <span>{[entry.scene, entry.model, note].filter(Boolean).join(" · ") || "积分账户变动"}</span>
+                <span>{detail.filter(Boolean).join(" · ") || "积分账户变动"}</span>
             </div>
             <time>{new Date(entry.createdAt).toLocaleString("zh-CN", { hour12: false })}</time>
             <b className={positive ? "is-income" : "is-consume"}>

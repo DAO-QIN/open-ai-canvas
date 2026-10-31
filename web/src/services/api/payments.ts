@@ -17,17 +17,25 @@ export type TopupSaleStrategy = "unlimited" | "periodic" | "inventory" | "timed"
 /** credits 发放积分；storage 扩容账号文件容量，storageDurationDays 为 0 表示永久。 */
 export type TopupProductKind = "credits" | "storage";
 
+/** fixed 为固定套餐；custom 为自定义金额充值：amountFen / creditsMicrocredits 是每份售价与积分，用户在份数区间内自选。 */
+export type TopupPricingMode = "fixed" | "custom";
+
 export type TopupProduct = {
     id: string;
     name: string;
     description?: string;
     kind: TopupProductKind;
-    /** 售价，单位是 currency 的最小单位（分 / 美分）。 */
+    /** 售价，单位是 currency 的最小单位（分 / 美分）；自定义充值为每份售价。 */
     amountFen: number;
     currency: PaymentCurrency;
+    /** 到账积分（微积分）；自定义充值为每份积分。 */
     creditsMicrocredits: number;
     storageBytes: number;
     storageDurationDays: number;
+    pricingMode: TopupPricingMode;
+    /** 自定义充值可选的最少 / 最多份数；固定套餐不返回。 */
+    customMinQuantity?: number;
+    customMaxQuantity?: number;
     enabled: boolean;
     sortOrder: number;
     saleStrategy: TopupSaleStrategy;
@@ -106,7 +114,21 @@ export function listTopupProducts() {
     return http.get<{ products: TopupProduct[] }>("/payments/products");
 }
 
-export function createPaymentOrder(input: { productId: string; providerId: string; idempotencyKey: string }) {
+export type CreatePaymentOrderInput = {
+    productId: string;
+    providerId: string;
+    idempotencyKey: string;
+    /** 购买份数，只有自定义充值商品可以大于 1。 */
+    quantity?: number;
+    /** 用户确认时看到的报价；与服务端按商品当前配置算出的结果不一致时返回 409 topup_quote_changed。 */
+    expectedAmountFen?: number;
+    expectedCreditsMicrocredits?: number;
+};
+
+/** 服务端稳定原因：下单报价与商品当前价格不一致（确认后商品被修改），需刷新商品后让用户重新确认。 */
+export const PAYMENT_ERROR_REASON = { quoteChanged: "topup_quote_changed" } as const;
+
+export function createPaymentOrder(input: CreatePaymentOrderInput) {
     return http.post<{ order: PaymentOrder }>("/payments/orders", input);
 }
 
@@ -157,8 +179,10 @@ export function listAdminTopupProducts() {
     return http.get<{ products: TopupProduct[] }>("/admin/payments/products");
 }
 
-export type TopupProductInput = Pick<TopupProduct, "name" | "kind" | "amountFen" | "currency" | "creditsMicrocredits" | "storageBytes" | "storageDurationDays" | "enabled" | "sortOrder" | "saleStrategy"> & {
+export type TopupProductInput = Pick<TopupProduct, "name" | "kind" | "amountFen" | "currency" | "creditsMicrocredits" | "storageBytes" | "storageDurationDays" | "pricingMode" | "enabled" | "sortOrder" | "saleStrategy"> & {
     description?: string;
+    customMinQuantity?: number;
+    customMaxQuantity?: number;
     periodDays?: number;
     periodPurchaseLimit?: number;
     stockTotal?: number;

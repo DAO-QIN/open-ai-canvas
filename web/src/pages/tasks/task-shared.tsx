@@ -1,6 +1,4 @@
-import { Coins } from "lucide-react";
-
-import { formatCredits } from "@/constant/credits";
+import { CreditIcon, formatCredits } from "@/constant/credits";
 import { CONTENT_MODERATION_ERROR_CODE, generationErrorMessage, isContentModerationError } from "@/lib/generation-error";
 import { mediaDeliverySummary } from "@/lib/generation-task-display";
 import type { GenerationTask, TaskStatus } from "@/services/api/task-center";
@@ -64,7 +62,7 @@ export function TaskBilling({ billing }: { billing?: GenerationTask["billing"] }
     const note = billing.status === "settled" ? "已结算" : billing.status === "refunded" ? "已退回" : billing.status === "uncertain" ? "待核对" : "预计";
     return (
         <div className={`task-record-billing ${billing.status === "uncertain" ? "is-uncertain" : ""}`} title={`积分${note}`}>
-            <Coins className="size-4" />
+            <CreditIcon className="size-4" />
             <span>
                 <strong>{amount}</strong>
                 <small>{note}</small>
