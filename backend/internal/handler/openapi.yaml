@@ -61,10 +61,10 @@ paths:
     get:
       tags: [libtv]
       summary: 读取精选画布（首页前 5 个与「全部画布」页）
-      description: 游客与登录用户均可读取（与作品列表共用限流）。服务端从 LibTV「精选画布」标签中挑选最多 60 个：有成片和封面、节点数不少于 100 且模板可导入；跳过 LibTV 活动/品牌广告赛道、标题或标签含 LibTV 的合作作品，以及人工复核封面带 LibTV 水印的作品；按点赞数排序。服务启动后即在后台预热；结果在进程内缓存 30 分钟，所有访客共用；上游失败或挑不出作品时返回上一份结果并在 1 分钟后重试，没有旧结果时返回错误。
+      description: 游客与登录用户均可读取（与作品列表共用限流）。服务端读完 LibTV「精选画布」标签和公开作品流，收录全部满足条件的作品，不设数量上限：有成片和横版封面（宽高比不小于 6:5），节点数不少于 100；复制后节点、连线和媒体结果一个不少，复制出的画布估算不超过 3MB；跳过 LibTV 活动/品牌广告赛道、标题或标签含 LibTV 的合作作品，以及人工复核封面带水印或本身是广告的作品。「精选画布」标签的作品在前，两组各自按点赞数排序。每个作品的复核结论按快照版本缓存；服务启动后即在后台预热，首次构建先返回排在最前的一批（约 20 个），其余在后台补全；结果在进程内缓存 30 分钟，所有访客共用；任一来源没读全、上游失败或挑不出作品时返回上一份结果并在 1 分钟后重试，没有旧结果时返回错误。
       responses:
         "200":
-          description: 标准信封 data 为 items、refreshedAt；每项字段同作品列表，另含 nodeCount、connectionCount（为 0 表示该作品详情暂时读不到）。
+          description: 标准信封 data 为 items、refreshedAt；每项字段同作品列表，另含复核时公开快照的 nodeCount、connectionCount。
         "401": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/Error" }
         "502": { $ref: "#/components/responses/Error" }
@@ -164,7 +164,7 @@ paths:
       responses:
         "200":
           {
-            description: "成功信封 data={from,to,days,timezoneOffset,daily:[{date,totalMicrocredits,agentMicrocredits,count,agentCount}],categories:[{capability,totalMicrocredits,agentMicrocredits,count,agentCount}],models:[{model,name,capability,totalMicrocredits,agentMicrocredits,count,agentCount}]}；daily 只含有消耗的日期并按日期升序，categories 的 capability 为 image|video|audio|text|other，按消耗降序；models 按 (capability, model) 汇总并按消耗降序，model 为账单记录的前台模型编码（未记录时为空串），name 为当前前台模型名称（查不到时为空串）",
+            description: "成功信封 data={from,to,days,timezoneOffset,daily:[{date,totalMicrocredits,agentMicrocredits,count,agentCount,models:[{model,capability,totalMicrocredits,agentMicrocredits,count,agentCount}]}],categories:[{capability,totalMicrocredits,agentMicrocredits,count,agentCount}],models:[{model,name,capability,totalMicrocredits,agentMicrocredits,count,agentCount}]}；daily 只含有消耗的日期并按日期升序，daily[].models 为当天按 (capability, model) 的构成（按消耗降序，不含名称）；categories 的 capability 为 image|video|audio|text|other，按消耗降序；models 按 (capability, model) 汇总并按消耗降序，model 为账单记录的前台模型编码（未记录时为空串），name 为当前前台模型名称（查不到时为空串）",
           }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
@@ -2967,7 +2967,7 @@ paths:
                   variant:
                     {
                       type: string,
-                      enum: [original, playback, thumbnail],
+                      enum: [original, playback, thumbnail, display],
                       default: original,
                     }
       responses:
@@ -2995,7 +2995,7 @@ paths:
           schema:
             {
               type: string,
-              enum: [original, playback, thumbnail],
+              enum: [original, playback, thumbnail, display],
               default: original,
             }
         - in: query
@@ -3194,7 +3194,7 @@ paths:
           schema:
             {
               type: string,
-              enum: [original, playback, thumbnail],
+              enum: [original, playback, thumbnail, display],
               default: original,
             }
         - in: header
