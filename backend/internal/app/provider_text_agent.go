@@ -25,7 +25,8 @@ func runAgentToolTask(ctx context.Context, input canvasGenerationInput) (map[str
 	// 防止供应商请求体反向污染任务记录，也避免切换模型时复用错误协议。
 	if input.AgentRequests != nil && input.AgentRequests.Canonical != nil {
 		_, declarative := agentProtocolAdapterForContext(ctx, input.Config.InterfaceType)
-		requests, err := expandCanonicalAgentRequest(input.AgentRequests.Canonical, input.Config, declarative)
+		canonical := restoreCanonicalAgentProviderCallIDs(input.AgentRequests.Canonical, input.AgentRequests.ProviderCallIDs)
+		requests, err := expandCanonicalAgentRequest(canonical, input.Config, declarative)
 		if err != nil {
 			return nil, err
 		}

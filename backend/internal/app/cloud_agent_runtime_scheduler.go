@@ -291,6 +291,7 @@ func (s *Service) advanceCloudAgent(run *model.CloudAgentExecution) (err error) 
 			if len(calls) == 0 {
 				calls = result.Legacy
 			}
+			calls = cloudAgentNormalizeProviderCalls(calls)
 			if violation := cloudAgentOutputViolation(result.Text, len(calls)); violation != "" {
 				return s.correctCloudAgentOutput(run, &state, violation)
 			}

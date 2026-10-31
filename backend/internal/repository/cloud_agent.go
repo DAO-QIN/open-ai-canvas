@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -184,6 +185,31 @@ func (r *Repository) ActiveCloudAgentTaskIDs(userID, runID string) ([]string, er
 		Where("user_id = ? AND agent_run_id = ? AND status IN ?", userID, runID, []model.TaskStatus{model.TaskStatusQueued, model.TaskStatusRunning}).
 		Order("created_at, id").Pluck("id", &ids).Error
 	return ids, err
+}
+
+// CloudAgentModelStepResults 返回同一会话（session / conversation）内已成功模型步骤的原始结果，
+// 用于把内部短调用 ID 还原成上游返回的原值。只取 id 与 result_json，按时间倒序。
+func (r *Repository) CloudAgentModelStepResults(userID string, runIDs []string, sessionID, conversationID string, operations []string) ([]model.Task, error) {
+	scope := r.db.Model(&model.CloudAgentExecution{}).Select("id").Where("user_id = ?", userID)
+	conditions, args := []string{}, []any{}
+	if len(runIDs) > 0 {
+		conditions, args = append(conditions, "id IN ?"), append(args, runIDs)
+	}
+	if sessionID != "" {
+		conditions, args = append(conditions, "session_id = ?"), append(args, sessionID)
+	}
+	if conversationID != "" {
+		conditions, args = append(conditions, "conversation_id = ?"), append(args, conversationID)
+	}
+	if len(conditions) == 0 {
+		return nil, nil
+	}
+	scope = scope.Where(strings.Join(conditions, " OR "), args...)
+	var tasks []model.Task
+	err := r.db.Model(&model.Task{}).Select("id", "result_json").
+		Where("user_id = ? AND operation IN ? AND status = ? AND agent_run_id IN (?)", userID, operations, model.TaskStatusSucceeded, scope).
+		Order("created_at DESC").Limit(2000).Find(&tasks).Error
+	return tasks, err
 }
 
 // A stable keyset makes waiting rows yield to later runs without changing business timestamps.

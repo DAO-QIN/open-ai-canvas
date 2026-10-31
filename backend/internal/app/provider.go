@@ -53,6 +53,8 @@ type agentToolRequests struct {
 	ChatCompletion map[string]interface{} `json:"chatCompletion"`
 	Claude         map[string]interface{} `json:"claude"`
 	Gemini         map[string]interface{} `json:"gemini"`
+	// ProviderCallIDs 把会话中的内部短调用 ID 映射回上游原值，只在展开上游协议时使用。
+	ProviderCallIDs map[string]string `json:"providerCallIds,omitempty"`
 }
 
 type providerTextMessage struct {

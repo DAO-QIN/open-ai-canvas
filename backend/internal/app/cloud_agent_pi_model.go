@@ -332,10 +332,15 @@ func (s *Service) runCloudAgentModelStep(ctx context.Context, userID, runID stri
 			}
 		}
 		canonical.Tools = cloudAgentCreationModelTools(&state, canonical.Tools)
+		agentRequests := map[string]any{"canonical": canonical}
+		// 会话里的内部短调用 ID 发给上游前还原成原值；映射与规范请求分开存放，不计入上下文估算。
+		if providerCallIDs := s.cloudAgentProviderCallIDs(userID, run, &canonical); len(providerCallIDs) > 0 {
+			agentRequests["providerCallIds"] = providerCallIDs
+		}
 		input := map[string]any{
 			"mode":          "text",
 			"prompt":        state.Request.Prompt,
-			"agentRequests": map[string]any{"canonical": canonical},
+			"agentRequests": agentRequests,
 			"metadata":      map[string]any{"agentSurface": state.Request.Surface},
 			"config": map[string]any{
 				"channelId":       state.Request.ChannelID,
@@ -431,6 +436,7 @@ func (s *Service) runCloudAgentModelStep(ctx context.Context, userID, runID stri
 	if err := json.Unmarshal([]byte(task.ResultJSON), &result); err != nil {
 		return nil, false, fmt.Errorf("decode model result: %w", err)
 	}
+	result.ToolCalls = cloudAgentNormalizeProviderCalls(result.ToolCalls)
 	if operation != cloudAgentContextCompactionOperation {
 		if violation := cloudAgentOutputViolation(result.Text, len(result.ToolCalls)); violation != "" {
 			if err := s.finishCloudAgentPiModelStepWithReceipt(userID, runID, task.ID, "", "", state.ModelReceipt, cloudAgentFence(ctx)); err != nil {
@@ -623,6 +629,7 @@ func (s *Service) finishCloudAgentPiModelStepWithReceipt(userID, runID, taskID, 
 					ToolCalls []cloudAgentCall `json:"toolCalls"`
 				}
 				_ = json.Unmarshal([]byte(finishedTask.ResultJSON), &result)
+				result.ToolCalls = cloudAgentNormalizeProviderCalls(result.ToolCalls)
 				if text != "" || len(result.ToolCalls) > 0 {
 					message := map[string]any{"role": "assistant", "content": text}
 					if len(result.ToolCalls) > 0 {
@@ -679,6 +686,7 @@ func (s *Service) finishCloudAgentPiModelStepWithReceipt(userID, runID, taskID, 
 				if err := json.Unmarshal([]byte(task.ResultJSON), &result); err != nil {
 					return err
 				}
+				result.ToolCalls = cloudAgentNormalizeProviderCalls(result.ToolCalls)
 				if cloudAgentOutputViolation(result.Text, len(result.ToolCalls)) == "" {
 					if err := validateCloudAgentCalls(result.ToolCalls); err != nil {
 						return err
