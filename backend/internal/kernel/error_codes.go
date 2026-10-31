@@ -53,6 +53,8 @@ const (
 	ReasonCreditBalanceOverflow ErrorReason = "credit_balance_overflow"
 	ReasonDramaBudgetExhausted  ErrorReason = "drama_budget_exhausted"
 	ReasonDramaSegmentChanged   ErrorReason = "drama_segment_changed"
+	// 下单时用户确认的金额或积分与商品当前报价不一致：前端刷新商品，请用户确认新价格后再付。
+	ReasonTopupQuoteChanged ErrorReason = "topup_quote_changed"
 )
 
 func ReasonForStatus(status int) ErrorReason {

@@ -36,6 +36,7 @@ const (
 	ReasonStorageReadOnly     = kernel.ReasonStorageReadOnly
 	ReasonDramaBudget         = kernel.ReasonDramaBudgetExhausted
 	ReasonDramaSegmentChanged = kernel.ReasonDramaSegmentChanged
+	ReasonTopupQuoteChanged   = kernel.ReasonTopupQuoteChanged
 	ReasonRateLimited         = kernel.ReasonRateLimited
 	ReasonUnavailable         = kernel.ReasonUnavailable
 	ReasonTimeout             = kernel.ReasonTimeout
