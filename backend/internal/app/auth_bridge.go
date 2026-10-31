@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"yingce/backend/internal/auth"
@@ -244,7 +246,14 @@ func (s *Service) LibTVGallery(ctx context.Context, actor *model.User, req LibTV
 	return s.authDomain().LibTVGallery(ctx, actor, req)
 }
 
-func (s *Service) PrewarmLibTVFeatured() { s.authDomain().PrewarmLibTVFeatured() }
+// PrewarmLibTVFeatured 精选画布快照放在持久数据目录，重启后先展示上一份精选再后台刷新。
+func (s *Service) PrewarmLibTVFeatured() {
+	snapshotPath := ""
+	if strings.TrimSpace(s.dataDir) != "" {
+		snapshotPath = filepath.Join(s.dataDir, "libtv-featured.json")
+	}
+	s.authDomain().PrewarmLibTVFeatured(snapshotPath)
+}
 
 func (s *Service) LibTVFeatured(ctx context.Context, actor *model.User) (*LibTVFeaturedResult, error) {
 	return s.authDomain().LibTVFeatured(ctx, actor)

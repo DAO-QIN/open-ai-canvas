@@ -3,10 +3,14 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,6 +48,9 @@ const (
 	libTVFeaturedTTL           = 30 * time.Minute
 	libTVFeaturedRetryAfter    = time.Minute
 	libTVFeaturedTimeout       = 5 * time.Minute
+	// 重启后先用落盘的上一份精选：超过这个时间的快照不再展示，退回首次构建。
+	libTVFeaturedSnapshotMaxAge  = 7 * 24 * time.Hour
+	libTVFeaturedSnapshotVersion = 1
 )
 
 // 这些标签下的作品是 LibTV 官方活动或品牌广告，封面普遍带 LibTV / 合作方水印。
@@ -105,17 +112,28 @@ type libTVFeaturedCache struct {
 	refreshes  sync.WaitGroup
 	now        func() time.Time
 	fetch      func(ctx context.Context, publish func(*LibTVFeaturedResult)) (*LibTVFeaturedResult, error)
+	// snapshotPath 非空时，每次完整刷新成功后把精选与作品复核结论落盘；
+	// 进程重启后先展示这份快照并立即后台刷新，首个访客不必等待整轮读取。
+	snapshotPath string
+	checks       *libTVCanvasChecks
 }
 
 var (
 	libTVFeaturedChecks = &libTVCanvasChecks{items: map[string]libTVCanvasCheck{}}
-	libTVFeatured       = &libTVFeaturedCache{now: time.Now, fetch: func(ctx context.Context, publish func(*LibTVFeaturedResult)) (*LibTVFeaturedResult, error) {
+	libTVFeatured       = &libTVFeaturedCache{now: time.Now, checks: libTVFeaturedChecks, fetch: func(ctx context.Context, publish func(*LibTVFeaturedResult)) (*LibTVFeaturedResult, error) {
 		return fetchLibTVFeaturedCanvases(ctx, libTVFeaturedChecks, publish)
 	}}
 )
 
-// PrewarmLibTVFeatured 由服务启动流程调用一次。
-func (s *Service) PrewarmLibTVFeatured() { libTVFeatured.prewarm() }
+// PrewarmLibTVFeatured 由服务启动流程调用一次；snapshotPath 是持久数据目录下的快照文件，可为空。
+func (s *Service) PrewarmLibTVFeatured(snapshotPath string) {
+	libTVFeatured.mu.Lock()
+	if libTVFeatured.snapshotPath == "" {
+		libTVFeatured.snapshotPath = snapshotPath
+	}
+	libTVFeatured.mu.Unlock()
+	libTVFeatured.prewarm()
+}
 
 func (s *Service) LibTVFeatured(ctx context.Context, actor *model.User) (*LibTVFeaturedResult, error) {
 	if actor == nil || strings.TrimSpace(actor.ID) == "" {
@@ -162,11 +180,81 @@ func (c *libTVFeaturedCache) get(ctx context.Context) (*LibTVFeaturedResult, err
 }
 
 // prewarm 在进程启动后立即后台准备精选，首个访客不必等待逐个读取详情。
+// 有可用快照时先装入快照（视为已过期），访客立即拿到上一份精选，后台同时刷新。
 func (c *libTVFeaturedCache) prewarm() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.result == nil && !c.refreshing {
+	if c.result == nil && c.snapshotPath != "" {
+		if snapshot := c.readSnapshot(c.snapshotPath); snapshot != nil {
+			c.result = snapshot.Result
+			c.expires = c.now()
+			if c.checks != nil && len(snapshot.Checks) > 0 {
+				c.checks.seed(snapshot.Checks)
+			}
+		}
+	}
+	if !c.refreshing && (c.result == nil || !c.now().Before(c.expires)) {
 		c.startRefreshLocked()
+	}
+}
+
+type libTVFeaturedSnapshot struct {
+	Version int                         `json:"version"`
+	SavedAt time.Time                   `json:"savedAt"`
+	Result  *LibTVFeaturedResult        `json:"result"`
+	Checks  map[string]libTVCanvasCheck `json:"checks,omitempty"`
+}
+
+// readSnapshot 读取并按当前规则校验快照；不存在、损坏、版本不符、过旧或筛完为空都返回 nil。
+func (c *libTVFeaturedCache) readSnapshot(path string) *libTVFeaturedSnapshot {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			log.Printf("[LibTV] featured snapshot unreadable: %v", err)
+		}
+		return nil
+	}
+	var snapshot libTVFeaturedSnapshot
+	if err := json.Unmarshal(raw, &snapshot); err != nil || snapshot.Version != libTVFeaturedSnapshotVersion || snapshot.Result == nil {
+		log.Printf("[LibTV] featured snapshot ignored: invalid or outdated format")
+		return nil
+	}
+	if age := c.now().Sub(snapshot.SavedAt); age < 0 || age > libTVFeaturedSnapshotMaxAge {
+		log.Printf("[LibTV] featured snapshot ignored: saved %s ago", age.Round(time.Minute))
+		return nil
+	}
+	// 快照之后新增的排除规则（水印名单、活动标签等）立即生效，不等后台刷新。
+	kept := snapshot.Result.Items[:0]
+	for _, item := range snapshot.Result.Items {
+		if libTVCuratedCandidate(item.LibTVGalleryItem) {
+			kept = append(kept, item)
+		}
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	snapshot.Result.Items = kept
+	return &snapshot
+}
+
+// writeSnapshot 原子写入快照（先写临时文件再替换），失败只记日志，不影响精选服务。
+func (c *libTVFeaturedCache) writeSnapshot(path string, result *LibTVFeaturedResult) {
+	snapshot := libTVFeaturedSnapshot{Version: libTVFeaturedSnapshotVersion, SavedAt: c.now().UTC(), Result: result}
+	if c.checks != nil {
+		snapshot.Checks = c.checks.snapshot()
+	}
+	raw, err := json.Marshal(snapshot)
+	if err == nil {
+		err = os.MkdirAll(filepath.Dir(path), 0o755)
+	}
+	if err == nil {
+		tmp := path + ".tmp"
+		if err = os.WriteFile(tmp, raw, 0o600); err == nil {
+			err = os.Rename(tmp, path)
+		}
+	}
+	if err != nil {
+		log.Printf("[LibTV] featured snapshot not saved: %v", err)
 	}
 }
 
@@ -193,16 +281,22 @@ func (c *libTVFeaturedCache) refresh(loading chan struct{}) {
 		}
 	})
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	defer release()
 	c.refreshing = false
 	if err != nil {
 		c.err = err
 		c.expires = c.now().Add(libTVFeaturedRetryAfter)
+		c.mu.Unlock()
+		release()
 		return
 	}
 	c.result, c.err = result, nil
 	c.expires = c.now().Add(libTVFeaturedTTL)
+	path, saved := c.snapshotPath, cloneLibTVFeatured(result)
+	c.mu.Unlock()
+	release()
+	if path != "" {
+		c.writeSnapshot(path, saved)
+	}
 }
 
 func (c *libTVFeaturedCache) load(publish func(*LibTVFeaturedResult)) (*LibTVFeaturedResult, error) {
@@ -431,6 +525,31 @@ func (c *libTVCanvasChecks) check(ctx context.Context, item LibTVGalleryItem, in
 }
 
 // retain 只保留这次列表里还在的作品，下架的不再占内存。
+// snapshot 复制当前全部复核结论，用于落盘。
+func (c *libTVCanvasChecks) snapshot() map[string]libTVCanvasCheck {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	copied := make(map[string]libTVCanvasCheck, len(c.items))
+	for uuid, check := range c.items {
+		copied[uuid] = check
+	}
+	return copied
+}
+
+// seed 用落盘的复核结论补齐缓存；内存里已有的结论更新，不被覆盖。
+func (c *libTVCanvasChecks) seed(saved map[string]libTVCanvasCheck) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.items == nil {
+		c.items = map[string]libTVCanvasCheck{}
+	}
+	for uuid, check := range saved {
+		if _, exists := c.items[uuid]; !exists {
+			c.items[uuid] = check
+		}
+	}
+}
+
 func (c *libTVCanvasChecks) retain(keep map[string]bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
