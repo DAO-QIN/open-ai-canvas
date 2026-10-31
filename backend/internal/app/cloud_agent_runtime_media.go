@@ -293,6 +293,19 @@ func (s *Service) enqueueCloudAgentTask(run *model.CloudAgentExecution, state *c
 				// 创作页把任务对回已确认的方案卡，结果直接显示在对应卡片里。
 				payload["approvalId"] = state.Approval.ID
 			}
+			// 任务实际提交的规格（模型默认值已在准入时解析进任务配置）。没有方案卡的任务也靠它
+			// 给生成中占位预留画幅，「重做」沿用原尺寸。
+			if config, ok := input["config"].(map[string]any); ok {
+				keys := []string{"size"}
+				if media.Args.Mode == "image" {
+					keys = append(keys, "quality", "imageResolution")
+				}
+				for _, key := range keys {
+					if value := stringValue(config[key]); value != "" {
+						payload[key] = value
+					}
+				}
+			}
 			state.event(run.ID, "generation_task_created", payload)
 			if cloudAgentCreationReturnsOnSubmit(state, media) {
 				// 提交即返回：回执随任务一起落库，桥接层读到工具结果立即交还模型，本轮不等待出图。

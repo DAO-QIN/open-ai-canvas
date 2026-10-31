@@ -90,7 +90,7 @@ function proposalModelName(proposal: AgentApprovalProposal) {
 /** 结果的预留画幅，取值顺序与 MediaResult 相同：任务参数里的画幅优先，其次方案上的尺寸。 */
 function proposalMediaRatio(proposal: AgentApprovalProposal, task: CreationMessage) {
     const mode: CreationMode = proposal.mode === "video" ? "video" : proposal.mode === "audio" ? "audio" : "image";
-    const [width, height] = creationMediaAspectRatio(task.settings?.ratio || proposal.size, mode)
+    const [width, height] = creationMediaAspectRatio(task.settings?.ratio || task.agentGeneration?.size || proposal.size, mode)
         .split("/")
         .map(Number);
     return width > 0 && height > 0 ? width / height : 1;

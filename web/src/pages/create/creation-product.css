@@ -403,8 +403,6 @@
 .creation-agent-proposal-result .creation-video-result { width: 100%; aspect-ratio: var(--creation-proposal-ratio, 16 / 9); }
 .creation-agent-proposal-specs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .creation-agent-proposal-specs > span { max-width: 100%; overflow: hidden; padding: 2px 8px; border-radius: 999px; background: var(--user-surface-muted); color: var(--user-ink-muted); font-size: 11.5px; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
-/* 结果图下「下载」后面的实际尺寸：纯文字，不加底色和圆角。字号与按钮文字相同、字重更轻，和两个操作之间的间距一致（按钮自带 8px 内边距）。 */
-.creation-agent-proposal-result .creation-media-actions > .creation-media-actions-size { margin: 0 0 0 8px; color: var(--user-ink-muted); font-size: var(--fs-caption); font-weight: 400; font-variant-numeric: tabular-nums; line-height: 1.5; white-space: nowrap; }
 .creation-agent-proposal-specs select { height: 24px; max-width: 140px; padding: 0 6px; border: 1px solid var(--user-border); border-radius: 999px; background: var(--user-surface-muted); color: var(--user-ink); font: inherit; font-size: 11.5px; cursor: pointer; }
 .creation-agent-proposal-specs select:disabled { cursor: not-allowed; opacity: 0.6; }
 .creation-agent-proposal-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }

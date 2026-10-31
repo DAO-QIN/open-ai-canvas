@@ -4,7 +4,7 @@ import type { GenerationTask } from "@/services/api/task-center";
 import { resolveResourceUrl } from "@/services/api/resources";
 import { ApiError, retryApiRead as retryCreationHistoryRead } from "@/services/api/request";
 export { retryApiRead as retryCreationHistoryRead } from "@/services/api/request";
-import type { CreationAgentPlanItem, CreationAgentProposalSet, CreationAgentQuestion, CreationAgentQuestionField, CreationCommercePlan, CreationConversation, CreationMessage } from "./creation-types";
+import type { CreationAgentGeneration, CreationAgentPlanItem, CreationAgentProposalSet, CreationAgentQuestion, CreationAgentQuestionField, CreationCommercePlan, CreationConversation, CreationMessage } from "./creation-types";
 import { creationImageDownloadBaseName } from "./creation-media-download";
 import { createCreationAgentStepCollector } from "./creation-agent-steps";
 
@@ -43,6 +43,15 @@ function creationAgentTaskReferences(ids: unknown, resources: Map<string, NonNul
         const storageKey = `resource:${id}`;
         return { id: storageKey, storageKey, name: known?.name || `参考图 ${index + 1}`, type: `${known?.kind || "image"}/*`, url: resolveResourceUrl(storageKey), previewUrl: "", bytes: 0 };
     });
+}
+
+/** 受理事件带回的参考素材和任务实际提交的规格；旧事件没有规格，两样都没有时不建 agentGeneration。 */
+function creationAgentTaskGeneration(payload: Record<string, unknown>, references: NonNullable<CreationMessage["attachments"]>): CreationAgentGeneration | undefined {
+    const size = text(payload.size).trim();
+    const quality = text(payload.quality).trim();
+    const imageResolution = text(payload.imageResolution).trim();
+    const generation: CreationAgentGeneration = { ...(references.length ? { references } : {}), ...(size ? { size } : {}), ...(quality ? { quality } : {}), ...(imageResolution ? { imageResolution } : {}) };
+    return Object.keys(generation).length ? generation : undefined;
 }
 
 /**
@@ -269,7 +278,7 @@ export function projectCreationAgentConversation(session: AgentSession, unsorted
                 const taskId = text(payload.taskId);
                 if (!taskId) continue;
                 const mode = payload.mode === "video" ? "video" : "image";
-                const references = creationAgentTaskReferences(payload.attachmentResourceIds, runResources);
+                const generation = creationAgentTaskGeneration(payload, creationAgentTaskReferences(payload.attachmentResourceIds, runResources));
                 if (!messages.some((item) => item.id === `task-${taskId}`))
                     messages.push({
                         id: `task-${taskId}`,
@@ -284,7 +293,7 @@ export function projectCreationAgentConversation(session: AgentSession, unsorted
                         ...(text(payload.approvalId) ? { approvalId: text(payload.approvalId) } : {}),
                         ...(text(payload.imageBatchItemId) ? { batchItemId: text(payload.imageBatchItemId) } : {}),
                         ...(imageBatches.has(text(payload.imageBatchId)) ? { batchId: text(payload.imageBatchId), batchTotal: imageBatches.get(text(payload.imageBatchId)) } : {}),
-                        ...(references.length ? { agentGeneration: { references } } : {}),
+                        ...(generation ? { agentGeneration: generation } : {}),
                     });
                 steps.media(taskId, event.createdAt);
             } else if (event.type === "plan_updated" && payload.inherited !== true && Array.isArray(payload.items)) {

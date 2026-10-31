@@ -114,7 +114,7 @@ export type CreationMessage = {
     /** 任务消息：所属的已确认方案与方案项，用于把结果放回卡片。 */
     approvalId?: string;
     batchItemId?: string;
-    /** 任务消息：模型写下的原始提示词（不含服务端追加的素材说明）和实际带上的参考素材，供结果「重做」沿用；旧记录没有。 */
+    /** 任务消息：模型写下的原始提示词（不含服务端追加的素材说明）、实际带上的参考素材和实际提交的规格，供生成中占位和结果「重做」沿用；旧记录没有。 */
     agentGeneration?: CreationAgentGeneration;
     /** 任务消息：Agent 用已有成品在本机合成的视频（timeline_render），不经模型生成、不扣积分。 */
     composition?: boolean;
@@ -130,7 +130,8 @@ export type CreationMessage = {
     batchCompletedCount?: number;
     batchFailedCount?: number;
 };
-export type CreationAgentGeneration = { prompt?: string; references?: CreationAttachment[] };
+/** size（画幅或像素）、quality、imageResolution 来自 generation_task_created，是准入后任务实际提交的值。 */
+export type CreationAgentGeneration = { prompt?: string; references?: CreationAttachment[]; size?: string; quality?: string; imageResolution?: string };
 export type CreationAgentPlanItem = { id: string; title: string; status: "pending" | "doing" | "done"; type?: string; targetCopy?: string; zhReviewCopy?: string; specs?: Record<string, unknown> };
 /**
  * 一组逐项方案卡。approvalId 是最新一次报价（改写、移出和续期都会轮换）；rootId 不随轮换变化，

@@ -136,6 +136,11 @@ func ResolveAccess(resource *model.Resource, setting storage.Settings, options A
 	}
 	access := &ResourceAccess{ResourceID: resource.ID, RequestedVariant: options.Variant, ActualVariant: VariantOriginal,
 		IssuedAt: now, ExpiresAt: &expires, RefreshAt: now.Add(expires.Sub(now) * 4 / 5), Revision: resource.ETag + ":" + resource.PlaybackStatus + ":" + storage.DeliveryRevision(setting)}
+	// 资源记录有宽高时，每次访问都带原图像素，不论交付原件还是缩小档位：客户端标尺寸、定比例不必等图片解码。
+	// 必须在 resource 换成缩略图或展示档位之前取。
+	if resource.Width > 0 && resource.Height > 0 {
+		access.OriginalWidth, access.OriginalHeight = resource.Width, resource.Height
+	}
 	if options.Variant == VariantPlayback {
 		if resource.Provider == "local" && resource.PlaybackStatus == model.PlaybackStatusReady && resource.PlaybackObjectKey != "" {
 			access.ActualVariant = VariantPlayback
@@ -146,7 +151,6 @@ func ResolveAccess(resource *model.Resource, setting storage.Settings, options A
 	if options.Variant == VariantThumbnail {
 		if resource.ThumbnailStatus == "ready" && resource.ThumbnailSize > 0 {
 			access.ActualVariant = VariantThumbnail
-			access.OriginalWidth, access.OriginalHeight = resource.Width, resource.Height
 			access.Revision += ":thumbnail-ready"
 			resource = ThumbnailResource(resource)
 		} else {
@@ -157,7 +161,6 @@ func ResolveAccess(resource *model.Resource, setting storage.Settings, options A
 		switch {
 		case resource.DisplayStatus == "ready" && resource.DisplaySize > 0:
 			access.ActualVariant = VariantDisplay
-			access.OriginalWidth, access.OriginalHeight = resource.Width, resource.Height
 			access.Revision += ":display-ready"
 			resource = DisplayResource(resource)
 		case resource.DisplayStatus == "failed":

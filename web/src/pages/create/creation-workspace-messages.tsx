@@ -360,7 +360,6 @@ export function CreationMessageView({
         <MediaResult
             item={{ ...task, batchTotal: undefined, batchCompletedCount: undefined, batchFailedCount: undefined }}
             ratioHint={proposal.size}
-            showResultSize
             onRetryFailure={onRetryAgentTasks ? () => onRetryAgentTasks([task]) : undefined}
             onCreateVariant={() => onCreateAgentTaskVariant?.(task)}
             onContinueCanvas={onContinueCanvas}
@@ -827,7 +826,6 @@ export function MediaResult({
     onRedo,
     referenceActionFirst = false,
     ratioHint,
-    showResultSize = false,
 }: {
     item: CreationMessage;
     submitting?: boolean;
@@ -843,10 +841,8 @@ export function MediaResult({
     onRedo?: CreationResultRedoHandler;
     /** 操作条把「作为参考」排第一（输入框是 Agent 时）。 */
     referenceActionFirst?: boolean;
-    /** 任务参数里没有画幅时（如 Agent 任务）用来占位的画幅，例如方案卡上的 1824x1024。 */
+    /** 任务参数里没有画幅时用来占位的画幅，例如方案卡上的 1824x1024。 */
     ratioHint?: string;
-    /** 在图下操作行最后标出实际像素（方案卡用），图片或视频加载出来之前不标。 */
-    showResultSize?: boolean;
 }) {
     const [previewUrl, setPreviewUrl] = useState("");
     const [previewType, setPreviewType] = useState<"image" | "video">("image");
@@ -859,10 +855,11 @@ export function MediaResult({
     const [downloadingImage, setDownloadingImage] = useState<number | null>(null);
     const [downloadError, setDownloadError] = useState("");
     const [recoveringSubmission, setRecoveringSubmission] = useState(false);
-    // 加载出来的实际像素，按结果身份记（showResultSize 时才写入）。
-    const [naturalSizes, setNaturalSizes] = useState<Record<string, string>>({});
-    // 显示的是展示档位时，图片本身只有长边 1600；标尺寸用后端给的原图像素。
-    const [originalSizes, setOriginalSizes] = useState<Record<string, string>>({});
+    // 图下标的实际像素有两个来源：资源访问回执里的原图像素（按 storageKey，不等图片加载），
+    // 和图片、视频加载出来的像素（按地址）。展示档位、缩略图的地址记进 reducedUrls，它们的加载像素不当原图尺寸。
+    const [resourceSizes, setResourceSizes] = useState<Record<string, string>>({});
+    const [loadedSizes, setLoadedSizes] = useState<Record<string, string>>({});
+    const [reducedUrls, setReducedUrls] = useState<Record<string, true>>({});
     const assets = useAssetStore((state) => state.assets);
     const config = useEffectiveConfig();
     const storedResultUrls = item.resultUrls || [];
@@ -886,11 +883,13 @@ export function MediaResult({
             try {
                 const access = await displayAccess(storageKey);
                 if (!active) return;
-                if (access.actualVariant === "display" && access.originalWidth && access.originalHeight) {
+                const url = resolveResourceAccessURL(access.url);
+                if (access.originalWidth && access.originalHeight) {
                     const size = `${access.originalWidth}x${access.originalHeight}`;
-                    setOriginalSizes((current) => (current[storageKey] === size ? current : { ...current, [storageKey]: size }));
+                    setResourceSizes((current) => (current[storageKey] === size ? current : { ...current, [storageKey]: size }));
                 }
-                updateResultUrl(storageKey, resolveResourceAccessURL(access.url));
+                if (url && (access.actualVariant === "display" || access.actualVariant === "thumbnail")) setReducedUrls((current) => (current[url] ? current : { ...current, [url]: true }));
+                updateResultUrl(storageKey, url);
                 const refreshAt = access.refreshAt ? new Date(access.refreshAt).getTime() : Number.NaN;
                 const expiresAt = access.expiresAt ? new Date(access.expiresAt).getTime() : Number.NaN;
                 const nextRefreshAt = Number.isFinite(refreshAt) ? refreshAt : expiresAt;
@@ -1053,19 +1052,18 @@ export function MediaResult({
         }
         return resolveImageUrl(image.storageKey, image.url);
     };
-    const placeholderRatio = creationMediaAspectRatio(item.settings?.ratio || ratioHint, "image");
-    // 尺寸只写加载出来的实际像素（图片 naturalWidth/Height，视频元数据），不写方案上请求的尺寸。
-    // 单张和视频标第一项，叠图标最前面那张，展开成网格后各张尺寸可能不同，不标。
-    const sizeKey = (index: number) => downloadImages[index]?.storageKey || `#${index}`;
-    const rememberSize = (index: number) => (width: number, height: number) => {
-        if (!showResultSize || !(width > 0 && height > 0)) return;
-        const key = sizeKey(index);
+    const placeholderRatio = creationMediaAspectRatio(item.settings?.ratio || item.agentGeneration?.size || ratioHint, "image");
+    // 尺寸只写结果的实际像素，不写请求的尺寸。图上是原件时用加载出来的像素（和看到的一致），
+    // 还没加载完、或图上是展示档位时用资源记录里的原图像素。
+    // 单张和视频标第一项，叠图标最前面那张；展开成网格后各张尺寸可能不同，不标。
+    const rememberLoadedSize = (url: string) => (width: number, height: number) => {
+        if (!url || !(width > 0 && height > 0)) return;
         const text = `${width}x${height}`;
-        setNaturalSizes((current) => (current[key] === text ? current : { ...current, [key]: text }));
+        setLoadedSizes((current) => (current[url] === text ? current : { ...current, [url]: text }));
     };
     const sizeIndex = isVideo || displayResultUrls.length <= 1 ? 0 : batchExpanded ? -1 : batchPreviewIndex;
-    const loadedSize = showResultSize && sizeIndex >= 0 ? naturalSizes[sizeKey(sizeIndex)] || "" : "";
-    const sizeText = loadedSize ? originalSizes[sizeKey(sizeIndex)] || loadedSize : "";
+    const sizeSource = sizeIndex >= 0 ? downloadImages[sizeIndex] : undefined;
+    const sizeText = (sizeSource?.url && !reducedUrls[sizeSource.url] ? loadedSizes[sizeSource.url] : "") || (sizeSource?.storageKey ? resourceSizes[sizeSource.storageKey] : "") || "";
     // 单张的下载已在图上右下角，图下一行放「重做」；多张仍保留打包下载。弹窗里展示单张或叠卡最前面那张。
     // 还在生成或状态待确认时不给重做，免得同一组没出完又提交一次、再扣一次积分。
     const redoIndex = displayResultUrls.length > 1 && !batchExpanded ? batchPreviewIndex : 0;
@@ -1084,7 +1082,7 @@ export function MediaResult({
                 square={displayResultUrls.length > 1}
                 ratio={placeholderRatio}
                 onReload={() => reloadImage(index)}
-                onNaturalSize={rememberSize(index)}
+                onNaturalSize={rememberLoadedSize(url)}
                 onPreview={(loadedUrl) => {
                     setPreviewType("image");
                     setPreviewUrl(loadedUrl);
@@ -1112,7 +1110,7 @@ export function MediaResult({
                     }}
                     aria-label="预览生成视频"
                 >
-                    {displayResultUrls[0] ? <video muted playsInline preload="metadata" src={displayResultUrls[0]} onLoadedMetadata={(event) => rememberSize(0)(event.currentTarget.videoWidth, event.currentTarget.videoHeight)} /> : loadingResult}
+                    {displayResultUrls[0] ? <video muted playsInline preload="metadata" src={displayResultUrls[0]} onLoadedMetadata={(event) => rememberLoadedSize(displayResultUrls[0])(event.currentTarget.videoWidth, event.currentTarget.videoHeight)} /> : loadingResult}
                     {displayResultUrls[0] ? (
                         <span>
                             <Maximize2 />
@@ -1132,7 +1130,7 @@ export function MediaResult({
                                 </span>
                             ))}
                             <span className="creation-image-result-stack-front" {...resultDragProps({ url: activeBatchUrl, storageKey: downloadImages[batchPreviewIndex]?.storageKey, index: batchPreviewIndex })}>
-                                <CreationResultImage key={batchPreviewIndex} url={activeBatchUrl} alt={`生成结果 ${batchPreviewIndex + 1}`} square previewLabel={`展开预览第 ${batchPreviewIndex + 1} 张图片`} onPreview={() => setBatchPreviewOpen(true)} onReload={() => reloadImage(batchPreviewIndex)} onNaturalSize={rememberSize(batchPreviewIndex)} />
+                                <CreationResultImage key={batchPreviewIndex} url={activeBatchUrl} alt={`生成结果 ${batchPreviewIndex + 1}`} square previewLabel={`展开预览第 ${batchPreviewIndex + 1} 张图片`} onPreview={() => setBatchPreviewOpen(true)} onReload={() => reloadImage(batchPreviewIndex)} onNaturalSize={rememberLoadedSize(activeBatchUrl)} />
                                 <CreationImageActions image={{ url: activeBatchUrl, storageKey: downloadImages[batchPreviewIndex]?.storageKey, index: batchPreviewIndex }} onUse={onUseResultImage} referenceActionFirst={referenceActionFirst} />
                             </span>
                         </span>
@@ -1303,7 +1301,7 @@ export function CreationMediaPending({ item, ratioHint, refreshing, onRefresh, o
             : null;
     const elapsed = useTaskElapsed(item.createdAt);
     const hint = generationPhaseHint(phase, kind, item.generationStage);
-    const aspectRatio = creationMediaAspectRatio(item.settings?.ratio || ratioHint, mode);
+    const aspectRatio = creationMediaAspectRatio(item.settings?.ratio || item.agentGeneration?.size || ratioHint, mode);
     const specs = creationPendingSpecs(item);
     const Icon = mode === "video" ? Film : ImageIcon;
     return (

@@ -87,10 +87,12 @@ function creationAgentRedoSource(messages: CreationMessage[], item: CreationMess
     // 只认已确认的方案：方案卡上的尺寸是准入后的实际值（手动参数模式下与模型写的不同）。
     const proposal = (reply?.agentProposalSets || []).flatMap((set) => (set.status === "approved" ? set.proposals.filter((candidate) => creationAgentProposalTask(set, candidate, runTasks)?.id === taskId) : [])).at(-1);
     const planItem = task.commerceItemId ? reply?.commercePlan?.items.find((candidate) => candidate.id === task.commerceItemId) : undefined;
-    const prompt = task.agentGeneration?.prompt?.trim() || proposal?.prompt.trim() || planItem?.prompt.trim() || "";
+    const generation = task.agentGeneration;
+    const prompt = generation?.prompt?.trim() || proposal?.prompt.trim() || planItem?.prompt.trim() || "";
     if (!prompt) return undefined;
-    const attachments = imageAttachments(task.agentGeneration?.references);
-    const quality = proposal?.quality || specText(planItem?.specs?.quality);
+    const attachments = imageAttachments(generation?.references);
+    // 规格先取任务上记的实际提交值（受理事件带回，没有方案卡的任务也有），旧记录没有时用方案卡或整套方案里的写法。
+    const quality = generation?.quality || proposal?.quality || specText(planItem?.specs?.quality);
     const modelName = proposal?.model?.trim();
     return {
         prompt,
@@ -98,7 +100,7 @@ function creationAgentRedoSource(messages: CreationMessage[], item: CreationMess
         references: buildCreationMentionReferences([], attachments),
         model: { name: modelName && modelName !== UNCATEGORIZED_MODEL_GROUP ? modelName : undefined },
         // 方案卡上的「质量」可能是分辨率档位（2K），两边都给，按模型能力各取能用的一个。
-        settings: { ratio: proposal?.size || specText(planItem?.specs?.size) || undefined, quality: quality || undefined, imageResolution: isResolutionTier(quality) ? quality : undefined },
+        settings: { ratio: generation?.size || proposal?.size || specText(planItem?.specs?.size) || undefined, quality: quality || undefined, imageResolution: generation?.imageResolution || (isResolutionTier(quality) ? quality : undefined) },
         count: 1,
     };
 }

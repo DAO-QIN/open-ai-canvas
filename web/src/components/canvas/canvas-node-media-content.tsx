@@ -678,7 +678,8 @@ export function RetainedCanvasImage({
                 const originalURL = resolveResourceAccessURL(access.url);
                 if (!originalURL) throw new Error("资源访问地址为空");
                 const original = await attempt(originalURL);
-                if (isCurrent()) show(original, originalURL, { width: access.originalWidth, height: access.originalHeight });
+                // 换成了原件：以解码像素为准（含 EXIF 方向），不用回执里资源记录的宽高。
+                if (isCurrent()) show(original, originalURL, {});
             } catch (error) {
                 if (isAbort(error) || !isCurrent()) return;
                 // 已显示过同一资源时保留旧画面；首次加载失败才进入可重试的失败态。
@@ -799,7 +800,9 @@ export function useNodeResourceUrl(node: CanvasNodeData, eager: boolean, variant
         setResolved({ identity, url: "", loading: true });
         void getResourceAccess(storageKey, "display", variant)
             .then((access) => {
-                if (!cancelled) setResolved({ identity, url: resolveResourceAccessURL(access.url), loading: false, originalWidth: access.originalWidth, originalHeight: access.originalHeight });
+                // 回执总带原图像素，但只有拿到缩略图时才需要它（缩略图解码出来比原图小）；拿到原件时以解码像素为准。
+                const reduced = access.actualVariant === "thumbnail" || access.actualVariant === "display";
+                if (!cancelled) setResolved({ identity, url: resolveResourceAccessURL(access.url), loading: false, ...(reduced ? { originalWidth: access.originalWidth, originalHeight: access.originalHeight } : {}) });
             })
             .catch(() => {
                 // 没有可用的回退地址时标记失败，节点显示「加载失败 + 重新加载」，而不是一块无提示的空白。

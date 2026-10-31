@@ -184,6 +184,10 @@
 .creation-home .creation-audio-result audio { display: block; width: 100%; height: 40px; }
 .creation-home .creation-audio-result .creation-media-result-placeholder { min-height: 40px; background: transparent; }
 
+/* 结果操作行最后的实际尺寸（普通结果和方案卡结果共用）：纯文字，不加底色和圆角。
+   字号与按钮文字相同、字重更轻，和两个操作之间的间距一致（按钮自带 8px 内边距）。 */
+.creation-home .creation-media-actions > .creation-media-actions-size { margin: 0 0 0 8px; color: var(--user-ink-muted); font-size: var(--fs-caption); font-weight: 400; font-variant-numeric: tabular-nums; line-height: 1.5; white-space: nowrap; }
+
 /* 视频合成：字幕烧录退回时的说明，跟在结果操作行下面。 */
 .creation-home .creation-media-subtitle-note { margin: var(--space-2) 0 0; color: var(--creation-muted); font-size: var(--fs-label); line-height: 1.5; }
 
