@@ -10,7 +10,7 @@ import { useCanvasImageWheelResize } from "./use-canvas-image-wheel-resize";
 import { canCancelGenerationTask } from "@/lib/generation-task-display";
 import { isCanvasStartNode, type CanvasStartNode } from "@/lib/canvas/canvas-start-node";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { loadAssetsForUse } from "@/services/user-data-sync";
@@ -69,7 +69,8 @@ import { CanvasPrevisTemplateModal } from "@/components/canvas/previs/canvas-pre
 import { CanvasFileDropOverlay } from "@/components/canvas/canvas-file-drop-overlay";
 import { CanvasUploadModal } from "@/components/canvas/canvas-upload-modal";
 import { CanvasPanoramaConfigModal } from "@/components/canvas/canvas-panorama-config-modal";
-import { CanvasViewport } from "@/components/canvas/canvas-viewport";
+import { CanvasViewport, type CanvasTouchLongPress } from "@/components/canvas/canvas-viewport";
+import { PHONE_LAYOUT_QUERY, useMediaQuery } from "@/hooks/use-media-query";
 import { CanvasCollaborationLayer } from "@/components/canvas/canvas-collaboration-layer";
 import { Minimap } from "@/components/canvas/canvas-mini-map";
 import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
@@ -174,6 +175,7 @@ import { useCanvasUpload } from "./use-canvas-upload";
 import { useCanvasTimelineAssetInsert } from "./use-canvas-timeline-asset-insert";
 import { useCanvasViewportController } from "./use-canvas-viewport-controller";
 import "./canvas-agent-focus.css";
+import "./canvas-phone.css";
 import {
     CanvasNodeType,
     type CanvasAssistantSession,
@@ -199,6 +201,10 @@ const CanvasPrevisWorkbench = lazy(() => import("@/components/canvas/previs/canv
 const CanvasDrawingEditorModal = lazy(() => import("@/components/canvas/canvas-drawing-editor-modal").then((module) => ({ default: module.CanvasDrawingEditorModal })));
 
 const NODE_STATUS_SUCCESS = "success" as const;
+/** 手机上节点上方要留给节点工具条的高度：44px 工具条 + 30px 间距 + 12px 余量。 */
+const PHONE_NODE_TOOLBAR_CLEARANCE = 86;
+/** 手机首屏取景的最小比例：再小节点标题会隐藏（见 canvas-node.tsx 的 0.35），图片也难以辨认。 */
+const PHONE_READABLE_SCALE = 0.4;
 const canvasStartNodeTypes: Record<CanvasStartNode, CanvasNodeType> = { image: CanvasNodeType.Image, video: CanvasNodeType.Video, audio: CanvasNodeType.Audio, script: CanvasNodeType.Script, text: CanvasNodeType.Text };
 const EMPTY_RESOURCE_REFERENCES: CanvasResourceReference[] = [];
 
@@ -332,6 +338,8 @@ function CanvasViewportPage() {
 
     const { tasks: activeTasks } = useCanvasActiveTasks(projectId, projectLoaded);
     const { focusMode, enterFocusMode, exitFocusMode, toggleFocusMode } = useFocusMode();
+    // 手机上节点面板改为贴底抽屉、打开画布时自动适配视野，其余桌面行为不变。
+    const phoneLayout = useMediaQuery(PHONE_LAYOUT_QUERY);
     const [focusDockRevealed, setFocusDockRevealed] = useState(false);
     // 画布 / 资产视图写在 URL 上，刷新和分享链接都能回到同一视图；专注模式只服务画布编辑。
     const canvasView: CanvasProjectView = searchParams.get("view") === "assets" && !focusMode ? "assets" : "canvas";
@@ -739,7 +747,9 @@ function CanvasViewportPage() {
         handleCanvasDoubleClick,
         handleViewportChange,
         handleViewportPreviewChange,
+        fitCanvasContentForPhone,
         previewViewport,
+        revealCanvasNodeInArea,
         screenToCanvas,
         setZoomScale,
         zoomCanvasIn,
@@ -759,6 +769,45 @@ function CanvasViewportPage() {
         setDialogNodeId,
         setToolbarNodeId,
     });
+
+    // 手机打开画布：保存的视野多半来自电脑，一个完整节点都看不到时重新取景到顶栏与底部工具条之间，
+    // 节点保持可读尺寸（标题不隐藏），而不是缩成看不清的全景。
+    const phoneInitialFitRef = useRef(false);
+    useEffect(() => {
+        if (!projectLoaded || !phoneLayout || phoneInitialFitRef.current || size.width > 720) return;
+        phoneInitialFitRef.current = true;
+        const current = viewportRef.current;
+        const someNodeVisible = nodesRef.current.some((node) => {
+            const left = current.x + node.position.x * current.k;
+            const top = current.y + node.position.y * current.k;
+            return left >= 0 && top >= 0 && left + node.width * current.k <= size.width && top + node.height * current.k <= size.height;
+        });
+        const container = containerRef.current;
+        const main = container?.closest("main");
+        if (someNodeVisible || !container || !main) return;
+        const rect = container.getBoundingClientRect();
+        const topbar = main.querySelector<HTMLElement>(".canvas-topbar, .canvas-focus-mode-bar")?.getBoundingClientRect();
+        const docks = [...main.querySelectorAll<HTMLElement>(".canvas-floating-dock")].map((element) => element.getBoundingClientRect()).filter((item) => item.height > 0);
+        const top = (topbar && topbar.height > 0 ? topbar.bottom - rect.top : 0) + 32;
+        const bottom = Math.min(rect.height, ...docks.map((item) => item.top - rect.top)) - 8;
+        fitCanvasContentForPhone({ left: 0, top, right: rect.width, bottom }, PHONE_READABLE_SCALE);
+    }, [fitCanvasContentForPhone, phoneLayout, projectLoaded, size.height, size.width]);
+
+    // 手机上节点面板是贴底抽屉：打开后把节点挪到抽屉上方，顶栏与节点工具条之间留出位置。
+    useEffect(() => {
+        if (!phoneLayout || !dialogNodeId) return;
+        const timer = window.setTimeout(() => {
+            const container = containerRef.current;
+            const main = container?.closest("main");
+            const sheet = main?.querySelector<HTMLElement>(".canvas-node-panel-sheet");
+            if (!container || !sheet) return;
+            const rect = container.getBoundingClientRect();
+            const topbar = main?.querySelector<HTMLElement>(".canvas-topbar, .canvas-focus-mode-bar")?.getBoundingClientRect();
+            const top = (topbar && topbar.height > 0 ? topbar.bottom - rect.top : 0) + PHONE_NODE_TOOLBAR_CLEARANCE;
+            revealCanvasNodeInArea(dialogNodeId, { left: 12, right: rect.width - 12, top, bottom: sheet.getBoundingClientRect().top - rect.top - 12 });
+        }, 360);
+        return () => window.clearTimeout(timer);
+    }, [dialogNodeId, phoneLayout, revealCanvasNodeInArea]);
 
     const applyLibTVDialogImport = useCallback(
         async (importedNodes: CanvasNodeData[], importedConnections: CanvasConnection[]) => {
@@ -1327,7 +1376,7 @@ function CanvasViewportPage() {
         setDialogNodeId(null);
     }, []);
 
-    const { alignmentGuides, cancelSelectionBox, deselectCanvas, dragPreview, frameDropTargetId, handleCanvasMouseDown, handleNodeMouseDown, isNodeDragging, nodeDraggingRef, selectionBoundsElementRef, selectionBox } = useCanvasSelectionController({
+    const { alignmentGuides, cancelNodeDrag, cancelSelectionBox, deselectCanvas, dragPreview, frameDropTargetId, handleCanvasMouseDown, handleNodeMouseDown, handleNodeTap, isNodeDragging, nodeDraggingRef, selectionBoundsElementRef, selectionBox } = useCanvasSelectionController({
         containerRef,
         nodesRef,
         viewportRef,
@@ -2011,6 +2060,14 @@ function CanvasViewportPage() {
         [modal, uploadNodeImageToArkPrivateAsset],
     );
 
+    const openCanvasContextMenu = useCallback(
+        (clientX: number, clientY: number) => {
+            closeConnectionCreateMenu();
+            setContextMenu({ type: "canvas", x: clientX, y: clientY, position: screenToCanvas(clientX, clientY) });
+        },
+        [closeConnectionCreateMenu, screenToCanvas],
+    );
+
     const handleCanvasContextMenu = useCallback(
         (event: ReactMouseEvent) => {
             const target = event.target instanceof Element ? event.target : null;
@@ -2023,16 +2080,13 @@ function CanvasViewportPage() {
                 return;
             }
 
-            closeConnectionCreateMenu();
-            setContextMenu({ type: "canvas", x: event.clientX, y: event.clientY, position: screenToCanvas(event.clientX, event.clientY) });
+            openCanvasContextMenu(event.clientX, event.clientY);
         },
-        [closeConnectionCreateMenu, screenToCanvas],
+        [openCanvasContextMenu],
     );
 
-    const handleNodeContextMenu = useCallback(
-        (event: ReactMouseEvent, id: string) => {
-            event.preventDefault();
-            event.stopPropagation();
+    const openNodeContextMenu = useCallback(
+        (id: string, clientX: number, clientY: number) => {
             setSelectedNodeIds((current) => {
                 if (current.has(id) && current.size > 1) return current;
                 return new Set([id]);
@@ -2041,9 +2095,18 @@ function CanvasViewportPage() {
             closeConnectionCreateMenu();
             setToolbarNodeId(null);
             setDialogNodeId(null);
-            setContextMenu({ type: "node", x: event.clientX, y: event.clientY, nodeId: id });
+            setContextMenu({ type: "node", x: clientX, y: clientY, nodeId: id });
         },
         [closeConnectionCreateMenu],
+    );
+
+    const handleNodeContextMenu = useCallback(
+        (event: ReactMouseEvent, id: string) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openNodeContextMenu(id, event.clientX, event.clientY);
+        },
+        [openNodeContextMenu],
     );
 
     const handleGenerateNode = useCanvasGenerationExecutor({
@@ -2549,14 +2612,46 @@ function CanvasViewportPage() {
         setSelectedNodeIds(new Set());
         setContextMenu(null);
     }, []);
-    const handleConnectionContextMenu = useCallback(
-        (event: ReactMouseEvent<SVGPathElement>, connectionId: string) => {
+    const openConnectionContextMenu = useCallback(
+        (connectionId: string, clientX: number, clientY: number) => {
             setSelectedConnectionId(connectionId);
             setSelectedNodeIds(new Set());
             closeConnectionCreateMenu();
-            setContextMenu({ type: "connection", x: event.clientX, y: event.clientY, connectionId });
+            setContextMenu({ type: "connection", x: clientX, y: clientY, connectionId });
         },
         [closeConnectionCreateMenu],
+    );
+    const handleConnectionContextMenu = useCallback(
+        (event: ReactMouseEvent<SVGPathElement>, connectionId: string) => openConnectionContextMenu(connectionId, event.clientX, event.clientY),
+        [openConnectionContextMenu],
+    );
+
+    // 触屏：已选中的节点单指拖动即移动；未选中的节点单指拖动平移画布、轻点才选中，长按打开右键菜单。
+    const handleTouchNodeDragStart = useCallback(
+        (event: ReactPointerEvent<HTMLDivElement>, nodeId: string) => {
+            if (!selectedNodeIdsRef.current.has(nodeId)) return false;
+            if (nodesRef.current.find((node) => node.id === nodeId)?.metadata?.locked) return false;
+            handleNodeMouseDown(event, nodeId);
+            return true;
+        },
+        [handleNodeMouseDown, nodesRef],
+    );
+    const handleTouchLongPress = useCallback(
+        ({ clientX, clientY, target }: CanvasTouchLongPress) => {
+            cancelNodeDrag();
+            const nodeId = target?.closest<HTMLElement>("[data-node-id]")?.dataset.nodeId;
+            if (nodeId) {
+                openNodeContextMenu(nodeId, clientX, clientY);
+                return;
+            }
+            const connectionId = target?.closest("[data-connection-id]")?.getAttribute("data-connection-id");
+            if (connectionId) {
+                openConnectionContextMenu(connectionId, clientX, clientY);
+                return;
+            }
+            openCanvasContextMenu(clientX, clientY);
+        },
+        [cancelNodeDrag, openCanvasContextMenu, openConnectionContextMenu, openNodeContextMenu],
     );
     const handleCanvasNodeHoverStart = useCallback(
         (nodeId: string) => {
@@ -2984,6 +3079,10 @@ function CanvasViewportPage() {
                                         onFileDragEnter={handleFileDragEnter}
                                         onFileDragLeave={handleFileDragLeave}
                                         onFileDragOver={handleFileDragOver}
+                                        onTouchNodeDragStart={handleTouchNodeDragStart}
+                                        onTouchNodeTap={handleNodeTap}
+                                        onTouchLongPress={handleTouchLongPress}
+                                        onTouchInterrupt={cancelNodeDrag}
                                     >
                                         <CanvasNodeActionContext.Provider value={canvasNodeActions}>
                                             <CanvasNodeGraphContext.Provider value={nodeGraphContext}>
@@ -3058,7 +3157,8 @@ function CanvasViewportPage() {
 
                                     <CanvasCollaborationLayer key={`${canvasStorageScope}:${projectId}`} canvasId={projectId} enabled={projectLoaded} containerRef={containerRef} nodesRef={nodesRef} viewportRef={viewportRef} />
 
-                                    <CanvasActiveTaskPanel tasks={activeTasks} onCancelTask={cancelCanvasTask} topInset={focusMode ? "var(--space-3)" : "var(--canvas-topbar-offset)"} />
+                                    {/* 手机上专注模式的工具条横跨顶部，任务面板排在它下面而不是盖住它。 */}
+                                    <CanvasActiveTaskPanel tasks={activeTasks} onCancelTask={cancelCanvasTask} topInset={focusMode ? (phoneLayout ? "calc(max(var(--space-2), env(safe-area-inset-top)) + 60px)" : "var(--space-3)") : "var(--canvas-topbar-offset)"} />
 
                                     {focusMode ? (
                                         <CanvasFocusModeBar
@@ -3340,6 +3440,7 @@ function CanvasViewportPage() {
                                         onToggleMiniMap={() => setIsMiniMapOpen((value) => !value)}
                                         onOpenShortcuts={() => setShortcutRequestNonce((value) => value + 1)}
                                         bare={dramaCanvas}
+                                        compact={phoneLayout}
                                     />
                                 </CanvasOverlayLayerContainer>
                             ) : null}

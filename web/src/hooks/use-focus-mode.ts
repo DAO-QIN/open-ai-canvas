@@ -2,6 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 
 const FOCUS_MODE_KEY = "canvas-focus-mode-v2";
 const SMALL_SCREEN_BREAKPOINT = 1024;
+// 手机（≤720px）有单独的精简顶栏和底部工具条，默认不进专注模式，返回、新建和菜单都在手边；
+// 平板等 721–1023px 的窄屏仍默认专注模式。
+const PHONE_MAX_WIDTH = 720;
+
+function defaultsToFocusMode(width: number) {
+    return width < SMALL_SCREEN_BREAKPOINT && width > PHONE_MAX_WIDTH;
+}
 
 // 未设置偏好时随窗口大小选择默认模式；明确选择后，缩放和刷新都保留该选择。
 function readInitialPreference(): boolean | null {
@@ -15,12 +22,12 @@ function readInitialPreference(): boolean | null {
 
 export function useFocusMode() {
     const [userPreference, setUserPreference] = useState<boolean | null>(readInitialPreference);
-    const [smallScreen, setSmallScreen] = useState<boolean>(() => window.innerWidth < SMALL_SCREEN_BREAKPOINT);
+    const [smallScreen, setSmallScreen] = useState<boolean>(() => defaultsToFocusMode(window.innerWidth));
 
     const focusMode = userPreference ?? smallScreen;
 
     useEffect(() => {
-        const handleResize = () => setSmallScreen(window.innerWidth < SMALL_SCREEN_BREAKPOINT);
+        const handleResize = () => setSmallScreen(defaultsToFocusMode(window.innerWidth));
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
     }, []);

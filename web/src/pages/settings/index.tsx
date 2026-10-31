@@ -1,10 +1,11 @@
 import { App, Button, InputNumber } from "antd";
 import { SettingsRow } from "@/components/ui/product/settings-row";
-import { ArrowLeft, BarChart3, Boxes, Brain, Bug, Cloud, Inbox, MessageSquareText, RadioTower, SlidersHorizontal, UserRound, Workflow } from "lucide-react";
+import { ArrowLeft, BarChart3, Boxes, Brain, Bug, ChevronLeft, Cloud, Inbox, MessageSquareText, RadioTower, SlidersHorizontal, UserRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 import { UserOSSSettingsForm } from "@/components/layout/user-oss-settings-form";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { refreshSystemChannels } from "@/lib/user-session";
 import { defaultConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -19,6 +20,7 @@ import { usePluginStore } from "@/stores/use-plugin-store";
 import { ProfilePane } from "./profile-pane";
 import { FeedbackInboxPane } from "./feedback-inbox-pane";
 import { UsageDashboardSkeleton } from "./usage-dashboard-skeleton";
+import { SettingsMobileHub } from "./settings-mobile-hub";
 
 // 用量看板只在打开时加载图表代码，不拖慢其他设置分区。
 const UsageDashboardPane = lazy(() => import("./usage-dashboard-pane"));
@@ -49,6 +51,9 @@ const configSectionGroups: Array<{ key: ConfigSectionGroup; label: string }> = [
 /** 编辑器类分区需要更宽的工作区，其余分区保持易读的内容宽度。 */
 const wideSections = new Set<ConfigSectionKey>(["channels", "runninghub", "prompts"]);
 
+/** 手机「我的」页列出的分区；渠道、工作流、提示词模板、Agent 记忆、对象存储和诊断面向桌面工作流，仍可用链接直接打开。 */
+const mobileHubSections = new Set<ConfigSectionKey>(["profile", "usage", "models", "preferences", "feedbacks"]);
+
 export function isConfigSection(value: string | null): value is ConfigSectionKey {
     return configSections.some((section) => section.key === value);
 }
@@ -56,8 +61,11 @@ export function isConfigSection(value: string | null): value is ConfigSectionKey
 export default function SettingsPage() {
     const { message } = App.useApp();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const requestedSection = searchParams.get("section");
+    // 手机上不带 section 的 /settings 是底部导航「我的」中心页；带 section 时只显示该分区和返回行。
+    const compact = useMediaQuery("(max-width: 720px)");
     const customChannelsEnabled = useUserStore((state) => state.features.customChannelsEnabled);
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const runtimeStatuses = usePluginStore((state) => state.runtimeStatuses);
@@ -103,7 +111,14 @@ export default function SettingsPage() {
         setActiveTab(section);
         const next = new URLSearchParams(searchParams);
         next.set("section", section);
-        setSearchParams(next, { replace: true });
+        // 保留导航 state：手机上从「我的」进来的分区之间互相跳转后，返回仍能直接回退到「我的」。
+        setSearchParams(next, { replace: true, state: location.state });
+    };
+
+    const showMobileHub = compact && !requestedSection;
+    const backToHub = () => {
+        if ((location.state as { fromSettingsHub?: boolean } | null)?.fromSettingsHub) navigate(-1);
+        else navigate("/settings", { replace: true });
     };
 
     const finishConfig = () => {
@@ -229,6 +244,42 @@ export default function SettingsPage() {
         ),
     };
 
+    const settingsNav = (
+        <aside className="settings-nav-panel">
+            <nav className="settings-nav" aria-label="配置分类">
+                {configSectionGroups.map((group) => {
+                    const items = visibleConfigSections.filter((section) => section.group === group.key);
+                    if (items.length === 0) return null;
+                    return (
+                        <div key={group.key} className="settings-nav-group" role="group" aria-label={group.label}>
+                            <span className="settings-nav-group-label" aria-hidden="true">
+                                {group.label}
+                            </span>
+                            {items.map((item) => {
+                                const selected = item.key === activeTab;
+                                return (
+                                    <button
+                                        key={item.key}
+                                        type="button"
+                                        className={`settings-nav-item${selected ? " is-active" : ""}`}
+                                        title={item.description}
+                                        onClick={() => selectSection(item.key)}
+                                        aria-current={selected ? "page" : undefined}
+                                    >
+                                        <span className="settings-nav-item-icon" aria-hidden="true">
+                                            {item.icon}
+                                        </span>
+                                        <span className="settings-nav-item-label">{item.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    );
+                })}
+            </nav>
+        </aside>
+    );
+
     return (
         <main className={`settings-page app-workspace-page app-user-workspace flex h-full min-h-0 flex-col text-foreground${wideSections.has(activeTab) ? " is-wide" : ""}`}>
             {shouldPromptContinue ? (
@@ -244,44 +295,24 @@ export default function SettingsPage() {
                 </div>
             ) : null}
             <div className="settings-scroll app-workspace-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                <div className="settings-library-frame">
-                    <aside className="settings-nav-panel">
-                        <nav className="settings-nav" aria-label="配置分类">
-                            {configSectionGroups.map((group) => {
-                                const items = visibleConfigSections.filter((section) => section.group === group.key);
-                                if (items.length === 0) return null;
-                                return (
-                                    <div key={group.key} className="settings-nav-group" role="group" aria-label={group.label}>
-                                        <span className="settings-nav-group-label" aria-hidden="true">
-                                            {group.label}
-                                        </span>
-                                        {items.map((item) => {
-                                            const selected = item.key === activeTab;
-                                            return (
-                                                <button
-                                                    key={item.key}
-                                                    type="button"
-                                                    className={`settings-nav-item${selected ? " is-active" : ""}`}
-                                                    title={item.description}
-                                                    onClick={() => selectSection(item.key)}
-                                                    aria-current={selected ? "page" : undefined}
-                                                >
-                                                    <span className="settings-nav-item-icon" aria-hidden="true">
-                                                        {item.icon}
-                                                    </span>
-                                                    <span className="settings-nav-item-label">{item.label}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                );
-                            })}
-                        </nav>
-                    </aside>
-                    <section className="settings-content" aria-label={visibleConfigSections.find((section) => section.key === activeTab)?.label}>
-                        <div className="settings-pane-root">{panes[activeTab]}</div>
-                    </section>
-                </div>
+                {showMobileHub ? (
+                    <div className="settings-library-frame">
+                        <SettingsMobileHub sections={visibleConfigSections.filter((section) => mobileHubSections.has(section.key))} />
+                    </div>
+                ) : (
+                    <div className="settings-library-frame">
+                        {compact ? null : settingsNav}
+                        <section className="settings-content" aria-label={visibleConfigSections.find((section) => section.key === activeTab)?.label}>
+                            {compact ? (
+                                <button type="button" className="settings-mobile-back" onClick={backToHub}>
+                                    <ChevronLeft aria-hidden="true" />
+                                    我的
+                                </button>
+                            ) : null}
+                            <div className="settings-pane-root">{panes[activeTab]}</div>
+                        </section>
+                    </div>
+                )}
             </div>
         </main>
     );

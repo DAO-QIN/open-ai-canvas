@@ -239,6 +239,38 @@ export function useCanvasViewportController({
         setDialogNodeId(node.type === CanvasNodeType.Drawing || node.type === CanvasNodeType.Script ? null : node.id);
     }, [nodesRef, selectFocusedNode, setDialogNodeId, size.height, size.width, transitionViewportTo, viewportRef]);
 
+    /**
+     * 手机打开画布时的首屏：能以可读比例放下全部节点就居中显示；放不下的方向按可读比例从内容起点开始，
+     * 而不是缩到看不清的全景。area 是顶栏与底部工具条之间的可见区域（相对画布容器）。
+     */
+    const fitCanvasContentForPhone = useCallback((area: { left: number; top: number; right: number; bottom: number }, readableScale: number) => {
+        const nodes = nodesRef.current;
+        const bounds = getCanvasNodesBounds(nodes.filter((node) => !isHiddenBatchChild(node, nodes) && !isNodeHiddenByCollapsedFrame(node, nodes)));
+        if (!bounds) return false;
+        const padding = 16;
+        const contentWidth = Math.max(1, bounds.right - bounds.left);
+        const contentHeight = Math.max(1, bounds.bottom - bounds.top);
+        const fitScale = Math.min(1, (area.right - area.left - padding * 2) / contentWidth, (area.bottom - area.top - padding * 2) / contentHeight);
+        const k = Math.max(fitScale, readableScale);
+        const place = (start: number, length: number, min: number, max: number) => (length * k <= max - min - padding * 2 ? min + (max - min - length * k) / 2 - start * k : min + padding - start * k);
+        transitionViewportTo({ x: place(bounds.left, contentWidth, area.left, area.right), y: place(bounds.top, contentHeight, area.top, area.bottom), k });
+        setContextMenu(null);
+        return true;
+    }, [nodesRef, setContextMenu, transitionViewportTo]);
+
+    /** 手机上节点面板从底部弹出后，把节点平移进面板上方的可见区域；不改缩放，已经可见时不动。 */
+    const revealCanvasNodeInArea = useCallback((nodeId: string, area: { left: number; top: number; right: number; bottom: number }) => {
+        const node = nodesRef.current.find((item) => item.id === nodeId);
+        if (!node || area.right - area.left < 40 || area.bottom - area.top < 40) return;
+        const current = viewportRef.current;
+        // 放不下时对齐起点（左边或上边），保证标题和工具条可见。
+        const shift = (start: number, length: number, min: number, max: number) => (length > max - min || start < min ? min - start : start + length > max ? max - start - length : 0);
+        const dx = shift(current.x + node.position.x * current.k, node.width * current.k, area.left, area.right);
+        const dy = shift(current.y + node.position.y * current.k, node.height * current.k, area.top, area.bottom);
+        if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+        transitionViewportTo({ x: current.x + dx, y: current.y + dy, k: current.k });
+    }, [nodesRef, transitionViewportTo, viewportRef]);
+
     const setZoomScale = useCallback((scale: number) => {
         cancelViewportTransition();
         const next = viewportAtScale(viewportRef.current, size, scale);
@@ -278,7 +310,9 @@ export function useCanvasViewportController({
         handleCanvasDoubleClick,
         handleViewportChange,
         handleViewportPreviewChange,
+        fitCanvasContentForPhone,
         previewViewport,
+        revealCanvasNodeInArea,
         screenToCanvas,
         setZoomScale,
         zoomCanvasIn,

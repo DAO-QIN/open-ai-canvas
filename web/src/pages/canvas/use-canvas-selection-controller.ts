@@ -31,7 +31,7 @@ type UseCanvasSelectionControllerOptions = {
     onNodeBringToFront?: (nodeId: string) => void;
     onNodeClick: (node: CanvasNodeData) => void;
     onNodeDragEnd?: (nodeId: string) => void;
-    onBatchConnectionTarget?: (event: ReactMouseEvent | ReactPointerEvent, nodeId: string) => boolean;
+    onBatchConnectionTarget?: (event: ReactMouseEvent | ReactPointerEvent | PointerEvent, nodeId: string) => boolean;
     onLinkedFolderDrop?: (folder: CanvasNodeData, nodes: CanvasNodeData[]) => void;
     onDeselect: () => void;
 };
@@ -157,7 +157,7 @@ export function useCanvasSelectionController({
     );
 
     const handleNodeMouseDown = useCallback(
-        (event: ReactMouseEvent | ReactPointerEvent, nodeId: string) => {
+        (event: ReactMouseEvent | ReactPointerEvent | PointerEvent, nodeId: string) => {
             event.stopPropagation();
             if (event.button !== 0) return;
             // 子组件的 pointerdown 停止冒泡不会阻止随后独立派发的 mousedown。
@@ -282,6 +282,22 @@ export function useCanvasSelectionController({
         },
         [historyPausedRef, nodesRef, onLinkedFolderDrop, onNodeClick, onNodeDragEnd, setNodes, viewportRef],
     );
+
+    /** 触屏轻点未选中的节点：等同于鼠标按下后原地松开，选中节点并打开它的面板。 */
+    const handleNodeTap = useCallback(
+        (event: PointerEvent, nodeId: string) => {
+            handleNodeMouseDown(event, nodeId);
+            finishNodeDrag(event.clientX, event.clientY);
+        },
+        [finishNodeDrag, handleNodeMouseDown],
+    );
+
+    /** 触屏长按或第二根手指按下时放弃这次拖动：节点回到原位，也不当作点击打开面板。 */
+    const cancelNodeDrag = useCallback(() => {
+        if (!dragRef.current.isDraggingNode) return;
+        dragRef.current = { ...dragRef.current, hasMoved: false, openPanelOnClick: false };
+        finishNodeDrag();
+    }, [finishNodeDrag]);
 
     const handleNodeDragMove = useCallback(
         (event: MouseEvent | PointerEvent) => {
@@ -429,12 +445,14 @@ export function useCanvasSelectionController({
 
     return {
         alignmentGuides,
+        cancelNodeDrag,
         cancelSelectionBox,
         deselectCanvas,
         dragPreview,
         frameDropTargetId,
         handleCanvasMouseDown,
         handleNodeMouseDown,
+        handleNodeTap,
         isNodeDragging,
         nodeDraggingRef,
         selectionBoundsElementRef,

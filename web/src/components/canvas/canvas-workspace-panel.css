@@ -151,6 +151,52 @@
 .canvas-workspace-close:hover {
     background: var(--dock-command-hover);
 }
+/* 窄屏抽屉：顶部一行分类切换与关闭，替代被遮罩挡住（手机上不显示）的左侧菜单。 */
+.canvas-workspace-drawer-tabs {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-3) var(--space-1);
+}
+.canvas-workspace-drawer-tabs > button {
+    display: inline-flex;
+    min-width: 0;
+    min-height: 40px;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    border-radius: var(--r-lg);
+    color: color-mix(in srgb, currentColor 64%, transparent);
+    font-size: var(--fs-caption);
+    font-weight: 500;
+    white-space: nowrap;
+    transition:
+        background-color var(--motion-instant) ease-out,
+        color var(--motion-instant) ease-out;
+}
+.canvas-workspace-drawer-tabs > button svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke-width: 1.75;
+}
+.canvas-workspace-drawer-tabs > button[aria-pressed="true"] {
+    background: var(--dock-command-active);
+    color: var(--dock-command-active-text);
+}
+.canvas-workspace-drawer-tabs > .canvas-workspace-drawer-close {
+    min-width: 40px;
+    flex: 0 0 40px;
+}
+.canvas-workspace-drawer-tabs > button:focus-visible {
+    outline: 2px solid var(--dock-command-active-text, var(--foreground));
+    outline-offset: 1px;
+}
+.canvas-workspace-drawer .canvas-workspace-close {
+    display: none;
+}
 .canvas-workspace-close:focus-visible {
     outline: 2px solid var(--dock-command-active-text, var(--foreground));
     outline-offset: 2px;
@@ -243,8 +289,18 @@
     outline-offset: -2px;
 }
 @media (prefers-reduced-motion: reduce) {
-    .canvas-workspace-rail .canvas-workspace-rail-button {
+    .canvas-workspace-rail .canvas-workspace-rail-button,
+    .canvas-workspace-drawer-tabs > button {
         transition: none;
+    }
+}
+/* 手机：左侧菜单常驻会占去六分之一的宽度，收起不显示；主页在顶栏菜单里，节点、素材库、任务和历史从底部「工作区」打开。 */
+@media (max-width: 720px) {
+    .canvas-main-with-workspace {
+        --canvas-workspace-inset: 0px;
+    }
+    .canvas-workspace-shell {
+        display: none;
     }
 }
 /* 无底板的画布工具条：去掉材质与模糊，与画布融为一体；图标用正文色并加一层投影，在点阵和节点上仍清晰可辨。 */

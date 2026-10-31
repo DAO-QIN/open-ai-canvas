@@ -124,7 +124,7 @@ export function FeedbackInboxPane() {
             {previewVideoUrl ? (
                 <Modal open={Boolean(previewVideoUrl)} onCancel={() => setPreviewVideoUrl(null)} footer={null} width={720} destroyOnClose title="附件视频预览">
                     <div className="py-2">
-                        <video src={previewVideoUrl} controls autoPlay className="w-full max-h-[60vh] rounded-lg bg-black" />
+                        <video src={previewVideoUrl} controls autoPlay playsInline className="w-full max-h-[60vh] rounded-lg bg-black" />
                     </div>
                 </Modal>
             ) : null}

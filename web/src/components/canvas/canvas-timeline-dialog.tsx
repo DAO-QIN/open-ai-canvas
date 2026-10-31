@@ -604,15 +604,16 @@ export function CanvasTimelineDialog({
                             title={`${clip.title || label} · ${formatTimelineTime(clip.startMs)}~${formatTimelineTime(clip.startMs + clip.durationMs)}`}
                         >
                             {!isSubtitle ? (
+                                // 触屏没有悬停：裁剪把手常显并加宽到 16px，手指才能按住拖动。
                                 <div
-                                    className="absolute bottom-0 left-0 top-0 w-2 cursor-ew-resize opacity-0 hover:opacity-100"
+                                    className="absolute bottom-0 left-0 top-0 w-2 cursor-ew-resize touch-none opacity-0 hover:opacity-100 pointer-coarse:w-4 pointer-coarse:opacity-60"
                                     style={{ background: theme.timeline.handle }}
                                     onPointerDown={(event) => handleClipPointerDown(event, clip.id, "trim-start")}
                                 />
                             ) : null}
                             <span className="pointer-events-none min-w-0 flex-1 truncate px-2">{clip.title || trackLabel(clip.trackId)}</span>
                             {!isSubtitle ? (
-                                <div className="absolute bottom-0 right-0 top-0 w-2 cursor-ew-resize opacity-0 hover:opacity-100" style={{ background: theme.timeline.handle }} onPointerDown={(event) => handleClipPointerDown(event, clip.id, "trim-end")} />
+                                <div className="absolute bottom-0 right-0 top-0 w-2 cursor-ew-resize touch-none opacity-0 hover:opacity-100 pointer-coarse:w-4 pointer-coarse:opacity-60" style={{ background: theme.timeline.handle }} onPointerDown={(event) => handleClipPointerDown(event, clip.id, "trim-end")} />
                             ) : null}
                         </div>
                     );

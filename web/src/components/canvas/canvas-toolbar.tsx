@@ -15,8 +15,13 @@ import { canvasDockStyle } from "@/lib/canvas/canvas-aceternity-style";
 import type { CanvasAppearance } from "@/lib/canvas/canvas-appearance";
 import { canvasThemes, type CanvasBackgroundMode, type CanvasTheme } from "@/lib/canvas-theme";
 import { defaultToolbarPrefs, readToolbarPrefs, resolveToolbarEntries, type ToolContext, type ToolbarHandlers, type ToolbarPrefs } from "@/lib/canvas/tool-registry";
+import { PHONE_LAYOUT_QUERY, useMediaQuery } from "@/hooks/use-media-query";
 import { useActiveTheme } from "@/stores/canvas/use-canvas-theme-store";
 import type { CanvasNodeTypeId, CanvasToolMode, CanvasWorkspaceMode } from "@/types/canvas";
+
+// 手机上触屏单指始终平移、框选不可用，抓手 / 框选开关没有作用；画布外观、工具栏排序和清空画布属于桌面工作流。
+// 留下撤销、重做、添加节点、素材库、工作区和选中节点后的删除，360px 宽也能一行放下。
+const PHONE_HIDDEN_MAIN_TOOLS = ["tool-canvas-mode", "tool-style", "tool-settings", "tool-clear"];
 
 export function CanvasToolbar({
     selectedCount,
@@ -104,6 +109,7 @@ export function CanvasToolbar({
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [panelX, setPanelX] = useState(0);
     const [prefs, setPrefs] = useState<ToolbarPrefs | null>(() => readToolbarPrefs("main"));
+    const phone = useMediaQuery(PHONE_LAYOUT_QUERY);
 
     useEffect(() => {
         if (addOpen || appearanceOpen) bringToFront();
@@ -239,7 +245,10 @@ export function CanvasToolbar({
         handlers,
     };
 
-    const items = resolveToolbarEntries("main", ctx, prefs ?? defaultToolbarPrefs("main"));
+    const basePrefs = prefs ?? defaultToolbarPrefs("main");
+    const items = resolveToolbarEntries("main", ctx, phone ? { ...basePrefs, hidden: [...basePrefs.hidden, ...PHONE_HIDDEN_MAIN_TOOLS] } : basePrefs);
+    // 手机上添加节点和外观面板水平居中铺开，不再对齐被点的按钮而贴到屏幕边上。
+    const popoverX = phone ? 0 : panelX;
 
     // 中央空白起点与主工具栏共用同一份命令解析，避免素材类型和插件节点逐渐分叉。
     const createCommands = useCanvasCreateCommands(ctx, runAddAction);
@@ -253,7 +262,7 @@ export function CanvasToolbar({
             onPointerDownCapture={bringToFront}
             onFocusCapture={bringToFront}
         >
-            <AnimatePresence>{addOpen ? <AddNodeMenu x={panelX} theme={theme} commands={createCommands} /> : null}</AnimatePresence>
+            <AnimatePresence>{addOpen ? <AddNodeMenu x={popoverX} theme={theme} commands={createCommands} /> : null}</AnimatePresence>
 
             <FloatingDock ref={dockRef} items={items} size={compact ? "compact" : "default"} className="canvas-floating-dock pointer-events-auto max-w-full" style={canvasDockStyle(theme)} />
 
@@ -264,8 +273,8 @@ export function CanvasToolbar({
                         animate={{ opacity: 1, scaleY: 1, y: 0 }}
                         exit={{ opacity: 0, scaleY: 0.92, y: 6 }}
                         transition={{ duration: aceternityMotion.duration.panel, ease: aceternityMotion.easing.enter }}
-                        className="pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] z-[var(--dock-z-popover)] w-[296px] max-w-[calc(100vw-24px)]"
-                        style={{ left: panelX || "50%", transformOrigin: "bottom center", x: "-50%" }}
+                        className="canvas-dock-popover pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] z-[var(--dock-z-popover)] w-[296px] max-w-[calc(100vw-24px)]"
+                        style={{ left: popoverX || "50%", transformOrigin: "bottom center", x: "-50%" }}
                     >
                         <SpotlightSurface
                             role="region"
@@ -315,7 +324,7 @@ function AddNodeMenu({ x, theme, commands }: { x: number; theme: CanvasTheme; co
             animate={{ opacity: 1, scaleY: 1, y: 0 }}
             exit={{ opacity: 0, scaleY: 0.92, y: 6 }}
             transition={{ duration: aceternityMotion.duration.panel, ease: aceternityMotion.easing.enter }}
-            className="pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] z-[var(--dock-z-popover)] w-[420px] max-w-[calc(100vw-24px)]"
+            className="canvas-dock-popover pointer-events-auto absolute bottom-[var(--canvas-dock-popover-offset)] z-[var(--dock-z-popover)] w-[420px] max-w-[calc(100vw-24px)]"
             style={{ left: x || "50%", transformOrigin: "bottom center", x: "-50%" }}
         >
             <SpotlightSurface

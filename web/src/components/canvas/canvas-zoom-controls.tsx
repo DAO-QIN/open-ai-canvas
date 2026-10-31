@@ -22,11 +22,14 @@ type CanvasZoomControlsProps = {
     containerRef?: RefObject<HTMLDivElement | null>;
     /** 紧凑且去掉底板：工具条与画布融为一体，靠图标对比度和悬停反馈区分。 */
     bare?: boolean;
+    /** 手机：双指已能缩放，只留适应画布与缩放；小地图、整理、连线显隐和快捷键属于桌面工作流。 */
+    compact?: boolean;
 };
 
 const QUICK_ZOOM_LEVELS = [0.25, 0.5, 1, 2] as const;
+const COMPACT_ZOOM_ITEM_IDS = new Set(["zoom-fit", "zoom-separator", "zoom-out", "zoom-precision", "zoom-in"]);
 
-export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoArrange, hideNodeConnections = false, onHideNodeConnectionsChange, isMiniMapOpen, onToggleMiniMap, onOpenShortcuts, containerRef, bare = false }: CanvasZoomControlsProps) {
+export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoArrange, hideNodeConnections = false, onHideNodeConnectionsChange, isMiniMapOpen, onToggleMiniMap, onOpenShortcuts, containerRef, bare = false, compact = false }: CanvasZoomControlsProps) {
     const theme = canvasThemes[useActiveTheme()];
     const rootRef = useRef<HTMLDivElement>(null);
     const liveScaleRef = useRef(scale);
@@ -198,7 +201,7 @@ export function CanvasZoomControls({ scale, onScaleChange, onFitContent, onAutoA
                 ) : null}
             </AnimatePresence>
 
-            <FloatingDock items={items} size={bare ? "compact" : "default"} className={bare ? "canvas-floating-dock is-bare" : "canvas-floating-dock"} style={bare ? { ...canvasDockStyle(theme, theme.node.text), background: "transparent", borderColor: "transparent", boxShadow: "none" } : canvasDockStyle(theme)} ariaLabel="画布视图控制" />
+            <FloatingDock items={compact ? items.filter((item) => COMPACT_ZOOM_ITEM_IDS.has(item.id)) : items} size={bare ? "compact" : "default"} className={bare ? "canvas-floating-dock is-bare" : "canvas-floating-dock"} style={bare ? { ...canvasDockStyle(theme, theme.node.text), background: "transparent", borderColor: "transparent", boxShadow: "none" } : canvasDockStyle(theme)} ariaLabel="画布视图控制" />
         </div>
     );
 }

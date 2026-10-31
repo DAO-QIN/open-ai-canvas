@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { LoaderCircle, Maximize2, Minus } from "lucide-react";
+import { useLocation } from "react-router";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
 import { agentAvatarClipForState, agentAvatarStateForRunStatus, assistantAppearance, DEFAULT_CANVAS_APPEARANCE, isAgentAvatarBundleManifest, type AgentAvatarBundleManifest } from "@/lib/canvas/agent-appearance";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -13,6 +14,7 @@ import { FluidOrb } from "@/components/ui/fluid-orb";
 import { AgentMoon } from "./agent-moon";
 import { useAgentLauncherPosition } from "./use-agent-launcher-position";
 import { layoutViewport } from "@/lib/ui-scale";
+import { hasWorkspaceShellChrome, isCanvasEditorPath } from "@/lib/workspace-routes";
 
 export function AgentLauncher({
     theme,
@@ -96,8 +98,12 @@ export function AgentLauncher({
     const idleSize = moon ? moonSize : 76;
     const height = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.max(40, Math.min(compact ? Math.min(appearance.avatarHeight, 96) : appearance.avatarHeight, viewport.height - 60, (viewport.width - 40) / aspectRatio)) : idleSize;
     const width = collapsed ? AGENT_LAUNCHER_COLLAPSED_SIZE : keepsAvatarSize ? Math.round(height * aspectRatio) : idleSize;
-    const bottomInset = compact ? 72 : 0;
+    // 手机上把入口（连同下方的名称标签）抬到底部导航（工作台页面）或画布底部工具条（画布编辑器，
+    // 58px 高、离底 12px）上方，并加上 iPhone 底部安全区；后台没有底部栏，入口贴底。
+    const { pathname } = useLocation();
+    const bottomInset = compact && (hasWorkspaceShellChrome(pathname) || isCanvasEditorPath(pathname)) ? 72 : 0;
     const { position, dragging, handlers } = useAgentLauncherPosition(onOpen, width, height + bottomInset);
+    const bottomOffset = (extra: number) => (bottomInset ? `calc(${position.bottom + bottomInset + extra}px + env(safe-area-inset-bottom, 0px))` : position.bottom + extra);
     const showToggle = !hidden && (largeAvatar || collapsed);
     return (
         <>
@@ -113,7 +119,7 @@ export function AgentLauncher({
                     keepsAvatarSize && media && "canvas-agent-launcher-media",
                     moon && "canvas-agent-launcher-moon",
                 )}
-                style={{ ...position, bottom: position.bottom + bottomInset, width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden ? { display: "none" } : null) } as CSSProperties}
+                style={{ ...position, bottom: bottomOffset(0), width, height, color: theme.node.text, "--canvas-agent-launcher-shadow": theme.spatial.shadow, ...(hidden ? { display: "none" } : null) } as CSSProperties}
                 aria-hidden={hidden || undefined}
                 tabIndex={hidden ? -1 : undefined}
                 data-canvas-no-zoom
@@ -164,7 +170,7 @@ export function AgentLauncher({
                 <button
                     type="button"
                     className="canvas-agent-launcher-toggle fixed z-[calc(var(--z-toast)+2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/35"
-                    style={{ right: position.right + width - 14, bottom: position.bottom + bottomInset + height - 14, color: theme.node.text } as CSSProperties}
+                    style={{ right: position.right + width - 14, bottom: bottomOffset(height - 14), color: theme.node.text } as CSSProperties}
                     aria-label={collapsed ? `展开${appearance.agentName}形象` : `收起${appearance.agentName}形象`}
                     aria-pressed={collapsed}
                     title={collapsed ? "展开形象" : "收起形象，只保留小入口"}

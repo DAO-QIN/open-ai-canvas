@@ -1,7 +1,8 @@
-import { ChevronRight, Coins, Gift, LogOut, Moon, RefreshCw, Settings, ShieldCheck, Sun } from "lucide-react";
+import { ChevronRight, Gift, LogOut, Moon, RefreshCw, Settings, ShieldCheck, Sun } from "lucide-react";
 import { Link } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AppChangelogButton } from "@/components/layout/app-changelog-modal";
+import { CreditIcon } from "@/constant/credits";
 import { usePromotionOverview } from "@/hooks/use-promotion-overview";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
 import { useWorkspaceLogout } from "@/hooks/use-workspace-logout";
@@ -26,8 +27,12 @@ function formatCredits(microcredits: number) {
     return (microcredits / 1_000_000).toLocaleString("zh-CN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
-/** 同一账户卡片用于顶部和侧栏；余额、偏好与退出均复用真实服务，两个入口内容保持一致。 */
-export function WorkspaceAccountCard({ onWallet, onNavigate, active }: { onWallet: () => void; onNavigate: () => void; active: boolean }) {
+/**
+ * 同一账户卡片用于顶部和侧栏；余额、偏好与退出均复用真实服务，两个入口内容保持一致。
+ * variant="page" 是手机「我的」页：卡片铺满页面，children 插在账户操作与外观 / 退出之间，
+ * 页面自己列出设置项，所以不再放「账户与设置」入口。
+ */
+export function WorkspaceAccountCard({ onWallet, onNavigate, active, variant = "menu", children }: { onWallet: () => void; onNavigate: () => void; active: boolean; variant?: "menu" | "page"; children?: ReactNode }) {
     const user = useUserStore((state) => state.user);
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const theme = useThemeStore((state) => state.theme);
@@ -58,7 +63,7 @@ export function WorkspaceAccountCard({ onWallet, onNavigate, active }: { onWalle
     const displayName = user.displayName || user.username;
     const balanceKnown = availableMicrocredits !== null;
     return (
-        <section className="workspace-account-card" aria-label="我的账户">
+        <section className={cn("workspace-account-card", variant === "page" && "is-page")} aria-label="我的账户">
             <Link to="/settings?section=profile" onClick={onNavigate} className="workspace-account-card-identity" title="查看个人信息">
                 <UserGroupAvatarRing><UserAvatar user={user} className="workspace-account-card-avatar" /></UserGroupAvatarRing>
                 <span className="workspace-account-card-identity-copy">
@@ -71,7 +76,7 @@ export function WorkspaceAccountCard({ onWallet, onNavigate, active }: { onWalle
                 <div className="workspace-account-card-wallet">
                     <div className="workspace-account-card-wallet-head">
                         <span>
-                            <Coins aria-hidden />
+                            <CreditIcon aria-hidden />
                             可用积分
                         </span>
                         <button type="button" className={cn("workspace-account-card-refresh", refreshing && "is-spinning")} onClick={() => void refresh()} disabled={refreshing} aria-label="刷新积分余额" title="刷新余额">
@@ -96,11 +101,13 @@ export function WorkspaceAccountCard({ onWallet, onNavigate, active }: { onWalle
                         <ChevronRight aria-hidden />
                     </Link>
                 ) : null}
-                <Link to="/settings?section=profile" onClick={onNavigate}>
-                    <Settings aria-hidden />
-                    <span>账户与设置</span>
-                    <ChevronRight aria-hidden />
-                </Link>
+                {variant === "menu" ? (
+                    <Link to="/settings?section=profile" onClick={onNavigate}>
+                        <Settings aria-hidden />
+                        <span>账户与设置</span>
+                        <ChevronRight aria-hidden />
+                    </Link>
+                ) : null}
                 {user.role === "admin" ? (
                     <Link to="/admin" onClick={onNavigate}>
                         <ShieldCheck aria-hidden />
@@ -109,6 +116,7 @@ export function WorkspaceAccountCard({ onWallet, onNavigate, active }: { onWalle
                     </Link>
                 ) : null}
             </nav>
+            {children}
             <div className="workspace-account-card-prefs">
                 <AppChangelogButton className="workspace-account-card-changelog" showLabel showVersion versionClassName="workspace-account-card-version" />
                 <div className="workspace-account-card-theme">
