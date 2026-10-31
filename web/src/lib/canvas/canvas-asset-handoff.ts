@@ -31,7 +31,17 @@ export function canvasAssetHandoffPayloads(assets: Asset[], assetIds: Iterable<s
     unique(assetIds).forEach((assetId) => {
         const asset = byId.get(assetId);
         if (asset?.kind === "image") {
-            payloads.push({ kind: "image", dataUrl: asset.data.dataUrl, storageKey: asset.data.storageKey, title: asset.title, assetId: asset.id });
+            payloads.push({
+                kind: "image",
+                dataUrl: asset.data.dataUrl,
+                storageKey: asset.data.storageKey,
+                title: asset.title,
+                width: asset.data.width,
+                height: asset.data.height,
+                bytes: asset.data.bytes,
+                mimeType: asset.data.mimeType,
+                assetId: asset.id,
+            });
             return;
         }
         if (asset?.kind === "video") {

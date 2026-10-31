@@ -14,8 +14,8 @@ test("Create exposes one accessible copy action beside each displayed user promp
 
 test("Create submit button does not forward the browser click event as retry context", async () => {
     const source = await Bun.file(new URL("../src/pages/create/index.tsx", import.meta.url)).text();
-    // 空态选"画布"时改走新建画布；两条路都不带参数调用，点击事件不会被当成重试上下文。
-    expect(source).toContain('onSubmit: () => void (isEmpty && creationSurface === "canvas" ? submitToCanvas() : submit())');
+    // 不带参数调用，点击事件不会被当成重试上下文。「画布」面没有输入框，不再有另一条发送路径。
+    expect(source).toContain("onSubmit: () => void submit(),");
     expect(source).not.toContain("onSubmit: submit,");
 });
 
@@ -202,7 +202,7 @@ test("canvas handoff resolves generated image and video assets in requested orde
     expect(module.canvasAssetHandoffPayloads(assets, ["video-1", "missing", "image-1"])).toEqual({
         payloads: [
             { kind: "video", url: "/video.mp4", storageKey: "resource:video", title: "video title", width: 1280, height: 720, durationMs: 6000, bytes: 800000, mimeType: "video/mp4", assetId: "video-1" },
-            { kind: "image", dataUrl: "/image.png", storageKey: "resource:image", title: "image title", assetId: "image-1" },
+            { kind: "image", dataUrl: "/image.png", storageKey: "resource:image", title: "image title", width: 1664, height: 936, bytes: 625000, mimeType: "image/png", assetId: "image-1" },
         ],
         missingAssetIds: ["missing"],
     });

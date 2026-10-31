@@ -14,6 +14,15 @@ export function fitImageNodeSize(width: number, height: number, maxWidth: number
     return { width: w * scale, height: h * scale };
 }
 
+/**
+ * 媒体记录里可信的像素尺寸。素材合同要求宽高为正数，未知尺寸会被补成 1（后端 ClientAssetPayload），
+ * 生成结果转存完成前登记的尺寸是 0；两边都大于 1 才算真实像素。
+ */
+export function knownMediaSize(width?: number, height?: number): { width: number; height: number } | undefined {
+    if (typeof width !== "number" || typeof height !== "number" || !Number.isFinite(width) || !Number.isFinite(height) || width <= 1 || height <= 1) return undefined;
+    return { width, height };
+}
+
 /** 异步产物回填只更新媒体；用户在等待期间确定的显示尺寸仍然有效。 */
 export function preserveImageNodeSize(node: CanvasNodeData | null | undefined, suggested: { width: number; height: number }) {
     return node && (node.metadata?.manualSize || node.metadata?.locked || node.metadata?.freeResize) ? { width: node.width, height: node.height } : suggested;
