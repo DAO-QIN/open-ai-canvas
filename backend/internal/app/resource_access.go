@@ -82,9 +82,14 @@ func (s *Service) resolveResourceAccess(resource *model.Resource, options Resour
 		// 本地资源无需存储配置，只注入运行时策略，让平台签名地址同样遵循后台配置的有效期。
 		setting.Runtime = s.storageSettingWithRuntimePolicy(ossSettingValue{}).Runtime
 	}
-	return assets.ResolveAccess(resource, setting, options, time.Now().UTC(), func(variant assets.ResourceVariant, expires time.Time) (string, error) {
+	access, err := assets.ResolveAccess(resource, setting, options, time.Now().UTC(), func(variant assets.ResourceVariant, expires time.Time) (string, error) {
 		return s.signedResourceAccessURL(resource, variant, expires, options.Purpose == assets.PurposeProvider)
 	})
+	if err == nil && access.FallbackReason == "display_not_ready" {
+		// 这次先回落原图，展示图在后台生成，下次访问就能拿到。
+		s.scheduleResourceDisplay(resource)
+	}
+	return access, err
 }
 
 func (s *Service) PrepareResourceDelivery(userID, id string, options ResourceAccessOptions, rangeHeader string) (*ResourceDelivery, error) {
@@ -118,6 +123,8 @@ func (s *Service) prepareResourceDelivery(userID string, resource *model.Resourc
 		delivery.Stream, err = s.OpenResourcePlaybackRange(userID, resource.ID)
 	} else if access.ActualVariant == assets.VariantThumbnail {
 		delivery.Stream, err = s.openResourceRange(userID, assets.ThumbnailResource(resource), rangeHeader)
+	} else if access.ActualVariant == assets.VariantDisplay {
+		delivery.Stream, err = s.openResourceRange(userID, assets.DisplayResource(resource), rangeHeader)
 	} else {
 		delivery.Stream, err = s.openResourceRange(userID, resource, rangeHeader)
 	}
@@ -148,6 +155,9 @@ func (s *Service) PrepareBrowserResourceFallback(userID, id, reason string, vari
 	}
 	if options.Variant == assets.VariantThumbnail && resource.ThumbnailStatus == "ready" {
 		resource = assets.ThumbnailResource(resource)
+	}
+	if options.Variant == assets.VariantDisplay && resource.DisplayStatus == "ready" && resource.DisplaySize > 0 {
+		resource = assets.DisplayResource(resource)
 	}
 	var stream *ResourceStream
 	if options.Variant == assets.VariantPlayback {

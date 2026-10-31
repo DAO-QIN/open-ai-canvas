@@ -90,6 +90,8 @@ func (r *Repository) SwitchResourceToObjectStorage(job *model.ResourceOffloadJob
 			"storage_setting_id": job.TargetStorageSettingID, "object_key": job.TargetObjectKey, "e_tag": etag,
 			// 播放副本只服务本地资源；切到对象存储后与其他远端视频一致，按原片播放。
 			"playback_status": model.PlaybackStatusNone, "playback_object_key": "", "playback_error": "",
+			// 展示图的对象键跟着原件走，换了存储位置就按新位置重新生成。
+			"display_status": "", "display_mime_type": "", "display_size": 0, "display_width": 0, "display_height": 0,
 			"updated_at": time.Now(),
 		})
 	return result.RowsAffected == 1, result.Error

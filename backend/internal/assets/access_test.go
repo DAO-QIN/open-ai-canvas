@@ -41,6 +41,49 @@ func TestReadyThumbnailUsesDerivedObjectAndKeepsOriginalDownload(t *testing.T) {
 	}
 }
 
+func TestDisplayVariantUsesDerivedObjectOnlyWhenReady(t *testing.T) {
+	setting := storage.Settings{Provider: "aliyun", CDNBaseURL: "https://media.example.com", Delivery: storage.DeliverySettings{CDNAuthMode: "public"}}
+	var variants []ResourceVariant
+	resolve := func(resource *model.Resource, purpose AccessPurpose) *ResourceAccess {
+		t.Helper()
+		access, err := ResolveAccess(resource, setting, AccessOptions{Purpose: purpose, Variant: VariantDisplay}, time.Now(), testPlatformURL(&variants))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return access
+	}
+	ready := testReadyResource("aliyun")
+	ready.Kind, ready.Width, ready.Height = "image", 2048, 1152
+	ready.DisplayStatus, ready.DisplayMimeType, ready.DisplaySize, ready.DisplayWidth, ready.DisplayHeight = "ready", "image/jpeg", 2048, 1600, 900
+	access := resolve(ready, PurposeDisplay)
+	if access.ActualVariant != VariantDisplay || !strings.HasSuffix(access.URL, ready.ObjectKey+".display") || access.FallbackReason != "" || access.OriginalWidth != 2048 || access.OriginalHeight != 1152 {
+		t.Fatalf("display access = %#v", access)
+	}
+	if download := resolve(ready, PurposeDownload); download.ActualVariant != VariantOriginal || strings.Contains(download.URL, ".display") {
+		t.Fatalf("download must stay original: %#v", download)
+	}
+	pending := *ready
+	pending.DisplayStatus = ""
+	if access := resolve(&pending, PurposeDisplay); access.ActualVariant != VariantOriginal || access.FallbackReason != "display_not_ready" || strings.Contains(access.URL, ".display") {
+		t.Fatalf("pending display access = %#v", access)
+	}
+	small := pending
+	small.Width, small.Height = 1600, 900
+	if access := resolve(&small, PurposeDisplay); access.FallbackReason != "display_not_needed" {
+		t.Fatalf("small original must not wait for a display variant: %#v", access)
+	}
+	animated := pending
+	animated.MimeType = "image/gif"
+	if access := resolve(&animated, PurposeDisplay); access.FallbackReason != "display_not_needed" {
+		t.Fatalf("gif must keep the original: %#v", access)
+	}
+	failed := pending
+	failed.DisplayStatus = "failed"
+	if access := resolve(&failed, PurposeDisplay); access.FallbackReason != "display_failed" || access.ActualVariant != VariantOriginal {
+		t.Fatalf("failed display access = %#v", access)
+	}
+}
+
 func testPlatformURL(variants *[]ResourceVariant) func(ResourceVariant, time.Time) (string, error) {
 	return func(variant ResourceVariant, _ time.Time) (string, error) {
 		*variants = append(*variants, variant)

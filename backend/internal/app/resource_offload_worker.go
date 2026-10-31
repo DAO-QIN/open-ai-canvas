@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"yingce/backend/internal/assets"
 	"yingce/backend/internal/model"
 
 	"gorm.io/gorm"
@@ -185,6 +186,10 @@ func (s *Service) removeUnreferencedLocalObject(objectKey, playbackKey string) b
 	if err := s.deleteLocalResourceObject(objectKey); err != nil {
 		slog.Warn("resource offload local cleanup failed", "error", err)
 		return false
+	}
+	// 本地生成过的展示图随原件一起清掉；切到对象存储后按新位置重新生成。
+	if err := s.deleteLocalResourceObject(assets.DisplayObjectKey(objectKey)); err != nil {
+		slog.Warn("resource offload display cleanup failed", "error", err)
 	}
 	if playbackKey != "" {
 		if err := os.Remove(filepath.Join(s.dataDir, playbackDirName, filepath.Base(playbackKey))); err != nil && !errors.Is(err, os.ErrNotExist) {
